@@ -78,3 +78,10 @@ test("isDuo: the Duo in every posture, never another phone or a desktop", () => 
   for (const s of [STRIP, COLUMN, INLINE, sig(385, 571, 469, 669), sig(594, 368, 594, 368, { screenWidth: 678, screenHeight: 466 })]) assert.equal(detect(s).duo, true);
   for (const s of [sig(402, 874, 402, 874), sig(390, 664, 390, 844), sig(1440, 900, 1440, 980), sig(375, 667, 375, 667, { pixelRatio: 3 })]) assert.equal(detect(s).duo, false);
 });
+
+test("split: a Safari split-view pane, in either pane, never full screen or a Home Screen app", () => {
+  assert.equal(detect(sig(385, 571, 469, 669)).split, true);
+  assert.equal(detect(sig(650, 571, 469, 669)).split, true); // zoomed out by wide content
+  assert.equal(detect(sig(385, 571, 469, 669), "left").side, "left");
+  for (const s of [STRIP, COLUMN, INLINE, sig(951, 543, 951, 669)]) assert.equal(detect(s).split, undefined);
+});

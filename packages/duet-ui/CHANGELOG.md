@@ -6,6 +6,7 @@ First release.
 
 - Switching the inline controls to the other side moves every control in the same frame, and closes the menu at once, so "…" is never left hidden.
 - The island opens and closes about 25% faster.
+- Split view remembers its own inline side (`useDuet().split`, `isSplit()`): no web API tells the left pane from the right, so moving the controls next to Safari's column once keeps them there, without moving them in full screen.
 - The tab lens is a glass bubble about 1.2x the rail's width that pokes past both edges, and stretches along the rail while it travels, matched frame by frame to Apple News and Music.
 - `<Duet>`: back, `leading`, `actions` (collapsing into "…", destructive last), `primary`, `tabs` with search, `searchButton`, `close`, `accessory`, `minimizeOnScroll`, island and morph menus, light and dark
 - Modes picked from the window: `strip` (Home Screen app), `column` (Safari's empty column), `inline` (unfolded, split view, landscape, in-app preview), with a draggable, remembered side

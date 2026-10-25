@@ -46,7 +46,7 @@ Duet picks a mode from the window size, safe areas and display mode. `useDuet()`
 | --- | --- | --- |
 | `strip` | Home Screen app, closed | In the slim strip beside the page, like a native app |
 | `column` | Safari tab, closed | Painted into the column Safari leaves empty, so the page keeps its full width |
-| `inline` | Unfolded, split view, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered |
+| `inline` | Unfolded, split view, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered, separately for split view (`useDuet().split`), so it stays beside Safari's column once moved there |
 
 ### Only on the Duo
 

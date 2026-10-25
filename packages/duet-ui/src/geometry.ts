@@ -84,6 +84,8 @@ export interface Context {
   layout: Layout;
   /** Running on an iPhone Duo, in any posture or mode (see isDuo). */
   duo: boolean;
+  /** A Safari split-view pane on the open Duo (see isSplit). */
+  split?: boolean;
 }
 
 export type Layout = "narrow" | "wide";
@@ -106,6 +108,11 @@ export const isPreview = (s: Signals) => !s.standalone && s.pixelRatio === PREVI
 const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
 export const isDuo = (s: Signals) => duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight);
+
+/** A Safari split-view pane: its window is 469x669 in either pane. Nothing tells the left pane from the right
+ *  (device probe 2026-10-25: screenX, availLeft, insets, visualViewport and touch screenX read the same in both),
+ *  though Safari's column sits on the pane's outer edge. So the inline side is remembered apart for split view. */
+export const isSplit = (s: Signals) => !s.standalone && Math.abs(s.outerWidth - 469) <= 1 && Math.abs(s.outerHeight - 669) <= 1;
 
 /** Measured on the Duo simulator: Safari's column is 84pt wide (outer − inner), the chrome below the
  *  page is 98pt (80 with the compact URL bar), the window is the closed screen's 678pt tall. A split-view
@@ -131,8 +138,8 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
     && s.visualHeight >= s.innerHeight - 1; // keyboard up
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
-  const preview = isPreview(s);
-  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }) };
+  const preview = isPreview(s), split = isSplit(s);
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(split && { split }) };
 }
 
 /** Mode flips are a feedback loop when the layout of one mode changes the signals into the other (the

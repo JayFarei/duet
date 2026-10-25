@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
-import { DUO, INLINE_WIDTH, ISLAND, MORPH, magnet, plan, stable, type Box, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
+import { DUO, INLINE_WIDTH, ISLAND, MORPH, isSplit, magnet, plan, stable, type Box, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
 import "./duet.css";
@@ -92,18 +92,21 @@ function signals(): Signals {
     standalone: (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches,
   };
 }
-// Inline (split view, landscape): the side is the user's, remembered per site.
-const SIDE_KEY = "duet-side";
-let preferred: Side | null | undefined;
+// Inline: the side is the user's, remembered per site, and apart for split view (Safari's column is on the pane's
+// outer edge, which the page cannot see, so the controls follow it once moved there).
+const sideKey = (split: boolean) => split ? "duet-side-split" : "duet-side";
+const preferred = new Map<string, Side | null>();
 const listeners = new Set<() => void>();
-/** null until the user moves the controls: then detect() picks the side for the context. */
-function preferredSide(): Side | undefined {
-  if (preferred === undefined) { try { const v = localStorage.getItem(SIDE_KEY); preferred = v === "left" || v === "right" ? v : null; } catch { preferred = null; } }
-  return preferred ?? undefined;
+/** undefined until the user moves the controls: then detect() picks the side for the context. */
+function preferredSide(split: boolean): Side | undefined {
+  const key = sideKey(split);
+  if (!preferred.has(key)) { try { const v = localStorage.getItem(key); preferred.set(key, v === "left" || v === "right" ? v : null); } catch { preferred.set(key, null); } }
+  return preferred.get(key) ?? undefined;
 }
 function setPreferredSide(side: Side) {
-  preferred = side;
-  try { localStorage.setItem(SIDE_KEY, side); } catch {}
+  const key = sideKey(!!snap?.split);
+  preferred.set(key, side);
+  try { localStorage.setItem(key, side); } catch {}
   listeners.forEach((f) => f());
 }
 
@@ -118,7 +121,7 @@ function switchSide(el: HTMLElement, side: Side) {
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
 function read(): Context {
-  const c = stable(damper, signals(), preferredSide(), performance.now());
+  const s = signals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now());
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
   return snap!;
