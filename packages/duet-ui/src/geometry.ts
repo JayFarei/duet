@@ -40,10 +40,11 @@ export const DUO = {
 /** Safari's own column in a tab: back + reader rows at the top, a 2-item +/tabs pill at the bottom.
  *  In a closed tab DUO.island pushes the back + reader rows down; the pill never moves. */
 export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem,
-  /** Split-view pane: the back slot's top, in the left pane (no status bar) and in the right pane (under the
-   *  status bar). Open, activities page inside the status column instead of growing it: on device with two
-   *  (recording + music) back still starts at 124. The pill sits DUO.bottom above the window bottom. */
-  splitTop: { left: 23.5, right: 124 } } as const;
+  /** Split-view pane: the back slot's top. The left pane has no status bar above it. The right pane sits
+   *  under the same status column as a closed tab and grows the same way (bare: 124, recording: 178, a
+   *  2-slot music activity: ~224), so it takes the closed tab's worst case. The pill sits DUO.bottom above
+   *  the window bottom. */
+  splitTop: { left: 23.5, right: DUO.top + DUO.island } } as const;
 
 /** Menu island slots: a button unrolls into a pill of these (Safari's own pill items are 50; 46.5 keeps
  *  every slot above the 44pt touch target). */

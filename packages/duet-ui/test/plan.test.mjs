@@ -97,8 +97,10 @@ test("split pane: column mode, both columns planned in the band beside Safari's 
   const l = plan({ ...c, side: "left" }, full), r = plan({ ...c, side: "right" }, full);
   assert.equal(l.centerX, DUO.centerFromEdge);
   assert.equal(r.centerX, 469 - DUO.centerFromEdge);
-  // Simulator: Safari's bookmarks button ends at 132.5 (left pane) and 232.5 (right, under the status bar),
-  // its +/tabs pill starts at 533.
-  assert.ok(l.back.top >= 132.5 + DUO.gap - 0.5 && r.back.top >= 232.5 + DUO.gap - 0.5);
+  // Simulator: Safari's bookmarks button ends at 132.5 in the left pane, its +/tabs pill starts at 533. The right
+  // pane sits under the status column, so two Live Activities push its bookmarks down to 374, as in a closed tab;
+  // the right band holds only "…" and the minimized tabs, back and actions fold.
+  assert.ok(l.back.top >= 132.5 + DUO.gap - 0.5 && r.more.top >= 374 + DUO.gap - 0.5);
+  assert.ok(!r.back && r.menu.back && r.menu.actions === 3 && r.tabs.min);
   for (const p of [l, r]) { assert.ok(p.tabs.top + p.tabs.height <= 533 - DUO.gap + 0.5); assertNoOverlap(p); }
 });
