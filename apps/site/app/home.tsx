@@ -56,7 +56,8 @@ function Site() {
   useEffect(() => { if (new URLSearchParams(location.search).get("menu") === "island") setMenuStyle("island"); }, []);
   const ctx = useDuet();
   const show = (v: boolean) => { setOpen(v); scrollTo(0, 0); };
-  const go = (id: string) => { setTab(id); document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }); };
+  // After Duet restores the new tab's own scroll position (top, on first visit), or that would undo the jump.
+  const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
 
   return (
     <Duet

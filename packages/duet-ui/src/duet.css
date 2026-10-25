@@ -163,9 +163,9 @@
 .duet-menu {
   position: fixed; z-index: 51; display: flex; flex-direction: row; align-items: center; justify-content: flex-end;
   padding: 0 3px; overflow: hidden; transition: none;
-  animation: duet-unroll 0.44s var(--duet-spring-out) both, duet-thin 0.44s ease-out both;
+  animation: duet-unroll 0.36s var(--duet-spring-out) both, duet-thin 0.36s ease-out both;
 }
-.duet-menu[data-closing] { animation: duet-roll 0.26s cubic-bezier(0.32, 0.72, 0, 1) both, duet-thin 0.26s ease-out both; pointer-events: none; }
+.duet-menu[data-closing] { animation: duet-roll 0.22s cubic-bezier(0.32, 0.72, 0, 1) both, duet-thin 0.22s ease-out both; pointer-events: none; }
 /* A touch denser than the controls, so the strip under it does not compete with the menu icons. */
 .duet-menu::before { background-color: var(--duet-menu); }
 .duet-menu > * { animation: duet-fade 0.16s 0.03s var(--duet-spring-out) both; }
@@ -202,9 +202,9 @@
    circle (--x0/--y0 is its top-left) and springs out to the list; closing shrinks it back into the button. */
 .duet-menu[data-style="morph"] {
   flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 6px; border-radius: 22px;
-  animation: duet-morph 0.42s var(--duet-spring-out) both;
+  animation: duet-morph 0.36s var(--duet-spring-out) both;
 }
-.duet-menu[data-style="morph"][data-closing] { animation: duet-unmorph 0.24s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.duet-menu[data-style="morph"][data-closing] { animation: duet-unmorph 0.2s cubic-bezier(0.32, 0.72, 0, 1) both; }
 .duet[data-side="left"] .duet-menu[data-style="morph"] { flex-direction: column; }
 .duet-menu[data-style="morph"] > .duet-menu-item {
   width: auto; height: 44px; border-radius: 16px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 0 12px;

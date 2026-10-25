@@ -470,7 +470,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
         {items.map((a, i) => (
           <button key={a.id} role={radio ? "menuitemradio" : "menuitem"} aria-checked={radio ? a.id === selected : undefined} aria-label={a.label}
             className="duet-menu-item" data-on={(radio && a.id === selected) || undefined} data-destructive={a.destructive || undefined}
-            data-sep={(a.destructive && i > 0 && !items[i - 1].destructive) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.12 + 0.04 * i : 0.14 + 0.06 * (items.length - i)}s` }) }}
+            data-sep={(a.destructive && i > 0 && !items[i - 1].destructive) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.06 + 0.025 * i : 0.05 + 0.035 * (items.length - i)}s` }) }}
             onClick={() => { setMenu(null); if (radio) select(a.id); else a.onPress?.(); }}>{a.icon}{morph && <span className="duet-menu-label">{a.label}</span>}{badge(a)}</button>
         ))}
         {close && <button className="duet-menu-item" aria-label="Close" onClick={() => setMenu(null)}><X size={20} /></button>}
