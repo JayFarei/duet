@@ -45,7 +45,7 @@ export function Home() {
   const desktop = useDesktop();
   // Before hydration the server can't tell a phone from a desktop: send the phone site, so a phone never sees a
   // blank page, and hide it on desktops (site.css) until the web Duo takes over.
-  return desktop ? <><UnfoldHero /><WebDuo src="/" title="Try it live" intro="The real site, running on a web iPhone Duo. Fold it, turn it, split it, and watch Duet pick its mode." /></> : <div className={desktop === null ? "ssr-site" : undefined}><Site /></div>;
+  return desktop ? <><UnfoldHero /><WebDuo src="/skeleton" sources={[["/skeleton", "Layout"], ["/", "This site"]]} title="Try it live" intro="A Duet app on a web iPhone Duo: grey boxes are your content, the rest is Duet. Fold it, turn it, split it, and watch Duet pick its mode." /></> : <div className={desktop === null ? "ssr-site" : undefined}><Site /></div>;
 }
 
 function Site() {

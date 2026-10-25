@@ -178,7 +178,8 @@ const fit = (s: State): State => {
   return !only ? s : s.posture === only && !s.rotated ? s : { ...s, app: "safari" };
 };
 
-export function WebDuo({ src, title = "Duet", intro = "This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly." }: { src: string; title?: string; intro?: string }) {
+export function WebDuo({ src: first, sources, title = "Duet", intro = "This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly." }: { src: string; sources?: [string, string][]; title?: string; intro?: string }) {
+  const [src, setSrc] = useState(first);
   const [s, setS] = useState<State>(TOUR[0]);
   // The page inside turns upright only once the device has finished turning, like iOS.
   const [upright, setUpright] = useState(false);
@@ -395,6 +396,7 @@ export function WebDuo({ src, title = "Duet", intro = "This is the site on a web
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", padding: "0 16px", maxWidth: 1100 }}>
+        {sources && <Segmented value={src} onChange={setSrc} options={sources} />}
         <Segmented value={s.posture} onChange={(posture) => go({ posture })} options={[["closed", "Closed"], ["open", "Open"]]} />
         <Button onClick={() => go({ rotated: !s.rotated })} label="Rotate"><RotateCw size={17} /></Button>
         <Segmented value={s.app} onChange={(app) => go({ app })}
