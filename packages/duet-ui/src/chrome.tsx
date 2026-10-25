@@ -120,8 +120,11 @@ function switchSide(el: HTMLElement, side: Side) {
 
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
+let pinTimer: ReturnType<typeof setTimeout> | undefined;
 function read(): Context {
   const s = signals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now());
+  // A pin lifts on its own time, with no resize to re-read on.
+  if (damper.pinned && !pinTimer) pinTimer = setTimeout(() => { pinTimer = undefined; listeners.forEach((f) => f()); }, damper.until! - performance.now() + 20);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
   return snap!;
@@ -443,6 +446,7 @@ export function Duet(p: DuetProps) {
     const shownLeading = leading.slice(0, leading.length - pl.menu.leading);
     const shownActions = actions.slice(0, actions.length - pl.menu.actions);
     const more: DuetItem[] = [
+      ...(pl.menu.primary && p.primary ? [p.primary] : []),
       ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
       ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length),
       ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {

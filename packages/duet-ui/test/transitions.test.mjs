@@ -2,7 +2,7 @@
 // Run: pnpm test (node --test; Node 23.6+ strips the types from geometry.ts)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detect, magnet, MAGNET, stable } from "../src/geometry.ts";
+import { detect, magnet, MAGNET, PIN_TTL, stable } from "../src/geometry.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -97,4 +97,24 @@ test("magnet is mirrored on the left", () => {
 test("an iframe never takes the column (it cannot paint there)", () => {
   assert.equal(detect(CLOSED).mode, "column");
   assert.equal(detect({ ...CLOSED, framed: true }).mode, "inline");
+});
+
+// Device 2026-10-25 17:31: Safari moved from the left split-view pane straight to the right one stayed inline.
+// Both panes are 469x669, so the window never changes size: the move's transient signals pinned inline for good.
+test("moving a split-view pane to the other side returns to column once the pin expires", () => {
+  const d = { flips: [] };
+  const move = [PANE, PANE_ZOOMED[0], PANE, PANE_ZOOMED[1], PANE];
+  move.forEach((s, i) => stable(d, s, "right", i * 100));
+  assert.equal(stable(d, PANE, "right", 600).mode, "inline"); // pinned by the move
+  assert.equal(stable(d, PANE, "right", 600 + PIN_TTL).mode, "column");
+});
+test("a real loop re-pins with a longer wait each time, so it does not flicker every few seconds", () => {
+  const d = { flips: [] };
+  let t = 0, s = PANE;
+  const step = () => { const c = stable(d, s, "right", t); s = c.mode === "column" ? PANE_ZOOMED[0] : PANE; t += 50; return c.mode; };
+  for (let i = 0; i < 10; i++) step();
+  const first = d.until - t;
+  t = d.until; for (let i = 0; i < 10; i++) step();
+  assert.ok(d.until - t > first * 1.5, `second wait ${d.until - t} vs first ${first}`);
+  assert.equal(step(), "inline");
 });

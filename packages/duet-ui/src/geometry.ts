@@ -147,18 +147,26 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
 }
 
 /** Mode flips are a feedback loop when the layout of one mode changes the signals into the other (the
- *  column layer's overflow resizing Safari's viewport). Three flips within FLIP_WINDOW for the same Safari
- *  window pin it to inline until the window changes size. */
-export interface Damper { mode?: Mode; flips: number[]; pinned?: string }
+ *  column layer's overflow resizing Safari's viewport). Three flips within FLIP_WINDOW pin the page to inline.
+ *  The pin lifts when the window changes size, or after `until`: moving a split-view pane to the other side
+ *  flips the mode a few times without changing the window's size. Each re-pin for the same window doubles
+ *  the wait, so a real loop settles instead of flickering. */
+export interface Damper { mode?: Mode; flips: number[]; pinned?: string; until?: number; ttl?: number }
 const FLIP_WINDOW = 2000;
+export const PIN_TTL = 3000;
 
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number): Context {
   const key = `${s.outerWidth}x${s.outerHeight}`;
-  if (d.pinned && d.pinned !== key) [d.pinned, d.flips] = [undefined, []];
+  if (d.pinned && d.pinned !== key) Object.assign(d, { pinned: undefined, ttl: undefined, flips: [] });
+  if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
   let c = detect(s, preferred, !d.pinned);
   if (d.mode && c.mode !== d.mode) {
     d.flips = [...d.flips.filter((t) => now - t < FLIP_WINDOW), now];
-    if (d.flips.length >= 3) { d.pinned = key; c = detect(s, preferred, false); }
+    if (d.flips.length >= 3) {
+      d.ttl = d.ttl ? d.ttl * 2 : PIN_TTL;
+      Object.assign(d, { pinned: key, until: now + d.ttl });
+      c = detect(s, preferred, false);
+    }
   }
   d.mode = c.mode;
   return c;
@@ -196,7 +204,8 @@ export interface Spec {
   /** Items that always live behind "…" (e.g. the inline side switch, destructive actions). */
   menuExtra?: number;
   /** The screen's main action (New chat, Compose): by the thumb above the tabs where one pane shows, at the top
-   *  under back where two do, never at the bottom of a wide screen (blueprint). It never folds into "…". */
+   *  under back where two do, never at the bottom of a wide screen (blueprint). It folds into "…" last, only
+   *  where the band has no room for it and "…" both. */
   primary?: boolean;
 }
 
@@ -212,8 +221,8 @@ export interface Plan {
   /** "…": its own round button under the actions, so it alone unrolls into the menu island. */
   more?: Box;
   primary?: Box;
-  /** What did not fit, in order, behind the "…" slot: back first, then leading, then actions (indexes). */
-  menu: { back: boolean; leading: number; actions: number };
+  /** What did not fit, in order, behind the "…" slot: primary first, then back, leading, actions (indexes). */
+  menu: { primary: boolean; back: boolean; leading: number; actions: number };
   /** min: only the selected tab shows (minimized, or the full pill does not fit). */
   tabs?: Box & { min: boolean };
   searchButton?: Box;
@@ -246,28 +255,30 @@ export function plan(c: Context, s: Spec): Plan {
   const tabsMin = !!s.tabs && (s.minimized || top + head + fullPill + (primaryLow ? step : 0) > bottom);
   const bottomH = s.tabs ? (tabsMin ? DUO.control : fullPill) : s.searchButton ? DUO.control : 0;
   const lowTop = bottom - bottomH - (bottomH ? DUO.gap : 0) - DUO.control;
-  const floor = primaryLow ? lowTop - DUO.gap : bottomH ? bottom - bottomH - DUO.gap : bottom;
 
-  // Show everything that fits; the rest folds into "…" (actions first, then leading, then back).
-  let back = s.back ? 1 : 0, leading = s.leading, actions = s.actions;
-  const menuCount = () => (s.menuExtra ?? 0) + (s.back ? 1 - back : 0) + (s.leading - leading) + (s.actions - actions);
+  // Show everything that fits; the rest folds into "…" (actions first, then leading, then back). "…" itself
+  // always gets a slot: where the band holds only two buttons (a closed Safari tab) the primary action
+  // folds too, as the menu's first item, rather than leave folded items unreachable.
+  let back = s.back ? 1 : 0, leading = s.leading, actions = s.actions, primary = !!s.primary;
+  const floor = () => primaryLow && primary ? lowTop - DUO.gap : bottomH ? bottom - bottomH - DUO.gap : bottom;
+  const menuCount = () => (s.menuExtra ?? 0) + (s.back ? 1 - back : 0) + (s.leading - leading) + (s.actions - actions) + (s.primary && !primary ? 1 : 0);
   const height = () => {
-    const parts = [back ? DUO.control : 0, primaryTop ? DUO.control : 0, leading ? groupHeight(leading) : 0, actions ? groupHeight(actions) : 0, menuCount() ? DUO.control : 0].filter(Boolean);
+    const parts = [back ? DUO.control : 0, primaryTop && primary ? DUO.control : 0, leading ? groupHeight(leading) : 0, actions ? groupHeight(actions) : 0, menuCount() ? DUO.control : 0].filter(Boolean);
     return parts.reduce((a, b) => a + b, 0) + Math.max(0, parts.length - 1) * DUO.gap;
   };
-  while (height() > floor - top) {
-    if (actions) actions--; else if (leading) leading--; else if (back) back--; else break;
+  while (height() > floor() - top) {
+    if (actions) actions--; else if (leading) leading--; else if (back) back--; else if (primary) primary = false; else break;
   }
 
-  const p: Plan = { centerX, left: centerX - DUO.control / 2, menu: { back: s.back && !back, leading: s.leading - leading, actions: s.actions - actions } };
+  const p: Plan = { centerX, left: centerX - DUO.control / 2, menu: { primary: !!s.primary && !primary, back: s.back && !back, leading: s.leading - leading, actions: s.actions - actions } };
   if (s.tabs) p.tabs = { top: bottom - bottomH, height: bottomH, min: tabsMin };
   else if (s.searchButton) p.searchButton = { top: bottom - DUO.control, height: DUO.control };
-  if (primaryLow) p.primary = { top: lowTop, height: DUO.control };
+  if (primaryLow && primary) p.primary = { top: lowTop, height: DUO.control };
 
   let y = top;
-  if (height() <= floor - top) {
+  if (height() <= floor() - top) {
     if (back) { p.back = { top: y, height: DUO.control }; y += step; }
-    if (primaryTop) { p.primary = { top: y, height: DUO.control }; y += step; }
+    if (primaryTop && primary) { p.primary = { top: y, height: DUO.control }; y += step; }
     if (leading) { const h = groupHeight(leading); p.leading = { top: y, height: h, visible: leading }; y += h + DUO.gap; }
     if (actions) { const h = groupHeight(actions); p.actions = { top: y, height: h, visible: actions }; y += h + DUO.gap; }
     if (menuCount()) p.more = { top: y, height: DUO.control };

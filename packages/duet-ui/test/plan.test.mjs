@@ -60,11 +60,15 @@ test("in-app Safari preview: inline, left by default, never the iPhone SE's 2x w
 });
 
 test("primary: by the thumb above the tabs where one pane shows, under back where two do", () => {
-  for (const s of [STRIP, COLUMN]) {
-    const p = plan(detect(s), spec({ back: true, actions: 3, tabs: 4, primary: true }));
-    assertNoOverlap(p);
-    assert.ok(p.primary.top + p.primary.height <= p.tabs.top && p.tabs.top - p.primary.top - p.primary.height <= DUO.gap + 0.01, "sits right above the tabs");
-  }
+  const p = plan(detect(STRIP), spec({ back: true, actions: 3, tabs: 4, primary: true }));
+  assertNoOverlap(p);
+  assert.ok(p.primary.top + p.primary.height <= p.tabs.top && p.tabs.top - p.primary.top - p.primary.height <= DUO.gap + 0.01, "sits right above the tabs");
+  // A closed Safari tab's band holds two buttons: with back and actions folded, "…" takes the slot and the
+  // primary action leads its menu; on its own it keeps the slot.
+  const closed = plan(detect(COLUMN), spec({ back: true, actions: 3, tabs: 4, primary: true }));
+  assert.ok(closed.more && !closed.primary && closed.menu.primary);
+  const alone = plan(detect(COLUMN), spec({ tabs: 4, primary: true }));
+  assert.ok(alone.primary && !alone.more);
   const wide = plan(detect(INLINE), spec({ back: true, actions: 2, tabs: 4, primary: true }));
   assertNoOverlap(wide);
   assert.equal(wide.primary.top, wide.back.top + DUO.control + DUO.gap);

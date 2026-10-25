@@ -48,6 +48,16 @@ Duet picks a mode from the window size, safe areas and display mode. `useDuet()`
 | `column` | Safari tab, closed or a split-view pane | Painted into the column Safari leaves empty, so the page keeps its full width. In split view both columns get the controls, since a pane can't tell which side it is on, and each shows only its own |
 | `inline` | Unfolded, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered |
 
+### Claimable space
+
+Each mode has a band the controls may use, and Duet keeps every control inside it, so you never position anything yourself:
+
+- **Above:** the status bar and Dynamic Island, and in Safari its own back and bookmarks buttons at the top of the column (in a split-view pane, wherever that pane puts them).
+- **Below:** Safari's +/tabs pill, or the home indicator.
+- **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item.
+
+`useDuet()` gives the mode; the band follows from it. The menus ("island" or "morph") open over the page and close back into their button.
+
 ### Only on the Duo
 
 `useDuet().duo` is true on an iPhone Duo in any posture, Safari or Home Screen, and false on other phones and desktops. It works outside `<Duet>`, so an existing app can switch to a Duo layout on it: render `<Duet>` only when it is true. `isDuo(signals)` is the same check for your own signals. The server can't tell, so before hydration `duo` is true; remember the answer in a cookie if the server should render the right layout first.
@@ -63,7 +73,7 @@ Links opened from social and mail apps land in the in-app Safari preview (`SFSaf
 | `back` | Back button at the top of the strip: `{ label?, onPress }` |
 | `leading` | Its own group under back, like SwiftUI `.topBarLeading` |
 | `actions` | Like `.primaryAction`; collapses into "…" when it would reach the tabs. Items with `destructive: true` only ever show in "…", last, in red |
-| `primary` | The one main action (compose, new). Narrow: just above the tabs. Wide: under back, at the top |
+| `primary` | The one main action (compose, new). Narrow: just above the tabs. Wide: under back, at the top. Folds into "…" last, only when the band has no room for both |
 | `tabs` | `{ items, selected, onSelect, search? }`. `search` adds a search tab as the last item |
 | `searchButton` | A round search button at the bottom when there are no tabs |
 | `close` | A sheet or card is open: the strip holds only a close button until it is cleared |
