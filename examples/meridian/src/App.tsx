@@ -65,7 +65,7 @@ export function App() {
 
 function LinesPage({ onLine }: { onLine: (id: string) => void }) {
   return (
-    <main className="page">
+    <main className="page duet-column">
       <h1>Lines</h1>
       {LINES.filter((l) => l.alert).map((l) => (
         <div key={l.id} className="alert"><LineBadge line={l} size={22} /><div><strong>{l.name}: {l.status}</strong><p>{l.alert}</p></div></div>
@@ -91,7 +91,7 @@ function LinesPage({ onLine }: { onLine: (id: string) => void }) {
 
 function SavedPage({ saved, onStation }: { saved: string[]; onStation: (id: string) => void }) {
   return (
-    <main className="page">
+    <main className="page duet-column">
       <h1>Saved</h1>
       {saved.length === 0 && <p className="empty">Stations you save with the star appear here.</p>}
       <ul className="list">
@@ -122,7 +122,7 @@ function SearchPage({ onStation, onLine }: { onStation: (id: string) => void; on
   const stations = STATIONS.filter((s) => m(s.name)).sort((a, b) => a.name.localeCompare(b.name));
   const lines = q.trim() ? LINES.filter((l) => m(l.name)) : [];
   return (
-    <main className="page">
+    <main className="page duet-column">
       <h1>Search</h1>
       <label className="field"><Search size={17} strokeWidth={2.2} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Stations and lines" enterKeyHint="search" /></label>
       <ul className="list">

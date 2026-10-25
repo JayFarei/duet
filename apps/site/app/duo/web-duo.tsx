@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { ArrowLeftRight, Highlighter, Pause, Play, RotateCw } from "lucide-react";
+import { ArrowLeftRight, Highlighter, Pause, Play, RotateCw, Snail } from "lucide-react";
 import type { Signals } from "duet-ui";
 
 // A web iPhone Duo for desktop browsers: the site runs in an iframe shaped like the device's screen, and the
@@ -132,6 +132,12 @@ export function WebDuo({ src }: { src: string }) {
   const [tour, setTour] = useState(false);
   const [slots, setSlots] = useState(false);
   const [view, setView] = useState({ w: 1280, h: 800 });
+  // Slow motion (a quarter speed) and the fold scrubber's position (0 closed, 1 open) while it is held.
+  const [slow, setSlow] = useState(false);
+  const [scrub, setScrub] = useState<number | null>(null);
+  const k = useRef(1), held = useRef<Animation[]>([]);
+  k.current = slow ? 4 : 1;
+  const turn = TURN * k.current;
   const frame = useRef<HTMLIFrameElement>(null);
   const page = useRef<HTMLDivElement>(null), hinge = useRef<HTMLDivElement>(null), flap = useRef<HTMLDivElement>(null);
   const cur = useRef(s), busy = useRef(false);
@@ -141,13 +147,16 @@ export function WebDuo({ src }: { src: string }) {
   // Folding: the right half stays put and the left half swings round the hinge towards the viewer, like a book
   // closing, so the inner screens meet face to face and the outer display ends up in front. The
   // device recentres, so it unfolds from the middle. Web Animations, so timing never depends on React or timers.
-  const swing = (open: boolean) => {
-    const o = { duration: FOLD, easing: "cubic-bezier(0.45, 0, 0.2, 1)", fill: "forwards" as const }; // eased both ends, so the swing reads
+  const swing = (open: boolean, easing = "cubic-bezier(0.45, 0, 0.2, 1)") => { // eased both ends, so the swing reads
+    const o = { duration: FOLD * k.current, easing, fill: "both" as const };
     const [a, b] = open ? [0, 1] : [1, 0];
     const shift = (t: number) => `translateX(${-(1 - t) * BODY.open.w / 4}px)`;
-    hinge.current?.animate([{ transform: shift(a) }, { transform: shift(b) }], o);
-    return flap.current?.animate([{ transform: `rotateY(${180 * (1 - a)}deg)` }, { transform: `rotateY(${180 * (1 - b)}deg)` }], o).finished;
+    return [
+      hinge.current?.animate([{ transform: shift(a) }, { transform: shift(b) }], o),
+      flap.current?.animate([{ transform: `rotateY(${180 * (1 - a)}deg)` }, { transform: `rotateY(${180 * (1 - b)}deg)` }], o),
+    ].filter((x): x is Animation => !!x);
   };
+  const finished = (as: Animation[]) => Promise.all(as.map((a) => a.finished)).catch(() => {});
   const go = async (next: Partial<State>, fromTour = false) => {
     if (!fromTour) setTour(false);
     if (busy.current) return;
@@ -157,11 +166,11 @@ export function WebDuo({ src }: { src: string }) {
     // The page fades out while the device moves and back in once it has settled, laid out for the new screen.
     busy.current = true;
     flushSync(() => setInstant(true));
-    const fade = page.current?.animate([{ opacity: 1 }, { opacity: 0, offset: 0.12 }, { opacity: 0, offset: 0.78 }, { opacity: 1 }], { duration: FOLD + 450, easing: "ease" }).finished;
+    const fade = page.current?.animate([{ opacity: 1 }, { opacity: 0, offset: 0.12 }, { opacity: 0, offset: 0.78 }, { opacity: 1 }], { duration: (FOLD + 450) * k.current, easing: "ease" }).finished;
     if (n.posture !== p.posture) {
       const open = n.posture === "open";
       flushSync(() => { setFolding(true); if (open) setS(n); });
-      await swing(open)?.catch(() => {});
+      await finished(swing(open));
       flushSync(() => { if (!open) setS(n); setFolding(false); });
       hinge.current?.getAnimations().forEach((a) => a.cancel());
     } else setS(n);
@@ -170,10 +179,40 @@ export function WebDuo({ src }: { src: string }) {
     setInstant(false);
   };
 
+  // The fold scrubber: holding it opens the device (the open layout under a flap at the closed angle) and parks
+  // the swing at the thumb; letting go finishes the swing towards the nearer end, from where it was.
+  const hold = (t: number) => {
+    if (!held.current.length) {
+      if (busy.current) return;
+      setTour(false);
+      busy.current = true;
+      page.current?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160 * k.current, fill: "forwards" });
+      flushSync(() => { setInstant(true); setFolding(true); setS((p) => ({ ...p, posture: "open" })); });
+      held.current = swing(true, "linear");
+      held.current.forEach((a) => a.pause());
+    }
+    held.current.forEach((a) => { a.currentTime = t * FOLD * k.current; });
+    setScrub(t);
+  };
+  const release = async () => {
+    const as = held.current;
+    if (!as.length) return;
+    const open = (scrub ?? 0) >= 0.5;
+    as.forEach((a) => { a.playbackRate = open ? 1 : -1; a.play(); });
+    await finished(as);
+    held.current = [];
+    flushSync(() => { if (!open) setS((p) => ({ ...p, posture: "closed", app: p.app === "split" ? "safari" : p.app })); setFolding(false); setScrub(null); });
+    as.forEach((a) => a.cancel());
+    busy.current = false;
+    await page.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450 * k.current, easing: "ease" }).finished.catch(() => {});
+    page.current?.getAnimations().forEach((a) => a.cancel());
+    setInstant(false);
+  };
+
   useEffect(() => {
-    const t = setTimeout(() => setUpright(s.rotated), s.rotated === upright ? 0 : TURN);
+    const t = setTimeout(() => setUpright(s.rotated), s.rotated === upright ? 0 : turn);
     return () => clearTimeout(t);
-  }, [s.rotated, upright]);
+  }, [s.rotated, upright, turn]);
 
   useEffect(() => {
     if (!tour) return;
@@ -230,18 +269,18 @@ export function WebDuo({ src }: { src: string }) {
         </div>
       </header>
 
-      <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `width ${TURN}ms ${ease}, height ${TURN}ms ${ease}` }}>
+      <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `width ${turn}ms ${ease}, height ${turn}ms ${ease}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
           transform: `translate(-50%, -50%) scale(${scale}) rotate(${s.rotated ? 90 : 0}deg)`,
-          transition: `transform ${TURN}ms ${ease}`,
+          transition: `transform ${turn}ms ${ease}`,
         }}>
         <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: 2600 }}>
         <div style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: "linear-gradient(#5a5b60, #2a2b2e)" }} />)}
           <div style={{
             position: "absolute", inset: 0, borderRadius: b.r, cornerShape: "squircle", background: "#0d0d0f",
-            boxShadow: "inset 0 0 0 1.5px #4a4b50, inset 0 0 0 3px #1b1c1f, 0 40px 80px rgb(0 0 0 / 0.28)", transition: `border-radius ${TURN}ms ${ease}`,
+            boxShadow: "inset 0 0 0 1.5px #4a4b50, inset 0 0 0 3px #1b1c1f, 0 40px 80px rgb(0 0 0 / 0.28)", transition: `border-radius ${turn}ms ${ease}`,
           } as CSSProperties} />
           <div style={{ position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, borderRadius: b.screenR, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
             {/* The page, upright for the user: counter-turned when the device is turned. */}
@@ -273,6 +312,12 @@ export function WebDuo({ src }: { src: string }) {
         <Button onClick={() => go({ rotated: !s.rotated, app: s.app === "split" ? "safari" : s.app })} label="Rotate"><RotateCw size={17} /></Button>
         <Segmented value={s.app} onChange={(app) => go({ app })} options={[["home", "Home Screen"], ["safari", "Safari"], ["split", "Split View"]]} />
         {s.app === "split" && <Button onClick={() => go({ pane: s.pane === "right" ? "left" : "right" })} label="Swap"><ArrowLeftRight size={17} /></Button>}
+        <label title="Drag to fold and unfold by hand" style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
+          Fold
+          <input type="range" aria-label="Fold" min={0} max={1} step={0.001} value={scrub ?? (s.posture === "open" ? 1 : 0)}
+            onChange={(e) => hold(+e.currentTarget.value)} onPointerUp={release} onKeyUp={release} onBlur={release} style={{ width: 120, accentColor: "var(--accent)" }} />
+        </label>
+        <Button onClick={() => setSlow((v) => !v)} label="¼ speed" on={slow}><Snail size={17} /></Button>
         <Button onClick={() => setSlots((v) => !v)} label="Slots" on={slots}><Highlighter size={17} /></Button>
         <Button onClick={() => setTour((t) => !t)} label={tour ? "Pause" : "Tour"} on={tour}>{tour ? <Pause size={17} /> : <Play size={17} />}</Button>
       </div>

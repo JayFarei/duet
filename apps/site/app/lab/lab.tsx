@@ -96,7 +96,7 @@ html,body{margin:0;background:var(--bg)}
         {s.list > 0 && (
           <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 120px" }}>
             {Array.from({ length: 40 }, (_, i) => (
-              <li key={i} style={{ padding: "11px 20px", borderBottom: "0.5px solid var(--line)", fontSize: 17 }}>Row {i}</li>
+              <li key={i} style={{ padding: "11px 0", ...bleed(20), borderBottom: "0.5px solid var(--line)", fontSize: 17 }}>Row {i}</li>
             ))}
           </ul>
         )}

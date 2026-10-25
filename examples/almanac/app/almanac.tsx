@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ALargeSmall, Bookmark, Library, Newspaper, Search, Share } from "lucide-react";
-import { Duet, bleed, type DuetItem } from "duet-ui";
+import { Duet, DuetPaneBar, DuetPanes, bleed, usePanes, type DuetItem } from "duet-ui";
 import { ARTICLES, find, minutes, type Article } from "./articles";
 import { Art } from "./art";
 
@@ -17,33 +17,38 @@ const SEARCH: DuetItem = { id: "search", label: "Search", icon: <Search size={24
 const SIZES = [{ px: 17, name: "Small" }, { px: 19, name: "Medium" }, { px: 22, name: "Large" }];
 const SAVED_KEY = "almanac-saved";
 
-const scroller = () => document.querySelector<HTMLElement>(".duet-scroller");
+const PATH = ["list", "story"];
+/** The pane an element sits in: each pane scrolls on its own. */
+const paneOf = (el: Element | null) => el?.closest<HTMLElement>(".duet-pane") ?? null;
 
+/** A list and a story, on panes: closed, the story replaces the list and back returns to it; unfolded, the list
+ *  stays beside the story, and the story can take the whole window from its pane bar. */
 export function Almanac() {
   const [tab, setTab] = useState<Tab>("today");
   const [open, setOpen] = useState<string | null>(null);
   const [size, setSize] = useState(1);
   const [saved, setSaved] = useState<string[]>(["moss"]);
   const [toast, setToast] = useState<{ text: string; n: number } | null>(null);
-  const listY = useRef(0); // list scroll position to come back to
+  const nav = usePanes(PATH);
+  const list = useRef<HTMLDivElement>(null);
   const article = find(open);
+  const reading = !!article && (nav.layout === "wide" || nav.at === "story");
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- browser-only state, read after hydration */
     try { const s = localStorage.getItem(SAVED_KEY); if (s) setSaved(JSON.parse(s)); } catch {}
     const h = location.hash.slice(1); // a shared link opens its story
-    if (find(h)) setOpen(h);
-  }, []);
+    if (find(h)) { setOpen(h); nav.go("story"); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 1600); return () => clearTimeout(t); }, [toast]);
   const say = (text: string) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 }));
 
-  // Each view starts at its top; going back returns the list to where it was.
-  const restore = useRef<number | null>(null);
-  useLayoutEffect(() => { const el = scroller(); if (el) el.scrollTop = restore.current ?? 0; restore.current = null; }, [open, tab]);
+  // A new tab starts the list at its top. The list keeps its own scroll while a story is open, so back needs nothing.
+  useLayoutEffect(() => { const el = paneOf(list.current); if (el) el.scrollTop = 0; }, [tab]);
 
-  const read = (slug: string) => { listY.current = scroller()?.scrollTop ?? 0; setOpen(slug); };
-  const back = () => { restore.current = listY.current; setOpen(null); };
-  const select = (id: string) => { setOpen(null); setTab(id as Tab); };
+  const read = (slug: string) => { setOpen(slug); nav.go("story"); };
+  const close = () => { setOpen(null); nav.go("list"); };
+  const select = (id: string) => { setTab(id as Tab); nav.go("list"); };
   const toggleSave = (slug: string) => {
     const on = !saved.includes(slug), next = on ? [...saved, slug] : saved.filter((s) => s !== slug);
     setSaved(next);
@@ -59,7 +64,7 @@ export function Almanac() {
   };
 
   const isSaved = !!article && saved.includes(article.slug);
-  const actions: DuetItem[] = article ? [
+  const actions: DuetItem[] = reading ? [
     { id: "size", label: "Text size", icon: <ALargeSmall size={23} />, onPress: () => { const n = (size + 1) % SIZES.length; setSize(n); say(`Text size: ${SIZES[n].name}`); } },
     { id: "save", label: isSaved ? "Remove bookmark" : "Bookmark", onPress: () => toggleSave(article.slug),
       icon: <Bookmark size={22} style={isSaved ? { color: "var(--accent)", fill: "currentColor" } : undefined} /> },
@@ -68,20 +73,25 @@ export function Almanac() {
 
   return (
     <Duet
-      back={!!article && { label: "Back", onPress: back }}
+      back={nav.back && { label: "Back", ...nav.back }}
       actions={actions}
       tabs={{ items: TABS, selected: tab, onSelect: select, search: SEARCH }}
       menuStyle="morph"
       minimizeOnScroll
     >
-      {article ? <Story a={article} size={SIZES[size].px} /> : (
-        <div className="page">
-          {tab === "today" && <Today read={read} />}
-          {tab === "library" && <LibraryView read={read} />}
-          {tab === "saved" && <Saved list={ARTICLES.filter((a) => saved.includes(a.slug))} read={read} />}
-          {tab === "search" && <SearchView read={read} />}
-        </div>
-      )}
+      <DuetPanes path={PATH} at={nav.at} expanded={nav.expanded} panes={{
+        list: (
+          <div ref={list} className="page duet-column">
+            {tab === "today" && <Today read={read} />}
+            {tab === "library" && <LibraryView read={read} />}
+            {tab === "saved" && <Saved list={ARTICLES.filter((a) => saved.includes(a.slug))} read={read} />}
+            {tab === "search" && <SearchView read={read} />}
+          </div>
+        ),
+        story: article
+          ? <Story key={article.slug} a={article} size={SIZES[size].px} bar={<DuetPaneBar onClose={nav.layout === "wide" ? close : undefined} onToggle={nav.toggle} expanded={nav.expanded} />} />
+          : <div className="empty pick"><Newspaper size={34} /><b>Pick a story</b>It opens here, beside the list.</div>,
+      }} />
       {toast && <div className="toast-wrap" key={toast.n}><div className="toast" role="status">{toast.text}</div></div>}
     </Duet>
   );
@@ -173,12 +183,13 @@ function SearchView({ read }: Read) {
 
 /** Hero band under the strip, then the text column. The compact title bar fades in once the headline has
  *  scrolled away; it is a bleed() band, so its glass runs under the controls while its title stays beside them. */
-function Story({ a, size }: { a: Article; size: number }) {
-  const head = useRef<HTMLHeadingElement>(null);
+function Story({ a, size, bar: paneBar }: { a: Article; size: number; bar: ReactNode }) {
+  const root = useRef<HTMLElement>(null), head = useRef<HTMLHeadingElement>(null);
   const [bar, setBar] = useState({ on: false, p: 0 });
   useEffect(() => {
-    const el = scroller();
+    const el = paneOf(root.current);
     if (!el) return;
+    el.scrollTop = 0; // each story starts at its top
     let raf = 0;
     const f = () => {
       cancelAnimationFrame(raf);
@@ -195,12 +206,13 @@ function Story({ a, size }: { a: Article; size: number }) {
 
   let first = true;
   return (
-    <article className="story" style={{ "--size": `${size}px` } as CSSProperties}>
+    <article ref={root} className="story" style={{ "--size": `${size}px` } as CSSProperties}>
       <div className="bar" data-on={bar.on || undefined} aria-hidden={!bar.on} style={{ ...bleed(16), "--p": bar.p } as CSSProperties}>
         <span>{a.title}</span><i />
       </div>
+      {paneBar}
       <div className="hero" style={bleed(false)}><Art kind={a.slug} hue={a.hue} /></div>
-      <div className="read">
+      <div className="read duet-column">
         <p className="kicker">{a.section}</p>
         <h1 ref={head}>{a.title}</h1>
         <p className="dek">{a.dek}</p>

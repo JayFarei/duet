@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { BookOpen, Code, FlaskConical, LayoutGrid, MonitorSmartphone } from "lucide-react";
-import { Duet, bleed, useDuet, type DuetItem } from "duet-ui";
+import { Duet, bleed, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { WebDuo, useDesktop } from "./duo/web-duo";
 
@@ -35,8 +35,8 @@ export function App() {
 // Recorded on the Duo simulator and framed by tools/media/compose.sh.
 const MODES: [string, string, string][] = [
   ["Strip", "Added to the Home Screen, your app owns the whole display. Controls live in the slim strip beside the page, like a native app.", "strip"],
-  ["Column", "In a closed Safari tab, Safari leaves a column empty beside the page. Duet paints its controls there, so the page keeps its full width.", "column"],
-  ["Inline", "Unfolded, in split view, or in landscape, Duet reserves an 84pt strip inside the page. Drag it to the side of the hand you hold; it remembers.", "inline-drag"],
+  ["Column", "In a closed Safari tab or a split-view pane, Safari leaves a column empty beside the page. Duet paints its controls there, so the page keeps its full width.", "column"],
+  ["Inline", "Unfolded at full width, or in landscape, Duet reserves an 84pt strip inside the page. Drag it to the side of the hand you hold; it remembers.", "inline-drag"],
 ];
 
 /** Desktop browsers get the site on a web Duo; phones, and the page inside the web Duo, get the site itself. */
@@ -65,7 +65,7 @@ function Site() {
       menuStyle={menuStyle}
       minimizeOnScroll
     >
-      {open ? <Sheet /> : <main style={{ maxWidth: 680, margin: "0 auto", padding: "calc(28px + env(safe-area-inset-top)) 20px 140px" }}>
+      {open ? <Sheet /> : <main style={{ padding: "calc(28px + env(safe-area-inset-top)) 0 140px", ...column(680) }}>
         <section id="intro" style={{ textAlign: "center", padding: "24px 0 36px" }}>
           <img src="/icon-512.png" alt="" width={112} height={112} style={{ borderRadius: 26 }} />
           <h1 style={{ font: "800 48px/1 -apple-system, system-ui", letterSpacing: -1.2, margin: "18px 0 10px" }}>Duet</h1>
@@ -91,7 +91,7 @@ function Site() {
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
             <pre style={{ margin: 0, padding: "18px 20px", fontSize: 13, lineHeight: 1.5, overflowX: "auto" }}><code dangerouslySetInnerHTML={{ __html: highlight(QUICK) }} /></pre>
           </div>
-          <p style={dim}>Content that should run edge to edge, like a hero band or a sticky title, uses <code>bleed()</code>: its background goes under the strip, its text stays beside it.</p>
+          <p style={dim}>Content that should run edge to edge, like a hero band or a sticky title, uses <code>bleed()</code>: its background goes under the strip, its text stays beside it. A reading column uses <code>column()</code>: it centres on the whole screen, like a native app, and moves aside only as far as the strip needs.</p>
         </section>
 
         <section id="lab" style={{ paddingTop: 28 }}>
@@ -113,6 +113,10 @@ function Site() {
             </div>
             <pre style={{ margin: "12px 0 0", fontSize: 13 }}><code dangerouslySetInnerHTML={{ __html: highlight(`<Duet menuStyle="${menuStyle}" … />`) }} /></pre>
           </div>
+          <a href="/panes" style={{ ...card, display: "block" }}>
+            <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Panes</div>
+            <p style={dim}>A path of screens that follows the fold: one pane closed, two side by side unfolded. Going deeper slides the pair along, and a draft survives folding.</p>
+          </a>
           <a href="/lab?tabs=4,searchTab=1,back=1,actions=2,title=1,feed=1" style={{ ...card, display: "block" }}>
             <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Lab</div>
             <p style={dim}>Every control combination, set from the URL. Open it on the phone, or add it to the Home Screen.</p>
@@ -127,7 +131,7 @@ function Site() {
           </a>
         </section>
       </main>}
-      <footer style={{ ...bleed(20), borderTop: "0.5px solid var(--line)", padding: "18px 20px 40px", textAlign: "center", ...dim, fontSize: 13 }}>
+      <footer style={{ borderTop: "0.5px solid var(--line)", padding: "18px 0 40px", textAlign: "center", ...dim, fontSize: 13, ...bleed(20) }}>
         MIT licensed. Not affiliated with Apple.
       </footer>
     </Duet>
@@ -138,7 +142,7 @@ function Site() {
 function Sheet() {
   const row: CSSProperties = { display: "flex", justifyContent: "space-between", padding: "13px 0", borderBottom: "0.5px solid var(--line)", font: "400 17px -apple-system, system-ui" };
   return (
-    <main style={{ maxWidth: 560, margin: "0 auto", padding: "calc(28px + env(safe-area-inset-top)) 20px 140px" }}>
+    <main style={{ padding: "calc(28px + env(safe-area-inset-top)) 0 140px", ...column(560) }}>
       <div style={{ textAlign: "center", padding: "12px 0 24px" }}>
         <div style={{ width: 84, height: 84, borderRadius: 99, margin: "0 auto 12px", background: "linear-gradient(135deg, #64d2ff, #0a84ff)" }} />
         <h2 style={{ ...h2, margin: "0 0 4px" }}>A card</h2>

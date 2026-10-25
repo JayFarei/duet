@@ -94,3 +94,19 @@ test("a page in an iframe never claims Safari's column", async ({ page }) => {
   await frame.locator(".duet .duet-glass").first().waitFor();
   expect(await frame.locator("html").getAttribute("data-duet-mode")).toBe("inline");
 });
+
+test("a reading column centres on the whole window, not the space beside the strip", async ({ page }) => {
+  // Open portrait has room to centre 680px clear of the 84pt strip, so the column sits mid-screen on either side.
+  await page.setViewportSize({ width: 951, height: 543 });
+  for (const side of ["right", "left"] as const) {
+    await page.evaluate((s) => localStorage.setItem("duet-side", s), side).catch(() => {});
+    await open(page, side, "/?plain");
+    expect((await probe(page)).side).toBe(side);
+    const mid = await page.evaluate(() => { const r = document.querySelector("main")!.getBoundingClientRect(); return (r.left + r.right) / 2 - innerWidth / 2; });
+    expect(Math.abs(mid), `${side}: column off centre by ${mid}px`).toBeLessThan(2);
+  }
+  // A split-view pane has no such room: the column moves aside and its text stays clear of the strip.
+  await page.setViewportSize({ width: 385, height: 571 });
+  await page.reload(); await page.waitForTimeout(600);
+  expect((await probe(page)).bad).toEqual([]);
+});

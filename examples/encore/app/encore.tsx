@@ -5,7 +5,7 @@ import {
   ArrowDownToLine, Check, ChevronRight, Disc3, FastForward, Heart, House, LayoutGrid, Library, ListMusic,
   MicVocal, Music, Pause, Play, Plus, Radio, Search, Share, Shuffle, User, UserRound,
 } from "lucide-react";
-import { Duet, bleed, type DuetItem } from "duet-ui";
+import { Duet, bleed, column, type DuetItem } from "duet-ui";
 import { ALBUMS, GENRES, MIXES, NEW, STATIONS, album, time, track, type Album, type Track } from "./data";
 import { Art, tone } from "./art";
 import * as audio from "./tone";
@@ -90,9 +90,10 @@ const Heading = ({ children, more = true }: { children: ReactNode; more?: boolea
 );
 
 function Carousel({ children }: { children: ReactNode }) {
-  // Sits inside .page (20px padding), so it also cancels that padding to reach the edges.
+  // Sits inside .page (padded by bleed(20)), so it cancels that padding to run edge to edge, then pads its first
+  // card back in line with the page.
   const b = bleed(20);
-  const style = { ...b, marginLeft: `calc(-20px + ${b.marginLeft})`, marginRight: `calc(-20px + ${b.marginRight})`, scrollPaddingLeft: b.paddingLeft, scrollPaddingRight: b.paddingRight };
+  const style = { ...b, marginLeft: `calc(-1 * ${b.paddingLeft})`, marginRight: `calc(-1 * ${b.paddingRight})`, scrollPaddingLeft: b.paddingLeft, scrollPaddingRight: b.paddingRight };
   return <div className="carousel" style={style}>{children}</div>;
 }
 
@@ -243,7 +244,8 @@ function AlbumView({ a, ...nav }: Nav & { a: Album }) {
   const mins = Math.round(a.tracks.reduce((n, t) => n + t.seconds, 0) / 60);
   return (
     <>
-      <header className="album-head" style={{ ...bleed(20), background: `linear-gradient(${tone(a.hues[0], 50, 70)}33, transparent)` }}>
+      {/* The tint runs under the strip; the centred cover and title centre on the whole screen (column). */}
+      <header className="album-head" style={{ background: `linear-gradient(${tone(a.hues[0], 50, 70)}33, transparent)` }}><div style={column(560)}>
         <Art hues={a.hues} style={a.style} className="album-art" radius={10} label={`${a.title} cover`} />
         <h1>{a.title}</h1>
         <div className="album-artist">{a.artist}</div>
@@ -252,7 +254,7 @@ function AlbumView({ a, ...nav }: Nav & { a: Album }) {
           <button className="pill" onClick={() => nav.play(a.tracks[0].id)}><Play size={17} fill="currentColor" strokeWidth={0} />Play</button>
           <button className="pill" onClick={() => nav.play(a.tracks[(a.tracks.length * 0.6) | 0].id)}><Shuffle size={17} strokeWidth={2.4} />Shuffle</button>
         </div>
-      </header>
+      </div></header>
       <div className="page">
         <ul className="list">{a.tracks.map((t) => <Row key={t.id} t={t} nav={nav} numbered />)}</ul>
         <p className="foot">{a.tracks.length} songs, {mins} minutes</p>

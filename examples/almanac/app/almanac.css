@@ -28,7 +28,8 @@ button { font: inherit; color: inherit; }
 :root[data-lg-theme="dark"] .art { --t0: hsl(var(--h) 12% 13%); --t1: hsl(var(--h) 12% 20%); --t2: hsl(var(--h) 11% 29%); --t3: hsl(var(--h) 10% 43%); }
 
 /* Tab pages */
-.page { max-width: 720px; margin: 0 auto; padding: calc(18px + env(safe-area-inset-top) + var(--duet-inset-top, 0px)) 20px 120px; }
+/* duet-column: centred on the whole screen, moved aside from the controls only as far as it must. */
+.page { --duet-max: 720px; padding: calc(18px + env(safe-area-inset-top) + var(--duet-inset-top, 0px)) 0 120px; }
 .eyebrow { font: 600 13px/1.2 var(--sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); margin: 0 0 4px; }
 .large { font: 700 34px/1.1 var(--sans); letter-spacing: -0.4px; margin: 0 0 20px; }
 .group { font: 600 20px/1.2 var(--sans); letter-spacing: -0.2px; margin: 32px 0 6px; }
@@ -74,7 +75,7 @@ button { font: inherit; color: inherit; }
 .bar span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; max-width: 65ch; margin: 0 auto; }
 .bar i { position: absolute; left: 0; bottom: -0.5px; height: 2px; background: var(--accent); width: calc(var(--p) * 100%); }
 
-.read { max-width: 65ch; margin: 0 auto; padding: 26px 22px 140px; font-family: var(--serif); color: var(--text); }
+.read { --duet-max: 65ch; --duet-pad: 22px; padding: 26px 0 140px; font-family: var(--serif); color: var(--text); }
 .read h1 { font: 700 clamp(30px, 6.4vw, 42px)/1.1 var(--serif); letter-spacing: -0.5px; color: var(--ink); margin: 10px 0 12px; text-wrap: balance; }
 .read .dek { font: 400 calc(var(--size) + 2px)/1.4 var(--serif); color: var(--dim); margin: 0 0 18px; text-wrap: pretty; }
 .byline { font: 400 14px/1.4 var(--sans); color: var(--dim); padding-bottom: 20px; margin-bottom: 26px; border-bottom: 0.5px solid var(--line); }
@@ -90,3 +91,7 @@ button { font: inherit; color: inherit; }
 .toast { padding: 10px 18px; border-radius: 999px; background: var(--bar); color: var(--ink); font: 500 15px var(--sans);
   -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 0 6px 24px rgb(0 0 0 / 0.12); border: 0.5px solid var(--line); animation: toast 0.25s ease-out; }
 @keyframes toast { from { opacity: 0; transform: translateY(8px); } }
+
+/* Panes: the empty story pane, and the compact title kept clear of the pane bar's pill */
+.pick { height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.story:has(.duet-pane-pill) .bar span { max-width: min(65ch, 100% - 200px); }

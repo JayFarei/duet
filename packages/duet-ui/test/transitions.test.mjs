@@ -2,7 +2,7 @@
 // Run: pnpm test (node --test; Node 23.6+ strips the types from geometry.ts)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detect, magnet, MAGNET, stable } from "../src/geometry.ts";
+import { detect, magnet, MAGNET, PIN_TTL, stable } from "../src/geometry.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -18,8 +18,8 @@ const PANE_ZOOMED = [696, 679, 659, 674, 681].map((h) => sig(469, h, 469, 669));
 
 test("closed Safari tab is column", () => assert.equal(detect(CLOSED).mode, "column"));
 test("open posture, full width, is inline", () => assert.equal(detect(OPEN_FULL).mode, "inline"));
-test("split-view pane is inline (its column does not take our paint)", () => {
-  assert.equal(detect(PANE).mode, "inline");
+test("split-view pane is column; zoomed out (no shrink-to-fit=no) it is inline", () => {
+  assert.equal(detect(PANE).mode, "column");
   for (const s of PANE_ZOOMED) assert.equal(detect(s).mode, "inline");
 });
 test("standalone, landscape and keyboard up never take the column", () => {
@@ -47,10 +47,10 @@ test("a column/inline feedback loop settles on inline within 3 flips", () => {
   assert.ok(flips(m) <= 3, `flipped ${flips(m)} times: ${m.join(" ")}`);
   assert.equal(m.at(-1), "inline");
 });
-test("the split pane never flips at all", () => {
+test("a split pane that Safari zooms out settles on inline within 3 flips", () => {
   const m = loop(PANE, PANE_ZOOMED[0]);
-  assert.equal(flips(m), 0);
-  assert.equal(m[0], "inline");
+  assert.ok(flips(m) <= 3, `flipped ${flips(m)} times: ${m.join(" ")}`);
+  assert.equal(m.at(-1), "inline");
 });
 test("a pin is released when the window changes size (fold, rotate, resize pane)", () => {
   const d = { flips: [] };
@@ -62,7 +62,7 @@ test("a pin is released when the window changes size (fold, rotate, resize pane)
 test("ordinary transitions (closed -> open -> split -> closed) are not mistaken for a loop", () => {
   const d = { flips: [] };
   const seq = [CLOSED, OPEN_FULL, PANE, CLOSED];
-  assert.deepEqual(seq.map((s, i) => stable(d, s, "right", i * 3000).mode), ["column", "inline", "inline", "column"]);
+  assert.deepEqual(seq.map((s, i) => stable(d, s, "right", i * 3000).mode), ["column", "inline", "column", "column"]);
 });
 
 // Magnet: controls on the right edge, finger pulling left (dx < 0).
@@ -74,6 +74,9 @@ test("magnet holds the controls near their edge until the release distance", () 
   }
   // resistance grows with the pull, never jumps
   assert.ok(magnet("right", -40).offset < magnet("right", -20).offset);
+});
+test("magnet does not move the controls inside its dead zone", () => {
+  for (const dx of [-1, -8, -MAGNET.dead, MAGNET.dead]) assert.equal(Math.abs(magnet("right", dx).offset), 0);
 });
 test("magnet lets go past the release distance and then tracks the finger", () => {
   const m = magnet("right", -MAGNET.release - 30);
@@ -94,4 +97,24 @@ test("magnet is mirrored on the left", () => {
 test("an iframe never takes the column (it cannot paint there)", () => {
   assert.equal(detect(CLOSED).mode, "column");
   assert.equal(detect({ ...CLOSED, framed: true }).mode, "inline");
+});
+
+// Device 2026-10-25 17:31: Safari moved from the left split-view pane straight to the right one stayed inline.
+// Both panes are 469x669, so the window never changes size: the move's transient signals pinned inline for good.
+test("moving a split-view pane to the other side returns to column once the pin expires", () => {
+  const d = { flips: [] };
+  const move = [PANE, PANE_ZOOMED[0], PANE, PANE_ZOOMED[1], PANE];
+  move.forEach((s, i) => stable(d, s, "right", i * 100));
+  assert.equal(stable(d, PANE, "right", 600).mode, "inline"); // pinned by the move
+  assert.equal(stable(d, PANE, "right", 600 + PIN_TTL).mode, "column");
+});
+test("a real loop re-pins with a longer wait each time, so it does not flicker every few seconds", () => {
+  const d = { flips: [] };
+  let t = 0, s = PANE;
+  const step = () => { const c = stable(d, s, "right", t); s = c.mode === "column" ? PANE_ZOOMED[0] : PANE; t += 50; return c.mode; };
+  for (let i = 0; i < 10; i++) step();
+  const first = d.until - t;
+  t = d.until; for (let i = 0; i < 10; i++) step();
+  assert.ok(d.until - t > first * 1.5, `second wait ${d.until - t} vs first ${first}`);
+  assert.equal(step(), "inline");
 });

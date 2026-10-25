@@ -107,7 +107,7 @@ text { font-family: -apple-system, system-ui, sans-serif; paint-order: stroke; s
 .badge { display: inline-grid; place-items: center; flex: none; color: #fff; font-weight: 700; line-height: 1; letter-spacing: 0; }
 
 /* List pages scroll in Duet's scroller, which already keeps them beside the strip. */
-.page { padding: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom) + 24px); max-width: 680px; }
+.page { --duet-max: 680px; --duet-pad: 16px; padding: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 14px) 0 calc(env(safe-area-inset-bottom) + 24px); }
 .page h1 { font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.6px; margin: 8px 4px 16px; }
 .list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: 14px; overflow: hidden; }
 .list:empty { display: none; }

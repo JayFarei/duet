@@ -1,0 +1,23 @@
+# Publishes duet-ui to npm when a vX.Y.Z tag is pushed. npm trusts this workflow by name (Trusted Publishing,
+# OIDC), so there is no npm token anywhere: see docs/releasing.md.
+name: Release
+on:
+  push: { tags: ["v*"] }
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: 24, cache: pnpm, registry-url: "https://registry.npmjs.org" }
+      - run: npm install -g npm@latest
+      - run: pnpm install --frozen-lockfile
+      - name: Tag matches package version
+        run: test "v$(node -p 'require("./packages/duet-ui/package.json").version')" = "$GITHUB_REF_NAME"
+      - run: pnpm build && pnpm typecheck && pnpm test
+      - run: npm publish --access public
+        working-directory: packages/duet-ui
