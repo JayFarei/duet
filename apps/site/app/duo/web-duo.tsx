@@ -81,7 +81,8 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
     under: o.rounded ? <div style={{ ...windowBg, left: win.x, top: win.y, width: win.w, height: win.h }} /> : undefined,
     chrome: (
       <div style={{ position: "absolute", left: win.x, top: win.y, width: win.w, height: win.h, borderRadius: o.rounded ? 30 : undefined, overflow: "hidden", pointerEvents: "none" }}>
-        <div style={{ position: "absolute", left: pageX, top: page.h, width: page.w, height: bar, background: "var(--card)" }} />
+        {/* In column mode the page runs on under the pill (Duet extends it by outer minus inner height). */}
+        {!column && <div style={{ position: "absolute", left: pageX, top: page.h, width: page.w, height: bar, background: "var(--card)" }} />}
         <UrlBar left={pageX + 18} top={page.h + Math.min(22, (bar - 46) / 2)} width={page.w - 36} host={o.host} />
         <SafariColumn x={col === "left" ? 0 : page.w} h={win.h} col={col} back={o.back} clock={o.clock} over={column} />
       </div>
