@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Docs only: the README now documents how the Duo is detected, how each mode is picked, column mode's reliance on WebKit behaviour, split view, server rendering and every prop.
+
 ## 0.2.3
 
 - Island and morph menus open and close about 20% faster, and their items appear with half the stagger.
