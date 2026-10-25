@@ -126,7 +126,7 @@ The page spans the whole window and the controls float over it, so backgrounds r
 - `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
 - `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image).
 
-The insets are exposed as `--duet-inset-left`, `--duet-inset-right` and `--duet-inset-top` (the strip's top blur in Home Screen apps). Inside `<DuetPanes>` each pane gets its own: only the pane next to the controls is inset.
+The insets are exposed as `--duet-inset-left`, `--duet-inset-right`, `--duet-inset-top` (the strip's top blur in Home Screen apps) and `--duet-inset-bottom` (Safari's floating URL pill in column mode: the page runs on under it, and the scroller ends with that much space so the last content scrolls clear). Inside `<DuetPanes>` each pane gets its own: only the pane next to the controls is inset.
 
 ## Panes
 

@@ -343,10 +343,13 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
     // inset, closed and unfolded; pages pad their top content by this much to stay sharp.
     r.setProperty("--duet-inset-top", ctx.mode === "strip" ? `${DUO.edgeBlur}px` : "0px");
+    // Safari's URL pill floats below the layout viewport (the column holds nothing above the page), so the scroller
+    // runs on under it like a document that scrolls, and the last content scrolls clear of it.
+    r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height)}px` : "0px");
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulated);
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.width, split]);
+  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, split]);
   const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, column);
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
