@@ -61,7 +61,7 @@ function Page({ self = false }: { self?: boolean }) {
           <Rise words={["Vertical", "controls", "for", "the"]} />{" "}
           <em><Rise words={["iPhone", "Duo."]} from={4} /></em>
         </h1>
-        <p className="lede">A React library that approximates the Duo&apos;s native side controls. They sit where you hold it, beside Safari&apos;s buttons or in a Home Screen app, with iOS 27&apos;s glass.</p>
+        <p className="lede">A React library that approximates the Duo&apos;s native side controls.</p>
         <div className="ctas">
           <Npm />
         </div>
