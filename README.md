@@ -41,7 +41,7 @@ export function App() {
 }
 ```
 
-That is the whole setup. The styles come with the component, and Duet adds `viewport-fit=cover` and `shrink-to-fit=no` to the viewport meta itself (the safe areas only reach the page with the first; the second keeps Safari from zooming a split-view pane out). Each tab keeps its own scroll position, and tapping the selected tab scrolls back to the top. On other phones and browsers Duet falls back to the `inline` strip.
+That is the whole setup. The styles come with the component, and Duet adds `viewport-fit=cover` and `shrink-to-fit=no` to every viewport meta itself, including ones the framework adds later (the safe areas only reach the page with the first; the second keeps Safari from zooming a split-view pane out). Each tab keeps its own scroll position, and tapping the selected tab scrolls back to the top. On other phones and browsers Duet falls back to the `inline` strip.
 
 Icons are yours, any library: 24pt in tabs, 21 to 22pt on round buttons matches the system. `as const` types the tab ids, so `onSelect` takes `setTab` without a cast.
 
@@ -52,7 +52,7 @@ Duet picks a mode from the window size, safe areas and display mode. `useDuet()`
 | Mode | When | Controls |
 | --- | --- | --- |
 | `strip` | Home Screen app, closed | In the slim strip beside the page, like a native app |
-| `column` | Safari tab, closed or a split-view pane | Painted into the column Safari leaves empty, so the page keeps its full width. In split view both columns get the controls, since a pane can't tell which side it is on, and each shows only its own |
+| `column` | Safari tab, closed, windowed or a split-view pane | Painted into the column Safari leaves empty, so the page keeps its full width. In split view both columns get the controls, since a pane can't tell which side it is on, and each shows only its own |
 | `inline` | Unfolded, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered |
 
 ### Claimable space
@@ -126,7 +126,7 @@ The page spans the whole window and the controls float over it, so backgrounds r
 - `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
 - `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image).
 
-The insets are exposed as `--duet-inset-left`, `--duet-inset-right` and `--duet-inset-top` (the strip's top blur in Home Screen apps). Inside `<DuetPanes>` each pane gets its own: only the pane next to the controls is inset.
+The insets are exposed as `--duet-inset-left`, `--duet-inset-right`, `--duet-inset-top` (the strip's top blur in Home Screen apps) and `--duet-inset-bottom` (Safari's floating URL pill in column mode: the page runs on under it, and the scroller ends with that much space so the last content scrolls clear). Inside `<DuetPanes>` each pane gets its own: only the pane next to the controls is inset.
 
 ## Panes
 

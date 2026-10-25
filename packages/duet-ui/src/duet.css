@@ -48,6 +48,8 @@
 /* Press lift, as iOS Liquid Glass: a separate button swells to ~1.4x and its glass turns lighter, then springs
    back on release. Items inside a shared surface (groups, the full tab pill) lift as a bubble of their own. */
 .duet-glass { transition: top 0.35s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1), scale 0.5s var(--duet-spring-in); }
+/* Minimizing on scroll, as native .onScrollDown: the pill shrinks to the one button in about 0.24s. */
+.duet-pill[data-min] { transition-duration: 0.24s, 0.24s, 0.4s; }
 .duet-glass::before { transition: background-color 0.25s; }
 :is(.duet-round, .duet-pill[data-min]):has(:active) { scale: 1.4; z-index: 52; transition-duration: 0.35s, 0.35s, 0.45s; transition-timing-function: ease, ease, var(--duet-spring-out); }
 :is(.duet-round, .duet-pill[data-min]):has(:active)::before { background-color: var(--duet-lift); }
@@ -82,8 +84,8 @@
 /* Letting go eases everything back together, without overshoot, so the swell and the lens melt away as one. */
 .duet-pill:not([data-min]) {
   --lx: 0px; --ly: 0px; --lm: 1; --pad: 6.35px; padding: var(--pad) 3px; touch-action: none; transform-origin: 100% 50%;
-  --duet-settle: 0.42s cubic-bezier(0.32, 0.72, 0, 1);
-  transition: top var(--duet-settle), height var(--duet-settle), left var(--duet-settle), width var(--duet-settle), --pad var(--duet-settle), scale var(--duet-settle),
+  --duet-settle: 0.42s cubic-bezier(0.32, 0.72, 0, 1); --duet-grow: 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: top var(--duet-grow), height var(--duet-grow), left var(--duet-grow), width var(--duet-grow), --pad var(--duet-settle), scale var(--duet-settle),
     --li 0.4s cubic-bezier(0.32, 0.72, 0, 1), --lx var(--duet-settle), --ly var(--duet-settle), --lm var(--duet-settle);
 }
 .duet[data-side="left"] .duet-pill { transform-origin: 0 50%; }
@@ -123,6 +125,9 @@
   -webkit-mask: linear-gradient(#000 var(--y0), transparent var(--y0), transparent var(--y1), #000 var(--y1));
   mask: linear-gradient(#000 var(--y0), transparent var(--y0), transparent var(--y1), #000 var(--y1));
 }
+/* Expanding from the minimized button, the other tabs come out of a blur as the pill grows (native: about 0.2s). */
+.duet-pill:not([data-min]) > .duet-tab:not([data-on]), .duet-pill-badges > span { animation: duet-tab-in 0.22s ease-out; }
+@keyframes duet-tab-in { from { opacity: 0; filter: blur(6px); scale: 0.7; } }
 .duet-pill-badges { position: absolute; z-index: 2; left: 3px; right: 3px; top: var(--pad); pointer-events: none; }
 .duet-pill-badges > span { display: block; position: relative; height: 50px; }
 .duet-tab > svg { transition: translate var(--duet-settle, 0.3s), scale var(--duet-settle, 0.3s); }
@@ -222,12 +227,15 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    column() or bleed(). Safari's column only shows in-document content and clips fixed boxes at the viewport
    edge, so there the scroller is an in-document box that runs on under the column. The document still never
    scrolls, so the chrome layer never moves. */
-html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-right)); }
+html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-right)); bottom: auto; height: calc(100% + var(--duet-inset-bottom)); }
+/* Safari's URL pill floats under the page's bottom edge: the scroller runs on under it (above) and this spacer lets
+   the last content scroll clear of it. */
+.duet-scroller::after { content: ""; display: block; height: var(--duet-inset-bottom, 0px); }
 /* Split pane: a column on each side (the pane's own is on its outer edge, which the page cannot see); the
    document is scrolled one column across (chrome.tsx). */
 html[data-duet-mode="column"][data-duet-split] .duet-scroller { width: calc(100% + var(--duet-inset-left) + var(--duet-inset-right)); }
-/* Emulated (the site's web Duo): the frame already spans the column. */
-html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; }
+/* Emulated (the site's web Duo): the frame already spans the column and runs under the pill. */
+html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; height: 100%; }
 
 /* Safari tab: an in-document layer at the document top (which never scrolls), so controls can paint in
    Safari's column.
