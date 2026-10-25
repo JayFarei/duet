@@ -157,12 +157,13 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
  *  then let go and follow the finger once it pulls MAGNET.release past the start. Released past the middle
  *  of the viewport after letting go, they switch sides; otherwise they snap back. `dx` is the finger's
  *  travel, positive to the right. */
-export const MAGNET = { release: 64, hold: 18 } as const;
+export const MAGNET = { dead: 16, release: 120, hold: 10 } as const;
 export function magnet(side: Side, dx: number): { offset: number; free: boolean } {
-  const away = side === "right" ? -dx : dx; // travel toward the other side
+  const away = side === "right" ? -dx : dx;
   if (away < MAGNET.release) {
-    const pull = Math.max(away, -MAGNET.release); // toward its own edge: same resistance, never past it
-    const offset = Math.sign(pull) * MAGNET.hold * (1 - Math.exp(-Math.abs(pull) / MAGNET.release));
+    // A dead zone first, so taps and scrubs never nudge the strip, then a stiff rubber band that only hints at the pull.
+    const pull = Math.sign(away) * Math.max(0, Math.min(Math.abs(away), MAGNET.release) - MAGNET.dead);
+    const offset = Math.sign(pull) * MAGNET.hold * (1 - Math.exp(-Math.abs(pull) / (MAGNET.release - MAGNET.dead)));
     return { offset: side === "right" ? -offset : offset, free: false };
   }
   return { offset: dx, free: true };

@@ -75,6 +75,9 @@ test("magnet holds the controls near their edge until the release distance", () 
   // resistance grows with the pull, never jumps
   assert.ok(magnet("right", -40).offset < magnet("right", -20).offset);
 });
+test("magnet does not move the controls inside its dead zone", () => {
+  for (const dx of [-1, -8, -MAGNET.dead, MAGNET.dead]) assert.equal(Math.abs(magnet("right", dx).offset), 0);
+});
 test("magnet lets go past the release distance and then tracks the finger", () => {
   const m = magnet("right", -MAGNET.release - 30);
   assert.equal(m.free, true);

@@ -194,11 +194,14 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
   useEffect(() => {
     const el = nav.current;
     if (!side || !el) return;
-    let x0: number | null = null, dragging = false, free = false;
-    const down = (e: PointerEvent) => { if ((e.target as Element).closest(".duet-glass:not(.duet-menu)")) { x0 = e.clientX; dragging = false; } };
+    let x0: number | null = null, y0 = 0, dragging = false, free = false;
+    const down = (e: PointerEvent) => { if ((e.target as Element).closest(".duet-glass:not(.duet-menu)")) { x0 = e.clientX; y0 = e.clientY; dragging = false; } };
     const move = (e: PointerEvent) => {
       if (x0 === null) return;
-      if (!dragging && Math.abs(e.clientX - x0) > 12) { dragging = true; onStart(); }
+      // Only a deliberate sideways swipe picks the strip up: a scrub along the rail, or a wobbly tap, never does.
+      const dx = Math.abs(e.clientX - x0), dy = Math.abs(e.clientY - y0);
+      if (!dragging && dy > 12 && dy > dx) { x0 = null; return; }
+      if (!dragging && dx > 24 && dx > 2 * dy) { dragging = true; onStart(); }
       if (!dragging) return;
       const m = magnet(side, e.clientX - x0);
       if (m.free !== free) { free = m.free; el.dataset.drag = free ? "free" : "held"; }
@@ -325,18 +328,20 @@ export function Duet(p: DuetProps) {
       data-tint={t.tint ? "" : undefined} style={{ ...tint(t), "--j": i } as CSSProperties}
       onClick={(e) => { if (min) toggle("tabs")(); else if (scrub === null && e.detail === 0) glideTo(t.id); }}>{t.icon}{min && badge(t)}</button>
   );
+  // The lens keeps its glass while it travels or settles, then melts back into the selection.
+  const settle = () => {
+    setGlide(true);
+    clearTimeout(glideTimer.current);
+    glideTimer.current = window.setTimeout(() => setGlide(false), 420);
+  };
   const glideTo = (id: string) => {
-    if (id !== selected) {
-      setGlide(true);
-      clearTimeout(glideTimer.current);
-      glideTimer.current = window.setTimeout(() => setGlide(false), 420);
-    }
+    if (id !== selected) settle();
     p.tabs!.onSelect(id);
   };
   // Scrub: holding or dragging on the full pill swells it and shows labels; a lens follows the finger over the
   // tabs and the tab under it lights up; lifting selects it. A quick tap just glides the lens to the tab.
   // Pointer capture keeps the drag even off the pill.
-  const HOLD_MS = 250, SLOP = 8;
+  const HOLD_MS = 250, SLOP = 8, SWELL = { x: 16, y: 12 };
   const endPress = () => { if (press.current) clearTimeout(press.current.timer); press.current = null; };
   const tabAt = (pill: HTMLElement, y: number) => {
     const tabs = [...pill.querySelectorAll<HTMLElement>(":scope > .duet-tab")];
@@ -361,11 +366,16 @@ export function Duet(p: DuetProps) {
     onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
       const tapped = press.current && scrub === null;
       endPress();
-      if (scrub !== null) { const t = tabItems[scrub]; setScrub(null); if (t) p.tabs!.onSelect(t.id); }
+      if (scrub !== null) { const t = tabItems[scrub]; setScrub(null); settle(); if (t) p.tabs!.onSelect(t.id); }
       else if (tapped) { const t = tabItems[tabAt(e.currentTarget, e.clientY)]; if (t) glideTo(t.id); }
     },
     onPointerCancel: () => { endPress(); setScrub(null); },
   };
+
+  // Held, the rail grows for real (wider towards the page, taller upwards), not just scaled, so the labels
+  // have room and clear its round ends, as Apple News and Music do.
+  const swell = (b: ReturnType<typeof at>, on: boolean) => !on ? b
+    : { ...b, top: b.top - SWELL.y, height: b.height + SWELL.y, width: b.width + SWELL.x, left: ctx.side === "right" ? b.left - SWELL.x : b.left };
 
   const lensAt = scrub ?? Math.max(0, tabItems.findIndex((t) => t.id === selected));
 
@@ -414,7 +424,7 @@ export function Duet(p: DuetProps) {
         {pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>}
         {!p.close && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
         {p.tabs && pl.tabs && (
-          <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...at(pl.tabs), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
+          <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
             data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
             {!pl.tabs.min && (
               // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
