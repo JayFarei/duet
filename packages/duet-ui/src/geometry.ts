@@ -70,6 +70,10 @@ export interface Signals {
   framed?: boolean;
   /** devicePixelRatio: tells the in-app preview's 375x667 window from an iPhone SE's (2x). */
   pixelRatio?: number;
+  /** navigator.userAgent and maxTouchPoints: tell iOS and Safari apart (see isIOS, browserOf). Unknown (an
+   *  emulator's signals) restricts nothing. */
+  userAgent?: string;
+  touchPoints?: number;
 }
 
 export interface Context {
@@ -94,6 +98,8 @@ export interface Context {
   /** A Safari split-view pane on the open Duo (see isSplit). In column mode nothing tells which pane it is, so
    *  the controls are drawn in both columns, each pane showing only its own (chrome.tsx); `side` is moot. */
   split?: boolean;
+  /** The browser the page runs in (see browserOf). Only Safari gets the column. */
+  browser: Browser;
 }
 
 export type Layout = "narrow" | "wide";
@@ -115,12 +121,30 @@ export const isPreview = (s: Signals) => !s.standalone && s.pixelRatio === PREVI
  *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
 const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
-export const isDuo = (s: Signals) => duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight);
+export const isDuo = (s: Signals) => isIOS(s) !== false && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
+
+/** iOS has no model in its UA, so the sizes above say Duo; the UA says iPhone. Safari's "Request Desktop Website"
+ *  sends a Mac UA, told from a Mac by touch. undefined when the signals carry no UA. */
+export const isIOS = (s: Signals) => s.userAgent === undefined ? undefined
+  : /iPhone|iPod/.test(s.userAgent) || (/Macintosh/.test(s.userAgent) && (s.touchPoints ?? 0) > 1);
+
+export type Browser = "safari" | "chrome" | "firefox" | "edge" | "webview" | "other";
+/** Every iOS browser is WebKit; the others name themselves in the UA. An in-app web view (Instagram, Facebook)
+ *  drops the "Safari/" token; the in-app Safari preview keeps it, and is Safari. */
+export function browserOf(ua: string | undefined): Browser {
+  if (ua === undefined) return "safari";
+  if (/EdgiOS|Edg\//.test(ua)) return "edge";
+  if (/CriOS|Chrome\//.test(ua)) return "chrome";
+  if (/FxiOS|Firefox\//.test(ua)) return "firefox";
+  if (/AppleWebKit/.test(ua) && !/Safari\//.test(ua)) return "webview";
+  if (/Version\/[\d.]+.*Safari\//.test(ua) && !/OPiOS|OPT\/|GSA\/|Ddg\//.test(ua)) return "safari";
+  return "other";
+}
 
 /** A Safari split-view pane: its window is 469x669 in either pane. Nothing tells the left pane from the right
  *  (device probe 2026-10-25: screenX, availLeft, insets, visualViewport and touch screenX read the same in both),
  *  though Safari's column sits on the pane's outer edge. So the inline side is remembered apart for split view. */
-export const isSplit = (s: Signals) => !s.standalone && Math.abs(s.outerWidth - 469) <= 1 && Math.abs(s.outerHeight - 669) <= 1;
+export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Math.abs(s.outerWidth - 469) <= 1 && Math.abs(s.outerHeight - 669) <= 1;
 
 /** Measured on the Duo simulator: Safari's column is 84pt wide (outer − inner), the chrome below the
  *  page is 98pt (80 with the compact URL bar), the window is the closed screen's 678pt tall. A split-view
@@ -135,13 +159,14 @@ const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= 
 
 /** preferred: the side the user picked for inline controls, if any. */
 export function detect(s: Signals, preferred?: Side, allowColumn = true): Context {
-  const duo = isDuo(s);
+  const duo = isDuo(s), browser = browserOf(s.userAgent);
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
   if (s.standalone && (s.insetRight >= 60 || s.insetLeft >= 60)) {
-    return { mode: "strip", duo, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+    return { mode: "strip", duo, browser, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
-  const base = { duo, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
-  const column = allowColumn && !s.standalone && !s.framed
+  const base = { duo, browser, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
+  // Other iOS browsers draw their own chrome where Safari has its column: inline for them.
+  const column = allowColumn && !s.standalone && !s.framed && browser === "safari"
     && within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width)
     && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome)
     && s.innerHeight > s.innerWidth // landscape moves Safari's column buttons around

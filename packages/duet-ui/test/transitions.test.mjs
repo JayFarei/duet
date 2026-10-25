@@ -2,7 +2,7 @@
 // Run: pnpm test (node --test; Node 23.6+ strips the types from geometry.ts)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detect, magnet, MAGNET, PIN_TTL, stable } from "../src/geometry.ts";
+import { browserOf, detect, isDuo, isIOS, magnet, MAGNET, PIN_TTL, stable } from "../src/geometry.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -167,3 +167,47 @@ test("windowed Safari and a compact split pane take the column", () => {
 });
 test("an 84pt-wide chrome off the Duo is not taken for Safari's column", () =>
   assert.equal(detect(sig(369, 591, 453, 661, { screenWidth: 1440, screenHeight: 900 })).mode, "inline"));
+
+// UAs from the Duo (iOS 27.1) and desktops. Sizes say Duo, the UA says iPhone and which browser.
+const UA = {
+  safari: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1",
+  safariDesktopSite: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Safari/605.1.15",
+  chrome: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.7390.41 Mobile/15E148 Safari/604.1",
+  firefox: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/144.0 Mobile/15E148 Safari/605.1.15",
+  edge: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 EdgiOS/141.0.3537.71 Mobile/15E148 Safari/605.1.15",
+  instagram: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 400.0.0.0.0",
+  macChrome: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+};
+const on = (s, ua, touchPoints = 5) => ({ ...s, userAgent: UA[ua], touchPoints });
+
+test("browserOf names every iOS browser", () => {
+  for (const b of ["safari", "chrome", "firefox", "edge"]) assert.equal(browserOf(UA[b]), b);
+  assert.equal(browserOf(UA.safariDesktopSite), "safari");
+  assert.equal(browserOf(UA.instagram), "webview");
+});
+test("Safari on the Duo takes the column, also asking for the desktop site", () => {
+  assert.equal(detect(on(CLOSED, "safari")).mode, "column");
+  assert.equal(detect(on(CLOSED, "safariDesktopSite")).mode, "column");
+  assert.equal(detect(on(PANE, "safari")).mode, "column");
+  assert.equal(detect(on(CLOSED, "safari")).browser, "safari");
+});
+test("other iOS browsers and in-app web views stay inline, still on the Duo", () => {
+  for (const b of ["chrome", "firefox", "edge", "instagram"]) {
+    const c = detect(on(CLOSED, b));
+    assert.equal(c.mode, "inline", b);
+    assert.equal(c.duo, true, b);
+  }
+});
+test("a desktop window at a Duo size is not a Duo", () => {
+  for (const s of [CLOSED, PANE, sig(951, 600, 951, 669)]) {
+    assert.equal(isDuo(on(s, "macChrome", 0)), false);
+    assert.equal(isDuo(on(s, "safariDesktopSite", 0)), false); // Safari on a Mac: no touch
+    assert.equal(detect(on(s, "safariDesktopSite", 0)).mode, "inline");
+  }
+  assert.equal(isIOS(on(CLOSED, "safariDesktopSite", 5)), true);
+});
+test("signals without a UA (an emulator) restrict nothing", () => {
+  assert.equal(isIOS(CLOSED), undefined);
+  assert.equal(isDuo(CLOSED), true);
+  assert.equal(detect(CLOSED).browser, "safari");
+});
