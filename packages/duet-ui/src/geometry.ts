@@ -100,6 +100,10 @@ export interface Context {
   split?: boolean;
   /** The browser the page runs in (see browserOf). Only Safari gets the column. */
   browser: Browser;
+  /** The device the page runs on (see deviceOf). */
+  device: Device;
+  /** Opened from the Home Screen as a web app, not in a browser tab. */
+  standalone: boolean;
 }
 
 export type Layout = "narrow" | "wide";
@@ -141,6 +145,19 @@ export function browserOf(ua: string | undefined): Browser {
   return "other";
 }
 
+export type Device = "duo" | "iphone" | "ipad" | "android" | "desktop";
+/** The Duo by its sizes (isDuo), other iOS devices by their screen's short side (an iPad's is 744pt or more,
+ *  and iPadOS sends a Mac UA with touch), Android by its UA. Without a UA (an emulator's signals) only the
+ *  sizes count. */
+export function deviceOf(s: Signals): Device {
+  if (isDuo(s)) return "duo";
+  const ua = s.userAgent ?? "";
+  if (/iPad/.test(ua) || (isIOS(s) && Math.min(s.screenWidth, s.screenHeight) >= 700)) return "ipad";
+  if (isIOS(s)) return "iphone";
+  if (/Android/.test(ua)) return "android";
+  return "desktop";
+}
+
 /** A Safari split-view pane: its window is 469x669 in either pane. Nothing tells the left pane from the right
  *  (device probe 2026-10-25: screenX, availLeft, insets, visualViewport and touch screenX read the same in both),
  *  though Safari's column sits on the pane's outer edge. So the inline side is remembered apart for split view. */
@@ -159,12 +176,12 @@ const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= 
 
 /** preferred: the side the user picked for inline controls, if any. */
 export function detect(s: Signals, preferred?: Side, allowColumn = true): Context {
-  const duo = isDuo(s), browser = browserOf(s.userAgent);
+  const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
   if (s.standalone && (s.insetRight >= 60 || s.insetLeft >= 60)) {
-    return { mode: "strip", duo, browser, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+    return { mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
-  const base = { duo, browser, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
+  const base = { duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
   // Other iOS browsers draw their own chrome where Safari has its column: inline for them.
   const column = allowColumn && !s.standalone && !s.framed && browser === "safari"
     && within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width)

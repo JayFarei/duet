@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+
+- New `useDuet().device` (`"duo"`, `"iphone"`, `"ipad"`, `"android"` or `"desktop"`) and `deviceOf()`.
+- New `useDuet().standalone`: true when opened from the Home Screen as a web app.
+
 ## 0.2.5
 
 - Column mode: a sideways swipe no longer pans the whole page, controls included, into Safari's column on the Duo's inner screen. Carousels and code blocks still scroll sideways.
