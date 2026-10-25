@@ -82,6 +82,8 @@ export interface Context {
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
+  /** Running on an iPhone Duo, in any posture or mode (see isDuo). */
+  duo: boolean;
 }
 
 export type Layout = "narrow" | "wide";
@@ -98,6 +100,13 @@ const PREVIEW = { width: 375, height: 667, pixelRatio: 3 } as const;
 export const isPreview = (s: Signals) => !s.standalone && s.pixelRatio === PREVIEW.pixelRatio
   && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height;
 
+/** Window and screen sizes only the Duo has, as [short, long] sides: the closed screen (Safari's `screen.*` keeps
+ *  466x678 after unfolding, so it holds in every Safari state), the open screen, and a split-view pane's window.
+ *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
+const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
+const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
+export const isDuo = (s: Signals) => duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight);
+
 /** Measured on the Duo simulator: Safari's column is 84pt wide (outer − inner), the chrome below the
  *  page is 98pt (80 with the compact URL bar), the window is the closed screen's 678pt tall. A split-view
  *  pane on the open Duo (469x669 outer, 385x571 inner, device recording 2026-10-24) has the same column
@@ -109,10 +118,11 @@ const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= 
 
 /** preferred: the side the user picked for inline controls, if any. */
 export function detect(s: Signals, preferred?: Side, allowColumn = true): Context {
+  const duo = isDuo(s);
   if (s.insetRight >= 60 || s.insetLeft >= 60) {
-    return { mode: "strip", layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+    return { mode: "strip", duo, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
-  const base = { width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
+  const base = { duo, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
   const column = allowColumn && !s.standalone && !s.framed
     && within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width)
     && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome)

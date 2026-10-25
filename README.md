@@ -48,6 +48,10 @@ Duet picks a mode from the window size, safe areas and display mode. `useDuet()`
 | `column` | Safari tab, closed | Painted into the column Safari leaves empty, so the page keeps its full width |
 | `inline` | Unfolded, split view, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered |
 
+### Only on the Duo
+
+`useDuet().duo` is true on an iPhone Duo in any posture, Safari or Home Screen, and false on other phones and desktops. It works outside `<Duet>`, so an existing app can switch to a Duo layout on it: render `<Duet>` only when it is true. `isDuo(signals)` is the same check for your own signals. The server can't tell, so before hydration `duo` is true; remember the answer in a cookie if the server should render the right layout first.
+
 ### In-app preview
 
 Links opened from social and mail apps land in the in-app Safari preview (`SFSafariViewController`). On the closed Duo its window is a fixed 375x667 at 3x, a size no iPhone has natively, and its own close and share buttons sit where the column would. Duet detects it, switches to `inline` on the left, and sets `useDuet().preview`.
