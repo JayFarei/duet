@@ -228,6 +228,10 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    edge, so there the scroller is an in-document box that runs on under the column. The document still never
    scrolls, so the chrome layer never moves. */
 html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-right)); bottom: auto; height: calc(100% + var(--duet-inset-bottom)); }
+/* That overflow widens the document, and touch-action on <html> stops at this scroll container, so without its own
+   a sideways swipe pans the whole page, chrome and all, into the column. Carousels inside are scrollers of their own
+   and still pan. */
+html[data-duet-mode="column"] .duet-scroller { touch-action: pan-y; }
 /* Safari's URL pill floats under the page's bottom edge: the scroller runs on under it (above) and this spacer lets
    the last content scroll clear of it. */
 .duet-scroller::after { content: ""; display: block; height: var(--duet-inset-bottom, 0px); }
