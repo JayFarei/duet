@@ -5,13 +5,14 @@ import { BookOpen, Code, FlaskConical, LayoutGrid, MonitorSmartphone } from "luc
 import { Duet, bleed, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { WebDuo, useDesktop } from "./duo/web-duo";
+import { UnfoldHero } from "./duo/unfold-hero";
 
 const REPO = "https://github.com/JayFarei/duet";
 const SECTIONS: DuetItem[] = [
   { id: "intro", label: "Duet", icon: <BookOpen size={24} /> },
   { id: "modes", label: "Modes", icon: <MonitorSmartphone size={24} /> },
   { id: "start", label: "Start", icon: <LayoutGrid size={24} /> },
-  { id: "lab", label: "Lab", icon: <FlaskConical size={24} /> },
+  { id: "lab", label: "Examples", icon: <FlaskConical size={24} /> },
 ];
 
 const card: CSSProperties = { background: "var(--card)", borderRadius: 22, padding: "18px 20px", margin: "0 0 14px" };
@@ -44,15 +45,15 @@ export function Home() {
   const desktop = useDesktop();
   // Before hydration the server can't tell a phone from a desktop: send the phone site, so a phone never sees a
   // blank page, and hide it on desktops (site.css) until the web Duo takes over.
-  return desktop ? <WebDuo src="/" /> : <div className={desktop === null ? "ssr-site" : undefined}><Site /></div>;
+  return desktop ? <><UnfoldHero /><WebDuo src="/skeleton" sources={[["/skeleton", "Layout"], ["/", "This site"]]} title="Try it live" intro="A Duet app on a web iPhone Duo: grey boxes are your content, the rest is Duet. Fold it, turn it, split it, and watch Duet pick its mode." /></> : <div className={desktop === null ? "ssr-site" : undefined}><Site /></div>;
 }
 
 function Site() {
   const [tab, setTab] = useState("intro");
   const [open, setOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<"island" | "morph">("island");
-  // ?menu=morph opens the site on the morph style (used by the clip recordings).
-  useEffect(() => { if (new URLSearchParams(location.search).get("menu") === "morph") setMenuStyle("morph"); }, []);
+  const [menuStyle, setMenuStyle] = useState<"island" | "morph">("morph");
+  // ?menu=island opens the site on the island style (used by the clip recordings).
+  useEffect(() => { if (new URLSearchParams(location.search).get("menu") === "island") setMenuStyle("island"); }, []);
   const ctx = useDuet();
   const show = (v: boolean) => { setOpen(v); scrollTo(0, 0); };
   const go = (id: string) => { setTab(id); document.getElementById(id)?.scrollIntoView({ behavior: "smooth" }); };
@@ -95,24 +96,11 @@ function Site() {
         </section>
 
         <section id="lab" style={{ paddingTop: 28 }}>
-          <h2 style={h2}>Try it</h2>
+          <h2 style={h2}>Examples</h2>
           <button onClick={() => show(true)} style={{ ...card, display: "block", width: "100%", textAlign: "left", border: 0, cursor: "pointer" }}>
             <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Open a card</div>
             <p style={dim}>Pass <code>close</code> and the strip steps aside for a single close button, like an iOS sheet.</p>
           </button>
-          <div style={card}>
-            <div style={{ font: "600 17px -apple-system, system-ui", marginBottom: 4 }}>Menus</div>
-            <p style={dim}>Scroll down until the tab bar shrinks to one button, then tap it. <b style={{ color: "var(--ink)" }}>Island</b> stretches the button into a pill of icons, like the Dynamic Island. <b style={{ color: "var(--ink)" }}>Morph</b> grows it into a labelled list, like a context menu.</p>
-            <div role="radiogroup" aria-label="Menu style" style={{ display: "flex", gap: 4, padding: 3, marginTop: 14, borderRadius: 12, background: "var(--line)" }}>
-              {(["island", "morph"] as const).map((m) => (
-                <button key={m} role="radio" aria-checked={menuStyle === m} onClick={() => setMenuStyle(m)}
-                  style={{ flex: 1, height: 34, border: 0, borderRadius: 9, cursor: "pointer", font: "600 15px -apple-system, system-ui", color: "var(--ink)", background: menuStyle === m ? "var(--card)" : "transparent", boxShadow: menuStyle === m ? "0 1px 3px rgb(0 0 0 / 0.15)" : "none" }}>
-                  {m === "island" ? "Island" : "Morph"}
-                </button>
-              ))}
-            </div>
-            <pre style={{ margin: "12px 0 0", fontSize: 13 }}><code dangerouslySetInnerHTML={{ __html: highlight(`<Duet menuStyle="${menuStyle}" … />`) }} /></pre>
-          </div>
           <a href="/panes" style={{ ...card, display: "block" }}>
             <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Panes</div>
             <p style={dim}>A path of screens that follows the fold: one pane closed, two side by side unfolded. Going deeper slides the pair along, and a draft survives folding.</p>
