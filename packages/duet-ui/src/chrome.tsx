@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { DUO, INLINE_WIDTH, ISLAND, MORPH, isSplit, magnet, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
@@ -16,7 +16,9 @@ export interface DuetItem {
   /** Deletes or discards: lives only in "…", last, in red, after a separator (blueprint). */
   destructive?: boolean;
 }
-export interface DuetProps {
+/** A tab: an item whose id is one of the app's tab ids. */
+export type DuetTab<T extends string = string> = DuetItem & { id: T };
+export interface DuetProps<T extends string = string> {
   /** Back button, top of the strip. */
   back?: false | { label?: string; onPress: () => void };
   /** SwiftUI `.topBarLeading`: its own group under back. */
@@ -27,8 +29,10 @@ export interface DuetProps {
   /** The screen's main action (New chat, Compose), a tinted round button: by the thumb above the tabs where one
    *  pane shows, at the top under back where two do. */
   primary?: DuetItem;
-  /** Tab pill at the bottom of the strip. `search` adds a `role: .search` tab as the last item. */
-  tabs?: { items: DuetItem[]; selected: string; onSelect: (id: string) => void; search?: DuetItem };
+  /** Tab pill at the bottom of the strip. `search` adds a `role: .search` tab as the last item. The ids are typed
+   *  from `items`: declare them `as const` and `onSelect` gets the union, so `setTab` fits without a cast. Each tab
+   *  keeps its own scroll position, and tapping the selected tab scrolls it to the top, like a native tab bar. */
+  tabs?: { items: readonly DuetTab<T>[]; selected: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; search?: DuetTab<T> };
   /** Searchable without tabs: a round search button at the bottom of the strip. */
   searchButton?: () => void;
   /** A sheet or card is open: the strip holds only a close button, where back goes, like an iOS sheet. Every
@@ -151,6 +155,23 @@ export function useDuet(): Context {
   return useSyncExternalStore(subscribe, read, () => ssr);
 }
 
+/** Tells the server whether this browser is an iPhone Duo, so it can render the Duo layout from the first byte.
+ *  The server can't tell on its own, so it renders what the `duet-duo` cookie says (`"1"` on a Duo) and passes that
+ *  as `rendered`. When the browser disagrees, this sets the cookie and calls `onChange`, by default a reload, so a
+ *  new device switches layout once and never again. Renders nothing; works outside `<Duet>`. */
+export function DuoCookie({ rendered, onChange = () => location.reload() }: { rendered: boolean; onChange?: (duo: boolean) => void }) {
+  const { duo } = useDuet();
+  // Before hydration useDuet() answers for the server (a Duo); only the browser's own answer counts.
+  const hydrated = useSyncExternalStore(noop, () => true, () => false);
+  useEffect(() => {
+    if (!hydrated || duo === rendered) return;
+    document.cookie = duo ? "duet-duo=1; path=/; max-age=31536000; samesite=lax" : "duet-duo=; path=/; max-age=0";
+    onChange(duo);
+  }, [hydrated, duo, rendered]); // eslint-disable-line react-hooks/exhaustive-deps -- onChange may be a fresh arrow each render
+  return null;
+}
+const noop = () => () => {};
+
 function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | null>) {
   const [min, setMin] = useState(false);
   useEffect(() => {
@@ -181,11 +202,12 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
 let tapSide: Side = "right";
 /** Without shrink-to-fit=no Safari zooms a split pane out to fit the layer's overflow, which reads as another
  *  window size and flips the mode. It applies even when set late, but must land before the first column paint. */
-function noShrink() {
-  const meta = document.querySelector<HTMLMetaElement>("meta[name=viewport]");
-  if (meta && !/shrink-to-fit/.test(meta.content)) meta.content += ",shrink-to-fit=no";
+function viewport(key: string, value: string) {
+  let meta = document.querySelector<HTMLMetaElement>("meta[name=viewport]");
+  if (!meta) { meta = document.createElement("meta"); meta.name = "viewport"; meta.content = "width=device-width,initial-scale=1"; document.head.appendChild(meta); }
+  if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
-if (typeof document !== "undefined") noShrink();
+if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
 function useColumnLayer(on: boolean, split: boolean, column: number) {
   const refs = [useRef<HTMLElement>(null), useRef<HTMLElement>(null)] as const;
   useEffect(() => {
@@ -266,7 +288,11 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
 
 // --- rendering ----------------------------------------------------------------------------------
 
-export function Duet(p: DuetProps) {
+// useLayoutEffect warns during SSR on React 18.
+const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+export function Duet<T extends string = string>(props: DuetProps<T>) {
+  const p = props as unknown as DuetProps; // tab ids are only typed at the boundary
   const ctx = useDuet();
   const scroller = useRef<HTMLDivElement>(null);
   const minimized = useMinimized(!!p.minimizeOnScroll, scroller);
@@ -331,7 +357,18 @@ export function Duet(p: DuetProps) {
   }, [menu, nav, nav2]); // eslint-disable-line react-hooks/exhaustive-deps -- setMenu only reads menu
   useSideDrag(ctx.mode === "inline" ? ctx.side : null, nav, () => { setMenu(null); setScrub(null); });
 
+  // The safe areas only reach the page with viewport-fit=cover. Set on mount, not on import, so a page that only
+  // imports DuoCookie keeps its own viewport on other phones.
+  useLayout(() => viewport("viewport-fit", "cover"), []);
   const selected = p.tabs?.selected;
+  // Each tab keeps its own scroll position in the inner scroller; the selected tab again scrolls to the top.
+  const scrolls = useRef(new Map<string, number>());
+  const select = (id: string) => {
+    const el = scroller.current;
+    if (id === selected) el?.scrollTo({ top: 0, behavior: "smooth" });
+    else { if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop); p.tabs!.onSelect(id); }
+  };
+  useLayout(() => { if (scroller.current && selected !== undefined) scroller.current.scrollTop = scrolls.current.get(selected) ?? 0; }, [selected]);
   const badge = (a: DuetItem) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge">{a.badge}</span>;
   const tint = (a: DuetItem) => a.tint ? { "--duet-tint": a.tint } as CSSProperties : undefined;
   const item = (a: DuetItem) => <button key={a.id} className="duet-item" aria-label={a.label} onClick={a.onPress}>{a.icon}{badge(a)}</button>;
@@ -355,7 +392,7 @@ export function Duet(p: DuetProps) {
   };
   const glideTo = (id: string) => {
     if (id !== selected) settle();
-    p.tabs!.onSelect(id);
+    select(id);
   };
   // Scrub: holding or dragging on the full pill swells it and shows labels; a lens follows the finger over the
   // tabs and the tab under it lights up; lifting selects it. A quick tap just glides the lens to the tab.
@@ -385,7 +422,7 @@ export function Duet(p: DuetProps) {
     onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
       const tapped = press.current && scrub === null;
       endPress();
-      if (scrub !== null) { const t = tabItems[scrub]; setScrub(null); settle(); if (t) p.tabs!.onSelect(t.id); }
+      if (scrub !== null) { const t = tabItems[scrub]; setScrub(null); settle(); if (t) select(t.id); }
       else if (tapped) { const t = tabItems[tabAt(e.currentTarget, e.clientY)]; if (t) glideTo(t.id); }
     },
     onPointerCancel: () => { endPress(); setScrub(null); },
@@ -420,7 +457,7 @@ export function Duet(p: DuetProps) {
           <button key={a.id} role={radio ? "menuitemradio" : "menuitem"} aria-checked={radio ? a.id === selected : undefined} aria-label={a.label}
             className="duet-menu-item" data-on={(radio && a.id === selected) || undefined} data-destructive={a.destructive || undefined}
             data-sep={(a.destructive && i > 0 && !items[i - 1].destructive) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.12 + 0.04 * i : 0.14 + 0.06 * (items.length - i)}s` }) }}
-            onClick={() => { setMenu(null); if (radio) p.tabs!.onSelect(a.id); else a.onPress?.(); }}>{a.icon}{morph && <span className="duet-menu-label">{a.label}</span>}{badge(a)}</button>
+            onClick={() => { setMenu(null); if (radio) select(a.id); else a.onPress?.(); }}>{a.icon}{morph && <span className="duet-menu-label">{a.label}</span>}{badge(a)}</button>
         ))}
         {close && <button className="duet-menu-item" aria-label="Close" onClick={() => setMenu(null)}><X size={20} /></button>}
       </GlassSurface>

@@ -1,4 +1,4 @@
-export { Duet, useDuet, type DuetProps, type DuetItem } from "./chrome.tsx";
+export { Duet, DuoCookie, useDuet, type DuetProps, type DuetItem, type DuetTab } from "./chrome.tsx";
 export { bleed, column } from "./layout.ts";
 export { DuetPanes, DuetPaneBar, usePanes, type DuetPanesProps, type DuetPaneBarProps } from "./duet-panes.tsx";
 export { panes, backFrom, type PaneWindow } from "./panes.ts";

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Duet, type DuetItem } from "duet-ui";
+import { Duet, type DuetItem, type DuetTab } from "duet-ui";
 import { ChevronRight, CircleCheck, Layers, LocateFixed, Map as MapIcon, Search, Star, TrainFront, TriangleAlert } from "lucide-react";
 import { LINES, STATIONS, alerts, departures, linesAt, station } from "./data";
 import { LineBadge } from "./LineBadge";
@@ -31,7 +31,7 @@ export function App() {
   const openStation = (id: string) => { setTab("map"); setSelected(id); };
   const openLine = (id: string) => { setTab("map"); setSelected(null); setFocusLine(id); };
 
-  const tabs: DuetItem[] = [
+  const tabs: DuetTab<Tab>[] = [
     { id: "map", label: "Map", icon: <MapIcon size={24} />, tint: ACCENT },
     { id: "lines", label: "Lines", icon: <TrainFront size={24} />, tint: ACCENT, badge: alerts || undefined },
     { id: "saved", label: "Saved", icon: <Star size={24} />, tint: ACCENT },
@@ -50,7 +50,7 @@ export function App() {
     <Duet
       back={back}
       leading={leading}
-      tabs={{ items: tabs, selected: tab, onSelect: (id) => setTab(id as Tab), search: { id: "search", label: "Search", icon: <Search size={24} />, tint: ACCENT } }}
+      tabs={{ items: tabs, selected: tab, onSelect: setTab, search: { id: "search", label: "Search", icon: <Search size={24} />, tint: ACCENT } }}
     >
       {tab === "map" && (
         <MapView selected={selected} focusLine={focusLine} layer={layer} locate={locate} toast={toast} saved={saved}
