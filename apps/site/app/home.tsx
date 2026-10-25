@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { BookOpen, Code, FlaskConical, LayoutGrid, MonitorSmartphone } from "lucide-react";
-import { Duet, bleed, useDuet, type DuetItem } from "duet-ui";
+import { Duet, bleed, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { WebDuo, useDesktop } from "./duo/web-duo";
 
@@ -65,7 +65,7 @@ function Site() {
       menuStyle={menuStyle}
       minimizeOnScroll
     >
-      {open ? <Sheet /> : <main style={{ maxWidth: 680, margin: "0 auto", padding: "calc(28px + env(safe-area-inset-top)) 20px 140px" }}>
+      {open ? <Sheet /> : <main style={{ padding: "calc(28px + env(safe-area-inset-top)) 0 140px", ...column(680) }}>
         <section id="intro" style={{ textAlign: "center", padding: "24px 0 36px" }}>
           <img src="/icon-512.png" alt="" width={112} height={112} style={{ borderRadius: 26 }} />
           <h1 style={{ font: "800 48px/1 -apple-system, system-ui", letterSpacing: -1.2, margin: "18px 0 10px" }}>Duet</h1>
@@ -91,7 +91,7 @@ function Site() {
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
             <pre style={{ margin: 0, padding: "18px 20px", fontSize: 13, lineHeight: 1.5, overflowX: "auto" }}><code dangerouslySetInnerHTML={{ __html: highlight(QUICK) }} /></pre>
           </div>
-          <p style={dim}>Content that should run edge to edge, like a hero band or a sticky title, uses <code>bleed()</code>: its background goes under the strip, its text stays beside it.</p>
+          <p style={dim}>Content that should run edge to edge, like a hero band or a sticky title, uses <code>bleed()</code>: its background goes under the strip, its text stays beside it. A reading column uses <code>column()</code>: it centres on the whole screen, like a native app, and moves aside only as far as the strip needs.</p>
         </section>
 
         <section id="lab" style={{ paddingTop: 28 }}>
@@ -131,7 +131,7 @@ function Site() {
           </a>
         </section>
       </main>}
-      <footer style={{ ...bleed(20), borderTop: "0.5px solid var(--line)", padding: "18px 20px 40px", textAlign: "center", ...dim, fontSize: 13 }}>
+      <footer style={{ borderTop: "0.5px solid var(--line)", padding: "18px 0 40px", textAlign: "center", ...dim, fontSize: 13, ...bleed(20) }}>
         MIT licensed. Not affiliated with Apple.
       </footer>
     </Duet>
@@ -142,7 +142,7 @@ function Site() {
 function Sheet() {
   const row: CSSProperties = { display: "flex", justifyContent: "space-between", padding: "13px 0", borderBottom: "0.5px solid var(--line)", font: "400 17px -apple-system, system-ui" };
   return (
-    <main style={{ maxWidth: 560, margin: "0 auto", padding: "calc(28px + env(safe-area-inset-top)) 20px 140px" }}>
+    <main style={{ padding: "calc(28px + env(safe-area-inset-top)) 0 140px", ...column(560) }}>
       <div style={{ textAlign: "center", padding: "12px 0 24px" }}>
         <div style={{ width: 84, height: 84, borderRadius: 99, margin: "0 auto 12px", background: "linear-gradient(135deg, #64d2ff, #0a84ff)" }} />
         <h2 style={{ ...h2, margin: "0 0 4px" }}>A card</h2>

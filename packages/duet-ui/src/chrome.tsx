@@ -13,14 +13,20 @@ export interface DuetItem {
   badge?: number | string;
   /** Colour of the icon and selection when this tab is selected. Default: the system blue. */
   tint?: string;
+  /** Deletes or discards: lives only in "…", last, in red, after a separator (blueprint). */
+  destructive?: boolean;
 }
 export interface DuetProps {
   /** Back button, top of the strip. */
   back?: false | { label?: string; onPress: () => void };
   /** SwiftUI `.topBarLeading`: its own group under back. */
   leading?: DuetItem[];
-  /** SwiftUI `.primaryAction`: collapses into "…" when it would hit the tab pill. */
+  /** SwiftUI `.primaryAction`: collapses into "…" when it would hit the tab pill. Destructive items always
+   *  go in "…". */
   actions?: DuetItem[];
+  /** The screen's main action (New chat, Compose), a tinted round button: by the thumb above the tabs where one
+   *  pane shows, at the top under back where two do. */
+  primary?: DuetItem;
   /** Tab pill at the bottom of the strip. `search` adds a `role: .search` tab as the last item. */
   tabs?: { items: DuetItem[]; selected: string; onSelect: (id: string) => void; search?: DuetItem };
   /** Searchable without tabs: a round search button at the bottom of the strip. */
@@ -135,15 +141,16 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
   const [min, setMin] = useState(false);
   useEffect(() => {
     if (!on) return;
-    const el = scroller.current, target = el ?? window;
-    const pos = () => el ? el.scrollTop : scrollY;
-    let last = pos();
-    const f = () => {
-      const y = pos(), d = y - last;
-      if (Math.abs(d) > 8) { setMin(d > 0 && y > 40); last = y; }
+    // Captured, so a scroll inside the page (a pane of <DuetPanes>) counts as well as the scroller's own; each
+    // scrolling element keeps its own last position.
+    const target = scroller.current ?? window, last = new WeakMap<object, number>();
+    const f = (e: Event) => {
+      const el = e.target instanceof Element ? e.target : null, y = el ? el.scrollTop : scrollY, key = el ?? window;
+      const d = y - (last.get(key) ?? 0);
+      if (Math.abs(d) > 8) { setMin(d > 0 && y > 40); last.set(key, y); }
     };
-    target.addEventListener("scroll", f, { passive: true });
-    return () => target.removeEventListener("scroll", f);
+    target.addEventListener("scroll", f, { passive: true, capture: true });
+    return () => target.removeEventListener("scroll", f, { capture: true });
   }, [on, scroller]);
   return on && min;
 }
@@ -236,31 +243,30 @@ export function Duet(p: DuetProps) {
     if (n && closing === n) setClosing(null);
     setMenuNow(n);
   };
-  const actions = p.actions ?? [], leading = p.leading ?? [];
+  const actions = (p.actions ?? []).filter((a) => !a.destructive), destructive = (p.actions ?? []).filter((a) => a.destructive);
+  const leading = p.leading ?? [];
   const tabItems = p.tabs ? [...p.tabs.items, ...(p.tabs.search ? [p.tabs.search] : [])] : [];
   const pl = plan(ctx, p.close
     ? { back: true, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized, menuExtra: 0 }
     : {
         back: !!p.back, leading: leading.length, actions: actions.length, tabs: tabItems.length,
-        searchButton: !p.tabs && !!p.searchButton, accessory: !!p.accessory, minimized, menuExtra: ctx.mode === "inline" ? 1 : 0,
+        searchButton: !p.tabs && !!p.searchButton, accessory: !!p.accessory, minimized,
+        menuExtra: (ctx.mode === "inline" ? 1 : 0) + destructive.length, primary: !!p.primary,
       });
   const left = ctx.side === "left";
 
   useEffect(() => {
-    // Content inset so pages stop before the strip, like List does natively. In Safari's column the
-    // controls are outside the viewport, so the page keeps its full width.
+    // The page spans the window and the controls float over it; these insets are how far text and buttons keep
+    // clear on each edge (layout.ts). In Safari's column the scroller runs on under the column (an emulated
+    // column's frame already spans it), so either way the inset there is the column's width.
     const r = document.documentElement.style;
-    // An emulated column has no Safari column to paint into: its frame includes the column, so the page
-    // stops before it like a strip.
-    const column = emulated ? `${ctx.screenWidth - ctx.width}px` : "0px";
-    const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : column;
-    r.setProperty("--duet-inset-right", ctx.side === "right" ? inset : envInset("right"));
-    r.setProperty("--duet-inset-left", ctx.side === "left" ? inset : envInset("left"));
+    const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
+    const right = ctx.side === "right" ? inset : envInset("right"), left = ctx.side === "left" ? inset : envInset("left");
+    // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
+    for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
     // inset, closed and unfolded; pages pad their top content by this much to stay sharp.
     r.setProperty("--duet-inset-top", ctx.mode === "strip" ? `${DUO.edgeBlur}px` : "0px");
-    // Safari's column: bleeds run this much further, under the column, so its controls sit on colour too.
-    r.setProperty("--duet-under", ctx.mode === "column" && !emulated ? `${ctx.screenWidth - ctx.width}px` : "0px");
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulated);
   }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.width]);
@@ -295,6 +301,7 @@ export function Duet(p: DuetProps) {
     ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
     ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length),
     ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => setPreferredSide(left ? "right" : "left") }] : []),
+    ...destructive,
   ];
   const selected = p.tabs?.selected;
   const badge = (a: DuetItem) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge">{a.badge}</span>;
@@ -352,7 +359,8 @@ export function Duet(p: DuetProps) {
         data-closing={rolling || undefined} onAnimationEnd={(e) => { if (rolling && (e.animationName === "duet-roll" || e.animationName === "duet-unmorph")) setClosing(null); }}>
         {items.map((a, i) => (
           <button key={a.id} role={radio ? "menuitemradio" : "menuitem"} aria-checked={radio ? a.id === selected : undefined} aria-label={a.label}
-            className="duet-menu-item" data-on={(radio && a.id === selected) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.12 + 0.04 * i : 0.14 + 0.06 * (items.length - i)}s` }) }}
+            className="duet-menu-item" data-on={(radio && a.id === selected) || undefined} data-destructive={a.destructive || undefined}
+            data-sep={(a.destructive && i > 0 && !items[i - 1].destructive) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.12 + 0.04 * i : 0.14 + 0.06 * (items.length - i)}s` }) }}
             onClick={() => { setMenu(null); if (radio) p.tabs!.onSelect(a.id); else a.onPress?.(); }}>{a.icon}{morph && <span className="duet-menu-label">{a.label}</span>}{badge(a)}</button>
         ))}
         {close && <button className="duet-menu-item" aria-label="Close" onClick={() => setMenu(null)}><X size={20} /></button>}
@@ -370,6 +378,9 @@ export function Duet(p: DuetProps) {
           </GlassSurface>
         )}
         {!p.close && p.back && pl.back && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="back" style={at(pl.back)}>{backButton}</GlassSurface>}
+        {!p.close && p.primary && pl.primary && (
+          <GlassSurface preset="control" className="duet-glass duet-round duet-primary" data-duet-slot="primary" style={{ ...at(pl.primary), ...tint(p.primary) }}>{item(p.primary)}</GlassSurface>
+        )}
         {pl.leading && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="leading" style={at(pl.leading)}>{shownLeading.map(item)}</GlassSurface>}
         {pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>}
         {!p.close && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}

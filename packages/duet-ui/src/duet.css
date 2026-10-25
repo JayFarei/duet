@@ -168,6 +168,11 @@
 .duet[data-drag="held"], .duet[data-drag="switch"] { transition: none; }
 .duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
+/* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */
+.duet-menu-item[data-destructive] { color: #ff3b30; }
+.duet-menu[data-style="morph"] > .duet-menu-item[data-sep] { box-shadow: 0 -0.5px 0 var(--duet-ring); border-top-left-radius: 0; border-top-right-radius: 0; }
+/* The primary action: the one tinted button, so the thumb finds it. */
+.duet-primary { color: var(--duet-tint); }
 
 /* Morph menu: the button grows into a labelled list, like an iOS context menu. It starts as the button's own
    circle (--x0/--y0 is its top-left) and springs out to the list; closing shrinks it back into the button. */
@@ -192,16 +197,15 @@
 
 /* Inner scroller: the document never scrolls, so nothing outside it moves with momentum or rubber-band. */
 html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height: 100%; overscroll-behavior: none; }
-.duet-scroller {
-  position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain;
-  padding-right: var(--duet-inset-right); padding-left: var(--duet-inset-left, env(safe-area-inset-left)); box-sizing: border-box;
-}
-/* Safari's column only shows in-document content and clips fixed boxes at the viewport edge, so there the
-   scroller is an in-document box that runs on under the column (bleeds paint there). The document still never
+.duet-scroller { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
+/* The page spans the whole window and the controls float over it (blueprint rules 14/15): backgrounds run on
+   under the controls, and only text and buttons keep clear, by the insets (--duet-inset-left/right), through
+   column() or bleed(). Safari's column only shows in-document content and clips fixed boxes at the viewport
+   edge, so there the scroller is an in-document box that runs on under the column. The document still never
    scrolls, so the chrome layer never moves. */
-html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-under)); padding-right: var(--duet-under); }
-/* Emulated (the site's web Duo): the frame already spans the column, so the page stops at the inset instead. */
-html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; padding-right: var(--duet-inset-right); }
+html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-right)); }
+/* Emulated (the site's web Duo): the frame already spans the column. */
+html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; }
 
 /* Safari tab: an in-document layer at the document top (which never scrolls), so controls can paint in
    Safari's column.
@@ -244,12 +248,18 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
 }
 .duet[data-mode="column"] .duet-glass.duet-menu:not(.duet-accessory)::before { background: var(--duet-solid); }
 
-/* Full-width band, the CSS twin of bleed(): background under the controls, content padded beside them.
-   Set --duet-pad for the band's own horizontal padding. */
+/* Full-width band, the CSS twin of bleed(): its background runs under the controls, its content is padded
+   beside them. Set --duet-pad for the band's own horizontal padding. */
 .duet-bleed {
-  margin-right: calc(-1 * var(--duet-inset-right, 0px) - var(--duet-under, 0px)); margin-left: calc(-1 * var(--duet-inset-left, 0px));
-  border-right: var(--duet-under, 0px) solid transparent; background-origin: border-box;
   padding-right: calc(var(--duet-pad, 0px) + var(--duet-inset-right, 0px)); padding-left: calc(var(--duet-pad, 0px) + var(--duet-inset-left, 0px));
+}
+/* Centred column, the CSS twin of column(): at most --duet-max wide, centred on the whole width (so a logo
+   lines up with the device, not with the space beside the controls), and nudged away from the controls only
+   as far as it must to keep --duet-pad clear of them. */
+.duet-column {
+  --duet-w: min(var(--duet-max, 680px), 100% - var(--duet-inset-left, 0px) - var(--duet-inset-right, 0px) - 2 * var(--duet-pad, 20px));
+  box-sizing: border-box; width: var(--duet-w); margin-right: 0;
+  margin-left: clamp(var(--duet-inset-left, 0px) + var(--duet-pad, 20px), (100% - var(--duet-w)) / 2, 100% - var(--duet-inset-right, 0px) - var(--duet-pad, 20px) - var(--duet-w));
 }
 
 /* Panes: every pane of the path sits in one track, a full width (narrow) or half (wide) each. The track slides
@@ -268,3 +278,35 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
 }
 .duet-panes[data-layout="wide"] .duet-pane + .duet-pane { box-shadow: inset 0.5px 0 0 var(--duet-pane-line, rgb(128 128 128 / 0.35)); }
 @media (prefers-reduced-motion: reduce) { .duet-panes-track, .duet-pane { transition: none; } }
+
+/* Pane bar: close, full screen and "…" in a pill at the pane's top right, stuck there as the pane scrolls, and
+   clear of the controls when the pane is on their edge (the pane's --duet-inset-right). Zero height, so it
+   floats over the pane's own header instead of pushing it down. */
+.duet-pane-bar {
+  position: sticky; top: calc(var(--duet-inset-top, 0px) + env(safe-area-inset-top) + 10px); z-index: 20; height: 0;
+  display: flex; flex-direction: column; align-items: flex-end; padding-right: calc(var(--duet-inset-right, 0px) + 12px);
+  font-family: -apple-system, system-ui, sans-serif;
+}
+.duet-pane-pill, .duet-pane-menu {
+  --duet-pane-glass: rgb(255 255 255 / 0.72); --duet-pane-ink: #000; --duet-pane-ring: rgb(0 0 0 / 0.12);
+  background: var(--duet-pane-glass); color: var(--duet-pane-ink); box-shadow: 0 0 0 0.5px var(--duet-pane-ring), 0 4px 14px rgb(0 0 0 / 0.08);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-lg-theme="light"]) :is(.duet-pane-pill, .duet-pane-menu) { --duet-pane-glass: rgb(44 44 46 / 0.72); --duet-pane-ink: #fff; --duet-pane-ring: rgb(255 255 255 / 0.14); }
+}
+[data-lg-theme="dark"] :is(.duet-pane-pill, .duet-pane-menu) { --duet-pane-glass: rgb(44 44 46 / 0.72); --duet-pane-ink: #fff; --duet-pane-ring: rgb(255 255 255 / 0.14); }
+.duet-pane-pill { display: flex; padding: 2px; border-radius: 999px; }
+.duet-pane-bar button { appearance: none; border: 0; background: none; color: inherit; margin: 0; cursor: pointer; display: flex; align-items: center; -webkit-tap-highlight-color: transparent; }
+.duet-pane-pill > button { width: 36px; height: 36px; justify-content: center; border-radius: 999px; transition: background 0.15s; }
+.duet-pane-pill > button:active, .duet-pane-pill > button[aria-expanded="true"] { background: rgb(128 128 128 / 0.2); }
+.duet-pane-menu {
+  margin-top: 46px; min-width: 220px; padding: 6px; border-radius: 18px; display: flex; flex-direction: column;
+  transform-origin: top right; animation: duet-fade 0.3s var(--duet-spring-out, ease-out) both;
+}
+.duet-pane-menu > button { height: 44px; padding: 0 12px; gap: 12px; justify-content: space-between; border-radius: 12px; font: 400 17px -apple-system, system-ui; text-align: left; }
+.duet-pane-menu > button:active { background: rgb(128 128 128 / 0.18); }
+.duet-pane-menu > button[data-destructive] { color: #ff3b30; }
+.duet-pane-menu > button[data-sep] { margin-top: 7px; position: relative; }
+.duet-pane-menu > button[data-sep]::before { content: ""; position: absolute; top: -4px; left: 12px; right: 12px; border-top: 0.5px solid var(--duet-pane-ring); }
+@media (prefers-reduced-motion: reduce) { .duet-pane-menu { animation: none; } }

@@ -58,7 +58,8 @@ Links opened from social and mail apps land in the in-app Safari preview (`SFSaf
 | --- | --- |
 | `back` | Back button at the top of the strip: `{ label?, onPress }` |
 | `leading` | Its own group under back, like SwiftUI `.topBarLeading` |
-| `actions` | Like `.primaryAction`; collapses into "…" when it would reach the tabs |
+| `actions` | Like `.primaryAction`; collapses into "…" when it would reach the tabs. Items with `destructive: true` only ever show in "…", last, in red |
+| `primary` | The one main action (compose, new). Narrow: just above the tabs. Wide: under back, at the top |
 | `tabs` | `{ items, selected, onSelect, search? }`. `search` adds a search tab as the last item |
 | `searchButton` | A round search button at the bottom when there are no tabs |
 | `close` | A sheet or card is open: the strip holds only a close button until it is cleared |
@@ -68,7 +69,7 @@ Links opened from social and mail apps land in the in-app Safari preview (`SFSaf
 | `dark` | Force a theme. Default: follow the system |
 | `children` | Page content, in an inner scroller so the chrome stays still during momentum scroll |
 
-Each `DuetItem` is `{ id, label, icon, onPress?, badge?, tint? }`.
+Each `DuetItem` is `{ id, label, icon, onPress?, badge?, tint?, destructive? }`.
 
 ### Menu styles
 
@@ -77,9 +78,14 @@ Each `DuetItem` is `{ id, label, icon, onPress?, badge?, tint? }`.
 
 Both are live on the [site](apps/site): scroll until the tabs shrink, tap the button, and switch styles in the Menus card.
 
-### Full-bleed content
+### Laying out content
 
-`bleed(pad)` returns styles that let a hero band or sticky bar run under the strip while its content stays beside it. `bleed(false)` runs content itself edge to edge (a map, an image). The page insets are also exposed as `--duet-inset-left`, `--duet-inset-right` and `--duet-inset-top` (the strip's top blur in Home Screen apps).
+The page spans the whole window and the controls float over it, so backgrounds run on under them and the layout is asymmetric, like a native app. Only text and buttons keep clear.
+
+- `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
+- `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image).
+
+The insets are exposed as `--duet-inset-left`, `--duet-inset-right` and `--duet-inset-top` (the strip's top blur in Home Screen apps). Inside `<DuetPanes>` each pane gets its own: only the pane next to the controls is inset.
 
 ## Panes
 
@@ -104,13 +110,15 @@ export function Mail() {
 }
 ```
 
-`useDuet().layout` is `"wide"` when the page has room for two panes (600pt beside the controls: the open Duo at full width) and `"narrow"` otherwise, from the page width rather than the posture. `nav.back` steps back along the path and is `false` when that would change nothing on screen, so the back button only shows when it does something. Try it on the [site](apps/site) at `/panes`.
+`<DuetPaneBar>` is the pane's header pill: close, a full-screen toggle (wide only) and "…" with the pane's own actions, destructive ones last. `nav.toggle` gives the focused pane the whole window (`expanded`); back leaves full screen before it steps along the path.
+
+`minimizeOnScroll` follows whichever pane scrolls. `useDuet().layout` is `"wide"` when the page has room for two panes (600pt beside the controls: the open Duo at full width) and `"narrow"` otherwise, from the page width rather than the posture. `nav.back` steps back along the path and is `false` when that would change nothing on screen, so the back button only shows when it does something. Try it on the [site](apps/site) at `/panes`.
 
 ## Examples
 
 | App | Shows | Run |
 | --- | --- | --- |
-| [Almanac](examples/almanac) | Reading app: back, actions, tabs with search, morph menus, sticky title with `bleed` | `pnpm --filter @duet/example-almanac dev`, port 3101 |
+| [Almanac](examples/almanac) | Reading app on `<DuetPanes>`: the list beside the story unfolded, a pane bar, tabs with search, morph menus, sticky title with `bleed` | `pnpm --filter @duet/example-almanac dev`, port 3101 |
 | [Encore](examples/encore) | Music player: badges, mini player `accessory`, island menus, carousels with `bleed` | `pnpm --filter @duet/example-encore dev`, port 3103 |
 | [Meridian](examples/meridian) | Transit map on Vite: `leading`, a full-screen map with `bleed(false)` | `pnpm --filter @duet/example-meridian dev`, port 3102 |
 
@@ -121,7 +129,7 @@ export function Mail() {
 | Path | What |
 | --- | --- |
 | [`packages/duet-ui`](packages/duet-ui) | The library |
-| [`apps/site`](apps/site) | Docs site. On a desktop it runs itself inside a web Duo you can fold and rotate |
+| [`apps/site`](apps/site) | Docs site. On a desktop it runs itself inside a web Duo you can fold, rotate and scrub through the fold (with ¼ speed) |
 | [`examples`](examples) | Example apps |
 | [`tools/simulator`](tools/simulator) | Driving the iPhone Duo simulator |
 | [`tools/media`](tools/media) | Framing simulator recordings for docs |

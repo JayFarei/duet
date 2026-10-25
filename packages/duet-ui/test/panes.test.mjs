@@ -19,6 +19,10 @@ test("wide shows the focused pane with the one before it, the first two at the r
   assert.deepEqual(panes(PATH, "chat", "wide").visible, ["list", "chat"]);
   assert.deepEqual(panes(PATH, "artifact", "wide"), { start: 2, count: 2, visible: ["chat", "artifact"] });
 });
+test("expanded: the focused pane takes the whole window, wide or narrow", () => {
+  assert.deepEqual(panes(PATH, "artifact", "wide", true), { start: 3, count: 1, visible: ["artifact"] });
+  assert.deepEqual(panes(PATH, "list", "narrow", true), panes(PATH, "list", "narrow"));
+});
 test("a one-pane path or an unknown id never breaks the window", () => {
   assert.deepEqual(panes(["only"], "only", "wide"), { start: 0, count: 1, visible: ["only"] });
   assert.deepEqual(panes(PATH, "nope", "narrow").visible, ["sidebar"]);

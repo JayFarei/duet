@@ -18,7 +18,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 * { box-sizing: border-box; }
 .art { width: 100%; }
 
-.page { padding: 0 20px calc(108px + env(safe-area-inset-bottom)); }
+/* The page spans the window; text keeps clear of the strip by its inset (what bleed(20) does inline). */
+.page { padding: 0 calc(20px + var(--duet-inset-right, 0px)) calc(108px + env(safe-area-inset-bottom)) calc(20px + var(--duet-inset-left, 0px)); }
 .top { padding-top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 22px); }
 .title { font: 700 34px/1.1 -apple-system, system-ui; letter-spacing: -0.4px; margin: 0 0 18px; }
 .h2 { display: flex; align-items: center; gap: 4px; font: 700 21px/1.2 -apple-system, system-ui; letter-spacing: -0.2px; margin: 30px 0 12px; }

@@ -54,3 +54,18 @@ test("a draft survives folding and unfolding", async ({ page }) => {
   expect(await shown(page)).toEqual(["inbox", "message"]);
   await expect(page.getByPlaceholder("Write a reply")).toHaveValue("Looks great");
 });
+
+test("the pane bar's full-screen toggle gives the focused pane the window, and back leaves it first", async ({ page }) => {
+  await page.setViewportSize(OPEN);
+  await open(page);
+  await page.getByRole("button", { name: /Fold test results/ }).click(); await settle(page);
+  await page.getByRole("button", { name: "Full screen" }).click(); await settle(page);
+  expect(await shown(page)).toEqual(["message"]);
+  await page.getByRole("button", { name: "Back" }).click(); await settle(page);
+  expect(await shown(page)).toEqual(["inbox", "message"]);
+  // Destructive items live in "…", last, after a separator.
+  await page.getByRole("button", { name: "More" }).first().click();
+  const items = page.locator(".duet-pane-menu [role=menuitem]");
+  await expect(items.last()).toHaveAttribute("data-destructive", "true");
+  await expect(items.last()).toContainText("Delete");
+});

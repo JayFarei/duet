@@ -80,13 +80,13 @@ export interface Context {
   /** In-app Safari preview (SFSafariViewController, opened from a social or mail app). */
   preview?: boolean;
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
-   *  (closed, split view, closed landscape). From the page width, not the posture. */
+   *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
 }
 
 export type Layout = "narrow" | "wide";
-/** Page width (beside the controls) from which two panes fit: the open Duo gives 867, a split-view pane 301,
- *  closed landscape 510, closed Safari 382. */
+/** Page width from which two panes fit. The page spans the window, controls floating over it: the open Duo gives
+ *  951, a split-view pane 385, closed landscape 594, closed Safari 382. */
 export const WIDE = 600;
 const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "narrow";
 
@@ -122,7 +122,7 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
   const preview = isPreview(s);
-  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth - INLINE_WIDTH), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }) };
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }) };
 }
 
 /** Mode flips are a feedback loop when the layout of one mode changes the signals into the other (the
@@ -171,8 +171,11 @@ export interface Spec {
   searchButton: boolean;
   accessory: boolean;
   minimized: boolean;
-  /** Items that always live behind "…" (e.g. the inline side switch). */
+  /** Items that always live behind "…" (e.g. the inline side switch, destructive actions). */
   menuExtra?: number;
+  /** The screen's main action (New chat, Compose): by the thumb above the tabs where one pane shows, at the top
+   *  under back where two do, never at the bottom of a wide screen (blueprint). It never folds into "…". */
+  primary?: boolean;
 }
 
 export interface Box { top: number; height: number }
@@ -186,6 +189,7 @@ export interface Plan {
   actions?: Box & { visible: number };
   /** "…": its own round button under the actions, so it alone unrolls into the menu island. */
   more?: Box;
+  primary?: Box;
   /** What did not fit, in order, behind the "…" slot: back first, then leading, then actions (indexes). */
   menu: { back: boolean; leading: number; actions: number };
   /** min: only the selected tab shows (minimized, or the full pill does not fit). */
@@ -214,16 +218,18 @@ export function plan(c: Context, s: Spec): Plan {
   // Bottom item: the tab pill (minimized to the selected tab when it would crowd out the "…" slot), or
   // the search button.
   const fullPill = DUO.pillPad + DUO.pillItem * s.tabs;
-  const head = (s.back ? step : 0) + (s.leading ? groupHeight(s.leading) + DUO.gap : 0) + (s.actions ? step : 0);
-  const tabsMin = !!s.tabs && (s.minimized || top + head + fullPill > bottom);
+  const primaryTop = !!s.primary && c.layout === "wide", primaryLow = !!s.primary && !primaryTop;
+  const head = (s.back ? step : 0) + (primaryTop ? step : 0) + (s.leading ? groupHeight(s.leading) + DUO.gap : 0) + (s.actions ? step : 0);
+  const tabsMin = !!s.tabs && (s.minimized || top + head + fullPill + (primaryLow ? step : 0) > bottom);
   const bottomH = s.tabs ? (tabsMin ? DUO.control : fullPill) : s.searchButton ? DUO.control : 0;
-  const floor = bottomH ? bottom - bottomH - DUO.gap : bottom;
+  const lowTop = bottom - bottomH - (bottomH ? DUO.gap : 0) - DUO.control;
+  const floor = primaryLow ? lowTop - DUO.gap : bottomH ? bottom - bottomH - DUO.gap : bottom;
 
   // Show everything that fits; the rest folds into "…" (actions first, then leading, then back).
   let back = s.back ? 1 : 0, leading = s.leading, actions = s.actions;
   const menuCount = () => (s.menuExtra ?? 0) + (s.back ? 1 - back : 0) + (s.leading - leading) + (s.actions - actions);
   const height = () => {
-    const parts = [back ? DUO.control : 0, leading ? groupHeight(leading) : 0, actions ? groupHeight(actions) : 0, menuCount() ? DUO.control : 0].filter(Boolean);
+    const parts = [back ? DUO.control : 0, primaryTop ? DUO.control : 0, leading ? groupHeight(leading) : 0, actions ? groupHeight(actions) : 0, menuCount() ? DUO.control : 0].filter(Boolean);
     return parts.reduce((a, b) => a + b, 0) + Math.max(0, parts.length - 1) * DUO.gap;
   };
   while (height() > floor - top) {
@@ -233,10 +239,12 @@ export function plan(c: Context, s: Spec): Plan {
   const p: Plan = { centerX, left: centerX - DUO.control / 2, menu: { back: s.back && !back, leading: s.leading - leading, actions: s.actions - actions } };
   if (s.tabs) p.tabs = { top: bottom - bottomH, height: bottomH, min: tabsMin };
   else if (s.searchButton) p.searchButton = { top: bottom - DUO.control, height: DUO.control };
+  if (primaryLow) p.primary = { top: lowTop, height: DUO.control };
 
   let y = top;
   if (height() <= floor - top) {
     if (back) { p.back = { top: y, height: DUO.control }; y += step; }
+    if (primaryTop) { p.primary = { top: y, height: DUO.control }; y += step; }
     if (leading) { const h = groupHeight(leading); p.leading = { top: y, height: h, visible: leading }; y += h + DUO.gap; }
     if (actions) { const h = groupHeight(actions); p.actions = { top: y, height: h, visible: actions }; y += h + DUO.gap; }
     if (menuCount()) p.more = { top: y, height: DUO.control };

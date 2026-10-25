@@ -13,7 +13,7 @@ const INLINE = sig(951, 543, 951, 669);
 const spec = (o = {}) => ({ back: false, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized: false, ...o });
 
 function boxes(p) {
-  return [p.back, p.leading, p.actions, p.more, p.tabs, p.searchButton].filter(Boolean).sort((a, b) => a.top - b.top);
+  return [p.back, p.primary, p.leading, p.actions, p.more, p.tabs, p.searchButton].filter(Boolean).sort((a, b) => a.top - b.top);
 }
 function assertNoOverlap(p) {
   const b = boxes(p);
@@ -57,4 +57,19 @@ test("in-app Safari preview: inline, left by default, never the iPhone SE's 2x w
   const se = detect(sig(375, 548, 375, 667, { pixelRatio: 2 }));
   assert.equal(se.preview, undefined);
   assert.equal(se.side, "right");
+});
+
+test("primary: by the thumb above the tabs where one pane shows, under back where two do", () => {
+  for (const s of [STRIP, COLUMN]) {
+    const p = plan(detect(s), spec({ back: true, actions: 3, tabs: 4, primary: true }));
+    assertNoOverlap(p);
+    assert.ok(p.primary.top + p.primary.height <= p.tabs.top && p.tabs.top - p.primary.top - p.primary.height <= DUO.gap + 0.01, "sits right above the tabs");
+  }
+  const wide = plan(detect(INLINE), spec({ back: true, actions: 2, tabs: 4, primary: true }));
+  assertNoOverlap(wide);
+  assert.equal(wide.primary.top, wide.back.top + DUO.control + DUO.gap);
+});
+test("destructive items count towards the … menu, so it shows even when everything else fits", () => {
+  const p = plan(detect(INLINE), spec({ actions: 1, menuExtra: 1 }));
+  assert.ok(p.more);
 });

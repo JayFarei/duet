@@ -29,7 +29,8 @@ const QUOTES = [
   ["“We shipped Duo support in an afternoon.”", "Lena, Engineer", "#34c759"],
 ];
 
-const pad = { padding: "0 24px" } as const;
+// Text keeps clear of the strip on either side; full-width bands add the same padding to their background.
+const pad = bleed(24);
 const btn = (bg: string, fg: string) => ({ display: "inline-block", padding: "13px 24px", borderRadius: 999, background: bg, color: fg, font: "700 16px -apple-system" }) as const;
 const eyebrow = (c: string) => ({ font: "800 13px -apple-system", letterSpacing: 1.2, textTransform: "uppercase", color: c }) as const;
 
@@ -67,7 +68,7 @@ export function Feed() {
       <section style={{ background: "linear-gradient(180deg, #ff6a00, #ee0979)", color: "#fff", padding: "40px 0 34px", ...bleed() }}>
         <div style={{ ...pad, ...eyebrow("rgb(255 255 255 / 0.8)") }}>Five finishes</div>
         <div style={{ ...pad, font: "900 34px/1.05 -apple-system", margin: "8px 0 20px" }}>Pick your colour.</div>
-        <div style={{ display: "flex", gap: 14, overflowX: "auto", padding: "0 24px", scrollbarWidth: "none" }}>
+        <div style={{ display: "flex", gap: 14, overflowX: "auto", scrollbarWidth: "none", ...pad }}>
           {COLORS.map(([n, bg]) => (
             <div key={n} style={{ flex: "none", width: 140, height: 200, borderRadius: 26, background: bg, padding: 14, boxSizing: "border-box", display: "flex", alignItems: "flex-end", font: "800 18px -apple-system", boxShadow: "inset 0 0 0 1px rgb(255 255 255 / 0.35)" }}>{n}</div>
           ))}
