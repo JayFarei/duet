@@ -1,6 +1,6 @@
 # Duet
 
-Native-feeling controls for React web apps on the foldable iPhone. Your page and its control strip, playing together.
+Native-feeling controls for React web apps on the foldable iPhone (the "iPhone Duo"). Your page and its control strip, playing together.
 
 ```sh
 npm i duet-ui
@@ -12,69 +12,125 @@ npm i duet-ui
 
 Recorded on the iPhone Duo simulator, framed by [`tools/media`](tools/media).
 
-## Why
+## What it does
 
-On the closed Duo, Safari keeps a narrow column beside the page for its own buttons, and a Home Screen app owns the whole display. iOS puts navigation in a vertical strip at the screen's edge, not a bottom tab bar. A web page that ignores this ends up with its own bar fighting Safari's, or its buttons under the camera. Duet works out where the page is running and draws back, actions and tabs where a native app would.
+On the closed Duo, iOS puts navigation in a vertical strip at the screen's edge, not a bottom tab bar. A Home Screen web app gets that strip as a safe-area inset. In a Safari tab, Safari owns the strip for its own buttons and leaves part of it empty. A web page that ignores this ends up with its own bar fighting Safari's, or its buttons under the camera.
 
-## Usage
+`<Duet>` draws your back button, actions, primary action, tabs, search and accessory where a native app would, picks one of three layouts (`strip`, `column`, `inline`) from the window geometry, keeps every control inside the space it may use, and folds what does not fit into a "…" menu. `<DuetPanes>` shows one screen of a path when the page is narrow and two side by side when it is wide. `useDuet()` tells your own code what Duet decided, including whether this looks like an iPhone Duo.
+
+Everything is inferred from web signals (window and screen sizes, safe-area insets, display mode, user agent). iOS gives a web page no API for the device model, the fold, Safari's buttons or the Dynamic Island, so detection is a heuristic built from measurements, and column mode relies on WebKit behaviour that is not a supported API. See [Limitations](#limitations).
+
+## Requirements
+
+- React and React DOM 18.3 or newer (peer dependencies).
+- A bundler that handles CSS imported from a package (Next.js, Vite): the components import their own stylesheet. It is also exported as `duet-ui/styles.css`.
+- Duet's components and hooks are client components (`"use client"` in the Next.js App Router).
+- The type definitions use `NoInfer`, so TypeScript 5.4 or newer.
+
+## Quick start
 
 ```tsx
 "use client";
-import { Duet, type DuetItem } from "duet-ui";
+import { useState } from "react";
+import { House, Link, Search } from "lucide-react";
+import { Duet, column, type DuetTab } from "duet-ui";
 
 const TABS = [
   { id: "home", label: "Home", icon: <House size={24} /> },
   { id: "search", label: "Search", icon: <Search size={24} /> },
-] as const satisfies readonly DuetItem[];
+] as const satisfies readonly DuetTab[];
+
+type Tab = (typeof TABS)[number]["id"];
 
 export function App() {
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("home");
+  const [tab, setTab] = useState<Tab>("home");
   return (
     <Duet
       tabs={{ items: TABS, selected: tab, onSelect: setTab }}
-      actions={[{ id: "share", label: "Share", icon: <Share size={22} />, onPress: share }]}
+      actions={[{ id: "copy", label: "Copy link", icon: <Link size={22} />, onPress: () => navigator.clipboard.writeText(location.href) }]}
       minimizeOnScroll
     >
-      <Page tab={tab} />
+      <main style={column(680)}>
+        <h1>{tab === "home" ? "Home" : "Search"}</h1>
+      </main>
     </Duet>
   );
 }
 ```
 
-That is the whole setup. The styles come with the component, and Duet adds `viewport-fit=cover` and `shrink-to-fit=no` to every viewport meta itself, including ones the framework adds later (the safe areas only reach the page with the first; the second keeps Safari from zooming a split-view pane out). Each tab keeps its own scroll position, and tapping the selected tab scrolls back to the top. On other phones and browsers Duet falls back to the `inline` strip.
+Icons are yours, from any library (this example uses `lucide-react`): 24pt in tabs and 21 to 22pt on round buttons match the system. `as const` types the tab ids, so `onSelect` takes `setTab` without a cast. Each tab keeps its own scroll position, and tapping the selected tab scrolls back to the top. Pass the page as `children`: it then scrolls in an inner scroller, which keeps the controls still during momentum scroll.
 
-Icons are yours, any library: 24pt in tabs, 21 to 22pt on round buttons matches the system. `as const` types the tab ids, so `onSelect` takes `setTab` without a cast.
+On phones and browsers that are not an iPhone Duo in Safari or a Home Screen app, the same code renders the `inline` layout, so you may want to render `<Duet>` only where `useDuet().duo` is true (see [Server rendering](#server-rendering-and-hydration)).
 
-## Modes
+## How Duet decides
 
-Duet picks a mode from the window size, safe areas and display mode. `useDuet()` returns it.
+### Is this an iPhone Duo?
 
-| Mode | When | Controls |
-| --- | --- | --- |
-| `strip` | Home Screen app, closed | In the slim strip beside the page, like a native app |
-| `column` | Safari tab, closed, windowed or a split-view pane | Painted into the column Safari leaves empty, so the page keeps its full width. In split view both columns get the controls, since a pane can't tell which side it is on, and each shows only its own |
-| `inline` | Unfolded, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered |
+`useDuet().duo` (and `isDuo(signals)`) is a heuristic. It is true when both hold:
+
+1. The screen size (`screen.width` x `screen.height`) or the window size (`outerWidth` x `outerHeight`) matches, within 1px and in either orientation, one of the sizes measured on the Duo: 466x678 (closed screen; Safari keeps reporting it as `screen.*` after unfolding), 669x951 (open screen) or 469x669 (a Safari split-view pane).
+2. The user agent says iOS: it contains `iPhone` or `iPod`, or it contains `Macintosh` and `navigator.maxTouchPoints` is greater than 1 (Safari's "Request Desktop Website"). Signals without a user agent, such as ones you build yourself for `isDuo()`, skip this check.
+
+Possible false positives: an iPad (which also sends a Mac user agent with touch) or another iOS device whose screen or window happens to match one of these sizes. Possible false negatives: anything that changes the reported sizes, such as a different display zoom setting, a future iOS release, or a window size that was not measured. Use it to switch to a Duo layout, not as proof of the device.
+
+### Which mode
+
+Duet re-reads the signals on resize, orientation change and visual viewport resize (again 300 and 600ms later, since the window size and insets settle late), and picks the first mode that matches:
+
+| Order | Mode | Conditions (all must hold) | Controls |
+| --- | --- | --- | --- |
+| 1 | `strip` | Running as a Home Screen app (`navigator.standalone` or `display-mode: standalone`), and the left or right safe-area inset is at least 60px. The right side wins if both are. Does not check for a Duo. | In the strip iOS gives the app, beside the page |
+| 2 | `column` | Not a Home Screen app; not inside an iframe; the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`); the keyboard is down (visual viewport height at least `innerHeight - 1`); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column its own buttons leave empty, so the page keeps its full width |
+| 3 | `inline` | Everything else: unfolded at full width, landscape, keyboard up, other browsers, in-app web views, the in-app Safari preview, other phones, desktops | An 84px strip inside the page, on the side the user picks |
+
+"Safari" means the user agent has `Version/x Safari/` and none of the tokens of other iOS browsers and apps (`CriOS`, `FxiOS`, `EdgiOS`, `OPiOS`, `GSA/`, `Ddg/`); an in-app web view drops the `Safari/` token. `useDuet().browser` reports the result: `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` or `"other"`. Other browsers draw their own chrome where Safari has its column, so they always get `inline`.
+
+There is no fold signal. The mode follows the geometry: folding or unfolding changes the window size, and the mode follows on the next read.
+
+### Column mode: how it works
+
+Column mode infers from the window geometry that Safari's column is there; it never sees Safari's buttons. The 80 to 88px width difference is Safari's column (84px measured), the height difference is Safari's chrome below the page.
+
+- `position: fixed` content is clipped to the page viewport, but WebKit paints in-document content that overflows the layout viewport into Safari's column. Duet renders the controls in an absolute layer at the top of the document, widens the document by the column's width, keeps the document itself from scrolling (the page scrolls in the inner scroller) and sets `touch-action: pan-y` on `<html>` so the page does not pan sideways. This is observed WebKit behaviour, not a supported API.
+- Touches in the column reach the page but are not hit-tested to Duet's buttons, and Safari usually keeps the touch end. Duet listens for `pointerdown`, finds the button under the touch's coordinates and clicks it, so a column button fires on touch down.
+- Placement comes from constants measured on the iPhone Duo simulator (iOS 27.1) and checked on a device: Safari's back and reader rows at the top of the column, its +/tabs pill at the bottom. A Safari update that moves its buttons or changes this painting behaviour needs new measurements.
+
+### Split view
+
+A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on the pane's outer edge, but no web signal says whether the pane is on the left or the right. In column mode Duet widens the document by a column on each side and draws the controls in both; each pane only shows its own column, and a tap there tells Duet which side it was. When a split pane falls back to `inline`, its side is remembered separately from the full-window side, so the user can move the controls next to Safari's column once. `useDuet().split` is true in a split pane.
+
+### Side
+
+`useDuet().side` is the edge the controls are on. It is only detected in `strip` mode (from which safe-area inset is large). In `column` mode it is always `"right"`, Safari's column on the closed Duo, and in a split pane it is nominal, since both edges are drawn. In `inline` mode it is the user's choice: drag the controls across the middle of the page, or use "Move controls" in "…". The choice is stored in `localStorage` per site (`duet-side`, or `duet-side-split` in split view). Without one, it is `"right"`, or `"left"` in the in-app preview.
+
+### In-app preview
+
+Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). Duet takes a window that is not standalone, exactly 375x667 (`outerWidth` x `outerHeight`) at `devicePixelRatio` 3 to be that preview, a size no iPhone has natively, measured on the closed Duo. The preview's own buttons sit beside the page and the page cannot paint there, so Duet uses `inline`, on the left unless the user picked a side before, and sets `useDuet().preview`. This is a heuristic too: another window at that size and density would match.
+
+### Oscillation guard
+
+Column mode can feed back into the signals (for example if Safari zooms the page out to fit the wider document, the column signature disappears, `inline` removes the overflow, and the signature returns). If the mode changes 3 times within 2 seconds while the outer window size stays the same, Duet pauses column mode for 3 seconds, then tries again. If the loop resumes as soon as the pause lifts, the next pause doubles. A change of window size resets the guard.
+
+### Viewport meta
+
+Duet appends `shrink-to-fit=no` to every `<meta name="viewport">` when `duet-ui` is imported, and `viewport-fit=cover` when `<Duet>` mounts, and keeps both on metas the framework adds or rewrites later. If there is no viewport meta it adds `width=device-width,initial-scale=1` first. It only appends a key that is absent: an existing `viewport-fit` or `shrink-to-fit` value is left as it is. Safe-area insets only reach the page with `viewport-fit=cover`, so with `viewport-fit=contain` `strip` mode cannot be detected. Without `shrink-to-fit=no`, Safari zooms a split pane out to fit the widened document.
 
 ### Claimable space
 
 Each mode has a band the controls may use, and Duet keeps every control inside it, so you never position anything yourself:
 
-- **Above:** the status bar and Dynamic Island, and in Safari its own back and bookmarks buttons at the top of the column (in a split-view pane, wherever that pane puts them). Live Activities grow the island down the strip and push Safari's buttons with it, and a page can't tell, so the band always assumes the worst case, two activities. The space they would take stays empty even when none are running. A split-view pane on the right sits under the same status column, so it gets the same small band as a closed tab, while the left pane uses the full column.
-- **Below:** Safari's +/tabs pill, or the home indicator.
+- **Above:** the status bar and Dynamic Island, and in Safari its own back and reader buttons at the top of the column. Live Activities grow the island down the strip and push Safari's buttons with it, and a page can't tell, so the band always assumes the worst case measured on device (two activities). That space stays empty even when none are running. A split-view pane on the right sits under the same status column, so it gets the same band as a closed tab, while the left pane uses the full column.
+- **Below:** Safari's +/tabs pill, or the bottom edge.
 - **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item.
 
-`useDuet()` gives the mode; the band follows from it. The menus ("island" or "morph") open over the page and close back into their button.
+## Server rendering and hydration
 
-### Only on the Duo
+The server can't measure anything, so on the server and during hydration `useDuet()` returns a fixed snapshot: `mode: "column"`, `duo: true`, `browser: "safari"`, `layout: "narrow"`, `side: "right"` (a closed Safari tab). The real values arrive right after hydration. So `useDuet().duo` is `true` in the server HTML on every device: a page that renders a Duo layout or a desktop layout from it switches once after hydration on non-Duo devices.
 
-`useDuet().duo` is true on an iPhone Duo in any posture, Safari or Home Screen, and false on other phones and desktops. iOS never names the model, so it takes two checks: an iPhone user agent (or Safari's desktop-site Mac agent with touch), and a screen or window size only the Duo has. It works outside `<Duet>`, so an existing app can switch to a Duo layout on it: render `<Duet>` only when it is true. `isDuo(signals)` is the same check for your own signals.
-
-`useDuet().browser` is `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` (an in-app browser such as Instagram's) or `"other"`. Only Safari gets `column`: the others draw their own chrome where Safari leaves its column, so they get `inline`.
-
-The server can't tell, so `<DuoCookie>` tells it: it keeps a `duet-duo` cookie in step with the browser, and a new device reloads once into the right layout. In the Next.js App Router:
+To choose the layout on the server, `<DuoCookie>` keeps a `duet-duo` cookie (`"1"` on a Duo) in step with the browser. Read the cookie on the server, render from it, and pass what you rendered as `rendered`. After hydration, if the browser's answer differs, `<DuoCookie>` updates the cookie and calls `onChange` (default: `location.reload()`), so a new device switches layout once. It renders nothing and works outside `<Duet>`. In the Next.js App Router:
 
 ```tsx
-// app/page.tsx, a server component
+// app/page.tsx, a server component. DuoApp and DesktopApp are your own components.
 import { cookies } from "next/headers";
 import { DuoCookie } from "duet-ui";
 
@@ -91,51 +147,58 @@ export default async function Page() {
 
 Pass `onChange={() => router.refresh()}` from a client component to re-render without a reload.
 
-### In-app preview
-
-Links opened from social and mail apps land in the in-app Safari preview (`SFSafariViewController`). On the closed Duo its window is a fixed 375x667 at 3x, a size no iPhone has natively, and its own close and share buttons sit where the column would. Duet detects it, switches to `inline` on the left, and sets `useDuet().preview`.
-
 ## Props
 
-| Prop | What it does |
-| --- | --- |
-| `back` | Back button at the top of the strip: `{ label?, onPress }` |
-| `leading` | Its own group under back, like SwiftUI `.topBarLeading` |
-| `actions` | Like `.primaryAction`; collapses into "…" when it would reach the tabs. Items with `destructive: true` only ever show in "…", last, in red |
-| `primary` | The one main action (compose, new). Narrow: just above the tabs. Wide: under back, at the top. Folds into "…" last, only when the band has no room for both |
-| `tabs` | `{ items, selected, onSelect, search? }`. `search` adds a search tab as the last item. Each tab keeps its scroll position |
-| `searchButton` | A round search button at the bottom when there are no tabs |
-| `close` | A sheet or card is open: the strip holds only a close button until it is cleared |
-| `accessory` | A view docked by the tabs, like `.tabViewBottomAccessory` (a mini player) |
-| `minimizeOnScroll` | Scrolling down shrinks the tabs to one button, like `.tabBarMinimizeBehavior(.onScrollDown)` |
-| `menuStyle` | How "…" and the minimized tab open: `"island"` or `"morph"` (below) |
-| `dark` | Force a theme. Default: follow the system |
-| `children` | Page content, in an inner scroller so the chrome stays still during momentum scroll |
+### `<Duet>`
 
-Each `DuetItem` is `{ id, label, icon, onPress?, badge?, tint?, destructive? }`.
+| Prop | Type | What it does |
+| --- | --- | --- |
+| `back` | `false \| { label?, onPress }` | Back button at the top of the strip |
+| `leading` | `DuetItem[]` | Its own group under back, like SwiftUI `.topBarLeading` |
+| `actions` | `DuetItem[]` | Like `.primaryAction`; folds into "…" when it would reach the tabs. Items with `destructive: true` only show in "…", last, in red |
+| `primary` | `DuetItem` | The screen's main action (compose, new), a tinted round button. Narrow: just above the tabs. Wide: under back. Folds into "…" last |
+| `tabs` | `{ items, selected, onSelect, search? }` | Tab pill at the bottom. `search` is a `DuetTab` added as the last tab. Each tab keeps its scroll position |
+| `searchButton` | `() => void` | A round search button at the bottom, when there are no tabs |
+| `close` | `false \| { label?, onPress }` | A sheet or card is open: the strip holds only a close button, where back goes, until it is cleared |
+| `accessory` | `ReactNode` | A view docked by the tabs, like `.tabViewBottomAccessory` (a mini player) |
+| `minimizeOnScroll` | `boolean` | Scrolling down shrinks the tabs to the selected one, like `.tabBarMinimizeBehavior(.onScrollDown)`. Follows the inner scroller and any pane |
+| `menuStyle` | `"island" \| "morph"` | How "…" and the minimized tab open their menu. Default `"island"` |
+| `dark` | `boolean` | Force a theme. Default: follow the system |
+| `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
+
+`DuetItem` is `{ id, label, icon, onPress?, badge?, tint?, destructive? }`: `badge` is a number or short text in a red badge, `tint` the colour of a selected tab or a primary button. `DuetTab<T>` is a `DuetItem` whose `id` is `T`.
 
 ### Menu styles
 
 - `"island"` (default): the button stretches sideways into a pill of icons, like the Dynamic Island. Best when the icons speak for themselves.
 - `"morph"`: the button grows into a labelled list, like a context menu. Best when items need their names.
 
-Both are live on the [site](apps/site): scroll until the tabs shrink, tap the button, and switch styles in the Menus card.
+Both are live on the [site](https://getduet.dev): scroll until the tabs shrink, tap the button, and switch styles in the Menus card.
 
-### Laying out content
+### `useDuet()`
+
+Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split` and `preview` (when true), `width` and `height` (the page viewport), plus the screen size and insets the placement uses. It works outside `<Duet>`.
+
+### Lower-level exports
+
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `plan`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests. `duet-ui/geometry` exports the geometry module alone, without React.
+
+## Laying out content
 
 The page spans the whole window and the controls float over it, so backgrounds run on under them and the layout is asymmetric, like a native app. Only text and buttons keep clear.
 
 - `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
-- `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image).
+- `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image). The `duet-bleed` class does the same in CSS.
 
-The insets are exposed as `--duet-inset-left`, `--duet-inset-right`, `--duet-inset-top` (the strip's top blur in Home Screen apps) and `--duet-inset-bottom` (Safari's floating URL pill in column mode: the page runs on under it, and the scroller ends with that much space so the last content scrolls clear). Inside `<DuetPanes>` each pane gets its own: only the pane next to the controls is inset.
+Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right`, `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear). Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
 
 ## Panes
 
-Apps with a path of screens (mailboxes, inbox, message) follow the fold with `<DuetPanes>`: closed or in split view one pane shows, unfolded two adjacent panes show side by side. Going deeper slides the pair along the path instead of opening a modal. Unfolding slides the neighbouring pane in, and folding plays the same motion backwards. Every pane stays mounted, so drafts and scroll positions survive the fold.
+Apps with a path of screens (mailboxes, inbox, message) follow the fold with `<DuetPanes>`: when `layout` is `"narrow"` one pane shows, when it is `"wide"` the focused pane and the one before it show side by side. Going deeper slides the pair along the path instead of opening a modal. Every pane stays mounted (off-screen panes are inert), so drafts and scroll positions survive the fold.
 
 ```tsx
-import { Duet, DuetPanes, usePanes } from "duet-ui";
+"use client";
+import { Duet, DuetPaneBar, DuetPanes, usePanes } from "duet-ui";
 
 const PATH = ["mailboxes", "inbox", "message"];
 
@@ -143,19 +206,37 @@ export function Mail() {
   const nav = usePanes(PATH);
   return (
     <Duet back={nav.back}>
-      <DuetPanes path={PATH} at={nav.at} panes={{
-        mailboxes: <Mailboxes onOpen={() => nav.go("inbox")} />,
-        inbox: <InboxList onOpen={() => nav.go("message")} />,
-        message: <Message />,
+      <DuetPanes path={PATH} at={nav.at} expanded={nav.expanded} panes={{
+        mailboxes: <button onClick={() => nav.go("inbox")}>Inbox</button>,
+        inbox: <button onClick={() => nav.go("message")}>First message</button>,
+        message: (
+          <article>
+            <DuetPaneBar onClose={nav.close} onToggle={nav.toggle} expanded={nav.expanded} />
+            <p>Hello from the message pane.</p>
+          </article>
+        ),
       }} />
     </Duet>
   );
 }
 ```
 
-`<DuetPaneBar>` is the pane's header pill: close, a full-screen toggle (wide only) and "…" with the pane's own actions, destructive ones last. `nav.toggle` gives the focused pane the whole window (`expanded`); back leaves full screen before it steps along the path.
+- `<DuetPanes path at expanded? panes>`: `panes` maps each id in `path` to its content. `expanded` gives the focused pane the whole window.
+- `usePanes(path, initial?)` returns `at`, `go(id)` (focus a pane, leaving full screen), `layout`, `expanded`, `toggle()` (full screen on and off), `close` (focus the previous pane, `undefined` at the root) and `back`, ready for `<Duet back>`: it leaves full screen first, then steps back along the path, and is `false` when that would change nothing on screen.
+- `<DuetPaneBar onClose? onToggle? expanded? more?>` is the pane's header pill: close, a full-screen toggle (only when `layout` is `"wide"`) and "…" with the pane's own `DuetItem`s, destructive ones last. It renders nothing when it has no buttons.
 
-`minimizeOnScroll` follows whichever pane scrolls. `useDuet().layout` is `"wide"` when the page has room for two panes (600pt beside the controls: the open Duo at full width) and `"narrow"` otherwise, from the page width rather than the posture. `nav.back` steps back along the path and is `false` when that would change nothing on screen, so the back button only shows when it does something. Try it on the [site](apps/site) at `/panes`.
+Try it on the [site](https://getduet.dev/panes).
+
+## Limitations
+
+- **Duo detection is a heuristic** from screen and window sizes plus the user agent (see above). It can misfire on devices with matching sizes and miss a Duo whose reported sizes differ.
+- **Column mode depends on unsupported WebKit behaviour** (painting in-document content outside the layout viewport) and on measured positions of Safari's buttons. A Safari or iOS update can break or shift it. Duet falls back to `inline` whenever any column check fails, but it cannot detect a Safari layout that still passes the checks while its buttons moved.
+- **Column taps are routed by coordinates** on `pointerdown`: they fire on touch down and show no native press state.
+- **Live Activities and the Dynamic Island are invisible to the page**, so the top band always reserves the worst case, which leaves empty space when no activity runs.
+- **Split-view panes can't tell their side**: column mode draws both edges, inline mode relies on the user's choice.
+- **Server rendering** starts from a fixed Duo snapshot (see [Server rendering](#server-rendering-and-hydration)).
+- Other iOS browsers, in-app web views, iframes, landscape, the open screen at full width and the keyboard all get `inline`.
+- Measured on the iPhone Duo simulator (iOS 27.1) and checked on a device in October 2026.
 
 ## Examples
 
@@ -171,12 +252,13 @@ export function Mail() {
 
 | Path | What |
 | --- | --- |
-| [`packages/duet-ui`](packages/duet-ui) | The library |
-| [`apps/site`](apps/site) | Docs site. On a desktop it runs itself inside a web Duo you can fold, rotate and scrub through the fold (with ¼ speed) |
+| [`packages/duet-ui`](packages/duet-ui) | The library ([changelog](packages/duet-ui/CHANGELOG.md)) |
+| [`apps/site`](apps/site) | Docs site at [getduet.dev](https://getduet.dev). On a desktop it runs itself inside a web Duo you can fold, rotate and scrub through the fold (with ¼ speed), sending the page emulated signals through `postMessage` |
 | [`examples`](examples) | Example apps |
 | [`tools/simulator`](tools/simulator) | Driving the iPhone Duo simulator |
 | [`tools/media`](tools/media) | Framing simulator recordings for docs |
 | [`e2e`](e2e) | Playwright tests |
+| [`docs`](docs) | [Releasing](docs/releasing.md), and the dated [research notes](docs/research-notes.md) behind column mode |
 
 ```sh
 pnpm install

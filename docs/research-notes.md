@@ -1,3 +1,7 @@
+> **Historical lab notes from 2026-10-24**, written while column mode was being built, before `duet-ui` was published. Paths, names (`native-chrome`, `DuoChrome`) and some conclusions are out of date, for example split-view panes now use Safari's column on both sides instead of always falling back to inline. For current behaviour, read the [README](../README.md#how-duet-decides) and `packages/duet-ui/src/geometry.ts`.
+>
+> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait, keyboard down) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here.
+
 # Handoff: our controls inside Safari's column on the iPhone Duo
 
 ## Goal

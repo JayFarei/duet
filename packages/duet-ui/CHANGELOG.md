@@ -4,20 +4,48 @@
 
 - Island and morph menus open and close about 20% faster, and their items appear with half the stagger.
 
+## 0.2.2
+
+- `useDuet().duo` and `isDuo()` also require an iOS user agent (iPhone, iPod, or a Mac user agent with touch), so a desktop window at a Duo size no longer counts.
+- Column mode only in Safari: Chrome, Firefox, Edge and in-app web views draw their own chrome there and get `inline`.
+- New `useDuet().browser`, `browserOf()` and `isIOS()`.
+
+## 0.2.1
+
+- A Safari tab never takes `strip`: strip mode requires a Home Screen app.
+- Column mode requires the Duo or split-view heuristic instead of the closed tab's height, and accepts a chrome height of 68 to 102px, so windowed Safari and compact split panes get the column.
+- The oscillation guard only counts mode flips at the same window size, and doubles its pause only when the loop resumes right after it lifts.
+- Every viewport meta is patched and kept patched.
+- In column mode the page runs on under Safari's URL bar (`--duet-inset-bottom`).
+- Tabs minimize in 0.24s and expand in 0.26s.
+
+## 0.2.0
+
+- `<DuoCookie>`: keep a `duet-duo` cookie in step with the browser, to choose a Duo layout on the server.
+- `DuetTab<T>`: `as const` tab ids type `onSelect` without a cast.
+- Each tab keeps its own scroll position; tapping the selected tab scrolls to the top.
+- `viewport-fit=cover` is added when `<Duet>` mounts.
+
+## 0.1.1
+
+- Package metadata only, first publish through the release workflow. No library changes.
+
 ## 0.1.0
 
 First release.
 
 - Switching the inline controls to the other side moves every control in the same frame, and closes the menu at once, so "…" is never left hidden.
 - The island opens and closes about 25% faster.
-- Split view remembers its own inline side (`useDuet().split`, `isSplit()`): no web API tells the left pane from the right, so moving the controls next to Safari's column once keeps them there, without moving them in full screen.
+- Split view draws the controls in Safari's column on both sides, and remembers its own inline side (`useDuet().split`, `isSplit()`): no web API tells the left pane from the right, so moving the controls next to Safari's column once keeps them there, without moving them in full screen.
 - The tab lens is a glass bubble about 1.2x the rail's width that pokes past both edges, and stretches along the rail while it travels, matched frame by frame to Apple News and Music.
 - `<Duet>`: back, `leading`, `actions` (collapsing into "…", destructive last), `primary`, `tabs` with search, `searchButton`, `close`, `accessory`, `minimizeOnScroll`, island and morph menus, light and dark
-- Modes picked from the window: `strip` (Home Screen app), `column` (Safari's empty column), `inline` (unfolded, split view, landscape, in-app preview), with a draggable, remembered side
-- `useDuet().duo` and `isDuo()`: true only on an iPhone Duo, to show a Duo layout there and nowhere else
+- Modes picked from the window: `strip` (Home Screen app), `column` (Safari's empty column, in a closed tab or on both sides of a split-view pane), `inline` (unfolded, landscape, in-app preview), with a draggable, remembered side
+- `useDuet().duo` and `isDuo()`: a screen and window size heuristic for the iPhone Duo, to show a Duo layout there
 - Full-width layout: the page runs under the controls, `column()` and `bleed()` keep text clear, insets as CSS variables
 - `<DuetPanes>`, `usePanes()` and `<DuetPaneBar>`: a path of screens that follows the fold, with a full-screen toggle
 - Tab rail behaves like Apple News: a tap glides the lens to the new tab with the rail at rest; a hold (250ms) or drag swells the whole rail with labels, and the lens stays inside it
 - Held, the rail grows for real (16pt wider, 12pt taller) so labels clear its round ends; letting go eases the rail and lens back together without overshoot
 - Side drag needs a deliberate sideways swipe (24pt, mostly horizontal) and the magnet is stiffer: a 16pt dead zone, 10pt of give, released at 120pt
 - Island and morph menus open about twice as fast with a springier stretch, and close in ~0.35s so the button is back sooner
+- The top band assumes the worst-case Live Activity island, measured on device
+- The inline side pin expires, and `primary` folds into "…" where the band holds only two buttons
