@@ -26,7 +26,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
     "prepack": "pnpm build && node scripts/pack-docs.mjs",
-    "test": "node --test test/",
+    "test": "node --test \"test/*.test.mjs\"",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
