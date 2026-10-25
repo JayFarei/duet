@@ -113,6 +113,10 @@ function Site() {
             </div>
             <pre style={{ margin: "12px 0 0", fontSize: 13 }}><code dangerouslySetInnerHTML={{ __html: highlight(`<Duet menuStyle="${menuStyle}" … />`) }} /></pre>
           </div>
+          <a href="/panes" style={{ ...card, display: "block" }}>
+            <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Panes</div>
+            <p style={dim}>A path of screens that follows the fold: one pane closed, two side by side unfolded. Going deeper slides the pair along, and a draft survives folding.</p>
+          </a>
           <a href="/lab?tabs=4,searchTab=1,back=1,actions=2,title=1,feed=1" style={{ ...card, display: "block" }}>
             <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Lab</div>
             <p style={dim}>Every control combination, set from the URL. Open it on the phone, or add it to the Home Screen.</p>

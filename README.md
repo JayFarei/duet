@@ -81,6 +81,31 @@ Both are live on the [site](apps/site): scroll until the tabs shrink, tap the bu
 
 `bleed(pad)` returns styles that let a hero band or sticky bar run under the strip while its content stays beside it. `bleed(false)` runs content itself edge to edge (a map, an image). The page insets are also exposed as `--duet-inset-left`, `--duet-inset-right` and `--duet-inset-top` (the strip's top blur in Home Screen apps).
 
+## Panes
+
+Apps with a path of screens (mailboxes, inbox, message) follow the fold with `<DuetPanes>`: closed or in split view one pane shows, unfolded two adjacent panes show side by side. Going deeper slides the pair along the path instead of opening a modal. Unfolding slides the neighbouring pane in, and folding plays the same motion backwards. Every pane stays mounted, so drafts and scroll positions survive the fold.
+
+```tsx
+import { Duet, DuetPanes, usePanes } from "duet-ui";
+
+const PATH = ["mailboxes", "inbox", "message"];
+
+export function Mail() {
+  const nav = usePanes(PATH);
+  return (
+    <Duet back={nav.back}>
+      <DuetPanes path={PATH} at={nav.at} panes={{
+        mailboxes: <Mailboxes onOpen={() => nav.go("inbox")} />,
+        inbox: <InboxList onOpen={() => nav.go("message")} />,
+        message: <Message />,
+      }} />
+    </Duet>
+  );
+}
+```
+
+`useDuet().layout` is `"wide"` when the page has room for two panes (600pt beside the controls: the open Duo at full width) and `"narrow"` otherwise, from the page width rather than the posture. `nav.back` steps back along the path and is `false` when that would change nothing on screen, so the back button only shows when it does something. Try it on the [site](apps/site) at `/panes`.
+
 ## Examples
 
 | App | Shows | Run |

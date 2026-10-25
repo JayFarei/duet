@@ -251,3 +251,20 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
   border-right: var(--duet-under, 0px) solid transparent; background-origin: border-box;
   padding-right: calc(var(--duet-pad, 0px) + var(--duet-inset-right, 0px)); padding-left: calc(var(--duet-pad, 0px) + var(--duet-inset-left, 0px));
 }
+
+/* Panes: every pane of the path sits in one track, a full width (narrow) or half (wide) each. The track slides
+   to the first visible pane; on a fold the widths and the slide change together, so the neighbouring pane
+   slides in as the focused one moves aside, and folding plays the same motion backwards. */
+.duet-panes { position: relative; height: 100%; overflow: hidden; }
+.duet-panes-track {
+  display: flex; height: 100%;
+  transform: translateX(calc(var(--start) * -100% / var(--n)));
+  transition: transform 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.duet-pane {
+  flex: 0 0 calc(100% / var(--n)); min-width: 0; height: 100%; box-sizing: border-box;
+  overflow-y: auto; overscroll-behavior: contain;
+  transition: flex-basis 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.duet-panes[data-layout="wide"] .duet-pane + .duet-pane { box-shadow: inset 0.5px 0 0 var(--duet-pane-line, rgb(128 128 128 / 0.35)); }
+@media (prefers-reduced-motion: reduce) { .duet-panes-track, .duet-pane { transition: none; } }

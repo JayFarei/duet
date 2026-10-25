@@ -79,7 +79,16 @@ export interface Context {
   insetBottom: number;
   /** In-app Safari preview (SFSafariViewController, opened from a social or mail app). */
   preview?: boolean;
+  /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
+   *  (closed, split view, closed landscape). From the page width, not the posture. */
+  layout: Layout;
 }
+
+export type Layout = "narrow" | "wide";
+/** Page width (beside the controls) from which two panes fit: the open Duo gives 867, a split-view pane 301,
+ *  closed landscape 510, closed Safari 382. */
+export const WIDE = 600;
+const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "narrow";
 
 /** In-app Safari preview on the closed Duo (simulator, iOS 27.1, and device screenshot 2026-10-25): the page
  *  window is a fixed 375x667 at 3x, a size no iPhone has natively, and the preview's own buttons (close,
@@ -101,7 +110,7 @@ const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= 
 /** preferred: the side the user picked for inline controls, if any. */
 export function detect(s: Signals, preferred?: Side, allowColumn = true): Context {
   if (s.insetRight >= 60 || s.insetLeft >= 60) {
-    return { mode: "strip", side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+    return { mode: "strip", layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
   const base = { width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
   const column = allowColumn && !s.standalone && !s.framed
@@ -111,9 +120,9 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
     && s.innerHeight > s.innerWidth // landscape moves Safari's column buttons around
     && s.visualHeight >= s.innerHeight - 1; // keyboard up
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
-  if (column) return { ...base, mode: "column", side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
+  if (column) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
   const preview = isPreview(s);
-  return { ...base, mode: "inline", side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }) };
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth - INLINE_WIDTH), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }) };
 }
 
 /** Mode flips are a feedback loop when the layout of one mode changes the signals into the other (the
