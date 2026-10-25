@@ -5,7 +5,7 @@ import {
   ArrowDownToLine, Check, ChevronRight, Disc3, FastForward, Heart, House, LayoutGrid, Library, ListMusic,
   MicVocal, Music, Pause, Play, Plus, Radio, Search, Share, Shuffle, User, UserRound,
 } from "lucide-react";
-import { Duet, bleed, column, type DuetItem } from "duet-ui";
+import { Duet, bleed, column, type DuetItem, type DuetTab } from "duet-ui";
 import { ALBUMS, GENRES, MIXES, NEW, STATIONS, album, time, track, type Album, type Track } from "./data";
 import { Art, tone } from "./art";
 import * as audio from "./tone";
@@ -21,8 +21,8 @@ export function Encore() {
   const [seenNew, setSeenNew] = useState(false);
   const [saved, setSaved] = useState<Record<string, "added" | "loved" | "down" | undefined>>({});
 
-  // Each view starts at its top, like a native navigation push or tab switch.
-  useEffect(() => { document.querySelector(".duet-scroller")?.scrollTo(0, 0); }, [tab, open]);
+  // An album starts at its top, like a native navigation push. Tabs keep their own scroll (Duet).
+  useEffect(() => { if (open) document.querySelector(".duet-scroller")?.scrollTo(0, 0); }, [open]);
   useEffect(() => () => audio.stop(), []);
 
   const start = (id: string) => { setNow(id); setPlaying(true); audio.play(track(id).n + album(track(id).albumId).hues[0]); };
@@ -31,9 +31,9 @@ export function Encore() {
     const t = track(now), list = album(t.albumId).tracks;
     start(list[(t.n) % list.length].id);
   };
-  const select = (id: string) => { setTab(id as Tab); setOpen(null); if (id === "new") setSeenNew(true); };
+  const select = (id: Tab) => { setTab(id); setOpen(null); if (id === "new") setSeenNew(true); };
 
-  const tabs: DuetItem[] = [
+  const tabs: DuetTab<Tab>[] = [
     { id: "home", label: "Home", icon: <House size={24} />, tint: ACCENT },
     { id: "new", label: "New", icon: <LayoutGrid size={24} />, tint: ACCENT, badge: seenNew ? undefined : NEW.length },
     { id: "radio", label: "Radio", icon: <Radio size={24} />, tint: ACCENT },

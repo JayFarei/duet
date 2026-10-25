@@ -19,15 +19,20 @@ On the closed Duo, Safari keeps a narrow column beside the page for its own butt
 ## Usage
 
 ```tsx
-import { Duet } from "duet-ui";
-import "duet-ui/styles.css";
+"use client";
+import { Duet, type DuetItem } from "duet-ui";
+
+const TABS = [
+  { id: "home", label: "Home", icon: <House size={24} /> },
+  { id: "search", label: "Search", icon: <Search size={24} /> },
+] as const satisfies readonly DuetItem[];
 
 export function App() {
-  const [tab, setTab] = useState("home");
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("home");
   return (
     <Duet
       tabs={{ items: TABS, selected: tab, onSelect: setTab }}
-      actions={[{ id: "share", label: "Share", icon: <Share />, onPress: share }]}
+      actions={[{ id: "share", label: "Share", icon: <Share size={22} />, onPress: share }]}
       minimizeOnScroll
     >
       <Page tab={tab} />
@@ -36,7 +41,9 @@ export function App() {
 }
 ```
 
-Add `viewport-fit=cover` to the viewport meta so the safe areas reach the page. Duet appends `shrink-to-fit=no` itself, so Safari doesn't zoom a split-view pane out to fit the column layer. On other phones and browsers Duet falls back to the `inline` strip.
+That is the whole setup. The styles come with the component, and Duet adds `viewport-fit=cover` and `shrink-to-fit=no` to the viewport meta itself (the safe areas only reach the page with the first; the second keeps Safari from zooming a split-view pane out). Each tab keeps its own scroll position, and tapping the selected tab scrolls back to the top. On other phones and browsers Duet falls back to the `inline` strip.
+
+Icons are yours, any library: 24pt in tabs, 21 to 22pt on round buttons matches the system. `as const` types the tab ids, so `onSelect` takes `setTab` without a cast.
 
 ## Modes
 
@@ -60,7 +67,27 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 
 ### Only on the Duo
 
-`useDuet().duo` is true on an iPhone Duo in any posture, Safari or Home Screen, and false on other phones and desktops. It works outside `<Duet>`, so an existing app can switch to a Duo layout on it: render `<Duet>` only when it is true. `isDuo(signals)` is the same check for your own signals. The server can't tell, so before hydration `duo` is true; remember the answer in a cookie if the server should render the right layout first.
+`useDuet().duo` is true on an iPhone Duo in any posture, Safari or Home Screen, and false on other phones and desktops. It works outside `<Duet>`, so an existing app can switch to a Duo layout on it: render `<Duet>` only when it is true. `isDuo(signals)` is the same check for your own signals.
+
+The server can't tell, so `<DuoCookie>` tells it: it keeps a `duet-duo` cookie in step with the browser, and a new device reloads once into the right layout. In the Next.js App Router:
+
+```tsx
+// app/page.tsx, a server component
+import { cookies } from "next/headers";
+import { DuoCookie } from "duet-ui";
+
+export default async function Page() {
+  const duo = (await cookies()).get("duet-duo")?.value === "1";
+  return (
+    <>
+      <DuoCookie rendered={duo} />
+      {duo ? <DuoApp /> : <DesktopApp />}
+    </>
+  );
+}
+```
+
+Pass `onChange={() => router.refresh()}` from a client component to re-render without a reload.
 
 ### In-app preview
 
@@ -74,7 +101,7 @@ Links opened from social and mail apps land in the in-app Safari preview (`SFSaf
 | `leading` | Its own group under back, like SwiftUI `.topBarLeading` |
 | `actions` | Like `.primaryAction`; collapses into "…" when it would reach the tabs. Items with `destructive: true` only ever show in "…", last, in red |
 | `primary` | The one main action (compose, new). Narrow: just above the tabs. Wide: under back, at the top. Folds into "…" last, only when the band has no room for both |
-| `tabs` | `{ items, selected, onSelect, search? }`. `search` adds a search tab as the last item |
+| `tabs` | `{ items, selected, onSelect, search? }`. `search` adds a search tab as the last item. Each tab keeps its scroll position |
 | `searchButton` | A round search button at the bottom when there are no tabs |
 | `close` | A sheet or card is open: the strip holds only a close button until it is cleared |
 | `accessory` | A view docked by the tabs, like `.tabViewBottomAccessory` (a mini player) |
