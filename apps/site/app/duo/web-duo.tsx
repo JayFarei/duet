@@ -19,8 +19,8 @@ interface State { posture: Posture; rotated: boolean; app: App; pane: Side }
 // Natural orientation: closed is portrait (outer display), open is landscape (inner display). `rotated` turns
 // the device a quarter turn clockwise, so the outer camera ends up bottom right.
 const SCREEN = { closed: { w: 466, h: 678 }, open: { w: 951, h: 669 } };
-// Night Sky finish: the band colours of Apple's 3D model (as unfold.foo measured them), around a black front.
-const FINISH = { band: "#3a4b66", rim: "#62759a", front: "#0b0c10", button: "linear-gradient(#62759a, #2c3a52)" };
+// A graphite finish around a black front: the site stays colourless.
+const FINISH = { band: "#3a3a3c", rim: "#6e6e73", front: "#0b0c10", button: "linear-gradient(#6e6e73, #2c2c2e)" };
 const BODY_SHADE = `inset 0 0 0 1.5px ${FINISH.rim}, inset 0 0 0 3.5px ${FINISH.band}`;
 // Closed: hinge spine on the left (26pt), free edge on the right. Open: 13pt sides, both free edges.
 const BODY = {
@@ -179,7 +179,9 @@ const fit = (s: State): State => {
   return !only ? s : s.posture === only && !s.rotated ? s : { ...s, app: "safari" };
 };
 
-export function WebDuo({ src: first, sources, title = "Duet", intro = "This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly." }: { src: string; sources?: [string, string][]; title?: string; intro?: string }) {
+/** embed: a stage inside a page, sized to its container, touring on its own while on screen. Its controls stay
+ *  hidden behind "Take control", which stops the tour. Otherwise a full-window playground. */
+export function WebDuo({ src: first, sources, title = "Duet", intro = "This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly.", embed = false }: { src: string; sources?: [string, string][]; title?: string; intro?: string; embed?: boolean }) {
   const [src, setSrc] = useState(first);
   const [s, setS] = useState<State>(TOUR[0]);
   // The page inside turns upright only once the device has finished turning, like iOS.
@@ -188,9 +190,12 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const [instant, setInstant] = useState(false);
   const [folding, setFolding] = useState(false);
   const [tour, setTour] = useState(false);
+  const [manual, setManual] = useState(false);
   const [slots, setSlots] = useState(false);
   const [live, setLive] = useState(false);
   const [view, setView] = useState({ w: 1280, h: 800 });
+  const [onScreen, setOnScreen] = useState(true);
+  const stage = useRef<HTMLDivElement>(null);
   // Slow motion (a quarter speed) and the fold scrubber's position (0 closed, 1 open) while it is held.
   const [slow, setSlow] = useState(false);
   const [scrub, setScrub] = useState<number | null>(null);
@@ -279,18 +284,34 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     return () => clearTimeout(t);
   }, [s.rotated, upright, turn]);
 
+  // The embedded stage tours by itself unless the reader asked for less motion, and only while it is on screen.
   useEffect(() => {
-    if (!tour) return;
+    if (!embed || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    setTour(true);
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.25 });
+    if (stage.current) io.observe(stage.current);
+    return () => io.disconnect();
+  }, [embed]);
+
+  useEffect(() => {
+    if (!tour || !onScreen) return;
     let i = TOUR.findIndex((t) => JSON.stringify(t) === JSON.stringify(s));
     const t = setInterval(() => { i = (i + 1) % TOUR.length; go(TOUR[i], true); }, 3600);
     return () => clearInterval(t);
-  }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps -- the tour starts from the current state
+  }, [tour, onScreen]); // eslint-disable-line react-hooks/exhaustive-deps -- the tour starts from the current state
 
   useEffect(() => {
-    const fit = () => setView({ w: innerWidth, h: innerHeight });
+    // Embedded: the container's width, and a stage height every posture fits in.
+    const fit = () => {
+      if (!embed) return setView({ w: innerWidth, h: innerHeight });
+      const w = stage.current?.clientWidth ?? innerWidth;
+      setView({ w, h: Math.max(260, Math.min(w * 0.85, 600, innerHeight * 0.62)) });
+    };
     fit();
+    const ro = new ResizeObserver(fit);
+    if (stage.current) ro.observe(stage.current);
     addEventListener("resize", fit);
-    return () => removeEventListener("resize", fit);
+    return () => { ro.disconnect(); removeEventListener("resize", fit); };
   }, []);
 
   const n = SCREEN[s.posture], b = BODY[s.posture];
@@ -342,18 +363,19 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
   // Fit the turned device and the controls in the window.
   const [bw, bh] = s.rotated ? [b.h, b.w] : [b.w, b.h];
-  const scale = Math.min((view.w - 64) / bw, (view.h - 320) / bh, 1);
+  const scale = embed ? Math.min(view.w / bw, view.h / bh, 1) : Math.min((view.w - 64) / bw, (view.h - 320) / bh, 1);
   const motion = (props: string[]) => instant ? "none" : props.map((x) => `${x} ${MOVE}ms ${ease}`).join(", ");
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22, padding: "28px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
-      <header style={{ textAlign: "center" }}>
+    <div ref={stage} style={embed ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 18, width: "100%" } : { minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22, padding: "28px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
+      {!embed && <header style={{ textAlign: "center" }}>
         <div style={{ font: "800 30px/1 -apple-system, system-ui", letterSpacing: -0.6 }}>{title}</div>
         <div style={{ color: "var(--dim)", font: "400 15px/1.4 -apple-system, system-ui", marginTop: 6 }}>
           {intro}
         </div>
-      </header>
+      </header>}
 
+      <div style={{ ...(embed && { height: view.h, display: "flex", alignItems: "center" }) }}>
       <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `width ${turn}ms ${ease}, height ${turn}ms ${ease}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
@@ -379,9 +401,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
                 position: "absolute", left: sc.clip.x, top: sc.clip.y, width: sc.clip.w, height: sc.clip.h, overflow: "hidden",
                 borderRadius: sc.clipR, transition: motion(["left", "top", "width", "height", "border-radius"]),
               }}>
-                <iframe ref={frame} src={src} title="Duet on the iPhone Duo" style={{
+                <iframe ref={frame} src={src} title="Duet on the iPhone Duo" tabIndex={embed ? -1 : undefined} style={{
                   position: "absolute", left: sc.frame.x, top: sc.frame.y, width: sc.frame.w, height: sc.frame.h,
-                  border: 0, display: "block", background: "var(--bg)", transition: motion(["left", "top", "width", "height"]),
+                  border: 0, display: "block", background: "var(--bg)", pointerEvents: embed ? "none" : undefined, transition: motion(["left", "top", "width", "height"]),
                 }} />
               </div>
               {/* System chrome fades in with each new app or screen. */}
@@ -395,8 +417,17 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         </div>
         </div>
       </div>
+      </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", padding: "0 16px", maxWidth: 1100 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", padding: "0 16px", maxWidth: 1100, order: embed ? 1 : undefined }}>
+        {embed && !manual ? (
+          <button onClick={() => { setManual(true); setTour(false); }} style={{ ...control, padding: "0 16px", background: "transparent", color: "var(--dim)" }}>Take control</button>
+        ) : embed ? <>
+        <Segmented value={s.posture} onChange={(posture) => go({ posture })} options={[["closed", "Closed"], ["open", "Open"]]} />
+        <Segmented value={s.app} onChange={(app) => go({ app })} options={[["home", "Home"], ["safari", "Safari"], ["split", "Split"], ["window", "Window"]]} />
+        <Button onClick={() => go({ rotated: !s.rotated })} label="Rotate"><RotateCw size={17} /></Button>
+        <Button onClick={() => setTour((t) => !t)} label={tour ? "Pause" : "Play"} on={tour}>{tour ? <Pause size={17} /> : <Play size={17} />}</Button>
+        </> : <>
         {sources && <Segmented value={src} onChange={setSrc} options={sources} />}
         <Segmented value={s.posture} onChange={(posture) => go({ posture })} options={[["closed", "Closed"], ["open", "Open"]]} />
         <Button onClick={() => go({ rotated: !s.rotated })} label="Rotate"><RotateCw size={17} /></Button>
@@ -412,6 +443,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         <Button onClick={() => setSlow((v) => !v)} label="¼ speed" on={slow}><Snail size={17} /></Button>
         <Button onClick={() => setSlots((v) => !v)} label="Slots" on={slots}><Highlighter size={17} /></Button>
         <Button onClick={() => setTour((t) => !t)} label={tour ? "Pause" : "Tour"} on={tour}>{tour ? <Pause size={17} /> : <Play size={17} />}</Button>
+        </>}
       </div>
       <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, minHeight: 44, textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
         <b style={{ color: "var(--ink)", textTransform: "capitalize" }}>{sc.mode} mode.</b> {sc.note}
@@ -555,10 +587,9 @@ function OtherApp() {
 
 /** The Home Screen beside a Safari window: quiet icon tiles, so the eye stays on the window. */
 function HomeScreen({ w, h }: { w: number; h: number }) {
-  const tones = ["#ff9f0a", "#30d158", "#0a84ff", "#ff375f", "#bf5af2", "#64d2ff", "#ffd60a", "#ff453a"];
   return (
     <div style={{ position: "absolute", left: 0, top: 0, width: w, height: h, padding: "64px 34px 0", boxSizing: "border-box", display: "grid", gridTemplateColumns: "repeat(4, 64px)", gridAutoRows: 64, gap: "34px 30px", justifyContent: "center", alignContent: "start" }}>
-      {Array.from({ length: 20 }, (_, i) => <div key={i} style={{ borderRadius: 16, background: tones[(i * 5) % tones.length], opacity: 0.35 }} />)}
+      {Array.from({ length: 20 }, (_, i) => <div key={i} style={{ borderRadius: 16, background: "var(--dim)", opacity: 0.25 }} />)}
     </div>
   );
 }
@@ -580,7 +611,7 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
     <div role="radiogroup" style={{ display: "flex", padding: 3, gap: 2, borderRadius: 99, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
       {options.map(([v, label]) => (
         <button key={v} role="radio" aria-checked={value === v} onClick={() => onChange(v)}
-          style={{ ...control, height: 34, padding: "0 14px", background: value === v ? "var(--accent)" : "transparent", color: value === v ? "#fff" : "var(--ink)" }}>{label}</button>
+          style={{ ...control, height: 34, padding: "0 14px", whiteSpace: "nowrap", background: value === v ? "var(--accent)" : "transparent", color: value === v ? "var(--bg)" : "var(--ink)" }}>{label}</button>
       ))}
     </div>
   );
@@ -588,7 +619,7 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
 
 function Button({ onClick, label, on, children }: { onClick: () => void; label: string; on?: boolean; children: ReactNode }) {
   return (
-    <button onClick={onClick} style={{ ...control, display: "flex", alignItems: "center", gap: 7, padding: "0 16px", background: on ? "var(--accent)" : "var(--card)", color: on ? "#fff" : "var(--ink)", boxShadow: "0 0 0 0.5px var(--line)" }}>
+    <button onClick={onClick} style={{ ...control, display: "flex", alignItems: "center", gap: 7, padding: "0 16px", background: on ? "var(--accent)" : "var(--card)", color: on ? "var(--bg)" : "var(--ink)", boxShadow: "0 0 0 0.5px var(--line)" }}>
       {children}{label}
     </button>
   );
@@ -597,7 +628,7 @@ function Button({ onClick, label, on, children }: { onClick: () => void; label: 
 // --- host -----------------------------------------------------------------------------------------
 
 const DESKTOP = "(hover: hover) and (pointer: fine) and (min-width: 900px)";
-/** true on a desktop browser, where the site shows on the web Duo; false on phones (the iPhone Duo included,
+/** true on a desktop browser, where a page shows on the web Duo; false on phones (the iPhone Duo included,
  *  where Duet reads the real device) and inside the web Duo itself; null before hydration. `?plain` opts out. */
 export function useDesktop(): boolean | null {
   return useSyncExternalStore(
