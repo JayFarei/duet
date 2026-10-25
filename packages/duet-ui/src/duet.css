@@ -151,13 +151,13 @@
 .duet-menu {
   position: fixed; z-index: 51; display: flex; flex-direction: row; align-items: center; justify-content: flex-end;
   padding: 0 3px; overflow: hidden; transition: none;
-  animation: duet-unroll 0.6s var(--duet-spring-out) both, duet-thin 0.6s ease-out both;
+  animation: duet-unroll 0.44s var(--duet-spring-out) both, duet-thin 0.44s ease-out both;
 }
-.duet-menu[data-closing] { animation: duet-roll 0.36s cubic-bezier(0.32, 0.72, 0, 1) both, duet-thin 0.36s ease-out both; pointer-events: none; }
+.duet-menu[data-closing] { animation: duet-roll 0.26s cubic-bezier(0.32, 0.72, 0, 1) both, duet-thin 0.26s ease-out both; pointer-events: none; }
 /* A touch denser than the controls, so the strip under it does not compete with the menu icons. */
 .duet-menu::before { background-color: var(--duet-menu); }
-.duet-menu > * { animation: duet-fade 0.22s 0.04s var(--duet-spring-out) both; }
-.duet-menu[data-closing] > * { animation: duet-fade 0.12s ease-in reverse both; }
+.duet-menu > * { animation: duet-fade 0.16s 0.03s var(--duet-spring-out) both; }
+.duet-menu[data-closing] > * { animation: duet-fade 0.09s ease-in reverse both; }
 @keyframes duet-unroll { from { left: var(--x0); width: 49px; } }
 @keyframes duet-roll { to { left: var(--x0); width: 49px; } }
 @keyframes duet-thin { 35% { transform: scaleY(0.93); } 70% { transform: scaleY(1.02); } }
@@ -176,6 +176,8 @@
 /* Held by the magnet: tracks the finger. Letting go of the edge eases over (the snap), then tracks. On
    release the offset springs back to 0; a side switch drops it at once (data-drag="switch"). */
 .duet[data-drag="held"], .duet[data-drag="switch"] { transition: none; }
+/* Switching sides moves every control in the same frame: nothing glides across the page on its own. */
+.duet[data-drag="switch"] * { transition: none !important; }
 .duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
 /* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */
@@ -188,9 +190,9 @@
    circle (--x0/--y0 is its top-left) and springs out to the list; closing shrinks it back into the button. */
 .duet-menu[data-style="morph"] {
   flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 6px; border-radius: 22px;
-  animation: duet-morph 0.55s var(--duet-spring-out) both;
+  animation: duet-morph 0.42s var(--duet-spring-out) both;
 }
-.duet-menu[data-style="morph"][data-closing] { animation: duet-unmorph 0.32s cubic-bezier(0.32, 0.72, 0, 1) both; }
+.duet-menu[data-style="morph"][data-closing] { animation: duet-unmorph 0.24s cubic-bezier(0.32, 0.72, 0, 1) both; }
 .duet[data-side="left"] .duet-menu[data-style="morph"] { flex-direction: column; }
 .duet-menu[data-style="morph"] > .duet-menu-item {
   width: auto; height: 44px; border-radius: 16px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 0 12px;
@@ -198,8 +200,8 @@
 }
 .duet-menu[data-style="morph"] > .duet-menu-item > svg { flex: none; }
 .duet-menu-label { overflow: hidden; text-overflow: ellipsis; }
-.duet-menu[data-style="morph"] > .duet-menu-item { animation: duet-rise 0.2s 0.03s ease-out both; }
-.duet-menu[data-style="morph"][data-closing] > .duet-menu-item { animation: duet-rise 0.1s ease-in reverse both; }
+.duet-menu[data-style="morph"] > .duet-menu-item { animation: duet-rise 0.15s 0.02s ease-out both; }
+.duet-menu[data-style="morph"][data-closing] > .duet-menu-item { animation: duet-rise 0.08s ease-in reverse both; }
 @keyframes duet-morph { from { left: var(--x0); top: var(--y0); width: 49px; height: 49px; border-radius: 24.5px; } }
 @keyframes duet-unmorph { to { left: var(--x0); top: var(--y0); width: 49px; height: 49px; border-radius: 24.5px; } }
 @keyframes duet-rise { from { opacity: 0; transform: translateY(-6px); } }

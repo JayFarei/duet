@@ -107,6 +107,14 @@ function setPreferredSide(side: Side) {
   listeners.forEach((f) => f());
 }
 
+/** Moves the inline controls to `side` in one frame: data-drag="switch" holds every transition off until the
+ *  new layout has painted (CSS), so no control glides across the page on its own. */
+function switchSide(el: HTMLElement, side: Side) {
+  el.dataset.drag = "switch";
+  setPreferredSide(side);
+  requestAnimationFrame(() => requestAnimationFrame(() => { if (el.dataset.drag === "switch") delete el.dataset.drag; }));
+}
+
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
 function read(): Context {
@@ -214,7 +222,7 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
       const flip = dragging && free && to !== side;
       if (flip) el.dataset.drag = "switch"; else delete el.dataset.drag;
       el.style.removeProperty("--duet-drag");
-      if (flip) { setPreferredSide(to); requestAnimationFrame(() => delete el.dataset.drag); }
+      if (flip) switchSide(el, to);
       free = false;
     };
     const click = (e: MouseEvent) => { if (dragging) { e.stopPropagation(); e.preventDefault(); dragging = false; } };
@@ -309,7 +317,12 @@ export function Duet(p: DuetProps) {
   const more: DuetItem[] = [
     ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
     ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length),
-    ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => setPreferredSide(left ? "right" : "left") }] : []),
+    ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
+      // The menu goes at once, without rolling back into "…": its button is about to move, and would stay hidden
+      // as "unrolled" until a roll that no longer lines up with it.
+      setMenuNow(null); setClosing(null); setScrub(null);
+      if (nav.current) switchSide(nav.current, left ? "right" : "left");
+    } }] : []),
     ...destructive,
   ];
   const selected = p.tabs?.selected;
