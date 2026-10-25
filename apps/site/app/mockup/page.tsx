@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { Mockup } from "./mockup";
 
 export const metadata: Metadata = { title: "Mockup" };
@@ -7,7 +8,9 @@ export const metadata: Metadata = { title: "Mockup" };
 //   /mockup                       open Duo, split view, Duet running in the Safari pane
 //   /mockup?pane=left             Safari in the left pane
 //   /mockup?src=/lab?tabs=3       what runs in the Safari pane
+// Dev only, like the lab it frames.
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  if (process.env.NODE_ENV === "production") notFound();
   const q = await searchParams;
   return (
     <Mockup
