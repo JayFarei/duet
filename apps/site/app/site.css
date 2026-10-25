@@ -1,4 +1,4 @@
-:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: #0088ff; --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); }
+:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); }
 }
@@ -18,5 +18,46 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 @keyframes wd-slide { from { transform: translateX(var(--from)); } }
 [data-wd-callout] [data-wd-system] { outline: 1.5px dashed rgb(142 142 147); outline-offset: 2px; }
 
-/* The server-rendered phone site, hidden on desktops until the web Duo replaces it (same query as useDesktop). */
+/* The home page (app/home.tsx): one responsive page, Apple-style. Horizontal layout comes from duet-ui's column(). */
+html { scroll-behavior: smooth; }
+section[id] { scroll-margin-top: 24px; }
+.pill { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 22px; border-radius: 99px; border: 0; background: var(--card); color: var(--accent); font: 500 17px/1 -apple-system, system-ui; box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
+.pill-solid { background: var(--ink); color: var(--bg); box-shadow: none; }
+.pill-sm { height: 30px; padding: 0 14px; font-size: 13px; }
+.npm code { font-size: 15px; }
+.npm-hint { font-size: 12px; opacity: 0.75; }
+
+.eyebrow { margin: 0 0 10px; color: var(--dim); font: 600 clamp(15px, 1.6vw, 19px)/1.2 -apple-system, system-ui; }
+.display { margin: 0 auto; max-width: 10em; font: 400 clamp(48px, 8vw, 96px)/1 var(--serif), Georgia, serif; letter-spacing: -0.02em; }
+.display em, .h2 em { font-style: italic; white-space: nowrap; }
+.rise { display: inline-block; overflow: clip; overflow-clip-margin: 0.12em; vertical-align: top; padding-bottom: 0.08em; }
+.rise > span { display: inline-block; animation: rise 0.9s cubic-bezier(0.32, 0.72, 0, 1) both; }
+@keyframes rise { from { transform: translateY(105%); } }
+@media (prefers-reduced-motion: reduce) { .rise > span { animation: none; } }
+.h2 { margin: 0; font: 400 clamp(42px, 6.6vw, 72px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.015em; }
+.lede { margin: 20px auto 0; max-width: 640px; color: var(--dim); font: 500 clamp(19px, 2.2vw, 24px)/1.35 -apple-system, system-ui; letter-spacing: -0.01em; }
+.lede-l { margin-left: 0; margin-bottom: 36px; }
+.ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
+
+.hero { text-align: center; padding: clamp(40px, 9vw, 110px) 0 28px; }
+.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: clamp(48px, 8vw, 100px); }
+.section { padding: clamp(64px, 10vw, 128px) 0 0; }
+
+.card { background: var(--card); border-radius: 22px; }
+.self { padding: 28px 24px; text-align: center; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 760px) { .tiles { grid-template-columns: 1fr; } }
+.tile { background: var(--card); border-radius: 26px; padding: 14px 14px 24px; }
+.tile-k { margin: 16px 8px 2px; color: var(--dim); font: 600 13px/1.2 -apple-system, system-ui; text-transform: uppercase; letter-spacing: 0.04em; }
+.tile-h { margin: 0 8px 6px; font: 400 32px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.tile-p { margin: 0 8px; color: var(--dim); font: 400 16px/1.45 -apple-system, system-ui; }
+
+.code { margin: 16px 0 0; padding: 18px 20px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+
+.foot { margin-top: clamp(72px, 10vw, 128px); padding: 20px 0 calc(40px + env(safe-area-inset-bottom)); border-top: 0.5px solid var(--line); color: var(--dim); font-size: 13px; text-align: center; }
+/* On the Duo the page runs inside <Duet>: clear the status bar and the controls at the bottom. */
+html[data-duet-mode] .hero { padding-top: calc(clamp(40px, 9vw, 110px) + env(safe-area-inset-top)); }
+html[data-duet-mode] .foot { padding-bottom: 140px; }
+
+/* A server-rendered phone page, hidden on desktops until the web Duo replaces it (same query as useDesktop). */
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) { .ssr-site { visibility: hidden; } }
