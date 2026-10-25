@@ -67,7 +67,9 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 
 ### Only on the Duo
 
-`useDuet().duo` is true on an iPhone Duo in any posture, Safari or Home Screen, and false on other phones and desktops. It works outside `<Duet>`, so an existing app can switch to a Duo layout on it: render `<Duet>` only when it is true. `isDuo(signals)` is the same check for your own signals.
+`useDuet().duo` is true on an iPhone Duo in any posture, Safari or Home Screen, and false on other phones and desktops. iOS never names the model, so it takes two checks: an iPhone user agent (or Safari's desktop-site Mac agent with touch), and a screen or window size only the Duo has. It works outside `<Duet>`, so an existing app can switch to a Duo layout on it: render `<Duet>` only when it is true. `isDuo(signals)` is the same check for your own signals.
+
+`useDuet().browser` is `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` (an in-app browser such as Instagram's) or `"other"`. Only Safari gets `column`: the others draw their own chrome where Safari leaves its column, so they get `inline`.
 
 The server can't tell, so `<DuoCookie>` tells it: it keeps a `duet-duo` cookie in step with the browser, and a new device reloads once into the right layout. In the Next.js App Router:
 
