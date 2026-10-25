@@ -125,7 +125,9 @@ function scene(s: State, W: number, H: number, host: string, live: boolean, mode
     return {
       ...w, signals, mode,
       chrome: <><HomeScreen w={win.x} h={H} />{w.chrome}</>,
-      note: "A Safari window beside the Home Screen is neither a closed tab nor a split pane, so Duet keeps its controls inside the page.",
+      note: mode === "column"
+        ? "A Safari window beside the Home Screen keeps Safari's column, so Duet paints its controls there, as in a closed tab."
+        : "In this Safari window Duet keeps its controls inside the page.",
     };
   }
   if (s.app === "preview") {
@@ -176,7 +178,7 @@ const fit = (s: State): State => {
   return !only ? s : s.posture === only && !s.rotated ? s : { ...s, app: "safari" };
 };
 
-export function WebDuo({ src }: { src: string }) {
+export function WebDuo({ src, title = "Duet", intro = "This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly." }: { src: string; title?: string; intro?: string }) {
   const [s, setS] = useState<State>(TOUR[0]);
   // The page inside turns upright only once the device has finished turning, like iOS.
   const [upright, setUpright] = useState(false);
@@ -344,9 +346,9 @@ export function WebDuo({ src }: { src: string }) {
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22, padding: "28px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
       <header style={{ textAlign: "center" }}>
-        <div style={{ font: "800 30px/1 -apple-system, system-ui", letterSpacing: -0.6 }}>Duet</div>
+        <div style={{ font: "800 30px/1 -apple-system, system-ui", letterSpacing: -0.6 }}>{title}</div>
         <div style={{ color: "var(--dim)", font: "400 15px/1.4 -apple-system, system-ui", marginTop: 6 }}>
-          This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly.
+          {intro}
         </div>
       </header>
 
@@ -363,7 +365,7 @@ export function WebDuo({ src }: { src: string }) {
             position: "absolute", inset: 0, borderRadius: b.r, cornerShape: "squircle", background: FINISH.front,
             boxShadow: `${BODY_SHADE}, 0 40px 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}`,
           } as CSSProperties} />
-          <div style={{ position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, borderRadius: b.screenR, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
+          <div data-wd-screen style={{ position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, borderRadius: b.screenR, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
             {/* The page, upright for the user: counter-turned when the device is turned. */}
             <div style={{
               position: "absolute", left: 0, top: 0, width: W, height: H, transformOrigin: "0 0",
@@ -454,7 +456,7 @@ const circle: CSSProperties = { ...glass, width: 49, height: 49, borderRadius: 9
 function Island({ live }: { live: boolean }) {
   const w = live ? 58 : CAMERA.d, top = live ? CAMERA.y - 29 : CAMERA.y - CAMERA.d / 2;
   return (
-    <div data-wd-system style={{
+    <div data-wd-system data-wd-island style={{
       position: "absolute", left: CAMERA.x - w / 2, top, width: w, height: live ? 58 + DUO.island : CAMERA.d, borderRadius: 99, background: "#000", zIndex: 2,
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 8, paddingBottom: live ? 12 : 0, boxSizing: "border-box", overflow: "hidden",
       transition: `all ${MOVE}ms ${ease}`,
@@ -559,7 +561,7 @@ function HomeScreen({ w, h }: { w: number; h: number }) {
 }
 
 function Crease() {
-  return <div style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 18, marginLeft: -9, pointerEvents: "none", zIndex: 1, background: "linear-gradient(90deg, transparent, rgb(0 0 0 / 0.05) 40%, rgb(255 255 255 / 0.06) 55%, transparent)" }} />;
+  return <div data-wd-crease style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 18, marginLeft: -9, pointerEvents: "none", zIndex: 1, background: "linear-gradient(90deg, transparent, rgb(0 0 0 / 0.05) 40%, rgb(255 255 255 / 0.06) 55%, transparent)" }} />;
 }
 
 function Glyph({ d, style, size = 24 }: { d: string; style?: CSSProperties; size?: number }) {
