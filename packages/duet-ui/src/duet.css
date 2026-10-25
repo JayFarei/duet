@@ -87,10 +87,13 @@
     --li 0.4s cubic-bezier(0.32, 0.72, 0, 1), --lx var(--duet-settle), --ly var(--duet-settle), --lm var(--duet-settle);
 }
 .duet[data-side="left"] .duet-pill { transform-origin: 0 50%; }
-/* The lens stays inside the rail, as native: the whole rail swells instead (it grows for real, see swell() in
-   chrome.tsx, plus a slight scale), so nothing pokes past its edge and the labels clear its round ends. */
+/* The full pill lets its lens out: as in Apple News and Music the glass bubble is wider than the rail and pokes
+   past both edges (its own frost, rim and refraction layers clip themselves). */
+.duet-glass.duet-pill:not([data-min]) { overflow: visible; contain: layout style; }
+/* Holding swells the rail (it grows for real, see swell() in chrome.tsx, plus a slight scale) and the lens grows
+   into a near-round bubble about 1.2x the rail's width, as measured frame by frame on Apple News and Music. */
 .duet-pill[data-scrub] {
-  --lx: 0px; --ly: 3px; --lm: 1.22; --pad: 12.35px; scale: 1.05; z-index: 52;
+  --lx: 9px; --ly: 10px; --lm: 1.22; --pad: 12.35px; scale: 1.05; z-index: 52;
   --duet-swell: 0.45s var(--duet-spring-out);
   transition: top var(--duet-swell), height var(--duet-swell), left var(--duet-swell), width var(--duet-swell), --pad var(--duet-swell), scale var(--duet-swell),
     --li 0.25s var(--duet-spring-out), --lx 0.35s var(--duet-spring-out), --ly 0.35s var(--duet-spring-out), --lm 0.35s var(--duet-spring-out);
@@ -101,11 +104,15 @@
   background: var(--duet-sel); transition: background-color 0.35s ease-out, box-shadow 0.35s ease-out;
 }
 /* A tap: the rail keeps its size and the lens glides straight to the new tab as a clear magnifier, then settles. */
-.duet-pill[data-glide] { --ly: 2px; --lm: 1.12; }
+.duet-pill[data-glide] { --lx: 8px; --ly: 5px; --lm: 1.15; }
+/* On the way it stretches along the rail and narrows (News: about 55x87pt in flight, 60x60 at rest). */
+.duet-pill[data-glide] .duet-lens { animation: duet-lens-stretch 0.42s cubic-bezier(0.32, 0.72, 0, 1); }
+@keyframes duet-lens-stretch { 0% { scale: 1 1; } 30% { scale: 0.9 1.3; } 100% { scale: 1 1; } }
 .duet-pill:is([data-scrub], [data-glide]) .duet-lens {
-  background: rgb(255 255 255 / 0.04);
-  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.55), inset 0 1px 0.5px rgb(255 255 255 / 0.5),
-    inset 1.5px 0 1px -0.5px rgb(255 90 120 / 0.16), inset -1.5px 0 1px -0.5px rgb(80 170 255 / 0.16), 0 6px 16px rgb(0 0 0 / 0.14);
+  background: rgb(255 255 255 / 0.05);
+  box-shadow: inset 0 0 0 0.75px rgb(255 255 255 / 0.6), inset 0 1.5px 1px rgb(255 255 255 / 0.45), inset 0 -1px 1px rgb(255 255 255 / 0.2),
+    inset 3px 0 3px -1px rgb(255 80 140 / 0.3), inset -3px 0 3px -1px rgb(70 190 255 / 0.3), inset 0 3px 3px -1px rgb(255 220 90 / 0.18),
+    0 0 0 0.5px rgb(0 0 0 / 0.12), 0 6px 18px rgb(0 0 0 / 0.2);
 }
 .duet-lens-view { position: absolute; inset: 0; scale: var(--lm); }
 .duet-lens-col { position: absolute; left: var(--lx); right: var(--lx); top: var(--ly); translate: 0 calc(var(--li) * -50px); }
@@ -164,7 +171,7 @@
 @keyframes duet-fade { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
 /* The close button pops in where back sits when a sheet opens. */
 .duet-close { animation: duet-fade 0.35s var(--duet-spring-out) both; }
-@media (prefers-reduced-motion: reduce) { .duet-close, .duet-menu, .duet-menu > *, .duet-menu[data-closing], .duet-menu[data-closing] > * { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .duet-lens, .duet-close, .duet-menu, .duet-menu > *, .duet-menu[data-closing], .duet-menu[data-closing] > * { animation: none; } }
 /* The button became the island: hide it so it does not show through the island's end slot. */
 .duet-glass[data-unrolled] { visibility: hidden; }
 /* On the left the island grows rightwards: the close slot (or first tab) sits by the button. */
