@@ -13,6 +13,7 @@
   "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
+    "prepack": "pnpm build && node scripts/pack-docs.mjs",
     "test": "node --test test/",
     "typecheck": "tsc --noEmit"
   },
@@ -29,5 +30,7 @@
   },
   "keywords": ["react", "nextjs", "iphone", "foldable", "ios", "safari", "pwa", "liquid-glass", "tab-bar", "navigation"],
   "repository": { "type": "git", "url": "git+https://github.com/JayFarei/duet.git", "directory": "packages/duet-ui" },
-  "homepage": "https://github.com/JayFarei/duet#readme"
+  "homepage": "https://github.com/JayFarei/duet#readme",
+  "bugs": "https://github.com/JayFarei/duet/issues",
+  "author": "JayFarei"
 }
