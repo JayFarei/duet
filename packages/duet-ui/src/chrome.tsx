@@ -201,11 +201,13 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
  *  shows only its own column, and a tap there names the side (`tapSide`). */
 let tapSide: Side = "right";
 /** Without shrink-to-fit=no Safari zooms a split pane out to fit the layer's overflow, which reads as another
- *  window size and flips the mode. It applies even when set late, but must land before the first column paint. */
+ *  window size and flips the mode. It applies even when set late, but must land before the first column paint.
+ *  Safari reads the last viewport meta, and frameworks add their own after load (Next.js renders a second one on
+ *  the client, device trace 2026-10-25), so every one is patched. */
 function viewport(key: string, value: string) {
-  let meta = document.querySelector<HTMLMetaElement>("meta[name=viewport]");
-  if (!meta) { meta = document.createElement("meta"); meta.name = "viewport"; meta.content = "width=device-width,initial-scale=1"; document.head.appendChild(meta); }
-  if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
+  const metas = document.querySelectorAll<HTMLMetaElement>("meta[name=viewport]");
+  if (!metas.length) { const meta = document.createElement("meta"); meta.name = "viewport"; meta.content = "width=device-width,initial-scale=1"; document.head.appendChild(meta); return viewport(key, value); }
+  for (const meta of metas) if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
 function useColumnLayer(on: boolean, split: boolean, column: number) {
@@ -359,7 +361,14 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
 
   // The safe areas only reach the page with viewport-fit=cover. Set on mount, not on import, so a page that only
   // imports DuoCookie keeps its own viewport on other phones.
-  useLayout(() => viewport("viewport-fit", "cover"), []);
+  useLayout(() => {
+    const patch = () => { viewport("viewport-fit", "cover"); viewport("shrink-to-fit", "no"); };
+    patch();
+    // Keep them patched when the framework adds or rewrites a viewport meta later.
+    const watch = new MutationObserver(patch);
+    watch.observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ["content"] });
+    return () => watch.disconnect();
+  }, []);
   const selected = p.tabs?.selected;
   // Each tab keeps its own scroll position in the inner scroller; the selected tab again scrolls to the top.
   const scrolls = useRef(new Map<string, number>());

@@ -127,8 +127,10 @@ export const isSplit = (s: Signals) => !s.standalone && Math.abs(s.outerWidth - 
  *  pane on the open Duo (469x669 outer, 385x571 inner) has the same column on its outer edge, so either
  *  side of the page. In-document content paints into it once the document spans both columns (84 + 385 + 84)
  *  and is scrolled 84 across, with `shrink-to-fit=no` in the viewport meta, or Safari zooms the pane out to
- *  fit the wider document (simulator probes, 2026-10-25). */
-const SAFARI_COLUMN = { width: [80, 88], chrome: [76, 102], height: [675, 681] } as const;
+ *  fit the wider document (simulator probes, 2026-10-25). Windowed Safari (floating, or beside the Home Screen)
+ *  keeps the column at other window sizes (device 2026-10-25: 453x661 and 450x670 outer, 369x591 inner), and a
+ *  pane with the compact URL bar has 75pt of chrome, so any portrait Safari window on the Duo with the column counts. */
+const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 102] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
 
 /** preferred: the side the user picked for inline controls, if any. */
@@ -146,7 +148,7 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
     && s.visualHeight >= s.innerHeight - 1; // keyboard up
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column && isSplit(s)) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
-  if (column && within(s.outerHeight, SAFARI_COLUMN.height)) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
+  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
   const preview = isPreview(s), split = isSplit(s);
   return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(split && { split }) };
 }

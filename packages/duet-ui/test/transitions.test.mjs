@@ -155,3 +155,15 @@ test("repeated folding never pins: flips across window sizes do not count", () =
   for (let n = 0; n < 4; n++) for (const s of [CLOSED, ...FOLD]) { stable(d, s, "right", t += 50); assert.equal(d.pinned, undefined); }
   assert.equal(stable(d, CLOSED, "right", t + 50).mode, "column");
 });
+
+// Device trace 2026-10-25 19:30: windowed Safari (floating, or beside the Home Screen) and a split pane with the
+// compact URL bar stayed inline: the column check wanted the closed tab's window height and at least 76pt of chrome.
+test("windowed Safari and a compact split pane take the column", () => {
+  for (const s of [sig(369, 591, 453, 661, { insetBottom: 34 }), sig(369, 591, 450, 670), sig(366, 600, 450, 670)])
+    assert.equal(detect({ ...s, screenWidth: 466, screenHeight: 678 }).mode, "column", JSON.stringify(s));
+  const pane = detect({ ...sig(385, 594, 469, 669, { insetBottom: 34 }), screenWidth: 466, screenHeight: 678 });
+  assert.equal(pane.mode, "column");
+  assert.equal(pane.split, true);
+});
+test("an 84pt-wide chrome off the Duo is not taken for Safari's column", () =>
+  assert.equal(detect(sig(369, 591, 453, 661, { screenWidth: 1440, screenHeight: 900 })).mode, "inline"));
