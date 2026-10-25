@@ -108,6 +108,17 @@ test("moving a split-view pane to the other side returns to column once the pin 
   assert.equal(stable(d, PANE, "right", 600).mode, "inline"); // pinned by the move
   assert.equal(stable(d, PANE, "right", 600 + PIN_TTL).mode, "column");
 });
+// Both panes are 469x669, so the window key never changes between moves: each move used to double the wait,
+// and after a few the right pane stayed inline for most of a minute.
+test("repeated pane moves, each well after the last pin, keep the short wait", () => {
+  const d = { flips: [] };
+  const move = [PANE, PANE_ZOOMED[0], PANE, PANE_ZOOMED[1], PANE];
+  for (let n = 0, t0 = 0; n < 4; n++, t0 += 20000) {
+    move.forEach((s, i) => stable(d, s, "right", t0 + i * 100));
+    assert.equal(d.until - (t0 + 300), PIN_TTL, `move ${n + 1}`);
+    assert.equal(stable(d, PANE, "right", t0 + 400 + PIN_TTL).mode, "column");
+  }
+});
 test("a real loop re-pins with a longer wait each time, so it does not flicker every few seconds", () => {
   const d = { flips: [] };
   let t = 0, s = PANE;
@@ -117,4 +128,30 @@ test("a real loop re-pins with a longer wait each time, so it does not flicker e
   t = d.until; for (let i = 0; i < 10; i++) step();
   assert.ok(d.until - t > first * 1.5, `second wait ${d.until - t} vs first ${first}`);
   assert.equal(step(), "inline");
+});
+
+// Simulator trace 2026-10-25 (Duo Lab, Safari tab): unfold, then fold. Folding passes a frame where Safari reports
+// its column as an 84pt right inset with the outer size still open; a quick unfold + fold used to count 3 flips
+// and pin the closed tab to inline until the pin timed out.
+const FOLD = [
+  sig(466, 498, 466, 678), // unfolding, outer stale
+  sig(951, 543, 466, 678, { insetBottom: 34 }),
+  sig(951, 543, 951, 669, { insetBottom: 34 }),
+  sig(466, 498, 951, 669, { insetRight: 84 }), // folding, outer stale
+  CLOSED,
+];
+test("a Safari tab never takes the strip, even with a column-wide inset", () =>
+  assert.equal(detect(FOLD[3]).mode, "inline"));
+test("unfold then fold within the flip window lands on column, not pinned", () => {
+  const d = { flips: [] };
+  stable(d, CLOSED, "right", 0);
+  FOLD.forEach((s, i) => stable(d, s, "right", 100 + i * 100));
+  assert.equal(stable(d, CLOSED, "right", 700).mode, "column");
+  assert.equal(d.pinned, undefined);
+});
+test("repeated folding never pins: flips across window sizes do not count", () => {
+  const d = { flips: [] };
+  let t = 0;
+  for (let n = 0; n < 4; n++) for (const s of [CLOSED, ...FOLD]) { stable(d, s, "right", t += 50); assert.equal(d.pinned, undefined); }
+  assert.equal(stable(d, CLOSED, "right", t + 50).mode, "column");
 });

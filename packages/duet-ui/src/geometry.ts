@@ -134,7 +134,8 @@ const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= 
 /** preferred: the side the user picked for inline controls, if any. */
 export function detect(s: Signals, preferred?: Side, allowColumn = true): Context {
   const duo = isDuo(s);
-  if (s.insetRight >= 60 || s.insetLeft >= 60) {
+  // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
+  if (s.standalone && (s.insetRight >= 60 || s.insetLeft >= 60)) {
     return { mode: "strip", duo, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
   const base = { duo, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
@@ -152,22 +153,24 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
 
 /** Mode flips are a feedback loop when the layout of one mode changes the signals into the other (the
  *  column layer's overflow resizing Safari's viewport). Three flips within FLIP_WINDOW pin the page to inline.
- *  The pin lifts when the window changes size, or after `until`: moving a split-view pane to the other side
+ *  Flips only count while the window keeps its size. The pin lifts when the window changes size, or after `until`: moving a split-view pane to the other side
  *  flips the mode a few times without changing the window's size. Each re-pin for the same window doubles
  *  the wait, so a real loop settles instead of flickering. */
-export interface Damper { mode?: Mode; flips: number[]; pinned?: string; until?: number; ttl?: number }
+export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: string; until?: number; ttl?: number }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number): Context {
   const key = `${s.outerWidth}x${s.outerHeight}`;
-  if (d.pinned && d.pinned !== key) Object.assign(d, { pinned: undefined, ttl: undefined, flips: [] });
+  // A loop keeps the window size; a fold or rotation passes through other sizes, so only same-size flips count.
+  if (d.key !== key) Object.assign(d, { key, pinned: undefined, ttl: undefined, flips: [] });
   if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
   let c = detect(s, preferred, !d.pinned);
   if (d.mode && c.mode !== d.mode) {
     d.flips = [...d.flips.filter((t) => now - t < FLIP_WINDOW), now];
     if (d.flips.length >= 3) {
-      d.ttl = d.ttl ? d.ttl * 2 : PIN_TTL;
+      // Doubles only when the loop resumes as the last pin lifts; a later pane move starts from PIN_TTL again.
+      d.ttl = d.ttl && d.until !== undefined && now - d.until < FLIP_WINDOW ? d.ttl * 2 : PIN_TTL;
       Object.assign(d, { pinned: key, until: now + d.ttl });
       c = detect(s, preferred, false);
     }
