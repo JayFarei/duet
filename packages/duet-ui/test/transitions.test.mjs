@@ -2,7 +2,7 @@
 // Run: pnpm test (node --test; Node 23.6+ strips the types from geometry.ts)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { browserOf, detect, isDuo, isIOS, magnet, MAGNET, PIN_TTL, stable } from "../src/geometry.ts";
+import { browserOf, detect, deviceOf, isDuo, isIOS, magnet, MAGNET, PIN_TTL, stable } from "../src/geometry.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -177,6 +177,7 @@ const UA = {
   edge: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 EdgiOS/141.0.3537.71 Mobile/15E148 Safari/605.1.15",
   instagram: "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 400.0.0.0.0",
   macChrome: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36",
+  android: "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
 };
 const on = (s, ua, touchPoints = 5) => ({ ...s, userAgent: UA[ua], touchPoints });
 
@@ -210,4 +211,29 @@ test("signals without a UA (an emulator) restrict nothing", () => {
   assert.equal(isIOS(CLOSED), undefined);
   assert.equal(isDuo(CLOSED), true);
   assert.equal(detect(CLOSED).browser, "safari");
+});
+
+test("deviceOf tells the Duo, iPhone, iPad, Android and desktop apart", () => {
+  const phone = sig(402, 700, 402, 874, { screenWidth: 402, screenHeight: 874 });
+  const pad = sig(820, 1100, 820, 1180, { screenWidth: 820, screenHeight: 1180 });
+  const mac = sig(1440, 800, 1440, 900, { screenWidth: 1440, screenHeight: 900 });
+  assert.equal(deviceOf(on(CLOSED, "safari")), "duo");
+  assert.equal(deviceOf(on(CLOSED, "safariDesktopSite")), "duo");
+  assert.equal(deviceOf(on(PANE, "chrome")), "duo");
+  assert.equal(deviceOf(on(phone, "safari")), "iphone");
+  assert.equal(deviceOf(on(pad, "safariDesktopSite")), "ipad"); // iPadOS sends a Mac UA, with touch
+  assert.equal(deviceOf(on(phone, "android")), "android");
+  assert.equal(deviceOf(on(mac, "safariDesktopSite", 0)), "desktop");
+  assert.equal(deviceOf(on(CLOSED, "macChrome", 0)), "desktop");
+  assert.equal(deviceOf(CLOSED), "duo"); // no UA: sizes alone
+  assert.equal(deviceOf(mac), "desktop");
+});
+test("the context carries device and standalone", () => {
+  const c = detect(on(CLOSED, "safari"));
+  assert.equal(c.device, "duo");
+  assert.equal(c.standalone, false);
+  const home = detect(on({ ...CLOSED, standalone: true, insetRight: 84 }, "safari"));
+  assert.equal(home.mode, "strip");
+  assert.equal(home.standalone, true);
+  assert.equal(home.device, "duo");
 });

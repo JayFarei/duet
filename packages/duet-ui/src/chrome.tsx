@@ -151,7 +151,7 @@ function subscribe(cb: () => void) {
     visualViewport?.removeEventListener("resize", on);
   };
 }
-const ssr: Context = { mode: "column", duo: true, browser: "safari", layout: "narrow", side: "right", width: 382, height: 580, offsetTop: 0, screenWidth: 466, screenHeight: 678, insetTop: 0, insetBottom: 0 };
+const ssr: Context = { mode: "column", duo: true, browser: "safari", device: "duo", standalone: false, layout: "narrow", side: "right", width: 382, height: 580, offsetTop: 0, screenWidth: 466, screenHeight: 678, insetTop: 0, insetBottom: 0 };
 
 export function useDuet(): Context {
   return useSyncExternalStore(subscribe, read, () => ssr);
