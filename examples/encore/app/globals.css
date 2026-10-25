@@ -1,0 +1,103 @@
+:root {
+  --bg: #fff; --card: rgb(242 242 247); --ink: #000; --dim: rgb(60 60 67 / 0.6); --hair: rgb(60 60 67 / 0.16);
+  --fill: rgb(118 118 128 / 0.12); --accent: #f2304d; --raise: 0 10px 30px rgb(0 0 0 / 0.14);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-lg-theme="light"]) {
+    --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --hair: rgb(84 84 88 / 0.5);
+    --fill: rgb(118 118 128 / 0.24); --accent: #fa4864; --raise: 0 10px 30px rgb(0 0 0 / 0.5);
+  }
+}
+:root[data-lg-theme="dark"] {
+  --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --hair: rgb(84 84 88 / 0.5);
+  --fill: rgb(118 118 128 / 0.24); --accent: #fa4864; --raise: 0 10px 30px rgb(0 0 0 / 0.5);
+}
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+* { box-sizing: border-box; }
+.art { width: 100%; }
+
+.page { padding: 0 20px calc(108px + env(safe-area-inset-bottom)); }
+.top { padding-top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 22px); }
+.title { font: 700 34px/1.1 -apple-system, system-ui; letter-spacing: -0.4px; margin: 0 0 18px; }
+.h2 { display: flex; align-items: center; gap: 4px; font: 700 21px/1.2 -apple-system, system-ui; letter-spacing: -0.2px; margin: 30px 0 12px; }
+.h2 svg { color: var(--dim); }
+.dim { color: var(--dim); }
+
+/* Featured band (home): full bleed, text and art padded back beside the strip by bleed(). */
+.feature { position: relative; color: #fff; padding-top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 22px); padding-bottom: 28px; overflow: hidden; }
+.feature::after { content: ""; position: absolute; inset: 0; background: linear-gradient(transparent 55%, rgb(0 0 0 / 0.16)); pointer-events: none; }
+.feature > * { position: relative; z-index: 1; }
+.feature-body { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.feature-art { width: min(180px, 44vw); box-shadow: 0 14px 40px rgb(0 0 0 / 0.25); border-radius: 10px; }
+.feature-text { flex: 1 1 180px; min-width: 0; }
+.eyebrow { font: 600 12px -apple-system, system-ui; letter-spacing: 0.6px; text-transform: uppercase; opacity: 0.8; }
+.feature h2 { font: 700 30px/1.05 -apple-system, system-ui; letter-spacing: -0.5px; margin: 6px 0 4px; }
+.feature p { margin: 0 0 16px; font-size: 16px; opacity: 0.88; }
+.pill { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 18px; border-radius: 999px; font: 600 15px -apple-system, system-ui; }
+.pill-light { background: rgb(255 255 255 / 0.92); color: #1c1c1e; }
+
+/* Carousels run under the strip; their padding (bleed) lines the first card up with the page. */
+.carousel { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 4px; }
+.carousel::-webkit-scrollbar { display: none; }
+.carousel > * { scroll-snap-align: start; flex: none; }
+.card { width: 150px; text-align: left; }
+.card-title { font: 500 14px/1.25 -apple-system, system-ui; margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-sub { font: 400 13px/1.25 -apple-system, system-ui; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 18px 14px; }
+.grid .card { width: auto; }
+
+/* Track rows */
+.list { margin: 0; padding: 0; list-style: none; }
+.row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; text-align: left; }
+.row-text { flex: 1; min-width: 0; align-self: stretch; display: flex; flex-direction: column; justify-content: center; border-bottom: 0.5px solid var(--hair); padding: 8px 0; }
+.list li:last-child .row-text { border-bottom: 0; }
+.row-title { font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-sub { font-size: 13px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row[data-on] .row-title { color: var(--accent); }
+.num { width: 22px; text-align: center; color: var(--dim); font-size: 15px; font-variant-numeric: tabular-nums; flex: none; }
+.cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); column-gap: 24px; }
+
+/* Equaliser bars on the playing row */
+.eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 14px; color: var(--accent); }
+.eq i { width: 3px; background: currentColor; border-radius: 1px; height: 40%; animation: eq 0.9s ease-in-out infinite alternate; }
+.eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.6s; }
+.eq[data-paused] i { animation-play-state: paused; }
+@keyframes eq { to { height: 100%; } }
+
+/* Album detail */
+.album-head { text-align: center; padding-top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 26px); padding-bottom: 6px; }
+.album-art { width: min(240px, 62vw); margin: 0 auto; box-shadow: var(--raise); border-radius: 10px; }
+.album-head h1 { font: 700 22px/1.2 -apple-system, system-ui; margin: 18px 0 2px; }
+.album-artist { font-size: 20px; color: var(--accent); }
+.album-meta { font-size: 13px; color: var(--dim); margin-top: 4px; }
+.album-btns { display: flex; gap: 12px; justify-content: center; margin: 18px 0 12px; }
+.album-btns .pill { background: var(--fill); color: var(--accent); min-width: 130px; justify-content: center; height: 44px; border-radius: 12px; font-size: 16px; }
+.foot { font-size: 13px; color: var(--dim); margin: 14px 0 0; }
+
+/* Radio */
+.station-hero { position: relative; display: block; width: 100%; border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 9; max-height: 320px; text-align: left; color: #fff; }
+.station-hero > div { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px; background: linear-gradient(transparent, rgb(0 0 0 / 0.35)); }
+.live { display: inline-block; background: var(--accent); color: #fff; font: 700 11px -apple-system, system-ui; letter-spacing: 0.5px; padding: 3px 7px; border-radius: 5px; margin-bottom: 6px; }
+
+/* Library nav rows */
+.nav-row { display: flex; align-items: center; gap: 14px; width: 100%; height: 50px; font-size: 18px; color: var(--ink); text-align: left; }
+.nav-row > svg:first-child { color: var(--accent); flex: none; }
+.nav-row span { flex: 1; border-bottom: 0.5px solid var(--hair); align-self: stretch; display: flex; align-items: center; }
+.nav-row > svg:last-child { color: var(--dim); opacity: 0.6; }
+
+/* Search: the field sticks, its bar bleeds under the strip */
+.search-bar { position: sticky; top: 0; z-index: 2; padding-top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 8px); padding-bottom: 10px; background: color-mix(in srgb, var(--bg) 82%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
+.field { display: flex; align-items: center; gap: 8px; height: 38px; border-radius: 11px; background: var(--fill); padding: 0 10px; color: var(--dim); }
+.field input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font: 17px -apple-system, system-ui; color: var(--ink); }
+.genre { position: relative; border-radius: 12px; aspect-ratio: 16 / 10; overflow: hidden; color: #fff; text-align: left; padding: 12px; display: flex; align-items: flex-end; font: 700 17px -apple-system, system-ui; }
+
+/* Mini player, inside Duet's glass accessory bar */
+.mp-wrap { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; height: 100%; margin: 0 -10px; }
+.mp { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; text-align: left; height: 100%; }
+.mp-text { min-width: 0; display: flex; flex-direction: column; }
+.mp-title { font: 600 15px/1.2 -apple-system, system-ui; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-sub { font: 400 12px/1.2 -apple-system, system-ui; opacity: 0.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp-btn { width: 34px; height: 40px; display: grid; place-items: center; flex: none; border-radius: 999px; }
+.mp-btn:active { background: rgb(128 128 128 / 0.2); }

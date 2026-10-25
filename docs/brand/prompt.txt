@@ -1,0 +1,12 @@
+Use your image generation tool to create 3 separate logo images for an open source developer library called "Duet". Save each generated image into the current directory as duet-logo-1.png, duet-logo-2.png, duet-logo-3.png (copy them from wherever the tool writes them).
+
+What Duet is: a React library that gives web apps native-feeling controls on a foldable iPhone ("iPhone Duo"). The phone has a slim vertical control strip beside the page, where floating round glass buttons and a vertical tab pill live. Duet makes a web page and that strip play together, like two musicians in a duet.
+
+Logo direction (all three variants share it):
+- An app-icon style mark on a squircle (iOS icon shape), centred, square 1024x1024, plain white or very light grey background outside the squircle.
+- The mark: two shapes side by side that read as a duet: a wide rounded rectangle (the page) and a slim tall capsule (the control strip), with a small round glass button dot in the capsule. Abstract and minimal, not a literal phone drawing.
+- Apple Liquid Glass aesthetic: translucent frosted glass, soft specular rim highlights, subtle depth, gentle refraction. Toned down: mostly neutral greys, white and soft graphite, with ONE single accent colour, system blue (#0088FF), used sparingly (for example only the button dot).
+- No text, no letters, no words, no gradients of many colours, no rainbow, no busy detail. Must still read at 32px.
+Variant 1: light glass on a pale grey squircle.
+Variant 2: same mark, dark graphite squircle (dark mode).
+Variant 3: flatter, simpler geometric take, suitable for a favicon.

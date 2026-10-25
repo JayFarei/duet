@@ -1,0 +1,21 @@
+{
+  "name": "duet-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.32.0",
+  "scripts": {
+    "build": "pnpm --filter duet-ui build",
+    "dev": "pnpm --filter duet-ui build && pnpm --parallel --filter \"./apps/*\" --filter \"./examples/*\" dev",
+    "test": "pnpm --filter duet-ui test",
+    "test:e2e": "pnpm --filter duet-ui build && playwright test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "typescript": "^5.9.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

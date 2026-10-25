@@ -1,0 +1,253 @@
+/* iOS 27 Duo strip controls on GlassyUI surfaces. Colours sampled from the native lab captures.
+   Theme follows GlassyUI's [data-lg-theme] on <html> (system light/dark unless forced), with the media
+   query as the fallback before hydration. */
+.duet {
+  --duet-solid: rgb(246 247 250);
+  --duet-ring: rgb(140 144 152 / 0.35);
+  /* Frost veil, press lift and selection, sampled from native glass over gradient, colour-band and dark
+     backdrops (duet-lab bg=1..3). Selection darkens what is under it instead of painting an opaque grey. */
+  --duet-frost: rgb(255 255 255 / 0.42);
+  --duet-lift: rgb(255 255 255 / 0.62);
+  --duet-sel: rgb(0 0 0 / 0.1);
+  --duet-menu: rgb(255 255 255 / 0.55);
+  --duet-ink: #000;
+  --duet-tint: #0088ff;
+  color: var(--duet-ink);
+  -webkit-tap-highlight-color: transparent;
+  /* A held press would otherwise start text selection and iOS's loupe instead of the lift. */
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-lg-theme="light"]) .duet {
+    --duet-solid: rgb(38 38 40); --duet-ring: rgb(255 255 255 / 0.16);
+    --duet-frost: rgb(0 0 0 / 0.24); --duet-lift: rgb(255 255 255 / 0.16);
+    --duet-sel: rgb(0 0 0 / 0.22); --duet-menu: rgb(0 0 0 / 0.4); --duet-ink: #fff;
+  }
+}
+[data-lg-theme="dark"] .duet {
+  --duet-solid: rgb(38 38 40); --duet-ring: rgb(255 255 255 / 0.16);
+  --duet-frost: rgb(0 0 0 / 0.24); --duet-lift: rgb(255 255 255 / 0.16);
+    --duet-sel: rgb(0 0 0 / 0.22); --duet-menu: rgb(0 0 0 / 0.4); --duet-ink: #fff;
+}
+.duet button {
+  appearance: none; border: 0; background: none; color: inherit; padding: 0; margin: 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.duet-glass {
+  position: fixed; z-index: 50; box-sizing: border-box; border-radius: 999px; color: var(--duet-ink);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.06);
+}
+/* GlassyUI's control frost is near clear (8% white, 10px blur); native glass is a milky veil over about twice the
+   blur, so colour bands melt into a soft wash instead of showing through. */
+.duet-glass { --lg-surface-blur: 18px; }
+.duet-glass::before { background-color: var(--duet-frost); }
+/* GlassyUI's grain reads as dirt on iOS-flat controls. */
+.duet .lg-noise { display: none; }
+/* Press lift, as iOS Liquid Glass: a separate button swells to ~1.4x and its glass turns lighter, then springs
+   back on release. Items inside a shared surface (groups, the full tab pill) lift as a bubble of their own. */
+.duet-glass { transition: top 0.35s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1), scale 0.5s var(--duet-spring-in); }
+.duet-glass::before { transition: background-color 0.25s; }
+:is(.duet-round, .duet-pill[data-min]):has(:active) { scale: 1.4; z-index: 52; transition-duration: 0.35s, 0.35s, 0.45s; transition-timing-function: ease, ease, var(--duet-spring-out); }
+:is(.duet-round, .duet-pill[data-min]):has(:active)::before { background-color: var(--duet-lift); }
+.duet-item, .duet-tab { border-radius: 999px; transition: scale 0.5s var(--duet-spring-in), background 0.2s; }
+.duet-group .duet-item:active { scale: 1.25; background: var(--duet-lift); transition: scale 0.4s var(--duet-spring-out), background 0.1s; }
+.duet-round { display: flex; }
+.duet-round > .duet-item { flex: 1; }
+.duet-group { display: flex; flex-direction: column; padding: 0; }
+.duet-item { flex: 1; min-height: 0; }
+.duet-pill { display: flex; flex-direction: column; padding: 6.35px 3px; }
+.duet-pill[data-min] { padding: 3px; }
+.duet-tab { height: 50px; flex: none; }
+.duet-pill[data-min] .duet-tab { height: 43px; }
+.duet-tab, .duet-menu-item { position: relative; }
+.duet-tab > *, .duet-menu-item > * { position: relative; } /* icons paint above the selection */
+/* Only the active item is coloured ([data-on]: the selected one, or the one under the finger while
+   scrubbing); custom icons can key off the same attribute. */
+:is(.duet-tab, .duet-menu-item)[data-on] { color: var(--duet-tint); }
+:is(.duet-pill[data-min] .duet-tab, .duet-menu-item)[data-on]::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--duet-sel);
+}
+/* Full pill: one lens marks the selected tab and glides between tabs. Scrubbing (Apple News, Wise), the pill
+   swells a little towards the page and shows labels, and the lens turns into a clear magnifier that follows the
+   finger: taller than a tab and wider than the pill, a thin rim, and the tabs under it drawn about 1.3x. The pill's
+   own glass does not change. --li (lens index), --lx/--ly (outset past the tab) and --lm (magnification) are
+   animatable, so the lens, the magnified copy and the hole masked in the real tabs move as one. */
+@property --li { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --lx { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --ly { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --lm { syntax: "<number>"; inherits: true; initial-value: 1; }
+.duet-pill:not([data-min]) {
+  --lx: 0px; --ly: 0px; --lm: 1; touch-action: none; transform-origin: 100% 50%;
+  transition: top 0.35s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1), scale 0.5s var(--duet-spring-in),
+    --li 0.45s var(--duet-spring-out), --lx 0.4s var(--duet-spring-in), --ly 0.4s var(--duet-spring-in), --lm 0.4s var(--duet-spring-in);
+}
+.duet[data-side="left"] .duet-pill { transform-origin: 0 50%; }
+.duet-pill[data-scrub] {
+  --lx: 8px; --ly: 6px; --lm: 1.3; scale: 1.08; z-index: 52;
+  transition: top 0.35s, height 0.35s, scale 0.45s var(--duet-spring-out),
+    --li 0.25s var(--duet-spring-out), --lx 0.35s var(--duet-spring-out), --ly 0.35s var(--duet-spring-out), --lm 0.35s var(--duet-spring-out);
+}
+.duet-lens {
+  position: absolute; z-index: 1; left: calc(3px - var(--lx)); right: calc(3px - var(--lx)); top: calc(6.35px - var(--ly));
+  height: calc(50px + 2 * var(--ly)); translate: 0 calc(var(--li) * 50px); border-radius: 999px; overflow: hidden; pointer-events: none;
+  background: var(--duet-sel); transition: background-color 0.2s, box-shadow 0.2s;
+}
+.duet-pill[data-scrub] .duet-lens {
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.55), inset 0 1px 0.5px rgb(255 255 255 / 0.5),
+    inset 1.5px 0 1px -0.5px rgb(255 90 120 / 0.16), inset -1.5px 0 1px -0.5px rgb(80 170 255 / 0.16), 0 6px 16px rgb(0 0 0 / 0.14);
+}
+.duet-lens-view { position: absolute; inset: 0; scale: var(--lm); }
+.duet-lens-col { position: absolute; left: var(--lx); right: var(--lx); top: var(--ly); translate: 0 calc(var(--li) * -50px); }
+.duet-lens-col .duet-tab { display: flex; align-items: center; justify-content: center; }
+/* The real tabs are cut away under the lens: a vertical hole in each tab's mask, in that tab's own coordinates. */
+.duet-pill:not([data-min]) > .duet-tab {
+  --y0: calc((var(--li) - var(--j)) * 50px - var(--ly)); --y1: calc(var(--y0) + 50px + 2 * var(--ly));
+  -webkit-mask: linear-gradient(#000 var(--y0), transparent var(--y0), transparent var(--y1), #000 var(--y1));
+  mask: linear-gradient(#000 var(--y0), transparent var(--y0), transparent var(--y1), #000 var(--y1));
+}
+.duet-pill-badges { position: absolute; z-index: 2; left: 3px; right: 3px; top: 6.35px; pointer-events: none; }
+.duet-pill-badges > span { display: block; position: relative; height: 50px; }
+.duet-tab > svg { transition: translate 0.3s var(--duet-spring-out), scale 0.3s var(--duet-spring-out); }
+/* Labels stay ink; only the icon takes the accent. */
+.duet-tab::after {
+  content: attr(aria-label); position: absolute; left: -6px; right: -6px; bottom: 3px; text-align: center; color: var(--duet-ink);
+  font: 600 9px/11px -apple-system, system-ui, sans-serif; letter-spacing: -0.1px; white-space: nowrap; opacity: 0; transition: opacity 0.2s;
+}
+.duet-pill[data-scrub] .duet-tab::after { opacity: 1; }
+.duet-pill[data-scrub] .duet-tab > svg { translate: 0 -6px; scale: 0.82; }
+/* Badges hang off the icon's corner towards the page, over the glass edge, as native tab bars draw them,
+   so a surface with one stops clipping (its frost, rim and refraction layers clip themselves). */
+.duet-glass:has(.duet-badge) { overflow: visible; contain: layout style; }
+.duet .duet-badge {
+  position: absolute; top: 2px; left: calc(50% + 5px); min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  border-radius: 9px; background: #ff3b30; color: #fff; font: 600 12px/18px -apple-system, system-ui; text-align: center;
+  font-variant-numeric: tabular-nums; pointer-events: none; box-shadow: 0 0 0 1.5px var(--duet-solid);
+}
+.duet[data-side="right"] .duet-badge { left: auto; right: calc(50% + 5px); }
+.duet-accessory { display: flex; align-items: center; padding: 0 18px; font: 600 17px -apple-system, system-ui; gap: 12px; }
+.duet-accessory { transition: opacity 0.2s, transform 0.2s; }
+.duet-accessory[data-covered] { opacity: 0; transform: scale(0.96); pointer-events: none; }
+
+/* Menus: one button stretches sideways into an island of icon slots, like the Dynamic Island, and snaps
+   back into it on close. Width only, right edge fixed on the button's, toward the page centre. Both ways run
+   on a damped spring (sampled into linear()), so the island overshoots and settles like an elastic band, and
+   thins a little while it is stretched. --x0 is the button's left edge; left + width stays constant. */
+.duet {
+  --duet-spring-out: linear(0, 0.075, 0.251, 0.466, 0.676, 0.853, 0.985, 1.071, 1.115, 1.126, 1.116, 1.093, 1.066, 1.04, 1.018, 1.001, 0.991, 0.985, 0.984, 0.985, 0.988, 0.992, 0.995, 0.998, 1, 1.001, 1.002, 1.002, 1.002, 1.001, 1);
+  --duet-spring-in: linear(0, 0.071, 0.229, 0.415, 0.593, 0.742, 0.858, 0.939, 0.992, 1.022, 1.035, 1.038, 1.035, 1.029, 1.021, 1.015, 1.009, 1.005, 1.002, 1, 0.999, 0.999, 0.999, 0.999, 1);
+}
+.duet-menu {
+  position: fixed; z-index: 51; display: flex; flex-direction: row; align-items: center; justify-content: flex-end;
+  padding: 0 3px; overflow: hidden; transition: none;
+  animation: duet-unroll 1.1s var(--duet-spring-out) both, duet-thin 1.1s ease-out both;
+}
+.duet-menu[data-closing] { animation: duet-roll 0.8s var(--duet-spring-in) both, duet-thin 0.8s ease-out both; pointer-events: none; }
+/* A touch denser than the controls, so the strip under it does not compete with the menu icons. */
+.duet-menu::before { background-color: var(--duet-menu); }
+.duet-menu > * { animation: duet-fade 0.35s 0.14s ease-out both; }
+.duet-menu[data-closing] > * { animation: duet-fade 0.2s ease-in reverse both; }
+@keyframes duet-unroll { from { left: var(--x0); width: 49px; } }
+@keyframes duet-roll { to { left: var(--x0); width: 49px; } }
+@keyframes duet-thin { 35% { transform: scaleY(0.93); } 70% { transform: scaleY(1.02); } }
+@keyframes duet-fade { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+/* The close button pops in where back sits when a sheet opens. */
+.duet-close { animation: duet-fade 0.35s var(--duet-spring-out) both; }
+@media (prefers-reduced-motion: reduce) { .duet-close, .duet-menu, .duet-menu > *, .duet-menu[data-closing], .duet-menu[data-closing] > * { animation: none; } }
+/* The button became the island: hide it so it does not show through the island's end slot. */
+.duet-glass[data-unrolled] { visibility: hidden; }
+/* On the left the island grows rightwards: the close slot (or first tab) sits by the button. */
+.duet[data-side="left"] .duet-menu { flex-direction: row-reverse; }
+/* Inline: the controls can be dragged to the other side (useSideDrag). */
+@property --duet-drag { syntax: "<length>"; inherits: true; initial-value: 0px; }
+.duet[data-mode="inline"] { transition: --duet-drag 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15); }
+.duet[data-mode="inline"] .duet-glass:not(.duet-menu) { touch-action: none; translate: var(--duet-drag) 0; }
+/* Held by the magnet: tracks the finger. Letting go of the edge eases over (the snap), then tracks. On
+   release the offset springs back to 0; a side switch drops it at once (data-drag="switch"). */
+.duet[data-drag="held"], .duet[data-drag="switch"] { transition: none; }
+.duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
+.duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
+
+/* Morph menu: the button grows into a labelled list, like an iOS context menu. It starts as the button's own
+   circle (--x0/--y0 is its top-left) and springs out to the list; closing shrinks it back into the button. */
+.duet-menu[data-style="morph"] {
+  flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 6px; border-radius: 22px;
+  animation: duet-morph 0.9s var(--duet-spring-out) both;
+}
+.duet-menu[data-style="morph"][data-closing] { animation: duet-unmorph 0.55s var(--duet-spring-in) both; }
+.duet[data-side="left"] .duet-menu[data-style="morph"] { flex-direction: column; }
+.duet-menu[data-style="morph"] > .duet-menu-item {
+  width: auto; height: 44px; border-radius: 16px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 0 12px;
+  font: 400 17px -apple-system, system-ui; text-align: left; white-space: nowrap;
+}
+.duet-menu[data-style="morph"] > .duet-menu-item > svg { flex: none; }
+.duet-menu-label { overflow: hidden; text-overflow: ellipsis; }
+.duet-menu[data-style="morph"] > .duet-menu-item { animation: duet-rise 0.3s ease-out both; }
+.duet-menu[data-style="morph"][data-closing] > .duet-menu-item { animation: duet-rise 0.15s ease-in reverse both; }
+@keyframes duet-morph { from { left: var(--x0); top: var(--y0); width: 49px; height: 49px; border-radius: 24.5px; } }
+@keyframes duet-unmorph { to { left: var(--x0); top: var(--y0); width: 49px; height: 49px; border-radius: 24.5px; } }
+@keyframes duet-rise { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .duet-menu[data-style="morph"], .duet-menu[data-style="morph"] > .duet-menu-item { animation: none; } }
+
+/* Inner scroller: the document never scrolls, so nothing outside it moves with momentum or rubber-band. */
+html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height: 100%; overscroll-behavior: none; }
+.duet-scroller {
+  position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding-right: var(--duet-inset-right); padding-left: var(--duet-inset-left, env(safe-area-inset-left)); box-sizing: border-box;
+}
+/* Safari's column only shows in-document content and clips fixed boxes at the viewport edge, so there the
+   scroller is an in-document box that runs on under the column (bleeds paint there). The document still never
+   scrolls, so the chrome layer never moves. */
+html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-under)); padding-right: var(--duet-under); }
+/* Emulated (the site's web Duo): the frame already spans the column, so the page stops at the inset instead. */
+html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; padding-right: var(--duet-inset-right); }
+
+/* Safari tab: an in-document layer at the document top (which never scrolls), so controls can paint in
+   Safari's column.
+   The column is flat page colour (html background), so blur there only paints artefacts. Safari's own
+   column buttons are a veil over that colour that follows the system appearance, not the page (sampled
+   over dark and cream pages); ours match so the two sets read as one. The accessory sits over the page,
+   not the column, so it keeps real glass; menus unroll over page content without blur, so they stay opaque. */
+.duet[data-mode="column"] { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 50; }
+:root .duet[data-mode="column"] .duet-glass:not(.duet-accessory) {
+  --duet-col: rgb(240 239 236 / 0.55); --duet-solid: rgb(246 247 250); --duet-ink: #000; --duet-edge: 0.3; --duet-rim: 0.15;
+}
+@media (prefers-color-scheme: dark) {
+  :root .duet[data-mode="column"] .duet-glass:not(.duet-accessory) {
+    --duet-col: rgb(90 89 84 / 0.43); --duet-solid: rgb(38 38 40); --duet-ink: #fff; --duet-edge: 0.6; --duet-rim: 0;
+  }
+}
+.duet[data-mode="column"] .duet-glass { position: absolute; }
+/* Rim, measured at device pixels against Safari's buttons on cream and near-black pages, light and dark UI.
+   Safari's highlight adds about 40 levels to whatever is under it (62 to 104, 140 to 182, 248 to 255), so
+   ours is a backdrop filter, not a white line: contrast then brightness is x + 40 with the clip at white. It
+   is a 3 device px band inside the edge at the top and bottom, with a soft glow behind it. Outside, a 1 device
+   px darker outline, heaviest at the sides (offset shadows paint side crescents; dark UI has none at top and
+   bottom), and a faint shadow below. */
+.duet[data-mode="column"] .duet-glass:not(.duet-accessory) {
+  box-shadow: -0.5px 0 0 rgb(0 0 0 / var(--duet-edge)), 0.5px 0 0 rgb(0 0 0 / var(--duet-edge)),
+    0 0 0 0.35px rgb(0 0 0 / var(--duet-rim)), 0 3px 10px rgb(0 0 0 / 0.03);
+}
+.duet[data-mode="column"] .duet-glass:not(.duet-accessory)::before {
+  -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--duet-col); box-shadow: none;
+}
+.duet[data-mode="column"] .duet-glass:not(.duet-accessory)::after {
+  padding: 1px; background: none; -webkit-backdrop-filter: contrast(0.76) brightness(1.31); backdrop-filter: contrast(0.76) brightness(1.31);
+  --duet-cap: linear-gradient(#000, transparent 35%, transparent 65%, #000);
+  --duet-glow: linear-gradient(rgb(0 0 0 / 0.3), transparent 8px, transparent calc(100% - 8px), rgb(0 0 0 / 0.3));
+  /* glow + (cap ∩ (edge band = border box − content box)) */
+  -webkit-mask: var(--duet-glow), var(--duet-cap), linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: source-over, source-in, xor;
+  mask: var(--duet-glow), var(--duet-cap), linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: add, intersect, exclude;
+}
+.duet[data-mode="column"] .duet-glass.duet-menu:not(.duet-accessory)::before { background: var(--duet-solid); }
+
+/* Full-width band, the CSS twin of bleed(): background under the controls, content padded beside them.
+   Set --duet-pad for the band's own horizontal padding. */
+.duet-bleed {
+  margin-right: calc(-1 * var(--duet-inset-right, 0px) - var(--duet-under, 0px)); margin-left: calc(-1 * var(--duet-inset-left, 0px));
+  border-right: var(--duet-under, 0px) solid transparent; background-origin: border-box;
+  padding-right: calc(var(--duet-pad, 0px) + var(--duet-inset-right, 0px)); padding-left: calc(var(--duet-pad, 0px) + var(--duet-inset-left, 0px));
+}

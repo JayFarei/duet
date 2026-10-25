@@ -1,0 +1,135 @@
+:root {
+  --accent: #128a7e;
+  --bg: #f2f2f7; --surface: #fff; --ink: #1c1c1e; --ink-2: rgb(60 60 67 / 0.62); --sep: rgb(60 60 67 / 0.16);
+  --sheet: #fff; --shadow: 0 8px 30px rgb(0 0 0 / 0.12), 0 1px 3px rgb(0 0 0 / 0.08);
+  /* map */
+  --land: #f2f0eb; --park: #d5e5c8; --water: #b9d6e8; --street: #fbfaf7; --road: #ffffff; --road-case: #e2ded5;
+  --label: #3d3c39; --label-2: #9a968c; --halo: #f2f0eb; --water-ink: #6b93ad; --park-ink: #6c8a5c; --hub: #2b2b2d;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #3cc2b2;
+    --bg: #000; --surface: #1c1c1e; --ink: #f2f2f7; --ink-2: rgb(235 235 245 / 0.6); --sep: rgb(84 84 88 / 0.5);
+    --sheet: #242426; --shadow: 0 8px 30px rgb(0 0 0 / 0.5);
+    --land: #1c1d1f; --park: #22301f; --water: #17283a; --street: #2a2b2e; --road: #3a3b3f; --road-case: #232427;
+    --label: #e6e4df; --label-2: #77756f; --halo: #1c1d1f; --water-ink: #6a8fae; --park-ink: #7c9a6c; --hub: #f2f2f7;
+  }
+}
+html { background: var(--bg); }
+body { margin: 0; color: var(--ink); font: 17px/1.35 -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; }
+button { font: inherit; color: inherit; }
+
+/* Map: fills Duet's scroller and runs under the strip (bleed(false)); drags pan it instead of scrolling. */
+.map { position: relative; height: 100%; overflow: hidden; background: var(--land); touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.map:active { cursor: grabbing; }
+.map-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.frame {
+  position: absolute; pointer-events: none; left: var(--duet-inset-left, 0px); right: var(--duet-inset-right, 0px);
+  top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px)); bottom: env(safe-area-inset-bottom);
+}
+.land { fill: var(--land); }
+.park { fill: var(--park); }
+.street { stroke: var(--street); fill: none; }
+.river { stroke: var(--water); fill: none; stroke-linecap: round; }
+.road-case { stroke: var(--road-case); fill: none; }
+.road { stroke: var(--road); fill: none; }
+.line, .line-case { fill: none; stroke-linejoin: round; stroke-linecap: round; transition: opacity 0.3s; }
+.line-case { stroke: var(--land); }
+.station { cursor: pointer; transition: opacity 0.3s; }
+.station-dot { fill: #fff; stroke: var(--hub); }
+.station-ring { fill: var(--accent); fill-opacity: 0.22; }
+text { font-family: -apple-system, system-ui, sans-serif; paint-order: stroke; stroke: var(--halo); stroke-linejoin: round; pointer-events: none; }
+.station-label { fill: var(--label); font-weight: 500; stroke-width: 3px; vector-effect: non-scaling-stroke; }
+.station-label.hub { font-weight: 650; }
+.district { fill: var(--label-2); font-weight: 600; stroke: none; }
+.park-label { fill: var(--park-ink); font-weight: 600; stroke: none; }
+.water-label { fill: var(--water-ink); font-style: italic; font-weight: 500; stroke: none; letter-spacing: 0.06em; }
+.street-label { fill: var(--label-2); font-weight: 500; stroke-width: 3px; vector-effect: non-scaling-stroke; }
+.you { fill: var(--accent); stroke: #fff; }
+.you-halo { fill: var(--accent); opacity: 0.16; }
+
+/* Overlays sit beside the strip, never under it: inset by Duet's CSS vars and the safe areas. */
+.overlay { position: absolute; z-index: 2; cursor: auto; }
+.searchbar {
+  top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 12px); left: calc(var(--duet-inset-left, 0px) + 12px);
+  width: min(380px, calc(100% - var(--duet-inset-left, 0px) - var(--duet-inset-right, 0px) - 24px));
+  display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 16px; box-sizing: border-box; border: 0; border-radius: 23px;
+  background: var(--sheet); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6);
+  box-shadow: var(--shadow); color: var(--ink-2); font-size: 17px; cursor: pointer; text-align: left;
+}
+.searchbar svg { color: var(--ink-2); }
+.toast {
+  top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 70px);
+  left: calc(var(--duet-inset-left, 0px) + (100% - var(--duet-inset-left, 0px) - var(--duet-inset-right, 0px)) / 2); translate: -50% 0;
+  padding: 7px 14px; border-radius: 18px; background: var(--sheet); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  box-shadow: var(--shadow); font-size: 14px; font-weight: 600; animation: toast 1.6s ease both; pointer-events: none;
+}
+@keyframes toast { 0% { opacity: 0; transform: translateY(-6px); } 12%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.attribution {
+  position: absolute; bottom: calc(env(safe-area-inset-bottom) + 10px); left: calc(var(--duet-inset-left, 0px) + 14px);
+  font-size: 11px; color: var(--label-2); pointer-events: none;
+}
+
+.card {
+  background: var(--sheet); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6);
+  box-shadow: var(--shadow); box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  animation: rise 0.45s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.card.sheet {
+  left: calc(var(--duet-inset-left, 0px) + 8px); right: calc(var(--duet-inset-right, 0px) + 8px); bottom: calc(env(safe-area-inset-bottom) + 8px);
+  max-height: 48%; border-radius: 28px; padding: 6px 18px 12px;
+}
+.card.wide {
+  left: calc(var(--duet-inset-left, 0px) + 12px); top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 70px); width: 340px;
+  max-height: calc(100% - env(safe-area-inset-top) - var(--duet-inset-top, 0px) - 82px - env(safe-area-inset-bottom)); border-radius: 24px; padding: 16px 18px 12px;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+.grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--sep); margin: 0 auto 10px; }
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.card h2 { margin: 0; font-size: 24px; line-height: 1.15; font-weight: 700; letter-spacing: -0.3px; }
+.sub { display: flex; align-items: center; gap: 5px; margin: 6px 0 4px; color: var(--ink-2); font-size: 14px; }
+.sub > span:last-child { margin-left: 4px; }
+.save {
+  flex: none; width: 38px; height: 38px; border-radius: 19px; border: 0; display: grid; place-items: center; cursor: pointer;
+  background: var(--sep); color: var(--ink-2);
+}
+.save.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.deps { list-style: none; margin: 8px 0 0; padding: 0; }
+.deps li { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 0.5px solid var(--sep); }
+.dep-to, .dep-mins { display: flex; flex-direction: column; min-width: 0; }
+.dep-to { flex: 1; }
+.dep-to strong, .dep-mins strong { font-size: 16px; font-weight: 600; }
+.dep-to span, .dep-mins span { font-size: 13px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dep-mins { align-items: flex-end; text-align: right; }
+.dep-mins strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+
+.badge { display: inline-grid; place-items: center; flex: none; color: #fff; font-weight: 700; line-height: 1; letter-spacing: 0; }
+
+/* List pages scroll in Duet's scroller, which already keeps them beside the strip. */
+.page { padding: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px) + 14px) 16px calc(env(safe-area-inset-bottom) + 24px); max-width: 680px; }
+.page h1 { font-size: 34px; line-height: 1.1; font-weight: 700; letter-spacing: -0.6px; margin: 8px 4px 16px; }
+.list { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: 14px; overflow: hidden; }
+.list:empty { display: none; }
+.list li + li .row { box-shadow: inset 0 0.5px 0 var(--sep); }
+.row { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 62px; padding: 9px 12px 9px 14px; border: 0; background: none; text-align: left; cursor: pointer; }
+.row:active { background: var(--sep); }
+.row-text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.row-text strong { font-weight: 600; font-size: 17px; }
+.row-text.wrap span { white-space: normal; }
+.row-text span { font-size: 14px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-icon { color: var(--accent); flex: none; }
+.chev { color: var(--ink-2); opacity: 0.6; flex: none; }
+.badges { display: flex; gap: 4px; flex: none; }
+.status { display: inline-flex; align-items: center; gap: 4px; vertical-align: -2px; }
+.status.warn { color: var(--ink); font-weight: 600; }
+.status svg { flex: none; }
+.pin { width: 30px; height: 30px; border-radius: 15px; display: grid; place-items: center; background: var(--sep); color: var(--ink-2); flex: none; }
+.alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; margin-bottom: 10px; background: var(--surface); border-radius: 14px; }
+.alert strong { font-size: 15px; font-weight: 600; }
+.alert p { margin: 2px 0 0; font-size: 14px; color: var(--ink-2); }
+.alert + .list { margin-top: 18px; }
+.field { display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; margin-bottom: 16px; border-radius: 12px; background: var(--sep); color: var(--ink-2); }
+.field input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; color: var(--ink); }
+.empty { color: var(--ink-2); padding: 12px 4px; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .card, .toast { animation: none; } }

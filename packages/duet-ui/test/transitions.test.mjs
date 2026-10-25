@@ -1,0 +1,97 @@
+// Mode transitions and the inline side drag, from signals recorded on device and simulator.
+// Run: pnpm test (node --test; Node 23.6+ strips the types from geometry.ts)
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { detect, magnet, MAGNET, stable } from "../src/geometry.ts";
+
+const sig = (iw, ih, ow, oh, o = {}) => ({
+  innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
+  insetTop: 0, insetBottom: 0, screenWidth: ow, screenHeight: oh, insetRight: 0, insetLeft: 0, standalone: false, ...o,
+});
+
+// Device recording 2026-10-24 23:14: full-width open Safari into a split-view pane. The lab title showed
+// these signals in turn: column 385x571 alternating with a zoomed-out pane (469 wide, height wobbling).
+const CLOSED = sig(382, 580, 466, 678);
+const OPEN_FULL = sig(951, 543, 466, 678); // outer lags after the unfold
+const PANE = sig(385, 571, 469, 669);
+const PANE_ZOOMED = [696, 679, 659, 674, 681].map((h) => sig(469, h, 469, 669));
+
+test("closed Safari tab is column", () => assert.equal(detect(CLOSED).mode, "column"));
+test("open posture, full width, is inline", () => assert.equal(detect(OPEN_FULL).mode, "inline"));
+test("split-view pane is inline (its column does not take our paint)", () => {
+  assert.equal(detect(PANE).mode, "inline");
+  for (const s of PANE_ZOOMED) assert.equal(detect(s).mode, "inline");
+});
+test("standalone, landscape and keyboard up never take the column", () => {
+  assert.equal(detect({ ...CLOSED, standalone: true }).mode, "inline");
+  assert.equal(detect(sig(594, 368, 678, 466)).mode, "inline");
+  assert.equal(detect({ ...CLOSED, visualHeight: 300 }).mode, "inline");
+});
+
+// Model of the feedback loop seen on device: in column mode the layer's overflow makes Safari zoom the
+// viewport out to the window width, which drops the column signature; inline restores it.
+function loop(window, zoomed, steps = 40, dt = 50) {
+  const d = { flips: [] }, modes = [];
+  let s = window;
+  for (let i = 0; i < steps; i++) {
+    const c = stable(d, s, "right", i * dt);
+    modes.push(c.mode);
+    s = c.mode === "column" ? zoomed : window;
+  }
+  return modes;
+}
+const flips = (m) => m.slice(1).filter((x, i) => x !== m[i]).length;
+
+test("a column/inline feedback loop settles on inline within 3 flips", () => {
+  const m = loop(CLOSED, sig(466, 640, 466, 678));
+  assert.ok(flips(m) <= 3, `flipped ${flips(m)} times: ${m.join(" ")}`);
+  assert.equal(m.at(-1), "inline");
+});
+test("the split pane never flips at all", () => {
+  const m = loop(PANE, PANE_ZOOMED[0]);
+  assert.equal(flips(m), 0);
+  assert.equal(m[0], "inline");
+});
+test("a pin is released when the window changes size (fold, rotate, resize pane)", () => {
+  const d = { flips: [] };
+  for (let i = 0; i < 6; i++) stable(d, i % 2 ? sig(466, 640, 466, 678) : CLOSED, "right", i * 50);
+  assert.equal(stable(d, CLOSED, "right", 400).mode, "inline"); // pinned
+  stable(d, PANE, "right", 500); // pane resized: unpinned
+  assert.equal(stable(d, CLOSED, "right", 5000).mode, "column");
+});
+test("ordinary transitions (closed -> open -> split -> closed) are not mistaken for a loop", () => {
+  const d = { flips: [] };
+  const seq = [CLOSED, OPEN_FULL, PANE, CLOSED];
+  assert.deepEqual(seq.map((s, i) => stable(d, s, "right", i * 3000).mode), ["column", "inline", "inline", "column"]);
+});
+
+// Magnet: controls on the right edge, finger pulling left (dx < 0).
+test("magnet holds the controls near their edge until the release distance", () => {
+  for (const dx of [-5, -20, -40, -MAGNET.release + 1]) {
+    const m = magnet("right", dx);
+    assert.equal(m.free, false);
+    assert.ok(m.offset <= 0 && m.offset > -MAGNET.hold, `dx ${dx} -> ${m.offset}`);
+  }
+  // resistance grows with the pull, never jumps
+  assert.ok(magnet("right", -40).offset < magnet("right", -20).offset);
+});
+test("magnet lets go past the release distance and then tracks the finger", () => {
+  const m = magnet("right", -MAGNET.release - 30);
+  assert.equal(m.free, true);
+  assert.equal(m.offset, -MAGNET.release - 30);
+});
+test("pulling toward the own edge only rubber-bands", () => {
+  const m = magnet("right", 200);
+  assert.equal(m.free, false);
+  assert.ok(m.offset > 0 && m.offset < MAGNET.hold);
+});
+test("magnet is mirrored on the left", () => {
+  assert.equal(magnet("left", MAGNET.release + 10).free, true);
+  assert.equal(magnet("left", MAGNET.release - 10).free, false);
+  assert.ok(magnet("left", 30).offset > 0);
+});
+
+test("an iframe never takes the column (it cannot paint there)", () => {
+  assert.equal(detect(CLOSED).mode, "column");
+  assert.equal(detect({ ...CLOSED, framed: true }).mode, "inline");
+});

@@ -1,0 +1,22 @@
+:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: #0088ff; --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); }
+}
+:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; }
+code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+/* Code colors, Xcode's default themes. Tokens come from sugar-high. */
+:root { --sh-keyword: #9b2393; --sh-string: #c41a16; --sh-class: #0b4f79; --sh-entity: #326d74; --sh-property: #0f68a0; --sh-identifier: var(--ink); --sh-sign: rgb(60 60 67 / 0.7); --sh-jsxliterals: var(--ink); --sh-comment: #5d6c79; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-lg-theme="light"]) { --sh-keyword: #ff7ab2; --sh-string: #ff8170; --sh-class: #6bdfff; --sh-entity: #67b7a4; --sh-property: #4eb0cc; --sh-sign: rgb(235 235 245 / 0.6); --sh-comment: #7f8c98; }
+}
+:root[data-lg-theme="dark"] { --sh-keyword: #ff7ab2; --sh-string: #ff8170; --sh-class: #6bdfff; --sh-entity: #67b7a4; --sh-property: #4eb0cc; --sh-sign: rgb(235 235 245 / 0.6); --sh-comment: #7f8c98; }
+
+/* The web Duo (app/duo/web-duo.tsx). */
+@keyframes wd-in { from { opacity: 0; } }
+@keyframes wd-slide { from { transform: translateX(var(--from)); } }
+[data-wd-callout] [data-wd-system] { outline: 1.5px dashed rgb(142 142 147); outline-offset: 2px; }
+
+/* The server-rendered phone site, hidden on desktops until the web Duo replaces it (same query as useDesktop). */
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) { .ssr-site { visibility: hidden; } }

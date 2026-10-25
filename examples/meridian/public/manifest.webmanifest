@@ -1,0 +1,15 @@
+{
+  "name": "Meridian",
+  "short_name": "Meridian",
+  "description": "City transit map, a Duet example.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f2f0eb",
+  "theme_color": "#f2f0eb",
+  "icons": [
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/favicon.png", "sizes": "64x64", "type": "image/png" }
+  ]
+}
