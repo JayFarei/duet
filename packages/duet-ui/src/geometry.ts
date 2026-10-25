@@ -2,9 +2,9 @@
 // iPhone Duo simulator, iOS 27.1, closed portrait, in iOS points (= CSS px).
 
 /** strip: Home Screen web app, iOS gives us the right-hand strip.
- *  column: Safari tab in its default closed-portrait layout; Safari owns the strip and we paint into the
+ *  column: Safari tab, closed portrait or a split-view pane; Safari owns the strip and we paint into the
  *  free space of its column (an undocumented WebKit behaviour, so only when every signal matches).
- *  inline: anything else (landscape, open posture, split view, keyboard up, other browsers); a right-edge
+ *  inline: anything else (landscape, open posture full width, keyboard up, other browsers); a right-edge
  *  strip inside the page viewport. */
 export type Mode = "strip" | "column" | "inline";
 /** Which screen edge the controls hug. strip: wherever iOS puts the strip (its safe-area inset). column:
@@ -37,7 +37,10 @@ export const DUO = {
 /** Safari's own column in a tab: back + reader rows at the top, a 2-item +/tabs pill at the bottom.
  *  Live Activities grow the Dynamic Island and push the back + reader rows down; the pill never moves.
  *  islandPush is the worst case measured on device (two activities, call + Maps): back 173.3 -> 265. */
-export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem, islandPush: 91.7 } as const;
+export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem, islandPush: 91.7,
+  /** Split-view pane (simulator, 2026-10-25): the back slot's top, in the left pane (no status bar) and in the
+   *  right pane (under the status bar). The pill sits as in a closed tab, DUO.bottom above the window bottom. */
+  splitTop: { left: 23.5, right: 123.5 } } as const;
 
 /** Menu island slots: a button unrolls into a pill of these (Safari's own pill items are 50; 46.5 keeps
  *  every slot above the 44pt touch target). */
@@ -84,7 +87,8 @@ export interface Context {
   layout: Layout;
   /** Running on an iPhone Duo, in any posture or mode (see isDuo). */
   duo: boolean;
-  /** A Safari split-view pane on the open Duo (see isSplit). */
+  /** A Safari split-view pane on the open Duo (see isSplit). In column mode nothing tells which pane it is, so
+   *  the controls are drawn in both columns, each pane showing only its own (chrome.tsx); `side` is moot. */
   split?: boolean;
 }
 
@@ -116,10 +120,10 @@ export const isSplit = (s: Signals) => !s.standalone && Math.abs(s.outerWidth - 
 
 /** Measured on the Duo simulator: Safari's column is 84pt wide (outer − inner), the chrome below the
  *  page is 98pt (80 with the compact URL bar), the window is the closed screen's 678pt tall. A split-view
- *  pane on the open Duo (469x669 outer, 385x571 inner, device recording 2026-10-24) has the same column
- *  but must stay inline: in-document content does not paint into its column (our controls clip at the
- *  page edge), and the column layer's 84pt overflow makes Safari zoom the pane out to 469 wide, which
- *  drops the signature and flips the mode several times a second. */
+ *  pane on the open Duo (469x669 outer, 385x571 inner) has the same column on its outer edge, so either
+ *  side of the page. In-document content paints into it once the document spans both columns (84 + 385 + 84)
+ *  and is scrolled 84 across, with `shrink-to-fit=no` in the viewport meta, or Safari zooms the pane out to
+ *  fit the wider document (simulator probes, 2026-10-25). */
 const SAFARI_COLUMN = { width: [80, 88], chrome: [76, 102], height: [675, 681] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
 
@@ -133,11 +137,11 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
   const column = allowColumn && !s.standalone && !s.framed
     && within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width)
     && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome)
-    && within(s.outerHeight, SAFARI_COLUMN.height)
     && s.innerHeight > s.innerWidth // landscape moves Safari's column buttons around
     && s.visualHeight >= s.innerHeight - 1; // keyboard up
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
-  if (column) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
+  if (column && isSplit(s)) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
+  if (column && within(s.outerHeight, SAFARI_COLUMN.height)) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
   const preview = isPreview(s), split = isSplit(s);
   return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(split && { split }) };
 }
@@ -223,6 +227,7 @@ export function plan(c: Context, s: Spec): Plan {
   // its back + reader rows at their worst-case (island-pushed) position, above its +/tabs pill. strip and
   // inline: viewport coordinates.
   const top = c.mode === "strip" ? DUO.top - c.offsetTop
+    : c.mode === "column" && c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap)
     : c.mode === "column" ? DUO.top + SAFARI.islandPush + SAFARI.rows * (DUO.control + DUO.gap)
     : c.insetTop + DUO.gap;
   const bottom = c.mode === "strip" ? c.height - DUO.bottom
@@ -272,6 +277,8 @@ export function plan(c: Context, s: Spec): Plan {
 
 function accessory(c: Context, s: Spec, centerX: number, bottom: number): Pick<Plan, "accessory"> {
   if (!s.accessory) return {};
+  // Split pane: drawn once, across the page, by the left copy, whose layer starts at the left column's outer edge.
+  if (c.mode === "column" && c.split) return { accessory: { left: c.screenWidth - c.width + DUO.gap, width: c.width - 2 * DUO.gap, top: c.height - DUO.gap - DUO.accessory.height, height: DUO.accessory.height } };
   const floor = c.mode === "column" ? c.height - DUO.gap : bottom;
   // Mirrored on the left: inner edge clear of the column, outer edge DUO.accessory.left from the screen edge.
   const left = c.side === "left" ? centerX + DUO.control / 2 + DUO.accessory.gapToColumn : DUO.accessory.left;

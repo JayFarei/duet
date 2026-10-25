@@ -82,6 +82,19 @@ test("isDuo: the Duo in every posture, never another phone or a desktop", () => 
 test("split: a Safari split-view pane, in either pane, never full screen or a Home Screen app", () => {
   assert.equal(detect(sig(385, 571, 469, 669)).split, true);
   assert.equal(detect(sig(650, 571, 469, 669)).split, true); // zoomed out by wide content
-  assert.equal(detect(sig(385, 571, 469, 669), "left").side, "left");
+  assert.equal(detect(sig(650, 571, 469, 669), "left").side, "left"); // inline fallback keeps the chosen side
   for (const s of [STRIP, COLUMN, INLINE, sig(951, 543, 951, 669)]) assert.equal(detect(s).split, undefined);
+});
+
+test("split pane: column mode, both columns planned in the band beside Safari's own buttons", () => {
+  const c = detect(sig(385, 571, 469, 669));
+  assert.equal(c.mode, "column");
+  const full = spec({ back: true, actions: 3, tabs: 5 });
+  const l = plan({ ...c, side: "left" }, full), r = plan({ ...c, side: "right" }, full);
+  assert.equal(l.centerX, DUO.centerFromEdge);
+  assert.equal(r.centerX, 469 - DUO.centerFromEdge);
+  // Simulator: Safari's bookmarks button ends at 132.5 (left pane) and 232.5 (right, under the status bar),
+  // its +/tabs pill starts at 533.
+  assert.ok(l.back.top >= 132.5 + DUO.gap - 0.5 && r.back.top >= 232.5 + DUO.gap - 0.5);
+  for (const p of [l, r]) { assert.ok(p.tabs.top + p.tabs.height <= 533 - DUO.gap + 0.5); assertNoOverlap(p); }
 });

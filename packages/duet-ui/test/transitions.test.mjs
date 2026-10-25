@@ -18,8 +18,8 @@ const PANE_ZOOMED = [696, 679, 659, 674, 681].map((h) => sig(469, h, 469, 669));
 
 test("closed Safari tab is column", () => assert.equal(detect(CLOSED).mode, "column"));
 test("open posture, full width, is inline", () => assert.equal(detect(OPEN_FULL).mode, "inline"));
-test("split-view pane is inline (its column does not take our paint)", () => {
-  assert.equal(detect(PANE).mode, "inline");
+test("split-view pane is column; zoomed out (no shrink-to-fit=no) it is inline", () => {
+  assert.equal(detect(PANE).mode, "column");
   for (const s of PANE_ZOOMED) assert.equal(detect(s).mode, "inline");
 });
 test("standalone, landscape and keyboard up never take the column", () => {
@@ -47,10 +47,10 @@ test("a column/inline feedback loop settles on inline within 3 flips", () => {
   assert.ok(flips(m) <= 3, `flipped ${flips(m)} times: ${m.join(" ")}`);
   assert.equal(m.at(-1), "inline");
 });
-test("the split pane never flips at all", () => {
+test("a split pane that Safari zooms out settles on inline within 3 flips", () => {
   const m = loop(PANE, PANE_ZOOMED[0]);
-  assert.equal(flips(m), 0);
-  assert.equal(m[0], "inline");
+  assert.ok(flips(m) <= 3, `flipped ${flips(m)} times: ${m.join(" ")}`);
+  assert.equal(m.at(-1), "inline");
 });
 test("a pin is released when the window changes size (fold, rotate, resize pane)", () => {
   const d = { flips: [] };
@@ -62,7 +62,7 @@ test("a pin is released when the window changes size (fold, rotate, resize pane)
 test("ordinary transitions (closed -> open -> split -> closed) are not mistaken for a loop", () => {
   const d = { flips: [] };
   const seq = [CLOSED, OPEN_FULL, PANE, CLOSED];
-  assert.deepEqual(seq.map((s, i) => stable(d, s, "right", i * 3000).mode), ["column", "inline", "inline", "column"]);
+  assert.deepEqual(seq.map((s, i) => stable(d, s, "right", i * 3000).mode), ["column", "inline", "column", "column"]);
 });
 
 // Magnet: controls on the right edge, finger pulling left (dx < 0).

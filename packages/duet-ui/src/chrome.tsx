@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
-import { DUO, INLINE_WIDTH, ISLAND, MORPH, isSplit, magnet, plan, stable, type Box, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
+import { DUO, INLINE_WIDTH, ISLAND, MORPH, isSplit, magnet, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
 import "./duet.css";
@@ -171,32 +171,52 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
  *  the document itself from scrolling, so the layer never moves. A scroll-driven transform lags momentum
  *  scrolling and drifts (issue #1); `follow` only covers pages without the scroller. Touches there reach the page
  *  but are not hit-tested to our elements, and Safari keeps the touch end (no pointerup, no click), so we route
- *  them by coordinates on pointerdown. Nothing in the column scrolls, so a touch there is always a tap. */
-function useColumnLayer(on: boolean) {
-  const ref = useRef<HTMLElement>(null);
+ *  them by coordinates on pointerdown. Nothing in the column scrolls, so a touch there is always a tap.
+ *  Split pane: the column is on the pane's outer edge, which the page cannot see, so the document spans a column
+ *  on each side, scrolled 84 across, and the controls are drawn in both (refs[0] left, refs[1] right). Each pane
+ *  shows only its own column, and a tap there names the side (`tapSide`). */
+let tapSide: Side = "right";
+/** Without shrink-to-fit=no Safari zooms a split pane out to fit the layer's overflow, which reads as another
+ *  window size and flips the mode. It applies even when set late, but must land before the first column paint. */
+function noShrink() {
+  const meta = document.querySelector<HTMLMetaElement>("meta[name=viewport]");
+  if (meta && !/shrink-to-fit/.test(meta.content)) meta.content += ",shrink-to-fit=no";
+}
+if (typeof document !== "undefined") noShrink();
+function useColumnLayer(on: boolean, split: boolean, column: number) {
+  const refs = [useRef<HTMLElement>(null), useRef<HTMLElement>(null)] as const;
   useEffect(() => {
-    const el = ref.current;
-    if (!on || !el) return;
+    const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
+    if (!on || !els.length) return;
     const html = document.documentElement.style, prev = html.touchAction;
     html.touchAction = "pan-y"; // the layer widens the document; keep the page from panning sideways
-    const follow = () => { el.style.transform = scrollY ? `translateY(${scrollY}px)` : ""; };
+    const follow = () => {
+      if (split && Math.round(scrollX) !== column) scrollTo(column, scrollY);
+      for (const el of els) el.style.transform = scrollY ? `translateY(${scrollY}px)` : "";
+    };
     const tap = (e: PointerEvent) => {
-      if (e.clientX < innerWidth) return; // inside the viewport, normal hit-testing applies
+      if (e.clientX >= 0 && e.clientX < innerWidth) return; // inside the viewport, normal hit-testing applies
+      const el = split ? refs[e.clientX < 0 ? 0 : 1].current : refs[0].current;
+      if (split) tapSide = e.clientX < 0 ? "left" : "right";
       // Skip a button that became an open menu: the menu covers it, and its own slot sits on top.
-      for (const b of el.querySelectorAll<HTMLButtonElement>(":not([data-unrolled]) > button")) {
+      for (const b of el?.querySelectorAll<HTMLButtonElement>(":not([data-unrolled]) > button") ?? []) {
         const r = b.getBoundingClientRect();
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) { b.click(); return; }
       }
     };
     follow();
+    // Safari restores or resets the sideways scroll on load and resize.
+    const t = [0, 300, 1000].map((ms) => setTimeout(follow, ms));
     addEventListener("scroll", follow, { passive: true });
+    addEventListener("resize", follow);
     addEventListener("pointerdown", tap);
     return () => {
-      html.touchAction = prev; el.style.transform = "";
-      removeEventListener("scroll", follow); removeEventListener("pointerdown", tap);
+      html.touchAction = prev; for (const el of els) el.style.transform = "";
+      t.forEach(clearTimeout);
+      removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pointerdown", tap);
     };
-  }, [on]);
-  return ref;
+  }, [on, split, column]); // eslint-disable-line react-hooks/exhaustive-deps -- refs are stable
+  return refs;
 }
 
 /** Inline: drag any control across the middle of the page to move the strip to that side. The controls
@@ -266,14 +286,19 @@ export function Duet(p: DuetProps) {
   const actions = (p.actions ?? []).filter((a) => !a.destructive), destructive = (p.actions ?? []).filter((a) => a.destructive);
   const leading = p.leading ?? [];
   const tabItems = p.tabs ? [...p.tabs.items, ...(p.tabs.search ? [p.tabs.search] : [])] : [];
-  const pl = plan(ctx, p.close
+  const spec: Spec = p.close
     ? { back: true, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized, menuExtra: 0 }
     : {
         back: !!p.back, leading: leading.length, actions: actions.length, tabs: tabItems.length,
         searchButton: !p.tabs && !!p.searchButton, accessory: !!p.accessory, minimized,
         menuExtra: (ctx.mode === "inline" ? 1 : 0) + destructive.length, primary: !!p.primary,
-      });
-  const left = ctx.side === "left";
+      };
+  // Split pane in column mode: the controls are drawn in both of Safari's possible columns (useColumnLayer).
+  const split = ctx.mode === "column" && !!ctx.split, column = ctx.screenWidth - ctx.width;
+  const sides: Side[] = split ? ["left", "right"] : [ctx.side];
+  const planFor = (side: Side) => plan(side === ctx.side ? ctx : { ...ctx, side }, spec);
+  // The copy whose column opened the menu draws it; the other copy's column is in the other pane.
+  const [menuSide, setMenuSide] = useState<Side>(ctx.side);
 
   useEffect(() => {
     // The page spans the window and the controls float over it; these insets are how far text and buttons keep
@@ -281,7 +306,7 @@ export function Duet(p: DuetProps) {
     // column's frame already spans it), so either way the inset there is the column's width.
     const r = document.documentElement.style;
     const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
-    const right = ctx.side === "right" ? inset : envInset("right"), left = ctx.side === "left" ? inset : envInset("left");
+    const right = ctx.side === "right" || split ? inset : envInset("right"), left = ctx.side === "left" || split ? inset : envInset("left");
     // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
     for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
@@ -289,50 +314,25 @@ export function Duet(p: DuetProps) {
     r.setProperty("--duet-inset-top", ctx.mode === "strip" ? `${DUO.edgeBlur}px` : "0px");
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulated);
-  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.width]);
-  const nav = useColumnLayer(ctx.mode === "column");
+    document.documentElement.toggleAttribute("data-duet-split", split);
+  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.width, split]);
+  const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, column);
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
     if (!menu) return;
-    const close = (e: PointerEvent) => { if (!nav.current?.contains(e.target as Node) && e.clientX < innerWidth) setMenu(null); };
+    const close = (e: PointerEvent) => {
+      if (![nav, nav2].some((n) => n.current?.contains(e.target as Node)) && e.clientX >= 0 && e.clientX < innerWidth) setMenu(null);
+    };
     addEventListener("pointerdown", close);
     return () => removeEventListener("pointerdown", close);
-  }, [menu, nav]); // eslint-disable-line react-hooks/exhaustive-deps -- setMenu only reads menu
+  }, [menu, nav, nav2]); // eslint-disable-line react-hooks/exhaustive-deps -- setMenu only reads menu
   useSideDrag(ctx.mode === "inline" ? ctx.side : null, nav, () => { setMenu(null); setScrub(null); });
 
-  const at = (b: Box) => ({ top: b.top, left: pl.left, width: DUO.control, height: b.height });
-  // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
-  // as tall as the button, outer edge on the button's, widening towards the page centre only.
-  const menuAt = (b: Box, n: number) => {
-    const w = 2 * ISLAND.pad + n * ISLAND.item;
-    return { top: b.top + b.height / 2 - DUO.control / 2, left: left ? pl.left : pl.left + DUO.control - w, width: w, height: DUO.control, "--x0": `${pl.left}px` } as CSSProperties;
-  };
-  // Morph: the button grows into a labelled list, outer edge on the button's, top on its top; opening upwards
-  // instead when the list would run off the bottom of the screen.
-  const morph = p.menuStyle === "morph";
-  const morphAt = (b: Box, n: number) => {
-    const w = MORPH.width, h = 2 * MORPH.pad + n * MORPH.row, y0 = b.top + b.height / 2 - DUO.control / 2;
-    const top = y0 + h > ctx.height - MORPH.pad ? Math.max(MORPH.pad, y0 + DUO.control - h) : y0;
-    return { top, left: left ? pl.left : pl.left + DUO.control - w, width: w, height: h, "--x0": `${pl.left}px`, "--y0": `${y0}px` } as CSSProperties;
-  };
-  const shownLeading = leading.slice(0, leading.length - pl.menu.leading);
-  const shownActions = actions.slice(0, actions.length - pl.menu.actions);
-  const more: DuetItem[] = [
-    ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
-    ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length),
-    ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
-      // The menu goes at once, without rolling back into "…": its button is about to move, and would stay hidden
-      // as "unrolled" until a roll that no longer lines up with it.
-      setMenuNow(null); setClosing(null); setScrub(null);
-      if (nav.current) switchSide(nav.current, left ? "right" : "left");
-    } }] : []),
-    ...destructive,
-  ];
   const selected = p.tabs?.selected;
   const badge = (a: DuetItem) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge">{a.badge}</span>;
   const tint = (a: DuetItem) => a.tint ? { "--duet-tint": a.tint } as CSSProperties : undefined;
   const item = (a: DuetItem) => <button key={a.id} className="duet-item" aria-label={a.label} onClick={a.onPress}>{a.icon}{badge(a)}</button>;
-  const toggle = (m: "more" | "tabs") => () => setMenu(menu === m ? null : m);
+  const toggle = (m: "more" | "tabs") => () => { if (split) setMenuSide(tapSide); setMenu(menu === m ? null : m); };
   const backButton = p.back && <button className="duet-item" aria-label={p.back.label ?? "Back"} onClick={p.back.onPress}><ChevronLeft size={24} strokeWidth={2.2} /></button>;
   const moreButton = <button className="duet-item" aria-label="More" aria-expanded={menu === "more"} onClick={toggle("more")}><Ellipsis size={22} /></button>;
   const searchButton = <button className="duet-item" aria-label="Search" onClick={p.searchButton}><Search size={22} /></button>;
@@ -390,22 +390,23 @@ export function Duet(p: DuetProps) {
 
   // Held, the rail grows for real (wider towards the page, taller upwards), not just scaled, so the labels
   // have room and clear its round ends, as Apple News and Music do.
-  const swell = (b: ReturnType<typeof at>, on: boolean) => !on ? b
-    : { ...b, top: b.top - SWELL.y, height: b.height + SWELL.y, width: b.width + SWELL.x, left: ctx.side === "right" ? b.left - SWELL.x : b.left };
+  const swell = (b: CSSProperties & { top: number; left: number; width: number; height: number }, on: boolean, side: Side) => !on ? b
+    : { ...b, top: b.top - SWELL.y, height: b.height + SWELL.y, width: b.width + SWELL.x, left: side === "right" ? b.left - SWELL.x : b.left };
 
   const lensAt = scrub ?? Math.max(0, tabItems.findIndex((t) => t.id === selected));
 
   // Menus only unroll from separate round buttons: "…" and the minimized tab.
-  const moreAnchor = pl.more;
-  const tabsAnchor = pl.tabs?.min ? pl.tabs : undefined;
+  const anchors = (pl: Plan) => ({ more: pl.more, tabs: pl.tabs?.min ? pl.tabs : undefined });
   // A menu whose button went away mid-roll (a tab change scrolls to the top and un-minimizes the tab bar)
   // never fires its animationend; drop it, or its button stays hidden as "unrolled".
-  const closingGone = (closing === "tabs" && !tabsAnchor) || (closing === "more" && !moreAnchor);
+  const gone = anchors(planFor(split ? menuSide : ctx.side));
+  const closingGone = (closing === "tabs" && !gone.tabs) || (closing === "more" && !gone.more);
   useEffect(() => { if (closingGone) setClosing(null); }, [closingGone]);
 
   // Island: icons only; the "…" island ends in a close slot where the "…" was, so the button reads as unrolled.
   // Morph: icon and label rows; a touch outside closes it, so it needs no close row.
-  const menuEl = (kind: "more" | "tabs", anchor: Box | undefined | false, items: DuetItem[], radio: boolean) => {
+  const morph = p.menuStyle === "morph";
+  const menuEl = (kind: "more" | "tabs", anchor: Box | undefined | false, items: DuetItem[], radio: boolean, menuAt: (b: Box, n: number) => CSSProperties, morphAt: (b: Box, n: number) => CSSProperties) => {
     if ((menu !== kind && closing !== kind) || !anchor) return null;
     const close = kind === "more" && !morph, rolling = menu !== kind;
     return (
@@ -423,10 +424,37 @@ export function Duet(p: DuetProps) {
     );
   };
 
-  return (
-    <GlassProvider defaultTheme={p.dark === undefined ? undefined : p.dark ? "dark" : "light"}>
-      {p.children !== undefined && <div ref={scroller} className="duet-scroller">{p.children}</div>}
-      <nav ref={nav} className="duet" data-mode={ctx.mode} data-side={ctx.side}>
+  const bar = (side: Side, i: number) => {
+    const pl = planFor(side), left = side === "left", anchor = anchors(pl);
+    const at = (b: Box) => ({ top: b.top, left: pl.left, width: DUO.control, height: b.height });
+    // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
+    // as tall as the button, outer edge on the button's, widening towards the page centre only.
+    const menuAt = (b: Box, n: number) => {
+      const w = 2 * ISLAND.pad + n * ISLAND.item;
+      return { top: b.top + b.height / 2 - DUO.control / 2, left: left ? pl.left : pl.left + DUO.control - w, width: w, height: DUO.control, "--x0": `${pl.left}px` } as CSSProperties;
+    };
+    // Morph: the button grows into a labelled list, outer edge on the button's, top on its top; opening upwards
+    // instead when the list would run off the bottom of the screen.
+    const morphAt = (b: Box, n: number) => {
+      const w = MORPH.width, h = 2 * MORPH.pad + n * MORPH.row, y0 = b.top + b.height / 2 - DUO.control / 2;
+      const top = y0 + h > ctx.height - MORPH.pad ? Math.max(MORPH.pad, y0 + DUO.control - h) : y0;
+      return { top, left: left ? pl.left : pl.left + DUO.control - w, width: w, height: h, "--x0": `${pl.left}px`, "--y0": `${y0}px` } as CSSProperties;
+    };
+    const shownLeading = leading.slice(0, leading.length - pl.menu.leading);
+    const shownActions = actions.slice(0, actions.length - pl.menu.actions);
+    const more: DuetItem[] = [
+      ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
+      ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length),
+      ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
+        // The menu goes at once, without rolling back into "…": its button is about to move, and would stay hidden
+        // as "unrolled" until a roll that no longer lines up with it.
+        setMenuNow(null); setClosing(null); setScrub(null);
+        if (nav.current) switchSide(nav.current, left ? "right" : "left");
+      } }] : []),
+      ...destructive,
+    ];
+    return (
+      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} style={split && i ? { left: column } : undefined}>
         {p.close && pl.back && (
           <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
             <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>
@@ -440,7 +468,7 @@ export function Duet(p: DuetProps) {
         {pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>}
         {!p.close && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
         {p.tabs && pl.tabs && (
-          <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
+          <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
             data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
             {!pl.tabs.min && (
               // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
@@ -455,14 +483,21 @@ export function Duet(p: DuetProps) {
           </GlassSurface>
         )}
         {pl.searchButton && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="search" style={at(pl.searchButton)}>{searchButton}</GlassSurface>}
-        {menuEl("more", moreAnchor, more, false)}
-        {p.tabs && menuEl("tabs", tabsAnchor, tabItems, true)}
+        {(!split || side === menuSide) && menuEl("more", anchor.more, more, false, menuAt, morphAt)}
+        {p.tabs && (!split || side === menuSide) && menuEl("tabs", anchor.tabs, tabItems, true, menuAt, morphAt)}
         {/* The tab island unrolls across the accessory's row; the accessory steps aside while it is open. */}
-        {p.accessory && pl.accessory && (
+        {p.accessory && pl.accessory && !i && (
           <GlassSurface preset="control" className="duet-glass duet-accessory" data-duet-slot="accessory" style={pl.accessory}
             data-covered={menu === "tabs" || undefined}>{p.accessory}</GlassSurface>
         )}
       </nav>
+    );
+  };
+
+  return (
+    <GlassProvider defaultTheme={p.dark === undefined ? undefined : p.dark ? "dark" : "light"}>
+      {p.children !== undefined && <div ref={scroller} className="duet-scroller">{p.children}</div>}
+      {sides.map(bar)}
     </GlassProvider>
   );
 }

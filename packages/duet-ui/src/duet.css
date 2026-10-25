@@ -223,6 +223,9 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    edge, so there the scroller is an in-document box that runs on under the column. The document still never
    scrolls, so the chrome layer never moves. */
 html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-right)); }
+/* Split pane: a column on each side (the pane's own is on its outer edge, which the page cannot see); the
+   document is scrolled one column across (chrome.tsx). */
+html[data-duet-mode="column"][data-duet-split] .duet-scroller { width: calc(100% + var(--duet-inset-left) + var(--duet-inset-right)); }
 /* Emulated (the site's web Duo): the frame already spans the column. */
 html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; }
 

@@ -35,8 +35,8 @@ export function App() {
 // Recorded on the Duo simulator and framed by tools/media/compose.sh.
 const MODES: [string, string, string][] = [
   ["Strip", "Added to the Home Screen, your app owns the whole display. Controls live in the slim strip beside the page, like a native app.", "strip"],
-  ["Column", "In a closed Safari tab, Safari leaves a column empty beside the page. Duet paints its controls there, so the page keeps its full width.", "column"],
-  ["Inline", "Unfolded, in split view, or in landscape, Duet reserves an 84pt strip inside the page. Drag it to the side of the hand you hold; it remembers.", "inline-drag"],
+  ["Column", "In a closed Safari tab or a split-view pane, Safari leaves a column empty beside the page. Duet paints its controls there, so the page keeps its full width.", "column"],
+  ["Inline", "Unfolded at full width, or in landscape, Duet reserves an 84pt strip inside the page. Drag it to the side of the hand you hold; it remembers.", "inline-drag"],
 ];
 
 /** Desktop browsers get the site on a web Duo; phones, and the page inside the web Duo, get the site itself. */

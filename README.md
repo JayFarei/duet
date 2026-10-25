@@ -36,7 +36,7 @@ export function App() {
 }
 ```
 
-Add `viewport-fit=cover` to the viewport meta so the safe areas reach the page. On other phones and browsers Duet falls back to the `inline` strip.
+Add `viewport-fit=cover` to the viewport meta so the safe areas reach the page. Duet appends `shrink-to-fit=no` itself, so Safari doesn't zoom a split-view pane out to fit the column layer. On other phones and browsers Duet falls back to the `inline` strip.
 
 ## Modes
 
@@ -45,8 +45,8 @@ Duet picks a mode from the window size, safe areas and display mode. `useDuet()`
 | Mode | When | Controls |
 | --- | --- | --- |
 | `strip` | Home Screen app, closed | In the slim strip beside the page, like a native app |
-| `column` | Safari tab, closed | Painted into the column Safari leaves empty, so the page keeps its full width |
-| `inline` | Unfolded, split view, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered, separately for split view (`useDuet().split`), so it stays beside Safari's column once moved there |
+| `column` | Safari tab, closed or a split-view pane | Painted into the column Safari leaves empty, so the page keeps its full width. In split view both columns get the controls, since a pane can't tell which side it is on, and each shows only its own |
+| `inline` | Unfolded, landscape, in-app preview | An 84pt strip inside the page. Drag it to either side; the choice is remembered |
 
 ### Only on the Duo
 
