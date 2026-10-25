@@ -2,6 +2,8 @@
 
 Pushing a `vX.Y.Z` tag publishes `packages/duet-ui` to npm through [`release.yml`](../.github/workflows/release.yml). npm trusts that workflow by name (Trusted Publishing), so no npm token is stored anywhere.
 
+Add the release's entry to [`packages/duet-ui/CHANGELOG.md`](../packages/duet-ui/CHANGELOG.md) first, then bump, commit and tag:
+
 ```sh
 cd packages/duet-ui && npm version patch --no-git-tag-version && cd ../..
 git commit -am "duet-ui 0.1.1" && git tag v0.1.1 && git push && git push origin v0.1.1

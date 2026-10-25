@@ -19,25 +19,30 @@ const card: CSSProperties = { background: "var(--card)", borderRadius: 22, paddi
 const h2: CSSProperties = { font: "700 28px/1.1 -apple-system, system-ui", letterSpacing: -0.4, margin: "0 0 14px" };
 const dim: CSSProperties = { color: "var(--dim)", font: "400 16px/1.45 -apple-system, system-ui", margin: 0 };
 
-const QUICK = `import { Duet } from "duet-ui";
+const QUICK = `"use client";
+import { useState } from "react";
+import { House, Search } from "lucide-react";
+import { Duet, column, type DuetTab } from "duet-ui";
+
+const TABS = [
+  { id: "home", label: "Home", icon: <House size={24} /> },
+  { id: "search", label: "Search", icon: <Search size={24} /> },
+] as const satisfies readonly DuetTab[];
 
 export function App() {
-  const [tab, setTab] = useState("home");
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("home");
   return (
-    <Duet
-      tabs={{ items: TABS, selected: tab, onSelect: setTab }}
-      actions={[{ id: "share", label: "Share", icon: <Share />, onPress: share }]}
-    >
-      <Page tab={tab} />
+    <Duet tabs={{ items: TABS, selected: tab, onSelect: setTab }} minimizeOnScroll>
+      <main style={column(680)}><h1>{tab}</h1></main>
     </Duet>
   );
 }`;
 
 // Recorded on the Duo simulator and framed by tools/media/compose.sh.
 const MODES: [string, string, string][] = [
-  ["Strip", "Added to the Home Screen, your app owns the whole display. Controls live in the slim strip beside the page, like a native app.", "strip"],
-  ["Column", "In a closed Safari tab or a split-view pane, Safari leaves a column empty beside the page. Duet paints its controls there, so the page keeps its full width.", "column"],
-  ["Inline", "Unfolded at full width, or in landscape, Duet reserves an 84pt strip inside the page. Drag it to the side of the hand you hold; it remembers.", "inline-drag"],
+  ["Strip", "Added to the Home Screen, your app owns the whole display. When iOS gives it a side strip, the controls live there, beside the page, like a native app.", "strip"],
+  ["Column", "In Safari, in a closed tab, a windowed tab or a split-view pane, Safari leaves part of its column empty beside the page. Duet paints its controls there, so the page keeps its full width.", "column"],
+  ["Inline", "Everywhere else (unfolded at full width, landscape, other browsers, the in-app preview, other phones), Duet reserves an 84pt strip inside the page. Drag it to either side; it remembers.", "inline-drag"],
 ];
 
 /** Desktop browsers get the site on a web Duo; phones, and the page inside the web Duo, get the site itself. */
