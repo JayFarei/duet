@@ -24,8 +24,11 @@ export const DUO = {
   pillItem: 50,
   /** Gap between stacked groups. */
   gap: 11,
-  /** First slot top, in screen coordinates, clear of the clock and Dynamic Island in the strip. */
+  /** First slot top, in screen coordinates, clear of the clock and a bare Dynamic Island in the strip. */
   top: 173.3,
+  /** Live Activities grow the Dynamic Island down the strip and nothing tells the page, so every band top
+   *  assumes the worst case, measured on device (two activities, call + Maps): Safari's back 173.3 -> 265. */
+  island: 91.7,
   /** Bottom of the tab pill (and search button, accessory) above the screen bottom. */
   bottom: 23.7,
   /** Mini-player accessory: left inset, gap to the strip column, height. */
@@ -35,12 +38,12 @@ export const DUO = {
 } as const;
 
 /** Safari's own column in a tab: back + reader rows at the top, a 2-item +/tabs pill at the bottom.
- *  Live Activities grow the Dynamic Island and push the back + reader rows down; the pill never moves.
- *  islandPush is the worst case measured on device (two activities, call + Maps): back 173.3 -> 265. */
-export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem, islandPush: 91.7,
-  /** Split-view pane (simulator, 2026-10-25): the back slot's top, in the left pane (no status bar) and in the
-   *  right pane (under the status bar). The pill sits as in a closed tab, DUO.bottom above the window bottom. */
-  splitTop: { left: 23.5, right: 123.5 } } as const;
+ *  In a closed tab DUO.island pushes the back + reader rows down; the pill never moves. */
+export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem,
+  /** Split-view pane: the back slot's top, in the left pane (no status bar) and in the right pane (under the
+   *  status bar). Open, activities page inside the status column instead of growing it: on device with two
+   *  (recording + music) back still starts at 124. The pill sits DUO.bottom above the window bottom. */
+  splitTop: { left: 23.5, right: 124 } } as const;
 
 /** Menu island slots: a button unrolls into a pill of these (Safari's own pill items are 50; 46.5 keeps
  *  every slot above the 44pt touch target). */
@@ -235,9 +238,9 @@ export function plan(c: Context, s: Spec): Plan {
   // column: screen coordinates (the layer is in-document), in the band Safari's column never uses: below
   // its back + reader rows at their worst-case (island-pushed) position, above its +/tabs pill. strip and
   // inline: viewport coordinates.
-  const top = c.mode === "strip" ? DUO.top - c.offsetTop
+  const top = c.mode === "strip" ? DUO.top + DUO.island - c.offsetTop
     : c.mode === "column" && c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap)
-    : c.mode === "column" ? DUO.top + SAFARI.islandPush + SAFARI.rows * (DUO.control + DUO.gap)
+    : c.mode === "column" ? DUO.top + DUO.island + SAFARI.rows * (DUO.control + DUO.gap)
     : c.insetTop + DUO.gap;
   const bottom = c.mode === "strip" ? c.height - DUO.bottom
     : c.mode === "column" ? c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap

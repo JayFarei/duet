@@ -52,7 +52,7 @@ Duet picks a mode from the window size, safe areas and display mode. `useDuet()`
 
 Each mode has a band the controls may use, and Duet keeps every control inside it, so you never position anything yourself:
 
-- **Above:** the status bar and Dynamic Island, and in Safari its own back and bookmarks buttons at the top of the column (in a split-view pane, wherever that pane puts them).
+- **Above:** the status bar and Dynamic Island, and in Safari its own back and bookmarks buttons at the top of the column (in a split-view pane, wherever that pane puts them). Live Activities grow the island down the strip and push Safari's buttons with it, and a page can't tell, so the band always assumes the worst case, two activities. The space they would take stays empty even when none are running.
 - **Below:** Safari's +/tabs pill, or the home indicator.
 - **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item.
 

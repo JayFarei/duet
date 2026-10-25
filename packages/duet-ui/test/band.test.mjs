@@ -21,9 +21,9 @@ const CONTEXTS = {
 // bands are the viewport less the island and home indicator.
 function band(c) {
   if (c.mode === "column") return [
-    c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap) : DUO.top + SAFARI.islandPush + SAFARI.rows * (DUO.control + DUO.gap),
+    c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap) : DUO.top + DUO.island + SAFARI.rows * (DUO.control + DUO.gap),
     c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap];
-  if (c.mode === "strip") return [DUO.top - c.offsetTop, c.height - DUO.bottom];
+  if (c.mode === "strip") return [DUO.top + DUO.island - c.offsetTop, c.height - DUO.bottom];
   return [c.insetTop + DUO.gap, c.height - Math.max(c.insetBottom, DUO.gap)];
 }
 const SPECS = [];
