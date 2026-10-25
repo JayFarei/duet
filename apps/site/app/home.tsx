@@ -111,14 +111,6 @@ function Site() {
             <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Panes</div>
             <p style={dim}>A path of screens that follows the fold: one pane closed, two side by side unfolded. Going deeper slides the pair along, and a draft survives folding.</p>
           </a>
-          <a href="/lab?tabs=4,searchTab=1,back=1,actions=2,title=1,feed=1" style={{ ...card, display: "block" }}>
-            <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Lab</div>
-            <p style={dim}>Every control combination, set from the URL. Open it on the phone, or add it to the Home Screen.</p>
-          </a>
-          <a href="/mockup" style={{ ...card, display: "block" }}>
-            <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Split view mockup</div>
-            <p style={dim}>The open device with two apps side by side, Duet running in the Safari pane.</p>
-          </a>
           <a href={REPO} style={{ ...card, display: "block" }}>
             <div style={{ font: "600 17px -apple-system, system-ui", color: "var(--ink)" }}>Source and docs</div>
             <p style={dim}>README, API, examples and the simulator tools.</p>
