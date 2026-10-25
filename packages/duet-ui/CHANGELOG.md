@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- Island and morph menus open and close about 20% faster, and their items appear with half the stagger.
+
 ## 0.1.0
 
 First release.
