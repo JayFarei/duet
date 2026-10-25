@@ -80,11 +80,12 @@
 .duet-pill:not([data-min]) {
   --lx: 0px; --ly: 0px; --lm: 1; touch-action: none; transform-origin: 100% 50%;
   transition: top 0.35s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1), scale 0.5s var(--duet-spring-in),
-    --li 0.45s var(--duet-spring-out), --lx 0.4s var(--duet-spring-in), --ly 0.4s var(--duet-spring-in), --lm 0.4s var(--duet-spring-in);
+    --li 0.4s cubic-bezier(0.32, 0.72, 0, 1), --lx 0.4s var(--duet-spring-in), --ly 0.4s var(--duet-spring-in), --lm 0.4s var(--duet-spring-in);
 }
 .duet[data-side="left"] .duet-pill { transform-origin: 0 50%; }
+/* The lens stays inside the rail, as native: the whole rail swells instead, so nothing pokes past its edge. */
 .duet-pill[data-scrub] {
-  --lx: 8px; --ly: 6px; --lm: 1.3; scale: 1.08; z-index: 52;
+  --lx: 0px; --ly: 3px; --lm: 1.25; scale: 1.16; z-index: 52;
   transition: top 0.35s, height 0.35s, scale 0.45s var(--duet-spring-out),
     --li 0.25s var(--duet-spring-out), --lx 0.35s var(--duet-spring-out), --ly 0.35s var(--duet-spring-out), --lm 0.35s var(--duet-spring-out);
 }
@@ -93,7 +94,9 @@
   height: calc(50px + 2 * var(--ly)); translate: 0 calc(var(--li) * 50px); border-radius: 999px; overflow: hidden; pointer-events: none;
   background: var(--duet-sel); transition: background-color 0.2s, box-shadow 0.2s;
 }
-.duet-pill[data-scrub] .duet-lens {
+/* A tap: the rail keeps its size and the lens glides straight to the new tab as a clear magnifier, then settles. */
+.duet-pill[data-glide] { --ly: 2px; --lm: 1.12; }
+.duet-pill:is([data-scrub], [data-glide]) .duet-lens {
   background: rgb(255 255 255 / 0.04);
   box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.55), inset 0 1px 0.5px rgb(255 255 255 / 0.5),
     inset 1.5px 0 1px -0.5px rgb(255 90 120 / 0.16), inset -1.5px 0 1px -0.5px rgb(80 170 255 / 0.16), 0 6px 16px rgb(0 0 0 / 0.14);

@@ -9,3 +9,4 @@ First release.
 - `useDuet().duo` and `isDuo()`: true only on an iPhone Duo, to show a Duo layout there and nowhere else
 - Full-width layout: the page runs under the controls, `column()` and `bleed()` keep text clear, insets as CSS variables
 - `<DuetPanes>`, `usePanes()` and `<DuetPaneBar>`: a path of screens that follows the fold, with a full-screen toggle
+- Tab rail behaves like Apple News: a tap glides the lens to the new tab with the rail at rest; a hold (250ms) or drag swells the whole rail with labels, and the lens stays inside it

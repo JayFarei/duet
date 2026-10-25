@@ -238,6 +238,12 @@ export function Duet(p: DuetProps) {
   const [closing, setClosing] = useState<"more" | "tabs" | null>(null);
   // Index of the tab under the finger while scrubbing the full pill, like Apple News' tab bar.
   const [scrub, setScrub] = useState<number | null>(null);
+  // A touch on the full pill is a tap until it is held or dragged; only then does the pill swell into a scrub.
+  const press = useRef<{ y0: number; y: number; timer: number } | null>(null);
+  // A tap glides the lens to the new tab as a clear magnifier, without swelling the pill, like Apple News.
+  const [glide, setGlide] = useState(false);
+  const glideTimer = useRef(0);
+  useEffect(() => () => { clearTimeout(glideTimer.current); if (press.current) clearTimeout(press.current.timer); }, []);
   const setMenu = (n: "more" | "tabs" | null) => {
     if (menu && menu !== n) setClosing(matchMedia("(prefers-reduced-motion: reduce)").matches ? null : menu);
     if (n && closing === n) setClosing(null);
@@ -317,10 +323,21 @@ export function Duet(p: DuetProps) {
     <button key={t.id} role="tab" aria-selected={t.id === selected} aria-label={t.label} className="duet-tab"
       data-on={(scrub === null ? t.id === selected : scrub === i) || undefined}
       data-tint={t.tint ? "" : undefined} style={{ ...tint(t), "--j": i } as CSSProperties}
-      onClick={(e) => { if (min) toggle("tabs")(); else if (scrub === null && e.detail === 0) p.tabs!.onSelect(t.id); }}>{t.icon}{min && badge(t)}</button>
+      onClick={(e) => { if (min) toggle("tabs")(); else if (scrub === null && e.detail === 0) glideTo(t.id); }}>{t.icon}{min && badge(t)}</button>
   );
-  // Scrub: touching the full pill widens it and shows labels; a lens follows the finger over the tabs and
-  // the tab under it lights up; lifting selects it. Pointer capture keeps the drag even off the pill.
+  const glideTo = (id: string) => {
+    if (id !== selected) {
+      setGlide(true);
+      clearTimeout(glideTimer.current);
+      glideTimer.current = window.setTimeout(() => setGlide(false), 420);
+    }
+    p.tabs!.onSelect(id);
+  };
+  // Scrub: holding or dragging on the full pill swells it and shows labels; a lens follows the finger over the
+  // tabs and the tab under it lights up; lifting selects it. A quick tap just glides the lens to the tab.
+  // Pointer capture keeps the drag even off the pill.
+  const HOLD_MS = 250, SLOP = 8;
+  const endPress = () => { if (press.current) clearTimeout(press.current.timer); press.current = null; };
   const tabAt = (pill: HTMLElement, y: number) => {
     const tabs = [...pill.querySelectorAll<HTMLElement>(":scope > .duet-tab")];
     let best = 0;
@@ -330,12 +347,24 @@ export function Duet(p: DuetProps) {
   const scrubbing = {
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
       if (e.button) return;
-      e.currentTarget.setPointerCapture(e.pointerId);
-      setScrub(tabAt(e.currentTarget, e.clientY));
+      const pill = e.currentTarget;
+      pill.setPointerCapture(e.pointerId);
+      endPress();
+      const timer = window.setTimeout(() => { if (press.current) setScrub(tabAt(pill, press.current.y)); }, HOLD_MS);
+      press.current = { y0: e.clientY, y: e.clientY, timer };
     },
-    onPointerMove: (e: React.PointerEvent<HTMLElement>) => { if (scrub !== null) setScrub(tabAt(e.currentTarget, e.clientY)); },
-    onPointerUp: () => { if (scrub !== null) { const t = tabItems[scrub]; setScrub(null); if (t) p.tabs!.onSelect(t.id); } },
-    onPointerCancel: () => setScrub(null),
+    onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
+      if (press.current) press.current.y = e.clientY;
+      if (scrub !== null) setScrub(tabAt(e.currentTarget, e.clientY));
+      else if (press.current && Math.abs(e.clientY - press.current.y0) > SLOP) { clearTimeout(press.current.timer); setScrub(tabAt(e.currentTarget, e.clientY)); }
+    },
+    onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
+      const tapped = press.current && scrub === null;
+      endPress();
+      if (scrub !== null) { const t = tabItems[scrub]; setScrub(null); if (t) p.tabs!.onSelect(t.id); }
+      else if (tapped) { const t = tabItems[tabAt(e.currentTarget, e.clientY)]; if (t) glideTo(t.id); }
+    },
+    onPointerCancel: () => { endPress(); setScrub(null); },
   };
 
   const lensAt = scrub ?? Math.max(0, tabItems.findIndex((t) => t.id === selected));
@@ -386,7 +415,7 @@ export function Duet(p: DuetProps) {
         {!p.close && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
         {p.tabs && pl.tabs && (
           <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...at(pl.tabs), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
-            data-scrub={scrub !== null || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
+            data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
             {!pl.tabs.min && (
               // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
               // are masked out under the lens (CSS), so only the enlarged copy shows through it.
