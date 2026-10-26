@@ -233,7 +233,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   k.current = slow ? 4 : 1;
   const turn = TURN * k.current;
   const frame = useRef<HTMLIFrameElement>(null);
-  const page = useRef<HTMLDivElement>(null), hinge = useRef<HTMLDivElement>(null), flap = useRef<HTMLDivElement>(null);
+  const page = useRef<HTMLDivElement>(null), hinge = useRef<HTMLDivElement>(null), flap = useRef<HTMLDivElement>(null), shadow = useRef<HTMLDivElement>(null);
   const cur = useRef(s), busy = useRef(false);
   cur.current = s;
   const host = useSyncExternalStore(() => () => {}, () => location.host, () => "");
@@ -245,9 +245,13 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const o = { duration: FOLD * k.current, easing, fill: "both" as const };
     const [a, b] = open ? [0, 1] : [1, 0];
     const shift = (t: number) => `translateX(${-(1 - t) * BODY.open.w / 4}px)`;
+    // The drop shadow follows the device's footprint: the right half, plus the flap's reach left of the hinge.
+    const half = BODY.open.w / 2, reach = (t: number) => `${half * (1 - Math.max(0, Math.cos(Math.PI * (1 - t))))}px`;
+    const steps = Array.from({ length: 25 }, (_, i) => a + (b - a) * i / 24);
     return [
       hinge.current?.animate([{ transform: shift(a) }, { transform: shift(b) }], o),
       flap.current?.animate([{ transform: `rotateY(${180 * (1 - a)}deg)` }, { transform: `rotateY(${180 * (1 - b)}deg)` }], o),
+      shadow.current?.animate(steps.map((t) => ({ left: reach(t) })), o),
     ].filter((x): x is Animation => !!x);
   };
   const finished = (as: Animation[]) => Promise.all(as.map((a) => a.finished)).catch(() => {});
@@ -268,7 +272,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       flushSync(() => { setFolding(true); if (open) setS(n); });
       await finished(swing(open));
       flushSync(() => { if (!open) setS(n); setFolding(false); });
-      hinge.current?.getAnimations().forEach((a) => a.cancel());
+      hinge.current?.getAnimations({ subtree: true }).forEach((a) => a.cancel());
     } else setS(n);
     busy.current = false;
     await fade?.catch(() => {});
@@ -409,11 +413,13 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
           transition: `transform ${turn}ms ${ease}`,
         }}>
         <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: 2600 }}>
+        {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned. */}
+        <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${s.rotated ? "40px 0" : "0 40px"} 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
         <div style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
           <div data-wd-shape style={{
             ...corners(b.r), position: "absolute", inset: 0, background: FINISH.front,
-            boxShadow: `${BODY_SHADE}, 0 40px 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}`,
+            boxShadow: BODY_SHADE, transition: `border-radius ${turn}ms ${ease}`,
           }} />
           <div data-wd-shape data-wd-screen style={{ ...corners(b.screenR), position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
             {/* The page, upright for the user: counter-turned when the device is turned. */}
@@ -506,7 +512,7 @@ function Note({ mode, text, hidden }: { mode: string; text: string; hidden?: boo
 function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const half = BODY.open.w / 2, face: CSSProperties = { position: "absolute", inset: 0, backfaceVisibility: "hidden", background: FINISH.front, boxShadow: BODY_SHADE };
   // A soft sheen across each face, so the swinging half reads against a dark page.
-  const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", cornerShape: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" }} />;
+  const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", cornerShape: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" } as CSSProperties} />;
   return (
     <div ref={ref} style={{ position: "absolute", left: 0, top: 0, width: half, height: BODY.open.h, transformOrigin: "100% 50%", transformStyle: "preserve-3d", transform: "rotateY(180deg)" }}>
       <div data-wd-shape style={{ ...face, ...corners([C.free, C.none, C.none, C.free]) }}>

@@ -11,12 +11,10 @@ const TABS = [
 ] as const satisfies readonly DuetItem[];
 
 const CSS = `
-@keyframes sk-shine { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-[data-sk] { background: linear-gradient(90deg, var(--sk) 40%, var(--sk-hi) 50%, var(--sk) 60%) 0 0 / 200% 100%; animation: sk-shine 1.8s linear infinite; }
-:root { --sk: rgb(60 60 67 / 0.13); --sk-hi: rgb(60 60 67 / 0.05); }
-@media (prefers-color-scheme: dark) { :root:not([data-lg-theme="light"]) { --sk: rgb(235 235 245 / 0.12); --sk-hi: rgb(235 235 245 / 0.2); } }
-:root[data-lg-theme="dark"] { --sk: rgb(235 235 245 / 0.12); --sk-hi: rgb(235 235 245 / 0.2); }
-@media (prefers-reduced-motion: reduce) { [data-sk] { animation: none; } }
+[data-sk] { background: var(--sk); }
+:root { --sk: rgb(60 60 67 / 0.13); }
+@media (prefers-color-scheme: dark) { :root:not([data-lg-theme="light"]) { --sk: rgb(235 235 245 / 0.12); } }
+:root[data-lg-theme="dark"] { --sk: rgb(235 235 245 / 0.12); }
 `;
 
 /** A ghost box: where a piece of content would be. */
