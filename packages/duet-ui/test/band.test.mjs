@@ -3,7 +3,7 @@
 // nothing overlaps, and whatever does not fit folds into "…", which is always reachable.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detect, plan, DUO, SAFARI } from "../src/geometry.ts";
+import { columnBand, detect, plan, DUO, SAFARI } from "../src/geometry.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -40,7 +40,13 @@ for (const [name, c] of Object.entries(CONTEXTS)) {
     for (const s of SPECS) {
       const p = plan(c, s), why = `${JSON.stringify(s)} -> ${JSON.stringify(p)}`;
       const boxes = [p.back, p.primary, p.leading, p.actions, p.more, p.tabs, p.searchButton].filter(Boolean).sort((a, b) => a.top - b.top);
-      for (const b of boxes) assert.ok(b.top >= top - 0.01 && b.top + b.height <= bottom + 0.01, `outside [${top}, ${bottom}]: ${why}`);
+      // Leading items and the primary action may rise into the island's reach (the free middle of Safari's column
+      // with a bare island); everything else, "…" included, stays under Safari's reader row.
+      const reach = columnBand(c)?.reach ?? 0;
+      for (const b of boxes) {
+        const lo = b === p.leading || b === p.primary ? top - reach : top;
+        assert.ok(b.top >= lo - 0.01 && b.top + b.height <= bottom + 0.01, `outside [${lo}, ${bottom}]: ${why}`);
+      }
       for (let i = 1; i < boxes.length; i++) assert.ok(boxes[i].top >= boxes[i - 1].top + boxes[i - 1].height - 0.01, `overlap: ${why}`);
       const shown = (p.back ? 1 : 0) + (p.leading?.visible ?? 0) + (p.actions?.visible ?? 0);
       const folded = (p.menu.primary ? 1 : 0) + (p.menu.back ? 1 : 0) + p.menu.leading + p.menu.actions;

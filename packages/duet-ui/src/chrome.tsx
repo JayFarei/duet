@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, INLINE_WIDTH, ISLAND, MORPH, isSplit, magnet, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { DUO, INLINE_WIDTH, columnBand, isSplit, islandBox, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
 import "./duet.css";
@@ -370,6 +370,10 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // Safari's URL pill floats below the layout viewport (the column holds nothing above the page), so the scroller
     // runs on under it like a document that scrolls, and the last content scrolls clear of it.
     r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height)}px` : "0px");
+    // Safari's column buttons paint over the page: a popover that reaches into the column keeps its top at or below
+    // this (columnBand). Split view takes the lower of the two panes' limits, since nothing tells which pane it is.
+    const bands = sides.map((side) => columnBand({ ...ctx, side }));
+    r.setProperty("--duet-safe-top-column", `${Math.max(0, ...bands.map((b) => b?.top ?? 0))}px`);
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulated);
     document.documentElement.toggleAttribute("data-duet-split", split);
@@ -507,15 +511,13 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
     // as tall as the button, outer edge on the button's, widening towards the page centre only.
     const menuAt = (b: Box, n: number) => {
-      const w = 2 * ISLAND.pad + n * ISLAND.item;
-      return { top: b.top + b.height / 2 - DUO.control / 2, left: left ? pl.left : pl.left + DUO.control - w, width: w, height: DUO.control, "--x0": `${pl.left}px` } as CSSProperties;
+      const { x0, ...box } = islandBox(pl, b, n, side);
+      return { ...box, "--x0": `${x0}px` } as CSSProperties;
     };
-    // Morph: the button grows into a labelled list, outer edge on the button's, top on its top; opening upwards
-    // instead when the list would run off the bottom of the screen.
+    // Morph: the button grows into a labelled list, clear of Safari's column buttons (morphBox).
     const morphAt = (b: Box, n: number) => {
-      const w = MORPH.width, h = 2 * MORPH.pad + n * MORPH.row, y0 = b.top + b.height / 2 - DUO.control / 2;
-      const top = y0 + h > ctx.height - MORPH.pad ? Math.max(MORPH.pad, y0 + DUO.control - h) : y0;
-      return { top, left: left ? pl.left : pl.left + DUO.control - w, width: w, height: h, "--x0": `${pl.left}px`, "--y0": `${y0}px` } as CSSProperties;
+      const { x0, y0, scroll, ...box } = morphBox(side === ctx.side ? ctx : { ...ctx, side }, pl, b, n);
+      return { ...box, "--x0": `${x0}px`, "--y0": `${y0}px`, ...(scroll && { overflowY: "auto", overscrollBehavior: "contain" }) } as CSSProperties;
     };
     const shownLeading = leading.slice(0, leading.length - pl.menu.leading);
     const shownActions = actions.slice(0, actions.length - pl.menu.actions);
