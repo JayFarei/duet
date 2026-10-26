@@ -553,7 +553,9 @@ function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", cornerShape: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" } as CSSProperties} />;
   return (
     <div ref={ref} style={{ position: "absolute", left: 0, top: 0, width: half, height: BODY.open.h, transformOrigin: "100% 50%", transformStyle: "preserve-3d", transform: "rotateY(180deg)" }}>
-      <div data-wd-shape style={{ ...face, ...corners([C.free, C.none, C.none, C.free]) }}>
+      <div data-wd-shape style={{ ...face, boxShadow: undefined, overflow: "hidden", ...corners([C.free, C.none, C.none, C.free]) }}>
+        {/* The rim runs past the hinge edge, where this half meets the other, so no seam shows down the middle. */}
+        <div style={{ position: "absolute", inset: "0 -4px 0 0", borderRadius: "inherit", cornerShape: "inherit", boxShadow: BODY_SHADE } as CSSProperties} />
         <div data-wd-shape style={{ position: "absolute", left: BODY.open.x, top: BODY.open.y, right: 0, bottom: BODY.open.y, ...corners([C.inner, C.none, C.none, C.inner]), background: "var(--bg)" }} />
         {sheen}
       </div>
