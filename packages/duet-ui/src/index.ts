@@ -1,4 +1,5 @@
 export { Duet, DuoCookie, useDuet, type DuetProps, type DuetItem, type DuetTab } from "./chrome.tsx";
+export { glassTheme, themeVars, type Appearance, type DuetIcons, type DuetTheme } from "./theme.ts";
 export { bleed, column } from "./layout.ts";
 export { DuetPanes, DuetPaneBar, usePanes, type DuetPanesProps, type DuetPaneBarProps } from "./duet-panes.tsx";
 export { panes, backFrom, type PaneWindow } from "./panes.ts";

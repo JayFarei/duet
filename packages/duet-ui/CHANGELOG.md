@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Theming: `tint` (accent, like iOS's tintColor), `appearance` (`"auto"`, `"light"` or `"dark"`, replacing `dark`, which still works) and `icons` (`size`, `tabSize`, `weight`, `color`). Each writes a documented `--duet-*` token that plain CSS can set too.
+- Your icons are now sized by context (22px in buttons and menus, 24px in tabs) and stroked at weight 2, like SF Symbols in a native bar. Set `icons` or the vars to change it. The chrome's own glyphs keep their sizes.
+- `badgeTone: "neutral"` on an item: a grey badge for plain counts like a balance.
+- Column mode: menus follow the page's appearance; the buttons keep following the system, like Safari's own.
+
 ## 0.3.0
 
 - New `useDuet().device` (`"duo"`, `"iphone"`, `"ipad"`, `"android"` or `"desktop"`) and `deviceOf()`.

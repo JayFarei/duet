@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
+import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, INLINE_WIDTH, ISLAND, MORPH, isSplit, magnet, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
@@ -9,9 +10,11 @@ import "./duet.css";
 
 export interface DuetItem {
   id: string; label: string; icon: ReactNode; onPress?: () => void;
-  /** Count or short text in a red badge on the icon's page-side corner, like a native tab item's badge. */
+  /** Count or short text in a badge on the icon's page-side corner, like a native tab item's badge. */
   badge?: number | string;
-  /** Colour of the icon and selection when this tab is selected. Default: the system blue. */
+  /** "alert" (default): red, for things that want attention. "neutral": grey, for plain counts like a balance. */
+  badgeTone?: "alert" | "neutral";
+  /** This item's accent when selected (a tab) or as the primary button. Default: the strip's `tint`. */
   tint?: string;
   /** Deletes or discards: lives only in "…", last, in red, after a separator (blueprint). */
   destructive?: boolean;
@@ -42,8 +45,16 @@ export interface DuetProps<T extends string = string> {
   accessory?: ReactNode;
   /** `.tabBarMinimizeBehavior(.onScrollDown)`. */
   minimizeOnScroll?: boolean;
-  /** Force a theme. Default: follow the system light/dark setting. */
+  /** Light or dark, like overrideUserInterfaceStyle. Default "auto": follow the system. Menus follow it too; in
+   *  Safari's column the buttons keep following the system, so they match Safari's own. */
+  appearance?: Appearance;
+  /** @deprecated Use `appearance`. */
   dark?: boolean;
+  /** Accent for the selected tab, the active menu item and the primary button, like iOS's tintColor. Default:
+   *  the system blue. Same as `--duet-tint` in CSS. */
+  tint?: string;
+  /** Size, stroke weight and colour of your icons. Same as the `--duet-icon*` vars in CSS. */
+  icons?: DuetIcons;
   /** How "…" and the minimized tab open their menu. "island" (default): the button stretches sideways into a
    *  pill of icons, like the Dynamic Island. "morph": the button grows into a labelled list, like a context menu. */
   menuStyle?: "island" | "morph";
@@ -394,7 +405,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     else { if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop); p.tabs!.onSelect(id); }
   };
   useLayout(() => { if (scroller.current && selected !== undefined) scroller.current.scrollTop = scrolls.current.get(selected) ?? 0; }, [selected]);
-  const badge = (a: DuetItem) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge">{a.badge}</span>;
+  const theme = themeVars(p) as CSSProperties;
+  const badge = (a: DuetItem) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge" data-tone={a.badgeTone === "neutral" ? "neutral" : undefined}>{a.badge}</span>;
   const tint = (a: DuetItem) => a.tint ? { "--duet-tint": a.tint } as CSSProperties : undefined;
   const item = (a: DuetItem) => <button key={a.id} className="duet-item" aria-label={a.label} onClick={a.onPress}>{a.icon}{badge(a)}</button>;
   const toggle = (m: "more" | "tabs") => () => { if (split) setMenuSide(tapSide); setMenu(menu === m ? null : m); };
@@ -520,7 +532,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
       ...destructive,
     ];
     return (
-      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || undefined} style={split && i ? { left: column } : undefined}>
+      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
         {p.close && pl.back && (
           <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
             <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>
@@ -561,7 +573,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   };
 
   return (
-    <GlassProvider defaultTheme={p.dark === undefined ? undefined : p.dark ? "dark" : "light"}>
+    <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.children !== undefined && <div ref={scroller} className="duet-scroller">{p.children}</div>}
       {sides.map(bar)}
     </GlassProvider>

@@ -26,7 +26,7 @@ function subscribe(cb: () => void) {
   return () => { listeners.delete(cb); m.removeEventListener("change", cb); removeEventListener("storage", onStorage); };
 }
 
-/** dark: the theme in effect; forced: whether it overrides the system (pass it to <Duet dark>). */
+/** dark: the theme in effect; appearance: the pick, or "auto" for the system (pass it to <Duet appearance>). */
 export function useTheme() {
   const forced = useSyncExternalStore(subscribe, stored, () => null);
   const system = useSyncExternalStore(subscribe, () => mq().matches, () => false);
@@ -37,6 +37,31 @@ export function useTheme() {
     try { if ((next === "dark") === mq().matches) localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY, next); } catch {}
     apply();
   };
-  return { dark, forced: forced ? forced === "dark" : undefined, toggle };
+  return { dark, appearance: forced ?? "auto", toggle } as const;
+}
+
+// The Integrate section's tint picker, kept like the theme so the stage's iframe follows it.
+const TINT_KEY = "duet-tint";
+/** iOS system colours that read well as an accent on glass, light and dark. */
+export const TINTS = [
+  ["Blue", "#0088ff"], ["Purple", "#cb30e0"], ["Pink", "#ff2d55"], ["Orange", "#ff8d28"], ["Green", "#34c759"], ["Graphite", "#8e8e93"],
+] as const;
+const tintListeners = new Set<() => void>();
+const storedTint = () => { try { return localStorage.getItem(TINT_KEY); } catch { return null; } };
+function subscribeTint(cb: () => void) {
+  const onStorage = (e: StorageEvent) => { if (e.key === TINT_KEY) cb(); };
+  tintListeners.add(cb);
+  addEventListener("storage", onStorage);
+  return () => { tintListeners.delete(cb); removeEventListener("storage", onStorage); };
+}
+
+/** The picked tint (undefined: Duet's default blue) and a setter. */
+export function useTint() {
+  const tint = useSyncExternalStore(subscribeTint, storedTint, () => null) ?? undefined;
+  const setTint = (c: string) => {
+    try { if (c === TINTS[0][1]) localStorage.removeItem(TINT_KEY); else localStorage.setItem(TINT_KEY, c); } catch {}
+    tintListeners.forEach((f) => f());
+  };
+  return { tint, setTint };
 }
 
