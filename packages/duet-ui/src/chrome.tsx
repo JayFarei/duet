@@ -322,16 +322,20 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const planFor = (side: Side) => plan(side === ctx.side ? ctx : { ...ctx, side }, spec);
   // The copy whose column opened the menu draws it; the other copy's column is in the other pane.
   const [menuSide, setMenuSide] = useState<Side>(ctx.side);
+  const inner = p.children !== undefined; // the inner scroller, which runs on under Safari's column
 
   useEffect(() => {
     // The page spans the window and the controls float over it; these insets are how far text and buttons keep
     // clear on each edge (layout.ts). In Safari's column the scroller runs on under the column (an emulated
     // column's frame already spans it), so either way the inset there is the column's width; a tab has no safe
-    // areas, so the other edge is 0.
+    // areas, so the other edge is 0. Without children the document is the page: it is laid out in the viewport
+    // and nothing runs under a right column (simulator, 2026-10-26: 84px of padding left a 100px gap), while a
+    // left column has the document scrolled one column across, so the page runs under it.
     const r = document.documentElement.style;
     const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
     const other = (side: Side) => ctx.mode === "column" ? "0px" : envInset(side);
-    const right = ctx.side === "right" || split ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
+    const under = ctx.mode !== "column" || inner || !!emulatedSignals();
+    const right = (ctx.side === "right" || split) && under ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
     // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
     for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
@@ -349,7 +353,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split]);
+  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
   const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, ctx.side === "left", column);
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
