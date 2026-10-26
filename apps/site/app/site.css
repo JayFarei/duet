@@ -16,6 +16,11 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 /* The web Duo (app/duo/web-duo.tsx). */
 @keyframes wd-in { from { opacity: 0; } }
 @keyframes wd-slide { from { transform: translateX(var(--from)); } }
+/* "Try it yourself": a ring breathes out of the button, so the stage reads as something to play with. */
+@keyframes wd-try { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }
+[data-wd-try] { animation: wd-try 2.4s ease-out infinite; }
+[data-wd-try]:hover { transform: scale(1.03); }
+@media (prefers-reduced-motion: reduce) { [data-wd-try] { animation: none; } }
 [data-wd-callout] [data-wd-system] { outline: 1.5px dashed rgb(142 142 147); outline-offset: 2px; }
 
 /* The home page (app/home.tsx): one responsive page, Apple-style. Horizontal layout comes from duet-ui's column(). */
