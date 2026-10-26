@@ -22,10 +22,11 @@ test("split-view pane is column; zoomed out (no shrink-to-fit=no) it is inline",
   assert.equal(detect(PANE).mode, "column");
   for (const s of PANE_ZOOMED) assert.equal(detect(s).mode, "inline");
 });
-test("standalone, keyboard up and a landscape of unknown turn never take the column", () => {
+test("standalone and a landscape of unknown turn never take the column; the keyboard keeps it", () => {
   assert.equal(detect({ ...CLOSED, standalone: true }).mode, "inline");
   assert.equal(detect(sig(594, 368, 678, 466)).mode, "inline");
-  assert.equal(detect({ ...CLOSED, visualHeight: 300 }).mode, "inline");
+  const kb = detect({ ...CLOSED, visualHeight: 300 });
+  assert.deepEqual([kb.mode, kb.keyboard], ["column", true]);
 });
 test("closed landscape takes the column on the side the Duo is turned to", () => {
   const left = detect(sig(594, 368, 678, 466, { angle: 90 })), right = detect(sig(594, 368, 678, 466, { angle: 270 }));

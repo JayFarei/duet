@@ -274,6 +274,8 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
    column buttons are a veil over that colour that follows the system appearance, not the page (sampled
    over dark and cream pages); ours match so the two sets read as one. The accessory sits over the page,
    not the column, so it keeps real glass; menus unroll over page content without blur, so they stay opaque. */
+/* The keyboard leaves Safari's column in place but covers its lower part; the controls step aside while typing. */
+.duet[data-mode="column"][data-keyboard] { visibility: hidden; }
 .duet[data-mode="column"] { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 50; }
 /* No children (no .duet-scroller): the document scrolls, and the layer rides it on a scroll timeline that Safari
    runs with the scroll itself, so it holds through momentum and smooth scrollTo/scrollIntoView (chrome.tsx sets

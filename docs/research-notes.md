@@ -1,6 +1,6 @@
 > **Historical lab notes from 2026-10-24**, written while column mode was being built, before `duet-ui` was published. Paths, names (`native-chrome`, `DuoChrome`) and some conclusions are out of date, for example split-view panes now use Safari's column on both sides instead of always falling back to inline. For current behaviour, read the [README](../README.md#how-duet-decides) and `packages/duet-ui/src/geometry.ts`.
 >
-> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait, keyboard down) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here. An in-app Safari preview (a 466x678 window with 75pt of chrome and a bottom inset, or the older 375x667 at 3x) is inline, on the left.
+> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait or a known landscape turn, not zoomed; the keyboard keeps the mode) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here. An in-app Safari preview (a 466x678 window with 75pt of chrome and a bottom inset, or the older 375x667 at 3x) is inline, on the left.
 
 # Handoff: our controls inside Safari's column on the iPhone Duo
 
@@ -242,3 +242,23 @@ Measured on the Duo Lab Preview simulator (iOS 27.1, closed portrait) with a sma
 ### Settling after a fold (RegTail ask #8)
 
 Folding open to closed in a portrait Safari tab could leave the controls inline (rail centre 382 − 48.2) instead of in the column (466 − 48.2). The viewport lands first and `outerWidth` later, with no event when it does, and the old re-reads at 0, 300 and 600ms could miss it; flips while the column layer's first frames resize Safari could also pin inline. `watchSignals` now polls every 100ms after any geometry event until outer, inner and visual sizes hold for 500ms (a page more than 100pt narrower or wider than its window counts as mid-fold and keeps polling), capped at 2s, re-reading on each change and once at the end. `settling()` is true for that time and `stable()` does not count flips while it is. The simulator could not be folded from here, so the case is a synthetic timeline in `transitions.test.mjs` (URL bar expanded and compact, ending in column at 466x678).
+
+## Preview hardening (#57, 2026-10-26)
+
+/probe beacons every 100ms on Duo Lab Media (iOS 18.7 Safari, 3x). Fixtures: `packages/duet-ui/test/fixtures/states.json`.
+
+| State | inner / outer | chrome | inset bottom | rule | mode |
+| --- | --- | --- | --- | --- | --- |
+| Tab, fresh load | 382x580 / 466x678 | 98 | 0 | not preview | column |
+| Tab, hard scroll, URL bar collapsed | 382x598 / 466x678 | 80 (min) | 0 | not preview | column |
+| Tab, momentum back to top | 382x580 | 98 | 0 | not preview | column |
+| Tab, keyboard up | 382x598, visual 272 | 80 | 0 | not preview | column |
+| Landscape, both turns | 594x368 / 678x466 | 98 | 0 | not preview | column left (90), right (270) |
+| Preview, full screen | 382x603 / 466x678 | 75 | 34 | preview | inline |
+| Preview, page sheet | 366x600 / 450x670 | 70 | 34 | not preview | column (known limit) |
+
+- The closest tab state is chrome 80 with inset 0; the preview is 75 with 34. The chrome band stays [73,77] and the rule now also wants inset >= 20. The verdict is sticky (README), so a scroll-time resize cannot flip a tab.
+- Non-geometric signals (display-mode, referrer, history length, screen, ApplePaySession, serviceWorker, share, Notification) are identical in tab and preview, so geometry is all there is.
+- Keyboard: focusing an input made Safari zoom out to scale 0.941 (inner 406x635). The old build read inline, then oscillated column/inline after dismissal and stuck inline. The zoom hold keeps column. Cause of the zoom: the document's scrollWidth is 442, the column nav (`.duet-pill`, absolute, x 393 to 442) overflows `innerWidth` in no-children mode. Follow-up.
+- One 100ms sample read inline during rotation before column.
+- Not measured: Reader, Hide Toolbar, find bar, private tab, Home Screen app, WKWebView, preview scrolled or landscape, a pinch zoom (two-finger simulator input did not zoom). These need the real-device /probe test.

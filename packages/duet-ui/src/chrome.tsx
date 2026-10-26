@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, INLINE_WIDTH, columnBand, isSplit, islandBox, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
-import { emulatedSignals, readSignals, settling, watchSignals } from "./signals.ts";
+import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
 import "./duet.css";
@@ -97,18 +97,24 @@ function switchSide(el: HTMLElement, side: Side) {
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
 let pinTimer: ReturnType<typeof setTimeout> | undefined;
-function read(): Context {
-  const s = readSignals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now(), settling());
+// The damper keeps history, so it is fed once per signal change (refresh, from the watcher), never from React's
+// getSnapshot (read), which React may call several times per render.
+function refresh() {
+  const s = readSignals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now(), settling(), epoch());
   // A pin lifts on its own time, with no resize to re-read on.
   if (damper.pinned && !pinTimer) pinTimer = setTimeout(() => { pinTimer = undefined; listeners.forEach((f) => f()); }, damper.until! - performance.now() + 20);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
+}
+function read(): Context {
+  if (!snap) refresh();
   return snap!;
 }
 function subscribe(cb: () => void) {
-  listeners.add(cb);
-  const unwatch = watchSignals(cb);
-  return () => { listeners.delete(cb); unwatch(); };
+  const f = () => { refresh(); cb(); };
+  listeners.add(f);
+  const unwatch = watchSignals(f);
+  return () => { listeners.delete(f); unwatch(); };
 }
 const ssr: Context = { mode: "column", duo: true, browser: "safari", device: "duo", standalone: false, layout: "narrow", side: "right", width: 382, height: 580, stableHeight: 580, offsetTop: 0, screenWidth: 466, screenHeight: 678, insetTop: 0, insetBottom: 0 };
 
@@ -510,7 +516,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
       ...destructive,
     ];
     return (
-      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
+      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || undefined} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
         {p.close && pl.back && (
           <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
             <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>
