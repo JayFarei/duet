@@ -129,3 +129,9 @@ test("perturbation: an outer size change commits within one read", () => {
   assert.equal(stable(d, open, undefined, 100, true).mode, "inline");
   assert.equal(stable(d, TAB, undefined, 200, true).mode, "column");
 });
+// #61: the column layer widens the document so it can paint there; from a text field's focus it must not, or Safari
+// zooms out to the wider document.
+test("column layer leaves the document width while a text field has focus", () => {
+  const css = readFileSync(new URL("../src/duet.css", import.meta.url), "utf8");
+  assert.match(css, /html:has\(:read-write:focus\) \.duet\[data-mode="column"\] \{ overflow: clip;/);
+});
