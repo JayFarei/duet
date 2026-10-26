@@ -220,9 +220,16 @@ test("Open in Safari: the preview's window becomes a tab's and the re-read takes
 
 // Device trace 2026-10-25 19:30: windowed Safari (floating, or beside the Home Screen) and a split pane with the
 // compact URL bar stayed inline: the column check wanted the closed tab's window height and at least 76pt of chrome.
-test("windowed Safari and a compact split pane take the column", () => {
-  for (const s of [sig(369, 591, 453, 661, { insetBottom: 34 }), sig(369, 591, 450, 670), sig(366, 600, 450, 670)])
+// iOS on the Duo has no windowed Safari or Stage Manager: a portrait window inside the screen with inset 34 is the
+// in-app preview's sheet (real Duo, 2026-10-26: 450x670, page 366x600), so it goes inline (#66). Without the inset
+// (the sheet's first sample) it still takes the column.
+test("a window inside the screen takes the column without an inset, the sheet's inline with one; a compact split pane takes the column", () => {
+  for (const s of [sig(369, 591, 450, 670), sig(366, 600, 450, 670), sig(369, 591, 453, 661)])
     assert.equal(detect({ ...s, screenWidth: 466, screenHeight: 678 }).mode, "column", JSON.stringify(s));
+  for (const s of [sig(369, 591, 453, 661, { insetBottom: 34 }), sig(366, 600, 450, 670, { insetBottom: 34 })]) {
+    const c = detect({ ...s, screenWidth: 466, screenHeight: 678 });
+    assert.deepEqual([c.mode, c.preview], ["inline", true], JSON.stringify(s));
+  }
   const pane = detect({ ...sig(385, 594, 469, 669, { insetBottom: 34 }), screenWidth: 466, screenHeight: 678 });
   assert.equal(pane.mode, "column");
   assert.equal(pane.split, true);

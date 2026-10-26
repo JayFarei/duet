@@ -118,11 +118,14 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo (iOS 27.1) the preview has a column like a Safari tab's, but its own buttons fill it (close, reader, back, and a share/reload/Safari pill), leaving too little room for Duet's controls, so Duet uses `inline`, on the left unless the user picked a side before, and sets `useDuet().preview`. Duet takes a Safari window that is not standalone to be the preview when it is either:
 
 - the closed screen's 466x678 window with the column signature, at most 77px of chrome below the page (the preview has 75, a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
+- a page sheet: a portrait window inside the closed 466x678 screen (450x670 on a real Duo) with the column signature and a bottom safe-area inset, or
 - exactly 375x667 at `devicePixelRatio` 3, the size earlier builds gave the preview.
 
-The verdict is sticky: a page that loaded as a tab stays a tab while its page height and insets move (scrolling collapses the URL bar to 80px of chrome), and is only re-decided when the window size, page width, turn, standalone or framing changes, or on `pageshow` or when the page becomes visible again. A preview that stops matching becomes a tab at once.
+No Safari tab on the Duo is smaller than the screen (a split pane is 469 wide, the screen 466), and iOS has no windowed Safari or Stage Manager, so a window inside the screen is the sheet.
 
-Limits: a page-sheet preview (450x670 window) reads exactly like windowed Safari and still gets `column`; the open posture preview was not measured. When "Open in Safari" hands the page to a tab, the `pageshow`/`visibilitychange` re-read switches to `column`. The [/probe page](https://getduet.dev/probe) logs every signal the rule reads, every 100ms. Measurements are in [docs/research-notes.md](docs/research-notes.md).
+The verdict is sticky: a page that loaded as a tab stays a tab while its page height and insets move (scrolling collapses the URL bar to 80px of chrome), and is only re-decided when the window size, page width, turn, standalone or framing changes, or on `pageshow` or when the page becomes visible again. In a window's first second the verdict may still rise to preview, since the sheet's inset reads 0 on the first sample and 34 about 100ms later. A preview that stops matching becomes a tab at once.
+
+Limits: the open posture and landscape sheet were not measured. When "Open in Safari" hands the page to a tab, the `pageshow`/`visibilitychange` re-read switches to `column`. The [/probe page](https://getduet.dev/probe) logs every signal the rule reads, every 100ms. Measurements are in [docs/research-notes.md](docs/research-notes.md).
 
 ### Oscillation guard
 

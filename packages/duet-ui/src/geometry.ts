@@ -141,22 +141,32 @@ const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "na
  *  windows say preview (docs/research-notes.md, "In-app Safari preview"):
  *  - iOS 27.1 (simulator, 2026-10-26, every presentation but a sheet): the closed screen's 466x678 window with an
  *    84pt column like a tab's, but only 75pt below the page (382x603) and the page reaching the screen bottom
- *    (safe-area-inset-bottom 34). A closed tab has 98pt (80 with the compact URL bar) and inset 0. As a sheet
- *    (450x670, page 366x600, inset 34) it reads exactly like windowed Safari, so it is not told apart.
+ *    (safe-area-inset-bottom 34). A closed tab has 98pt (80 with the compact URL bar) and inset 0.
  *    In landscape the preview's bar is above the page, no column width, so it is inline anyway.
+ *  - The page sheet, the common presentation (real Duo, iOS 18.7, Messages, 2026-10-26; simulator, iOS 27.1): a
+ *    450x670 window inside the 466x678 screen, page 366x600 (column 84, chrome 70), inset 34. The inset lands
+ *    ~100ms after the first sample (0, then 34), so stable() lets the verdict rise to preview at first (PREVIEW_RISE).
+ *    No tab is smaller than the screen: closed 466x678, open 951x669, a split pane 469x669 (wider than the 466
+ *    screen Safari keeps reporting), all inset 0 in every state measured.
  *  - Older builds (device screenshot 2026-10-25): a fixed 375x667 window at 3x, a size no iPhone has natively. */
-/** chrome: a band around the 75pt measured, clear of a tab's 98 and 80 (compact or scrolled URL bar). Windowed
- *  Safari (70) and a compact split pane (75) have other window sizes. stable() also keeps a tab's verdict while it
- *  scrolls, so a tab whose chrome drifts into the band mid-scroll is not taken for the preview. */
-const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [73, 77] } as const;
+/** chrome: a band around the 75pt measured, clear of a tab's 98 and 80 (compact or scrolled URL bar). A compact
+ *  split pane (75) has another window size. stable() also keeps a tab's verdict while it scrolls, so a tab whose
+ *  chrome drifts into the band mid-scroll is not taken for the preview. sheetInset: how far inside the screen, on
+ *  each side, a window must be to count as a sheet (16x8 measured; a split pane is 3pt wider than the screen). */
+const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [73, 77], sheetInset: 4 } as const;
 /** Why the signals read as the in-app preview, for probes and logs; undefined when they do not. */
 export function previewReason(s: Signals): string | undefined {
   if (s.standalone || browserOf(s.userAgent) !== "safari") return;
   if (s.pixelRatio === PREVIEW.pixelRatio && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height) return "375x667 window at 3x";
   const chrome = s.outerHeight - s.innerHeight;
   // A tab measured inset 0 in every state (fresh, scrolled, keyboard, landscape); the preview 34.
-  if (s.insetBottom >= 20 && hasColumn(s) && within(chrome, PREVIEW.chrome)
-    && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1) return `466x678 window, ${chrome}pt chrome, inset ${s.insetBottom}`;
+  if (s.insetBottom < 20 || !hasColumn(s)) return;
+  if (within(chrome, PREVIEW.chrome) && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1)
+    return `466x678 window, ${chrome}pt chrome, inset ${s.insetBottom}`;
+  // The sheet: a portrait window inside the closed screen on both sides.
+  const [w, h] = DUO_SIZES[0], m = PREVIEW.sheetInset;
+  if (s.screenWidth === w && s.screenHeight === h && s.outerWidth <= w - m && s.outerHeight <= h - m && s.outerWidth < s.outerHeight)
+    return `${s.outerWidth}x${s.outerHeight} sheet in the ${w}x${h} screen, inset ${s.insetBottom}`;
 }
 export const isPreview = (s: Signals) => previewReason(s) !== undefined;
 
@@ -208,9 +218,10 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
  *  pane on the open Duo (469x669 outer, 385x571 inner) has the same column on its outer edge, so either
  *  side of the page. In-document content paints into it once the document spans both columns (84 + 385 + 84)
  *  and is scrolled 84 across, with `shrink-to-fit=no` in the viewport meta, or Safari zooms the pane out to
- *  fit the wider document (simulator probes, 2026-10-25). Windowed Safari (floating, or beside the Home Screen)
- *  keeps the column at other window sizes (device 2026-10-25: 453x661 and 450x670 outer, 369x591 inner), and a
- *  pane with the compact URL bar has 75pt of chrome, so any portrait Safari window on the Duo with the column counts. */
+ *  fit the wider document (simulator probes, 2026-10-25). A device trace (2026-10-25) read the column at other
+ *  window sizes (453x661 and 450x670 outer, 369x591 and 366x600 inner), then taken for windowed Safari; 450x670
+ *  with inset 34 is the in-app preview's sheet (isPreview), which goes inline. A pane with the compact URL bar has
+ *  75pt of chrome, so any portrait Safari window on the Duo with the column counts. */
 const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 102] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
 const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome);
@@ -256,13 +267,16 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   /** Smallest viewport height per width and orientation (Context.stableHeight). */
   heights?: Record<string, number>;
   /** Sticky in-app preview verdict, and the window it was taken in. */
-  preview?: boolean; previewKey?: string;
+  preview?: boolean; previewKey?: string; previewAt?: number;
   /** Last context returned, and the stable signals it was committed under. */
   last?: Context; stableKey?: string }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 /** Longest pin: a loop that keeps resuming doubles the wait up to this. */
 export const PIN_MAX = 60000;
+/** How long after a window first shows (stable signals or epoch changed) its verdict may still rise to preview:
+ *  the real sheet's bottom inset reads 0 on the first sample and 34 ~100ms later (device, 2026-10-26). */
+export const PREVIEW_RISE = 1000;
 
 /** settling: the window is still moving after a geometry event (signals.ts settling()). A fold lands the viewport
  *  first and outerWidth up to ~2s later, flipping the mode on the way at an unchanged window size, so flips then are
@@ -276,8 +290,9 @@ export const PIN_MAX = 60000;
  *  under pinch zoom the last context holds.
  *
  *  The preview verdict is sticky the same way: a page that loaded as a tab stays a tab while it scrolls, since the
- *  URL bar collapsing changes only the page height. A tab becomes a preview only on a stable change; a preview
- *  becomes a tab as soon as the rule stops matching (Open in Safari). */
+ *  URL bar collapsing changes only the page height. A tab becomes a preview only on a stable change or in the
+ *  first PREVIEW_RISE ms of a window (the sheet's late inset); a preview becomes a tab as soon as the rule stops
+ *  matching (Open in Safari). */
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false, epoch = 0): Context {
   if ((s.scale ?? 1) !== 1 && d.last) {
     const keyboard = s.visualHeight < s.innerHeight - 1 || undefined;
@@ -285,7 +300,9 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   }
   const key = `${s.outerWidth}x${s.outerHeight}`;
   const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`, raw = isPreview(s);
-  if (d.preview === undefined || !raw || stableKey !== d.previewKey) d.preview = raw;
+  if (stableKey !== d.previewKey) d.previewAt = now;
+  const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
+  if (d.preview === undefined || !raw || stableKey !== d.previewKey || rising) d.preview = raw;
   d.previewKey = stableKey;
   const preview = d.preview;
   // A loop keeps the window size; a fold or rotation passes through other sizes, so only same-size flips count.

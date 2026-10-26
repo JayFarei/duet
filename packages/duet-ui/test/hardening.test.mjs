@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { detect, isPreview, PIN_MAX, stable } from "../src/geometry.ts";
+import { detect, isPreview, PIN_MAX, PREVIEW_RISE, previewReason, stable } from "../src/geometry.ts";
 
 const F = JSON.parse(readFileSync(new URL("./fixtures/states.json", import.meta.url), "utf8"));
 const full = (s) => ({
@@ -31,10 +31,28 @@ test("a tab whose page height drifts into the preview band mid-scroll stays a ta
   // Same window, page width and turn: only the page height and inset moved. The raw rule matches; the verdict holds.
   const drift = { ...TAB, innerHeight: 603, visualHeight: 603, insetBottom: 34 };
   assert.ok(isPreview(drift));
-  const c = stable(d, drift, undefined, 100);
+  // Past PREVIEW_RISE: the window has been a tab for over a second.
+  const c = stable(d, drift, undefined, PREVIEW_RISE + 100);
   assert.deepEqual([c.mode, c.preview], ["column", undefined]);
   // A new page show (epoch) re-decides.
-  assert.equal(stable(d, drift, undefined, 200, false, 1).preview, true);
+  assert.equal(stable(d, drift, undefined, PREVIEW_RISE + 200, false, 1).preview, true);
+});
+test("the sheet's late inset (0, then 34 ~100ms later, real Duo) still rises to preview on the same load", () => {
+  const d = { flips: [] };
+  const sheet = at("in-app preview, page sheet (real"), first = at("in-app preview, page sheet, first sample");
+  assert.deepEqual([stable(d, first, undefined, 0).mode, d.preview], ["column", false]);
+  const c = stable(d, sheet, undefined, 100, true);
+  assert.deepEqual([c.mode, c.side, c.preview], ["inline", "left", true]);
+  assert.match(previewReason(sheet), /450x670 sheet in the 466x678 screen/);
+});
+test("the sheet rule wants the inset, the column, a portrait window inside the closed screen and Safari", () => {
+  const sheet = at("in-app preview, page sheet (real");
+  assert.equal(isPreview({ ...sheet, insetBottom: 0 }), false);
+  assert.equal(isPreview({ ...sheet, innerWidth: 450 }), false, "no column");
+  assert.equal(isPreview({ ...sheet, outerWidth: 469, innerWidth: 385 }), false, "a split pane is wider than the screen");
+  assert.equal(isPreview({ ...sheet, screenWidth: 951, screenHeight: 669 }), false, "another screen");
+  assert.equal(isPreview({ ...sheet, userAgent: CHROME_UA }), false);
+  assert.equal(isPreview({ ...sheet, standalone: true }), false);
 });
 test("a preview becomes a tab as soon as the rule stops matching (Open in Safari)", () => {
   const d = { flips: [] };
