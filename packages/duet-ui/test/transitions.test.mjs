@@ -163,6 +163,60 @@ test("repeated folding never pins: flips across window sizes do not count", () =
   assert.equal(stable(d, CLOSED, "right", t + 50).mode, "column");
 });
 
+// RegTail ask #8 (device, 2026-10-26): folding open to closed in a portrait Safari tab left the controls inline (rail
+// centre 382 - 48.2) instead of in the column (466 - 48.2). The viewport lands first and outerWidth only up to ~2s
+// later, with no event, and the column layer's first frames at the new size flip the mode (FOLD[0] zoom-out) at an
+// unchanged window size. signals.ts polls until the sizes hold and reports settling(); stable() ignores those flips.
+// Synthetic timeline: the simulator cannot be folded from the tools available here.
+const foldToClosed = (ih) => [
+  sig(466, 498, 951, 669, { insetRight: 84 }), // folding frame, outer stale
+  sig(382, ih, 951, 669), // viewport landed, outer stale
+  sig(382, ih, 951, 669),
+  sig(382, ih, 466, 678), // the window lands, silently
+  sig(466, 498, 466, 678), // column layer's first frames zoom Safari out
+  sig(382, ih, 466, 678),
+  sig(466, 498, 466, 678),
+  sig(382, ih, 466, 678),
+];
+for (const [bar, ih] of [["expanded", 580], ["compact", 598]]) {
+  test(`fold open to closed, portrait, ${bar} URL bar: ends in column at 466x678`, () => {
+    const d = { flips: [] };
+    stable(d, sig(951, 571, 951, 669), "right", 0);
+    const frames = foldToClosed(ih);
+    frames.forEach((s, i) => stable(d, s, "right", 1000 + i * 300, true));
+    const c = stable(d, frames.at(-1), "right", 1000 + frames.length * 300 + 500, false);
+    assert.deepEqual([c.mode, c.side, c.screenWidth, c.screenHeight, d.pinned], ["column", "right", 466, 678, undefined]);
+  });
+}
+test("without settling the same fold pins inline: the reported bug", () => {
+  const d = { flips: [] };
+  stable(d, sig(951, 571, 951, 669), "right", 0);
+  foldToClosed(580).forEach((s, i) => stable(d, s, "right", 1000 + i * 100));
+  assert.equal(stable(d, CLOSED, "right", 2000).mode, "inline");
+});
+
+// In-app Safari preview, iOS 27.1 (Duo Lab Preview simulator, SFSafariViewController in a test host app,
+// 2026-10-26): full screen, default and over-full-screen presentations all read 382x603 of 466x678, inset bottom 34.
+const PREVIEW_27 = sig(382, 603, 466, 678, { insetBottom: 34, pixelRatio: 3 });
+test("iOS 27 in-app preview: inline on the left, never Safari's column (its column is full of its own buttons)", () => {
+  const c = detect(PREVIEW_27);
+  assert.deepEqual([c.mode, c.side, c.preview], ["inline", "left", true]);
+  assert.equal(detect(PREVIEW_27, "right").side, "right", "the user's side still wins");
+  // Turned, its bar is above the page: no column width, inline either way.
+  assert.equal(detect(sig(678, 391, 678, 466, { insetBottom: 34, angle: 90 })).mode, "inline");
+});
+test("a closed Safari tab is never taken for the preview, URL bar expanded or compact", () => {
+  for (const s of [CLOSED, sig(382, 598, 466, 678), sig(382, 598, 466, 678, { insetBottom: 34 })]) {
+    const c = detect(s);
+    assert.deepEqual([c.mode, c.preview], ["column", undefined], JSON.stringify(s));
+  }
+});
+test("Open in Safari: the preview's window becomes a tab's and the re-read takes the column", () => {
+  const d = { flips: [] };
+  assert.equal(stable(d, PREVIEW_27, undefined, 0).mode, "inline");
+  assert.equal(stable(d, CLOSED, undefined, 5000).mode, "column");
+});
+
 // Device trace 2026-10-25 19:30: windowed Safari (floating, or beside the Home Screen) and a split pane with the
 // compact URL bar stayed inline: the column check wanted the closed tab's window height and at least 76pt of chrome.
 test("windowed Safari and a compact split pane take the column", () => {

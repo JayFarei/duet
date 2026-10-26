@@ -75,12 +75,12 @@ Possible false positives: an iPad (which also sends a Mac user agent with touch)
 
 ### Which mode
 
-Duet re-reads the signals on resize, orientation change (including `screen.orientation` change: turning from one landscape to the other keeps the window size) and visual viewport resize (again 300 and 600ms later, since the window size and insets settle late), and picks the first mode that matches:
+Duet re-reads the signals on resize, orientation change (including `screen.orientation` change: turning from one landscape to the other keeps the window size), visual viewport resize, `pageshow` and `visibilitychange` (so a page handed from the in-app preview to a Safari tab re-reads). The window size and insets settle late (after a fold `outerWidth` can land up to ~2s after the viewport, with no event), so after each event Duet polls every 100ms until the sizes hold for 500ms, re-reading on every change, for at most 2s. It picks the first mode that matches:
 
 | Order | Mode | Conditions (all must hold) | Controls |
 | --- | --- | --- | --- |
 | 1 | `strip` | Running as a Home Screen app (`navigator.standalone` or `display-mode: standalone`), and the left or right safe-area inset is at least 60px. The right side wins if both are. Does not check for a Duo. | In the strip iOS gives the app, beside the page |
-| 2 | `column` | Not a Home Screen app; not inside an iframe; the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the keyboard is down (visual viewport height at least `innerHeight - 1`); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column its own buttons leave empty, so the page keeps its full width |
+| 2 | `column` | Not a Home Screen app; not inside an iframe; not the in-app Safari preview (below); the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the keyboard is down (visual viewport height at least `innerHeight - 1`); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column its own buttons leave empty, so the page keeps its full width |
 | 3 | `inline` | Everything else: unfolded at full width, landscape of unknown turn, keyboard up, other browsers, in-app web views, the in-app Safari preview, other phones, desktops | An 84px strip inside the page, on the side the user picks |
 
 "Safari" means the user agent has `Version/x Safari/` and none of the tokens of other iOS browsers and apps (`CriOS`, `FxiOS`, `EdgiOS`, `OPiOS`, `GSA/`, `Ddg/`); an in-app web view drops the `Safari/` token. `useDuet().browser` reports the result: `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` or `"other"`. Other browsers draw their own chrome where Safari has its column, so they always get `inline`.
@@ -107,11 +107,16 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 
 ### In-app preview
 
-Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). Duet takes a window that is not standalone, exactly 375x667 (`outerWidth` x `outerHeight`) at `devicePixelRatio` 3 to be that preview, a size no iPhone has natively, measured on the closed Duo. The preview's own buttons sit beside the page and the page cannot paint there, so Duet uses `inline`, on the left unless the user picked a side before, and sets `useDuet().preview`. This is a heuristic too: another window at that size and density would match.
+Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo (iOS 27.1) the preview has a column like a Safari tab's, but its own buttons fill it (close, reader, back, and a share/reload/Safari pill), leaving too little room for Duet's controls, so Duet uses `inline`, on the left unless the user picked a side before, and sets `useDuet().preview`. Duet takes a Safari window that is not standalone to be the preview when it is either:
+
+- the closed screen's 466x678 window with the column signature, at most 77px of chrome below the page (the preview has 75, a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
+- exactly 375x667 at `devicePixelRatio` 3, the size earlier builds gave the preview.
+
+Limits: a page-sheet preview (450x670 window) reads exactly like windowed Safari and still gets `column`; the open posture preview was not measured. When "Open in Safari" hands the page to a tab, the `pageshow`/`visibilitychange` re-read switches to `column`. Measurements are in [docs/research-notes.md](docs/research-notes.md).
 
 ### Oscillation guard
 
-Column mode can feed back into the signals (for example if Safari zooms the page out to fit the wider document, the column signature disappears, `inline` removes the overflow, and the signature returns). If the mode changes 3 times within 2 seconds while the outer window size stays the same, Duet pauses column mode for 3 seconds, then tries again. If the loop resumes as soon as the pause lifts, the next pause doubles. A change of window size resets the guard.
+Column mode can feed back into the signals (for example if Safari zooms the page out to fit the wider document, the column signature disappears, `inline` removes the overflow, and the signature returns). If the mode changes 3 times within 2 seconds while the outer window size stays the same, Duet pauses column mode for 3 seconds, then tries again. If the loop resumes as soon as the pause lifts, the next pause doubles. A change of window size resets the guard, and changes while the window is still settling after an event (the 2s polling above, as during a fold) are not counted: they are the transition, not a loop.
 
 ### Viewport meta
 
@@ -220,7 +225,14 @@ Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wid
 
 ### Lower-level exports
 
-`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `plan`, `columnBand`, `morphBox`, `islandBox`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests. `duet-ui/geometry` exports the geometry module alone, without React.
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `plan`, `columnBand`, `morphBox`, `islandBox`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. `duet-ui/geometry` exports the geometry module alone, without React.
+
+`readSignals()` returns the current `Signals` from the window, the same reading the chrome uses (browser only). `watchSignals(cb)` calls `cb` whenever they may have changed, with the triggers and settle polling described in [Which mode](#which-mode), and returns the unsubscribe. Together with `detect` they let a page act on the mode before React mounts:
+
+```ts
+import { readSignals, watchSignals, detect } from "duet-ui";
+const off = watchSignals(() => { document.documentElement.dataset.mode = detect(readSignals()).mode; });
+```
 
 ## Laying out content
 
@@ -229,7 +241,7 @@ The page spans the whole window and the controls float over it, so backgrounds r
 - `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
 - `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image). The `duet-bleed` class does the same in CSS.
 
-Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right`, `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear) and `--duet-safe-top-column` (in `column` mode, the top of the part of Safari's column clear of its back and reader buttons: keep popovers that cross the column below it). `--duet-vh` is `stableHeight` in px: size full-screen sections with `min-height: var(--duet-vh, 100svh)` so they keep their height while the URL bar collapses and expands. Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
+Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right` (the controls' width on their edge; in `column` mode without children the page does not run under a right-hand column, so that inset is 0), `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear) and `--duet-safe-top-column` (in `column` mode, the top of the part of Safari's column clear of its back and reader buttons: keep popovers that cross the column below it). `--duet-vh` is `stableHeight` in px: size full-screen sections with `min-height: var(--duet-vh, 100svh)` so they keep their height while the URL bar collapses and expands. Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
 
 ## Panes
 

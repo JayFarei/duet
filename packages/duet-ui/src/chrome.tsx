@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, typ
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, INLINE_WIDTH, columnBand, isSplit, islandBox, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { emulatedSignals, readSignals, settling, watchSignals } from "./signals.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
 import "./duet.css";
@@ -65,51 +66,8 @@ export interface DuetProps<T extends string = string> {
 
 // --- context ------------------------------------------------------------------------------------
 
-// A desktop page that draws a Duo around this page in an iframe (the site's web Duo) sends the signals the
-// real device would give: `postMessage({ type: "duet:signals", signals }, origin)`. Same origin only. The page
-// says `duet:ready` once it listens, so the host answers then instead of guessing when the page has loaded.
-let emulated: Signals | null = null;
-if (typeof window !== "undefined" && window.top !== window) {
-  addEventListener("message", (e: MessageEvent) => {
-    if (e.source !== parent || e.origin !== location.origin || e.data?.type !== "duet:signals") return;
-    emulated = e.data.signals as Signals;
-    listeners.forEach((f) => f());
-  });
-  parent.postMessage({ type: "duet:ready" }, location.origin);
-}
 /** The safe-area inset on one side as CSS: the real env() value, or the emulated one. */
-const envInset = (side: Side) => emulated ? `${side === "right" ? emulated.insetRight : emulated.insetLeft}px` : `env(safe-area-inset-${side})`;
-
-let probe: HTMLDivElement | null = null;
-function signals(): Signals {
-  if (emulated) return emulated;
-  if (!probe) {
-    probe = document.createElement("div");
-    probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;"
-      + "padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
-    document.body.appendChild(probe);
-  }
-  const pad = getComputedStyle(probe);
-  return {
-    innerWidth: innerWidth,
-    innerHeight: innerHeight,
-    outerWidth: outerWidth,
-    outerHeight: outerHeight,
-    visualHeight: visualViewport?.height ?? innerHeight,
-    insetTop: parseFloat(pad.paddingTop) || 0,
-    insetBottom: parseFloat(pad.paddingBottom) || 0,
-    screenWidth: innerWidth > innerHeight ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height),
-    screenHeight: innerWidth > innerHeight ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height),
-    insetRight: parseFloat(pad.paddingRight) || 0,
-    insetLeft: parseFloat(pad.paddingLeft) || 0,
-    framed: window.top !== window,
-    pixelRatio: devicePixelRatio,
-    userAgent: navigator.userAgent,
-    touchPoints: navigator.maxTouchPoints,
-    angle: screen.orientation?.angle ?? ((((window as Window & { orientation?: number }).orientation ?? 0) + 360) % 360),
-    standalone: (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches,
-  };
-}
+const envInset = (side: Side) => { const e = emulatedSignals(); return e ? `${side === "right" ? e.insetRight : e.insetLeft}px` : `env(safe-area-inset-${side})`; };
 // Inline: the side is the user's, remembered per site, and apart for split view (Safari's column is on the pane's
 // outer edge, which the page cannot see, so the controls follow it once moved there).
 const sideKey = (split: boolean) => split ? "duet-side-split" : "duet-side";
@@ -140,7 +98,7 @@ let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
 let pinTimer: ReturnType<typeof setTimeout> | undefined;
 function read(): Context {
-  const s = signals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now());
+  const s = readSignals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now(), settling());
   // A pin lifts on its own time, with no resize to re-read on.
   if (damper.pinned && !pinTimer) pinTimer = setTimeout(() => { pinTimer = undefined; listeners.forEach((f) => f()); }, damper.until! - performance.now() + 20);
   const k = JSON.stringify(c);
@@ -148,22 +106,9 @@ function read(): Context {
   return snap!;
 }
 function subscribe(cb: () => void) {
-  // Safe-area insets and outerWidth settle up to ~400ms after resize and rotation.
-  const on = () => { cb(); setTimeout(cb, 300); setTimeout(cb, 600); };
-  addEventListener("resize", on);
-  addEventListener("orientationchange", on);
-  screen.orientation?.addEventListener("change", on); // a turn from one landscape to the other keeps the window size
-  visualViewport?.addEventListener("resize", on);
-  // A fresh Safari tab can hydrate before its window geometry settles, with no resize afterwards.
-  const t = [0, 300, 1000].map((ms) => setTimeout(cb, ms));
   listeners.add(cb);
-  return () => {
-    listeners.delete(cb);
-    t.forEach(clearTimeout);
-    removeEventListener("resize", on); removeEventListener("orientationchange", on);
-    screen.orientation?.removeEventListener("change", on);
-    visualViewport?.removeEventListener("resize", on);
-  };
+  const unwatch = watchSignals(cb);
+  return () => { listeners.delete(cb); unwatch(); };
 }
 const ssr: Context = { mode: "column", duo: true, browser: "safari", device: "duo", standalone: false, layout: "narrow", side: "right", width: 382, height: 580, stableHeight: 580, offsetTop: 0, screenWidth: 466, screenHeight: 678, insetTop: 0, insetBottom: 0 };
 
@@ -259,7 +204,7 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
       // (touch-action stops at the scroller), leaving page and controls panned off their rails: hold it.
       // An emulating host already frames both columns; pinning there loops in iOS Safari, whose frame overflows a few px.
       const x = split || left ? column : 0;
-      if (!emulated && Math.round(scrollX) !== x) scrollTo(x, scrollY);
+      if (!emulatedSignals() && Math.round(scrollX) !== x) scrollTo(x, scrollY);
       if (timeline) range();
       else for (const el of els) el.style.transform = scrollY ? `translateY(${scrollY}px)` : "";
     };
@@ -377,16 +322,20 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const planFor = (side: Side) => plan(side === ctx.side ? ctx : { ...ctx, side }, spec);
   // The copy whose column opened the menu draws it; the other copy's column is in the other pane.
   const [menuSide, setMenuSide] = useState<Side>(ctx.side);
+  const inner = p.children !== undefined; // the inner scroller, which runs on under Safari's column
 
   useEffect(() => {
     // The page spans the window and the controls float over it; these insets are how far text and buttons keep
     // clear on each edge (layout.ts). In Safari's column the scroller runs on under the column (an emulated
     // column's frame already spans it), so either way the inset there is the column's width; a tab has no safe
-    // areas, so the other edge is 0.
+    // areas, so the other edge is 0. Without children the document is the page: it is laid out in the viewport
+    // and nothing runs under a right column (simulator, 2026-10-26: 84px of padding left a 100px gap), while a
+    // left column has the document scrolled one column across, so the page runs under it.
     const r = document.documentElement.style;
     const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
     const other = (side: Side) => ctx.mode === "column" ? "0px" : envInset(side);
-    const right = ctx.side === "right" || split ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
+    const under = ctx.mode !== "column" || inner || !!emulatedSignals();
+    const right = (ctx.side === "right" || split) && under ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
     // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
     for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
@@ -402,9 +351,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // The page's height without Safari's URL bar bouncing it mid-scroll (Context.stableHeight), like 100svh.
     r.setProperty("--duet-vh", `${ctx.stableHeight}px`);
     document.documentElement.dataset.duetMode = ctx.mode;
-    document.documentElement.toggleAttribute("data-duet-emulated", !!emulated);
+    document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split]);
+  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
   const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, ctx.side === "left", column);
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.

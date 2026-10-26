@@ -125,13 +125,21 @@ export type Layout = "narrow" | "wide";
 export const WIDE = 600;
 const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "narrow";
 
-/** In-app Safari preview on the closed Duo (simulator, iOS 27.1, and device screenshot 2026-10-25): the page
- *  window is a fixed 375x667 at 3x, a size no iPhone has natively, and the preview's own buttons (close,
- *  reader, back, share/reload/Safari) sit in the column beside it, which the page cannot paint into (it
- *  clips at its edge). So controls go inline, on the left by default, away from the preview's column. */
-const PREVIEW = { width: 375, height: 667, pixelRatio: 3 } as const;
-export const isPreview = (s: Signals) => !s.standalone && s.pixelRatio === PREVIEW.pixelRatio
-  && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height;
+/** In-app Safari preview (SFSafariViewController) on the closed Duo. Its own buttons (close, reader, back, and a
+ *  share/reload/Safari pill) fill the column beside the page, leaving ~122pt free between them with a bare island
+ *  and ~31pt with Live Activities, so controls go inline, on the left by default, away from that column. Two
+ *  windows say preview (docs/research-notes.md, "In-app Safari preview"):
+ *  - iOS 27.1 (simulator, 2026-10-26, every presentation but a sheet): the closed screen's 466x678 window with an
+ *    84pt column like a tab's, but only 75pt below the page (382x603) and the page reaching the screen bottom
+ *    (safe-area-inset-bottom 34). A closed tab has 98pt (80 with the compact URL bar) and inset 0. As a sheet
+ *    (450x670, page 366x600, inset 34) it reads exactly like windowed Safari, so it is not told apart.
+ *    In landscape the preview's bar is above the page, no column width, so it is inline anyway.
+ *  - Older builds (device screenshot 2026-10-25): a fixed 375x667 window at 3x, a size no iPhone has natively. */
+const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: 77 } as const;
+export const isPreview = (s: Signals) => !s.standalone && browserOf(s.userAgent) === "safari" && (
+  (s.pixelRatio === PREVIEW.pixelRatio && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height)
+  || (s.insetBottom > 0 && hasColumn(s) && s.outerHeight - s.innerHeight <= PREVIEW.chrome
+    && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1));
 
 /** Window and screen sizes only the Duo has, as [short, long] sides: the closed screen (Safari's `screen.*` keeps
  *  466x678 after unfolding, so it holds in every Safari state), the open screen, and a split-view pane's window.
@@ -186,6 +194,7 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
  *  pane with the compact URL bar has 75pt of chrome, so any portrait Safari window on the Duo with the column counts. */
 const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 102] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
+const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome);
 
 /** preferred: the side the user picked for inline controls, if any. */
 export function detect(s: Signals, preferred?: Side, allowColumn = true): Context {
@@ -201,14 +210,13 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
   const closed = Math.abs(s.outerWidth - DUO_SIZES[0][1]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][0]) <= 1;
   const columnSide: Side | undefined = !landscape ? "right" : closed ? turned : undefined;
   // Other iOS browsers draw their own chrome where Safari has its column: inline for them.
-  const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari"
-    && within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width)
-    && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome)
-    && s.visualHeight >= s.innerHeight - 1; // keyboard up
-  // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
-  if (column && isSplit(s)) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
-  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight };
+  // An in-app preview has the column signature too, but its column is full of its own buttons.
   const preview = isPreview(s), split = isSplit(s);
+  const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari" && !preview
+    && hasColumn(s) && s.visualHeight >= s.innerHeight - 1; // keyboard up
+  // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
+  if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
+  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight };
   return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(split && { split }) };
 }
 
@@ -223,13 +231,16 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 
-export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number): Context {
+/** settling: the window is still moving after a geometry event (signals.ts settling()). A fold lands the viewport
+ *  first and outerWidth up to ~2s later, flipping the mode on the way at an unchanged window size, so flips then are
+ *  the transition, not a loop, and do not count. */
+export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false): Context {
   const key = `${s.outerWidth}x${s.outerHeight}`;
   // A loop keeps the window size; a fold or rotation passes through other sizes, so only same-size flips count.
   if (d.key !== key) Object.assign(d, { key, pinned: undefined, ttl: undefined, flips: [] });
   if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
   let c = detect(s, preferred, !d.pinned);
-  if (d.mode && c.mode !== d.mode) {
+  if (d.mode && c.mode !== d.mode && !settling) {
     d.flips = [...d.flips.filter((t) => now - t < FLIP_WINDOW), now];
     if (d.flips.length >= 3) {
       // Doubles only when the loop resumes as the last pin lifts; a later pane move starts from PIN_TTL again.
