@@ -14,7 +14,8 @@ type Posture = "closed" | "open";
 /** home: added to the Home Screen. safari: a full-screen tab. split: Safari in a split-view pane. window: a Safari
  *  window beside the Home Screen. */
 type App = "home" | "safari" | "split" | "window";
-interface State { posture: Posture; rotated: boolean; app: App; pane: Side }
+/** live: Live Activities are running, which grows the Dynamic Island down the closed strip (closed only). */
+interface State { posture: Posture; rotated: boolean; app: App; pane: Side; live: boolean }
 
 // Natural orientation: closed is portrait (outer display), open is landscape (inner display). `rotated` turns
 // the device a quarter turn clockwise, so the outer camera ends up bottom right.
@@ -105,12 +106,11 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
 }
 
 /** Where the page sits on the screen, the signals it gets and the system chrome around it. W x H is the screen as
- *  the user sees it (upright). `modeOf`: the mode the page shows for a set of signals. `live`: Live Activities are
- *  running, which grows the Dynamic Island down the closed strip and pushes Safari's rows down, telling the page
- *  nothing. */
-function scene(s: State, W: number, H: number, host: string, live: boolean, modeOf: (s: Signals) => Mode): Scene {
+ *  the user sees it (upright). `modeOf`: the mode the page shows for a set of signals. Live Activities push iOS's
+ *  clock and Safari's rows down, telling the page nothing. */
+function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode): Scene {
   const full = { w: W, h: H }, screen = { x: 0, y: 0, w: W, h: H };
-  const push = live && s.posture === "closed" ? DUO.island : 0;
+  const push = s.live ? DUO.island : 0;
   if (s.app === "home") {
     const strip = W < H ? s.posture === "closed" : s.posture === "open"; // natural orientation only
     const signals = sig(full, full, { insetRight: strip ? STRIP : 0, standalone: true });
@@ -164,35 +164,39 @@ function scene(s: State, W: number, H: number, host: string, live: boolean, mode
   };
 }
 
+const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, rotated: false, app, pane: "right", live: false, ...o });
 const TOUR: State[] = [
-  { posture: "closed", rotated: false, app: "home", pane: "right" },
-  { posture: "open", rotated: false, app: "home", pane: "right" },
-  { posture: "open", rotated: true, app: "home", pane: "right" },
-  { posture: "closed", rotated: true, app: "home", pane: "right" },
-  { posture: "closed", rotated: false, app: "home", pane: "right" },
-  { posture: "closed", rotated: false, app: "safari", pane: "right" },
-  { posture: "open", rotated: false, app: "safari", pane: "right" },
-  { posture: "open", rotated: false, app: "split", pane: "right" },
-  { posture: "open", rotated: false, app: "split", pane: "left" },
-  { posture: "open", rotated: false, app: "window", pane: "right" },
+  stop("closed", "home"), stop("closed", "home", { live: true }),
+  stop("open", "home"), stop("open", "home", { rotated: true }), stop("closed", "home", { rotated: true }), stop("closed", "home"),
+  stop("closed", "safari"), stop("closed", "safari", { live: true }), stop("open", "safari"),
+  stop("open", "split"), stop("open", "split", { pane: "left" }), stop("open", "window"),
 ];
-/** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. */
+const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
+/** The phase list: each row starts at a tour stop and lasts until the next row's. */
+const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
+  { group: "Home Screen web app", rows: [["Closed", 0], ["Live Activity", 1], ["Unfolded and turned", 2]] },
+  { group: "Safari", rows: [["Closed tab", 6], ["Live Activity", 7], ["Unfolded", 8], ["Split view", 9], ["Window", 11]] },
+];
+/** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. The island exists
+ *  on the closed screen only. */
 const ONLY: Partial<Record<App, Posture>> = { split: "open", window: "open" };
 const fit = (s: State): State => {
-  const only = ONLY[s.app];
-  return !only ? s : s.posture === only && !s.rotated ? s : { ...s, app: "safari" };
+  const only = ONLY[s.app], live = s.live && s.posture === "closed" && !s.rotated;
+  return !only ? { ...s, live } : s.posture === only && !s.rotated ? { ...s, live } : { ...s, app: "safari", live };
 };
 
-const LIVE_NOTE = " Live Activities grow the Dynamic Island down the strip without telling the page, so Duet's controls always sit below its tallest size.";
+const LIVE_NOTE: Partial<Record<App, string>> = {
+  home: " Live Activities grow the Dynamic Island down the strip and push iOS's clock with it, telling the page nothing. Duet's controls already sit below the island's tallest size, so they stay put.",
+  safari: " Live Activities grow the Dynamic Island and push Safari's own buttons down, telling the page nothing. Duet's controls already sit below them at their lowest, so they stay put.",
+};
 /** Every caption the stage can show, rendered invisibly under the real one so the text below never moves.
  *  Built on first use: `scene` needs the styles defined further down. */
 let notes: string[] | undefined;
 const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => [false, true].flatMap((rotated) =>
   (["home", "safari", "split", "window"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
     (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
-      const n = SCREEN[posture], [W, H] = rotated ? [n.h, n.w] : [n.w, n.h];
-      const sc = scene(fit({ posture, rotated, app, pane }), W, H, "", live, () => m);
-      return `${m}|${sc.note}${live && posture === "closed" ? LIVE_NOTE : ""}`;
+      const n = SCREEN[posture], [W, H] = rotated ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, rotated, app, pane, live });
+      return `${m}|${scene(st, W, H, "", () => m).note}${st.live ? LIVE_NOTE[st.app] ?? "" : ""}`;
     })))))))];
 
 /** embed: a stage inside a page, sized to its container, touring on its own while on screen. Its controls stay
@@ -208,7 +212,8 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const [tour, setTour] = useState(false);
   const [manual, setManual] = useState(false);
   const [slots, setSlots] = useState(false);
-  const [live, setLive] = useState(false);
+  // The tour stop last reached (-1: somewhere the tour never goes), for the phase list.
+  const [at, setAt] = useState(0);
   const [view, setView] = useState({ w: 1280, h: 800 });
   const [onScreen, setOnScreen] = useState(true);
   // Until the stage has measured its container it stays hidden, and then appears at its size without growing into it.
@@ -254,6 +259,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const only = ONLY[n.app];
     if (next.app && only) [n.posture, n.rotated] = [only, false]; // picking the app moves the device there
     Object.assign(n, fit(n));
+    if (!fromTour) setAt(TOUR.findIndex((t) => same(t, n)));
     if (n.posture === p.posture && n.rotated === p.rotated) return setS(n);
     // The page fades out while the device moves and back in once it has settled, laid out for the new screen.
     busy.current = true;
@@ -318,9 +324,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   useEffect(() => {
     if (!tour || !onScreen) return;
     // Each stop holds for HOLD once the device has settled, however long the move there took.
-    let i = TOUR.findIndex((t) => JSON.stringify(t) === JSON.stringify(s)), t = 0, on = true;
+    let i = same(TOUR[at] ?? s, s) ? at : TOUR.findIndex((t) => same(t, s)), t = 0, on = true;
     const next = () => { t = window.setTimeout(async () => {
       i = (i + 1) % TOUR.length;
+      setAt(i);
       const start = performance.now();
       await go(TOUR[i], true);
       if (!on) return;
@@ -348,7 +355,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const n = SCREEN[s.posture], b = BODY[s.posture];
   const [W, H] = upright ? [n.h, n.w] : [n.w, n.h];
   const modeOf = (x: Signals) => { const j = JSON.stringify(x); return seen?.signals === j ? seen.mode : detect(x).mode; };
-  const sc = scene({ ...s, rotated: upright }, W, H, host, live, modeOf);
+  const sc = scene({ ...s, rotated: upright }, W, H, host, modeOf);
 
   // Tell the page what the device would tell it: now, and whenever it (re)loads and says it is listening.
   const signals = JSON.stringify(sc.signals);
@@ -412,6 +419,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
       <div style={{ position: "relative", alignSelf: "stretch", display: "flex", justifyContent: "center", alignItems: "center", visibility: measured ? undefined : "hidden", ...(embed && { height: view.h }) }}>
       {beside && <Showing app={s.app} style={{ position: "absolute", right: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 170, top: "50%", translate: "0 -50%", transition: `right ${turn}ms ${ease}` }} />}
+      {beside && <Phases at={at} tour={tour} onPick={(i) => go(TOUR[i])} onTour={() => setTour((t) => !t)} style={{ position: "absolute", left: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 200, top: "50%", translate: "0 -50%", transition: `left ${turn}ms ${ease}` }} />}
       <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `width ${turn}ms ${ease}, height ${turn}ms ${ease}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
@@ -448,7 +456,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
               {/* System chrome fades in with each new app or screen. */}
               <div key={`${s.app}-${s.posture}-${upright}`} data-wd-callout={slots || undefined} style={{ position: "absolute", inset: 0, pointerEvents: "none", animation: `wd-in ${MOVE}ms ${ease} both` }}>{sc.chrome}</div>
             </div>
-            {s.posture === "closed" && <Island live={live} />}
+            {s.posture === "closed" && <Island live={s.live} />}
             {s.posture === "open" && <Crease />}
           </div>
         </div>
@@ -479,7 +487,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         <Segmented value={s.app} onChange={(app) => go({ app })}
           options={[["home", "Home Screen"], ["safari", "Safari"], ["split", "Split View"], ["window", "Window"]]} />
         {s.app === "split" && <Button onClick={() => go({ pane: s.pane === "right" ? "left" : "right" })} label="Swap"><ArrowLeftRight size={17} /></Button>}
-        {s.posture === "closed" && <Button onClick={() => setLive((v) => !v)} label="Live Activity" on={live}><Activity size={17} /></Button>}
+        {s.posture === "closed" && !s.rotated && <Button onClick={() => go({ live: !s.live })} label="Live Activity" on={s.live}><Activity size={17} /></Button>}
         <label title="Drag to fold and unfold by hand" style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
           Fold
           <input type="range" aria-label="Fold" min={0} max={1} step={0.001} value={scrub ?? (s.posture === "open" ? 1 : 0)}
@@ -492,8 +500,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       </div>
       </div>
       {!beside && <Showing app={s.app} row />}
+      {!beside && <Phases at={at} tour={tour} onPick={(i) => go(TOUR[i])} onTour={() => setTour((t) => !t)} row />}
       <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
-        <Note mode={sc.mode} text={sc.note + (live && s.posture === "closed" ? LIVE_NOTE : "")} />
+        <Note mode={sc.mode} text={sc.note + (s.live ? LIVE_NOTE[s.app] ?? "" : "")} />
         {allNotes().map((n) => { const [m, t] = n.split("|"); return <Note key={n} mode={m} text={t} hidden />; })}
       </p>
       {slots && (
@@ -525,6 +534,45 @@ function Showing({ app, row, style }: { app: App; row?: boolean; style?: CSSProp
         <b style={{ display: "block", color: "var(--ink)", fontWeight: 600 }}>{title}</b>{sub}
       </div>
     </div>
+  );
+}
+
+/** The tour's phases, grouped by where the page runs: the current one follows the tour, and picking one jumps there
+ *  (which pauses the tour). `row`: chips under the stage, where there is no room beside it. */
+function Phases({ at, tour, onPick, onTour, row, style }: { at: number; tour: boolean; onPick: (i: number) => void; onTour: () => void; row?: boolean; style?: CSSProperties }) {
+  const starts = PHASES.flatMap((g) => g.rows.map(([, i]) => i)).sort((a, b) => a - b);
+  const current = at < 0 ? -1 : starts.filter((i) => i <= at).at(-1);
+  const item = (label: string, i: number) => {
+    const on = i === current, live = label === "Live Activity";
+    return (
+      <button key={i} onClick={() => onPick(i)} aria-current={on || undefined} data-wd-phase={i}
+        style={{ ...control, height: row ? 32 : 30, padding: row ? "0 12px" : "0 10px", display: "flex", alignItems: "center", gap: 7, width: row ? undefined : "100%", textAlign: "left", font: "500 14px -apple-system, system-ui", whiteSpace: "nowrap",
+          background: on ? "var(--card)" : "transparent", color: on ? "var(--ink)" : "var(--dim)", boxShadow: on ? "0 0 0 0.5px var(--line)" : undefined, transition: "background 0.25s, color 0.25s" }}>
+        {live ? <Activity size={14} style={{ marginLeft: row ? 0 : 12 }} /> : <i style={{ width: 6, height: 6, borderRadius: 99, flex: "none", background: on ? "var(--accent)" : "var(--line)" }} />}
+        {label}
+      </button>
+    );
+  };
+  const toggle = (
+    <button onClick={onTour} aria-label={tour ? "Pause the tour" : "Play the tour"} style={{ ...control, height: row ? 32 : 30, padding: "0 10px", display: "flex", alignItems: "center", gap: 6, background: "transparent", color: "var(--dim)", font: "500 13px -apple-system, system-ui" }}>
+      {tour ? <Pause size={13} /> : <Play size={13} />}{tour ? "Pause" : "Play tour"}
+    </button>
+  );
+  if (row) return (
+    <div data-wd-phases style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", padding: "0 16px", maxWidth: 760 }}>
+      {PHASES.flatMap((g) => g.rows.map(([label, i]) => item(label, i)))}{toggle}
+    </div>
+  );
+  return (
+    <nav data-wd-phases aria-label="Tour phases" style={{ display: "grid", gap: 14, ...style }}>
+      {PHASES.map((g) => (
+        <div key={g.group} style={{ display: "grid", gap: 2, justifyItems: "start" }}>
+          <div style={{ font: "600 12px -apple-system, system-ui", letterSpacing: 0.3, textTransform: "uppercase", color: "var(--dim)", padding: "0 10px 4px" }}>{g.group}</div>
+          {g.rows.map(([label, i]) => item(label, i))}
+        </div>
+      ))}
+      <div>{toggle}</div>
+    </nav>
   );
 }
 
@@ -602,10 +650,10 @@ function Island({ live }: { live: boolean }) {
 }
 
 /** iOS's clock and status as the Duo draws them in the strip and in Safari's column (Duo simulator, 3x captures):
- *  the clock over the battery ring. They never slide: when the Island pushes them down they just sit lower. */
+ *  the clock over the battery ring, moving down when the Island grows. */
 function Status({ x, top }: { x: number; top: number }) {
   return (
-    <div data-wd-system style={{ position: "absolute", left: x - 40, top, width: 80, display: "grid", justifyItems: "center", gap: 3, color: "var(--ink)", pointerEvents: "none" }}>
+    <div data-wd-system style={{ position: "absolute", left: x - 40, top, width: 80, display: "grid", justifyItems: "center", gap: 3, color: "var(--ink)", pointerEvents: "none", transition: `top ${MOVE}ms ${ease}` }}>
       <Clock /><Battery />
     </div>
   );
