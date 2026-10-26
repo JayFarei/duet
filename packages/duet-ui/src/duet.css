@@ -276,6 +276,10 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
    not the column, so it keeps real glass; menus unroll over page content without blur, so they stay opaque. */
 /* The keyboard leaves Safari's column in place but covers its lower part; the controls step aside while typing. */
 .duet[data-mode="column"][data-keyboard] { visibility: hidden; }
+/* The layer only paints in the column as long as it widens the document (overflow-x clip, a clip margin or rtl
+   all stop the paint), and Safari zooms out to that width when a text field takes focus (to 0.94, column held).
+   So from focus, before the zoom and the keyboard, the layer is clipped out of the document width. */
+html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibility: hidden; }
 .duet[data-mode="column"] { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 50; }
 /* No children (no .duet-scroller): the document scrolls, and the layer rides it on a scroll timeline that Safari
    runs with the scroll itself, so it holds through momentum and smooth scrollTo/scrollIntoView (chrome.tsx sets
