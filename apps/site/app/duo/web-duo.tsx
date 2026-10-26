@@ -700,9 +700,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         {/* Perspective only while the flap swings: left on, Chrome rasterizes the scaled device at full size and it reads blurry. */}
         <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: folding ? 2600 : undefined, transformOrigin: "75% 50%" }}>
         {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned:
-            its offset is turned back by the device's own angle on the same curve, so mid-turn it still falls straight down, at full length. */}
+            its offset is turned back by the device's own angle on the same curve, so mid-turn it still falls straight down, at full length.
+            A blurred fill, not a box-shadow: a box-shadow is hollow, and moved out from under the body its hole shows as a pale slab. */}
         <div style={{ position: "absolute", inset: 0, transform: `rotate(${-spin.current}deg) translateY(40px) rotate(${spin.current}deg)`, transition: settle("transform") }}>
-          <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, transformOrigin: "100% 50%", boxShadow: "0 0 80px rgb(0 0 0 / 0.28)", transition: `border-radius ${turn}ms ${SETTLE}` }} />
+          <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, transformOrigin: "100% 50%", background: "rgb(0 0 0 / 0.28)", filter: "blur(40px)", transition: `border-radius ${turn}ms ${SETTLE}` }} />
         </div>
         <div ref={fold} style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
