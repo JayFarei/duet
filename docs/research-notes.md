@@ -1,6 +1,6 @@
 > **Historical lab notes from 2026-10-24**, written while column mode was being built, before `duet-ui` was published. Paths, names (`native-chrome`, `DuoChrome`) and some conclusions are out of date, for example split-view panes now use Safari's column on both sides instead of always falling back to inline. For current behaviour, read the [README](../README.md#how-duet-decides) and `packages/duet-ui/src/geometry.ts`.
 >
-> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait, keyboard down) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here.
+> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait, keyboard down) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here. An in-app Safari preview (a 466x678 window with 75pt of chrome and a bottom inset, or the older 375x667 at 3x) is inline, on the left.
 
 # Handoff: our controls inside Safari's column on the iPhone Duo
 
@@ -218,3 +218,27 @@ In inline mode the strip can be dragged to the other edge. It now acts like a ma
 `duo-lab/harness/transitions.test.mjs`, run with `node --test duo-lab/harness/`. It covers the mode for each recorded signature (closed, open, split pane, zoomed pane, standalone, landscape, keyboard), a model of the zoom feedback loop (settles inline within 3 flips; the split pane never flips), pin release on a size change, the ordinary sequence closed → open → split → closed, and the magnet curve (hold, monotonic resistance, release and track, rubber band toward its own edge, mirrored on the left).
 
 Simulator, open posture: a slow pull of 40pt holds the strip within a few points; continued to x 300 it let go and switched to the left; a 52pt drag from the left and release sprang back. Recordings: `mag.mp4`, `spring.mp4` (scratchpad, not committed).
+
+## In-app Safari preview and settling after a fold (2026-10-26, issue #46)
+
+### In-app Safari preview (SFSafariViewController)
+
+Measured on the Duo Lab Preview simulator (iOS 27.1, closed portrait) with a small test host app that presents `SFSafariViewController` on a probe page (`viewport-fit=cover, shrink-to-fit=no`, as Duet sets). The UA is the same as a Safari tab's. Button rows measured from 3x screenshots.
+
+| State | inner | outer | inset bottom | Column signature (84 wide, 68 to 102 tall) |
+|---|---|---|---|---|
+| Preview, full screen, default and over-full-screen presentations | 382x603 | 466x678 | 34 | yes (84, 75) |
+| Preview, page sheet | 366x600 | 450x670 | 34 | yes (84, 70), the same window as windowed Safari |
+| Preview, landscape (angle 90 and 270) | 678x391 | 678x466 | 34 | no (width 0): bar above the page |
+| Safari tab, closed (after "Open in Safari", and a fresh tab) | 382x580 | 466x678 | 0 | yes (84, 98) |
+
+- The preview's column holds its own buttons: close 173.3 to 222.7, reader 233.3 to 282.7, back 427.3 to 476.7, and a share/reload/Safari pill 487.3 to 644.7 (157.3 tall, 33.3 above the screen bottom). Free between reader and back: ~122pt with a bare island, ~31pt with the Live Activities worst case (`DUO.island`). Too small to keep clear of reliably, so the preview goes `inline`, on the left by default.
+- This column (close, reader, share/reload/compass pill) is the "compact column state" from the 2026-10-24 report above that could not be reproduced in a tab: it was most likely the preview.
+- The window reads 466x678 at load with no column, then resizes to 382x603 about 0.1s later; `screen.*` read 375x667 on one launch and 466x678 on the next, so it is not used.
+- Detection (`isPreview`): not standalone, Safari, and either the older 375x667 window at 3x, or the closed screen's 466x678 window with the column signature, at most 77pt of chrome below the page and a bottom inset. A closed tab has 98pt (80 with the compact URL bar) and inset 0. Windowed Safari (453x661) and a compact split pane (385x594) also report inset 34 on device, so the inset alone is not enough; the window size and chrome height are.
+- Not told apart: a page-sheet preview reads exactly like windowed Safari at 450x670, so it still takes the column. The open posture preview was not measured (the simulator could not be unfolded from here).
+- "Open in Safari" on the simulator reloaded the page in a tab (load, then pageshow with persisted false), and the tab took the column. On device RegTail reports no reload; `watchSignals` re-reads on pageshow and visibilitychange for that case.
+
+### Settling after a fold (RegTail ask #8)
+
+Folding open to closed in a portrait Safari tab could leave the controls inline (rail centre 382 − 48.2) instead of in the column (466 − 48.2). The viewport lands first and `outerWidth` later, with no event when it does, and the old re-reads at 0, 300 and 600ms could miss it; flips while the column layer's first frames resize Safari could also pin inline. `watchSignals` now polls every 100ms after any geometry event until outer, inner and visual sizes hold for 500ms (a page more than 100pt narrower or wider than its window counts as mid-fold and keeps polling), capped at 2s, re-reading on each change and once at the end. `settling()` is true for that time and `stable()` does not count flips while it is. The simulator could not be folded from here, so the case is a synthetic timeline in `transitions.test.mjs` (URL bar expanded and compact, ending in column at 466x678).
