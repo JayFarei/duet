@@ -16,6 +16,11 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 /* The web Duo (app/duo/web-duo.tsx). */
 @keyframes wd-in { from { opacity: 0; } }
 @keyframes wd-slide { from { transform: translateX(var(--from)); } }
+/* "Try it yourself": a ring breathes out of the button, so the stage reads as something to play with. */
+@keyframes wd-try { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }
+[data-wd-try] { animation: wd-try 2.4s ease-out infinite; }
+[data-wd-try]:hover { transform: scale(1.03); }
+@media (prefers-reduced-motion: reduce) { [data-wd-try] { animation: none; } }
 [data-wd-callout] [data-wd-system] { outline: 1.5px dashed rgb(142 142 147); outline-offset: 2px; }
 
 /* The home page (app/home.tsx): one responsive page, Apple-style. Horizontal layout comes from duet-ui's column(). */
@@ -59,5 +64,25 @@ section[id] { scroll-margin-top: 24px; }
 html[data-duet-mode] .hero { padding-top: calc(clamp(40px, 9vw, 110px) + env(safe-area-inset-top)); }
 html[data-duet-mode] .foot { padding-bottom: 140px; }
 
+/* A portrait iPhone (Bars in app/home.tsx): a top bar and a tab bar of glass over a page that scrolls under them. */
+.bar-glass { background: color-mix(in srgb, var(--card) 70%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); box-shadow: 0 0 0 0.5px var(--line), 0 6px 20px rgb(0 0 0 / 0.08); color: var(--ink); border: 0; border-radius: 99px; }
+.bar-top { position: fixed; z-index: 50; top: max(12px, env(safe-area-inset-top)); left: 16px; right: 16px; display: flex; justify-content: space-between; pointer-events: none; }
+.bar-top > * { pointer-events: auto; }
+/* iOS's scroll-edge effect: the page blurs and fades under the status bar and the top bar. */
+.bars::before { content: ""; position: fixed; z-index: 49; top: 0; left: 0; right: 0; height: calc(max(12px, env(safe-area-inset-top)) + 64px); pointer-events: none; background: linear-gradient(var(--bg) 30%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); -webkit-mask-image: linear-gradient(#000 50%, transparent); mask-image: linear-gradient(#000 50%, transparent); }
+.bar-round { display: grid; place-items: center; width: 44px; height: 44px; }
+.bar-try { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; font: 600 15px/1 -apple-system, system-ui; cursor: pointer; }
+.bar-tabs { position: fixed; z-index: 50; bottom: calc(10px + env(safe-area-inset-bottom)); left: 50%; translate: -50% 0; display: flex; padding: 4px; }
+.bar-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 84px; height: 54px; border: 0; border-radius: 99px; background: none; color: var(--ink); font: 600 10px/1 -apple-system, system-ui; cursor: pointer; transition: background 0.2s, color 0.2s; }
+.bar-tab svg { width: 24px; height: 24px; }
+.bar-tab[data-on] { color: #007aff; background: rgb(120 120 128 / 0.14); }
+.bars .hero { padding-top: calc(max(12px, env(safe-area-inset-top)) + 72px); }
+.bars .foot { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+
 /* A server-rendered phone page, hidden on desktops until the web Duo replaces it (same query as useDesktop). */
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) { .ssr-site { visibility: hidden; } }
+
+/* The emulator's device corners: superellipse radii where corner-shape is supported, circles elsewhere. */
+@supports (corner-shape: squircle) {
+  [data-wd-shape] { border-radius: var(--wd-r) !important; }
+}

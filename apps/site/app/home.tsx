@@ -1,8 +1,8 @@
 "use client";
 
-import { Fragment, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { BookOpen, Layers, Sparkles } from "lucide-react";
-import { Duet, DuoCookie, bleed, column, type DuetItem } from "duet-ui";
+import { Fragment, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { BookOpen, Layers, PanelBottom, PanelRight, Sparkles } from "lucide-react";
+import { Duet, DuoCookie, bleed, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { WebDuo } from "./duo/web-duo";
 
@@ -40,15 +40,58 @@ export function Home({ duo }: { duo: boolean }) {
 
 function Site({ self }: { self: boolean }) {
   const [tab, setTab] = useState("top");
+  // A portrait iPhone gets an iPhone's bars, with a button to try the Duo's side controls on it.
+  const { device, width, height } = useDuet();
+  const [sides, setSides] = useState(false);
   const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
+  if (device === "iphone" && height > width && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} />;
   return (
     <Duet
       tabs={{ items: SECTIONS, selected: tab, onSelect: go }}
-      actions={[{ id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") }]}
+      actions={[
+        { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
+        ...(device === "iphone" ? [{ id: "bars", label: "Top and bottom bars", icon: <PanelBottom size={22} />, onPress: () => setSides(false) }] : []),
+      ]}
       minimizeOnScroll
     >
       <Page self={self} />
     </Duet>
+  );
+}
+
+/** The page as an iPhone app would show it: actions in a top bar, sections in a tab bar at the bottom. The document
+ *  itself scrolls, so the page runs on under Safari's toolbar. */
+function Bars({ tab, setTab, go, onSides }: { tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void }) {
+  useEffect(() => {
+    // Duet leaves its insets on <html> when it steps aside; here nothing floats beside the page.
+    const html = document.documentElement;
+    for (const k of ["inset-left", "inset-right", "edge-left", "edge-right", "inset-top", "inset-bottom"]) html.style.removeProperty(`--duet-${k}`);
+    delete html.dataset.duetMode;
+    // The tab follows the section in view.
+    const f = () => {
+      let at = SECTIONS[0].id;
+      for (const s of SECTIONS) if ((document.getElementById(s.id)?.getBoundingClientRect().top ?? 1e9) < innerHeight * 0.4) at = s.id;
+      setTab(at);
+    };
+    f();
+    addEventListener("scroll", f, { passive: true });
+    return () => removeEventListener("scroll", f);
+  }, [setTab]);
+  return (
+    <div className="bars">
+      <Page />
+      <div className="bar-top">
+        <button className="bar-glass bar-try" onClick={onSides}><PanelRight size={18} />Side controls</button>
+        <a className="bar-glass bar-round" href={REPO} target="_blank" rel="noreferrer" aria-label="GitHub"><GitHub /></a>
+      </div>
+      <nav className="bar-glass bar-tabs" role="tablist">
+        {SECTIONS.map((s) => (
+          <button key={s.id} role="tab" aria-selected={s.id === tab} data-on={s.id === tab || undefined} className="bar-tab" onClick={() => go(s.id)}>
+            {s.icon}<span>{s.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
   );
 }
 

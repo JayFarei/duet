@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Activity, ArrowLeftRight, Highlighter, Pause, Play, RotateCw, Snail } from "lucide-react";
+import { Activity, ArrowLeftRight, Highlighter, Pause, Play, Pointer, RotateCw, Snail } from "lucide-react";
 import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui/geometry";
 
 // A web iPhone Duo for desktop browsers: the site runs in an iframe shaped like the device's screen, and the
@@ -22,11 +22,25 @@ const SCREEN = { closed: { w: 466, h: 678 }, open: { w: 951, h: 669 } };
 // A graphite finish around a black front: the site stays colourless.
 const FINISH = { band: "#3a3a3c", rim: "#6e6e73", front: "#0b0c10", button: "linear-gradient(#6e6e73, #2c2c2e)" };
 const BODY_SHADE = `inset 0 0 0 1.5px ${FINISH.rim}, inset 0 0 0 3.5px ${FINISH.band}`;
-// Closed: hinge spine on the left (26pt), free edge on the right. Open: 13pt sides, both free edges.
+// Corners fitted to Apple's iPhone Duo simulator artwork (body and screen masks): a superellipse of radius `r` and
+// CSS corner-shape `k` (1 is a circle), and the closest circle where corner-shape is unsupported.
+interface Corner { r: number; k: number; round: number }
+const C = {
+  free: { r: 103.5, k: 1.6, round: 75 }, hinge: { r: 40, k: 2.25, round: 30 }, // the body: free edge, hinge spine
+  screen: { r: 74.5, k: 1.4, round: 60.5 }, inner: { r: 67.5, k: 1.4, round: 55 }, // outer and inner display
+  spine: { r: 9, k: 1, round: 9 }, none: { r: 0, k: 1, round: 0 },
+} satisfies Record<string, Corner>;
+// Closed: hinge spine on the left (26pt), free edge on the right (13pt). Open: 13pt sides, both free edges.
+// Corners run top left, top right, bottom right, bottom left.
 const BODY = {
-  closed: { w: 514, h: 706, x: 26, y: 14, r: "22px 72px 72px 22px", screenR: "9px 56.5px 56.5px 9px" },
-  open: { w: 977, h: 697, x: 13, y: 14, r: "72px", screenR: "56.5px" },
+  closed: { w: 505, h: 706, x: 26, y: 14, r: [C.hinge, C.free, C.free, C.hinge], screenR: [C.spine, C.screen, C.screen, C.spine] },
+  open: { w: 977, h: 697, x: 13, y: 14, r: [C.free, C.free, C.free, C.free], screenR: [C.inner, C.inner, C.inner, C.inner] },
 };
+/** Corners as the device draws them, for an element marked `data-wd-shape`: site.css swaps in the superellipse
+ *  radii where corner-shape works, and other browsers keep the closest circle. */
+const corners = (c: Corner[]) => ({
+  borderRadius: c.map((x) => `${x.round}px`).join(" "), "--wd-r": c.map((x) => `${x.r}px`).join(" "), cornerShape: c.map((x) => `superellipse(${x.k})`).join(" "),
+}) as CSSProperties;
 // Volume on top and power on the right, relative to the free edge (body right).
 const BUTTONS = [{ right: 271, top: -4, w: 66, h: 6 }, { right: 191, top: -4, w: 66, h: 6 }, { right: -3, top: 196, w: 5, h: 113 }];
 // Outer display camera, screen coordinates in natural portrait (seen in recordings at the top of the strip).
@@ -101,7 +115,7 @@ function scene(s: State, W: number, H: number, host: string, live: boolean, mode
     const strip = W < H ? s.posture === "closed" : s.posture === "open"; // natural orientation only
     const signals = sig(full, full, { insetRight: strip ? STRIP : 0, standalone: true });
     return strip
-      ? { clip: screen, frame: screen, signals, mode: modeOf(signals), chrome: <Status x={W - DUO.centerFromEdge} top={(s.posture === "closed" ? 74 : 26) + push} />,
+      ? { clip: screen, frame: screen, signals, mode: modeOf(signals), chrome: <Status x={W - DUO.centerFromEdge} top={(s.posture === "closed" ? 84 : 26) + push} />,
           note: "Added to the Home Screen, the app owns the display and iOS gives it the strip. Duet draws its controls there, like a native app." }
       : { clip: screen, frame: screen, signals, mode: modeOf(signals), chrome: null,
           note: "Turned sideways there is no strip, so Duet keeps an 84pt one inside the page. Drag it to the other edge; it remembers." };
@@ -143,7 +157,7 @@ function scene(s: State, W: number, H: number, host: string, live: boolean, mode
   if (s.posture === "closed") {
     const portrait = W < H, page = portrait ? TAB.page : { w: W - STRIP, h: H - 98 };
     const signals = sig(page, full, { screen: safariScreen(page) }), mode = modeOf(signals);
-    const w = safariWindow({ win: screen, page, col: "right", back: portrait ? DUO.top + push : 62, clock: portrait ? 74 + push : 24, host, mode });
+    const w = safariWindow({ win: screen, page, col: "right", back: portrait ? DUO.top + push : 62, clock: portrait ? 84 + push : 24, host, mode });
     return {
       ...w, signals, mode,
       note: portrait
@@ -179,8 +193,20 @@ const fit = (s: State): State => {
   return !only ? s : s.posture === only && !s.rotated ? s : { ...s, app: "safari" };
 };
 
+const LIVE_NOTE = " Live Activities grow the Dynamic Island down the strip without telling the page, so Duet's controls always sit below its tallest size.";
+/** Every caption the stage can show, rendered invisibly under the real one so the text below never moves.
+ *  Built on first use: `scene` needs the styles defined further down. */
+let notes: string[] | undefined;
+const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => [false, true].flatMap((rotated) =>
+  (["home", "safari", "split", "window", "preview"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
+    (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
+      const n = SCREEN[posture], [W, H] = rotated ? [n.h, n.w] : [n.w, n.h];
+      const sc = scene(fit({ posture, rotated, app, pane }), W, H, "", live, () => m);
+      return `${m}|${sc.note}${live && posture === "closed" ? LIVE_NOTE : ""}`;
+    })))))))];
+
 /** embed: a stage inside a page, sized to its container, touring on its own while on screen. Its controls stay
- *  hidden behind "Take control", which stops the tour. Otherwise a full-window playground. */
+ *  hidden behind "Try it yourself", which stops the tour. Otherwise a full-window playground. */
 export function WebDuo({ src: first, sources, title = "Duet", intro = "This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly.", embed = false }: { src: string; sources?: [string, string][]; title?: string; intro?: string; embed?: boolean }) {
   const [src, setSrc] = useState(first);
   const [s, setS] = useState<State>(TOUR[0]);
@@ -207,7 +233,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   k.current = slow ? 4 : 1;
   const turn = TURN * k.current;
   const frame = useRef<HTMLIFrameElement>(null);
-  const page = useRef<HTMLDivElement>(null), hinge = useRef<HTMLDivElement>(null), flap = useRef<HTMLDivElement>(null);
+  const page = useRef<HTMLDivElement>(null), hinge = useRef<HTMLDivElement>(null), flap = useRef<HTMLDivElement>(null), shadow = useRef<HTMLDivElement>(null);
   const cur = useRef(s), busy = useRef(false);
   cur.current = s;
   const host = useSyncExternalStore(() => () => {}, () => location.host, () => "");
@@ -219,9 +245,13 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const o = { duration: FOLD * k.current, easing, fill: "both" as const };
     const [a, b] = open ? [0, 1] : [1, 0];
     const shift = (t: number) => `translateX(${-(1 - t) * BODY.open.w / 4}px)`;
+    // The drop shadow follows the device's footprint: the right half, plus the flap's reach left of the hinge.
+    const half = BODY.open.w / 2, reach = (t: number) => `${half * (1 - Math.max(0, Math.cos(Math.PI * (1 - t))))}px`;
+    const steps = Array.from({ length: 25 }, (_, i) => a + (b - a) * i / 24);
     return [
       hinge.current?.animate([{ transform: shift(a) }, { transform: shift(b) }], o),
       flap.current?.animate([{ transform: `rotateY(${180 * (1 - a)}deg)` }, { transform: `rotateY(${180 * (1 - b)}deg)` }], o),
+      shadow.current?.animate(steps.map((t) => ({ left: reach(t) })), o),
     ].filter((x): x is Animation => !!x);
   };
   const finished = (as: Animation[]) => Promise.all(as.map((a) => a.finished)).catch(() => {});
@@ -242,7 +272,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       flushSync(() => { setFolding(true); if (open) setS(n); });
       await finished(swing(open));
       flushSync(() => { if (!open) setS(n); setFolding(false); });
-      hinge.current?.getAnimations().forEach((a) => a.cancel());
+      hinge.current?.getAnimations({ subtree: true }).forEach((a) => a.cancel());
     } else setS(n);
     busy.current = false;
     await fade?.catch(() => {});
@@ -383,13 +413,15 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
           transition: `transform ${turn}ms ${ease}`,
         }}>
         <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: 2600 }}>
+        {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned. */}
+        <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${s.rotated ? "40px 0" : "0 40px"} 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
         <div style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
-          <div style={{
-            position: "absolute", inset: 0, borderRadius: b.r, cornerShape: "squircle", background: FINISH.front,
-            boxShadow: `${BODY_SHADE}, 0 40px 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}`,
-          } as CSSProperties} />
-          <div data-wd-screen style={{ position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, borderRadius: b.screenR, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
+          <div data-wd-shape style={{
+            ...corners(b.r), position: "absolute", inset: 0, background: FINISH.front,
+            boxShadow: BODY_SHADE, transition: `border-radius ${turn}ms ${ease}`,
+          }} />
+          <div data-wd-shape data-wd-screen style={{ ...corners(b.screenR), position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
             {/* The page, upright for the user: counter-turned when the device is turned. */}
             <div style={{
               position: "absolute", left: 0, top: 0, width: W, height: H, transformOrigin: "0 0",
@@ -419,10 +451,16 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       </div>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", padding: "0 16px", maxWidth: 1100, order: embed ? 1 : undefined }}>
-        {embed && !manual ? (
-          <button onClick={() => { setManual(true); setTour(false); }} style={{ ...control, padding: "0 16px", background: "transparent", color: "var(--dim)" }}>Take control</button>
-        ) : embed ? <>
+      {/* Embedded, the button and the controls it reveals share one grid cell, so swapping them moves nothing below. */}
+      <div style={{ display: "grid", justifyItems: "center", alignItems: "center", order: embed ? 1 : undefined }}>
+      {embed && (
+        <button onClick={() => { setManual(true); setTour(false); }} data-wd-try aria-hidden={manual || undefined} tabIndex={manual ? -1 : undefined}
+          style={{ ...control, gridArea: "1/1", visibility: manual ? "hidden" : undefined, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
+          <Pointer size={18} strokeWidth={2.2} />Try it yourself
+        </button>
+      )}
+      <div aria-hidden={(embed && !manual) || undefined} style={{ gridArea: "1/1", visibility: embed && !manual ? "hidden" : undefined, display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", padding: "0 16px", maxWidth: 1100 }}>
+        {embed ? <>
         <Segmented value={s.posture} onChange={(posture) => go({ posture })} options={[["closed", "Closed"], ["open", "Open"]]} />
         <Segmented value={s.app} onChange={(app) => go({ app })} options={[["home", "Home"], ["safari", "Safari"], ["split", "Split"], ["window", "Window"]]} />
         <Button onClick={() => go({ rotated: !s.rotated })} label="Rotate"><RotateCw size={17} /></Button>
@@ -445,9 +483,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         <Button onClick={() => setTour((t) => !t)} label={tour ? "Pause" : "Tour"} on={tour}>{tour ? <Pause size={17} /> : <Play size={17} />}</Button>
         </>}
       </div>
-      <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, minHeight: 44, textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
-        <b style={{ color: "var(--ink)", textTransform: "capitalize" }}>{sc.mode} mode.</b> {sc.note}
-        {live && s.posture === "closed" && " Live Activities grow the Dynamic Island down the strip without telling the page, so Duet's controls always sit below its tallest size."}
+      </div>
+      <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
+        <Note mode={sc.mode} text={sc.note + (live && s.posture === "closed" ? LIVE_NOTE : "")} />
+        {allNotes().map((n) => { const [m, t] = n.split("|"); return <Note key={n} mode={m} text={t} hidden />; })}
       </p>
       {slots && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", justifyContent: "center", maxWidth: 640, padding: "0 16px", font: "500 13px -apple-system, system-ui", color: "var(--dim)" }}>
@@ -462,18 +501,26 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
 /** The left half of the open body, for the fold: its inner face is the inner display's left half, its outer face
  *  the outer display (hinge on the left once it lies over the right half, as on the closed device). */
+function Note({ mode, text, hidden }: { mode: string; text: string; hidden?: boolean }) {
+  return (
+    <span aria-hidden={hidden || undefined} style={{ gridArea: "1/1", visibility: hidden ? "hidden" : undefined }}>
+      <b style={{ color: "var(--ink)", textTransform: "capitalize" }}>{mode} mode.</b> {text}
+    </span>
+  );
+}
+
 function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const half = BODY.open.w / 2, face: CSSProperties = { position: "absolute", inset: 0, backfaceVisibility: "hidden", background: FINISH.front, boxShadow: BODY_SHADE };
   // A soft sheen across each face, so the swinging half reads against a dark page.
-  const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" }} />;
+  const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", cornerShape: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" } as CSSProperties} />;
   return (
     <div ref={ref} style={{ position: "absolute", left: 0, top: 0, width: half, height: BODY.open.h, transformOrigin: "100% 50%", transformStyle: "preserve-3d", transform: "rotateY(180deg)" }}>
-      <div style={{ ...face, borderRadius: "72px 0 0 72px" }}>
-        <div style={{ position: "absolute", left: BODY.open.x, top: BODY.open.y, right: 0, bottom: BODY.open.y, borderRadius: "56.5px 0 0 56.5px", background: "var(--bg)" }} />
+      <div data-wd-shape style={{ ...face, ...corners([C.free, C.none, C.none, C.free]) }}>
+        <div data-wd-shape style={{ position: "absolute", left: BODY.open.x, top: BODY.open.y, right: 0, bottom: BODY.open.y, ...corners([C.inner, C.none, C.none, C.inner]), background: "var(--bg)" }} />
         {sheen}
       </div>
-      <div style={{ ...face, transform: "rotateY(180deg)", borderRadius: BODY.closed.r }}>
-        <div style={{ position: "absolute", left: BODY.closed.x, top: BODY.open.y, right: BODY.open.y, bottom: BODY.open.y, borderRadius: BODY.closed.screenR, background: "var(--bg)" }} />
+      <div data-wd-shape style={{ ...face, transform: "rotateY(180deg)", ...corners(BODY.closed.r) }}>
+        <div data-wd-shape style={{ position: "absolute", left: BODY.closed.x, top: BODY.open.y, right: 13, bottom: BODY.open.y, ...corners(BODY.closed.screenR), background: "var(--bg)" }} />
         {sheen}
       </div>
     </div>
@@ -504,13 +551,34 @@ function Island({ live }: { live: boolean }) {
   );
 }
 
-/** The strip's clock and status, under the camera. */
+/** iOS's clock and status as the Duo draws them in the strip and in Safari's column (Duo simulator, 3x captures):
+ *  the clock over the battery ring. They never slide: when the Island pushes them down they just sit lower. */
 function Status({ x, top }: { x: number; top: number }) {
   return (
-    <div data-wd-system style={{ position: "absolute", left: x - 40, top, width: 80, textAlign: "center", color: "var(--ink)", pointerEvents: "none", transition: `top ${MOVE}ms ${ease}` }}>
-      <div style={{ font: "600 17px -apple-system, system-ui" }}>9:41</div>
-      <Glyph d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" style={{ marginTop: 6 }} />
+    <div data-wd-system style={{ position: "absolute", left: x - 40, top, width: 80, display: "grid", justifyItems: "center", gap: 3, color: "var(--ink)", pointerEvents: "none" }}>
+      <Clock /><Battery />
     </div>
+  );
+}
+
+function Clock() {
+  return <div style={{ font: "700 15px/16px -apple-system, system-ui", fontVariantNumeric: "tabular-nums" }}>09:41</div>;
+}
+
+/** The battery ring, charging (green, bolt in its top gap), wifi inside, the four signal dots just under its bottom gap.
+ *  44pt wide, the ring's centre 25pt from the top. */
+function Battery() {
+  const R = 19.2, at = (deg: number, r = R) => { const a = (deg * Math.PI) / 180; return [22 + r * Math.sin(a), 22 - r * Math.cos(a)].map((v) => +v.toFixed(2)); };
+  const arc = (from: number, to: number, r = R) => `M${at(from, r).join(" ")}A${r} ${r} 0 0 1 ${at(to, r).join(" ")}`;
+  const wifi = (r: number) => { const [x0, y0] = [22 - r * Math.SQRT1_2, 29.5 - r * Math.SQRT1_2].map((v) => +v.toFixed(2)); return `M${x0} ${y0}A${r} ${r} 0 0 1 ${44 - x0} ${y0}`; };
+  return (
+    <svg width={44} height={50} viewBox="0 -3 44 50" style={{ display: "block", overflow: "visible" }}>
+      <path d={`${arc(20, 129)}${arc(231, 340)}`} fill="none" stroke="#30d158" strokeWidth={2.4} strokeLinecap="round" />
+      <path d="M23.6 2 19.4 7H22l-1.4 3 4.2-5h-2.6z" fill="#8e8e93" />
+      <path d={`${wifi(11.2)}${wifi(6.9)}`} fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" />
+      <path d="M22 30.4 19.4 27.8a3.7 3.7 0 0 1 5.2 0z" fill="currentColor" stroke="currentColor" strokeWidth={1} strokeLinejoin="round" />
+      {[-26.7, -9.3, 9.3, 26.7].map((d) => { const [cx, cy] = at(180 + d, 22.7); return <circle key={d} cx={cx} cy={cy} r={2.2} fill="currentColor" />; })}
+    </svg>
   );
 }
 
@@ -521,7 +589,7 @@ function SafariColumn({ x, h, col, back, clock, over }: { x: number; h: number; 
   const cx = col === "right" ? STRIP - DUO.centerFromEdge : DUO.centerFromEdge, at = (top: number): CSSProperties => ({ position: "absolute", left: cx - DUO.control / 2, top, transition: `top ${MOVE}ms ${ease}` });
   return (
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
-      {clock !== undefined && <div style={{ position: "absolute", left: cx - 40, width: 80, top: clock, textAlign: "center", font: "600 17px -apple-system, system-ui", transition: `top ${MOVE}ms ${ease}` }}>9:41</div>}
+      {clock !== undefined && <Status x={cx} top={clock} />}
       <div data-wd-system style={{ ...circle, ...at(back) }}><Glyph d="m15 18-6-6 6-6" /></div>
       <div data-wd-system style={{ ...circle, ...at(back + DUO.control + DUO.gap) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
       <div data-wd-system style={{ ...glass, ...at(h - DUO.bottom - SAFARI.pill), width: DUO.control, height: SAFARI.pill, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
@@ -555,15 +623,23 @@ function UrlBar({ left, top, width, host }: { left: number; top: number; width: 
   return <div data-wd-system style={{ position: "absolute", left, top, width, height: 46, borderRadius: 99, ...glass, display: "flex", alignItems: "center", justifyContent: "center", font: "500 17px -apple-system, system-ui", color: "var(--ink)", pointerEvents: "none" }}>{host}</div>;
 }
 
-/** Safari unfolded: status row, then the toolbar with the address field. */
+/** Safari unfolded (Duo simulator): back and bookmarks, the address field centred, the +/tabs pill, then the clock
+ *  and battery at the end of the row; the tab bar under it. */
 function OpenSafari({ w, host }: { w: number; host: string }) {
+  const at = (left: number, width = 44): CSSProperties => ({ ...circle, position: "absolute", left, top: 24, width, height: 44 });
   return (
-    <div data-wd-system style={{ position: "absolute", left: 0, top: 0, width: w, height: OPEN_BAR, background: "var(--card)", borderBottom: "0.5px solid var(--line)", color: "var(--ink)", pointerEvents: "none" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", padding: "14px 40px 0", font: "600 15px -apple-system, system-ui" }}><span>9:41</span><span>100%</span></div>
-      <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "18px 28px 0" }}>
-        <Glyph d="m15 18-6-6 6-6" /><Glyph d="m9 18 6-6-6-6" style={{ opacity: 0.35 }} />
-        <div style={{ flex: 1, height: 40, borderRadius: 12, background: "var(--bg)", display: "grid", placeItems: "center", font: "500 16px -apple-system, system-ui" }}>{host}</div>
-        <Glyph d="M5 12h14M12 5v14" /><Glyph d="M8 8h12v12H8zM4 16V4h12" />
+    <div style={{ position: "absolute", left: 0, top: 0, width: w, height: OPEN_BAR, background: "var(--card)", borderBottom: "0.5px solid var(--line)", color: "var(--ink)", pointerEvents: "none" }}>
+      <div data-wd-system style={at(20)}><Glyph d="m15 18-6-6 6-6" style={{ opacity: 0.35 }} /></div>
+      <div data-wd-system style={at(75)}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
+      <UrlBar left={(w - 356) / 2} top={23} width={356} host={host} />
+      <div data-wd-system style={{ ...at(w - 235, 109), display: "flex", justifyContent: "space-evenly", alignItems: "center" }}>
+        <Glyph d="M5 12h14M12 5v14" style={{ margin: 0 }} /><Glyph d="M8 8h12v12H8zM4 16V4h12" style={{ margin: 0 }} />
+      </div>
+      <div data-wd-system style={{ position: "absolute", right: 30, top: 21, display: "flex", alignItems: "center", gap: 11 }}><Clock /><Battery /></div>
+      <div data-wd-system style={{ position: "absolute", left: 20, right: 20, top: 80, height: 33, borderRadius: 99, background: "var(--bg)", display: "flex", alignItems: "center", padding: 2, gap: 2, font: "500 13px -apple-system, system-ui" }}>
+        {["Duo Lab", "Duo Lab", "Duet"].map((t, i, all) => (
+          <div key={i} style={{ flex: 1, height: "100%", borderRadius: 99, display: "grid", placeItems: "center", ...(i === all.length - 1 && { ...glass, flex: 1.4 }) }}>{t}</div>
+        ))}
       </div>
     </div>
   );
