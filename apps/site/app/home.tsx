@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { BookOpen, Layers, Moon, PanelBottom, PanelRight, Sparkles, Sun } from "lucide-react";
-import { Duet, DuoCookie, bleed, column, useDuet, type DuetItem } from "duet-ui";
+import { Duet, DuoCookie, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { WebDuo } from "./duo/web-duo";
 import { useTheme } from "./theme";
@@ -116,7 +116,7 @@ function Page({ self = false }: { self?: boolean }) {
         </div>
       </section>
 
-      <section className="stage" style={bleed(16)}>
+      <section className="stage">
         {self ? (
           <div style={{ ...column(980, 20), width: "100%" }}>
             <div className="card self">

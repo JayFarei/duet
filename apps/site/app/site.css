@@ -48,6 +48,14 @@ section[id] { scroll-margin-top: 24px; }
 
 .hero { text-align: center; padding: clamp(40px, 9vw, 110px) 0 28px; }
 .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: clamp(48px, 8vw, 100px); }
+/* The stage centres where the hero's column(980, 20) does (duet-ui layout.ts), so device and title share one axis: --c2 is twice that column's centre. Each side keeps 16px clear of Duet's controls, and the side away from them gives up room to stay on the axis. */
+.stage {
+  --l: var(--duet-inset-left, 0px); --r: var(--duet-inset-right, 0px);
+  --w: min(980px, 100% - var(--l) - var(--r) - 40px);
+  --c2: calc(2 * clamp(var(--l) + 20px, (100% - var(--w)) / 2, 100% - var(--r) - 20px - var(--w)) + var(--w));
+  padding-left: max(16px + var(--l), var(--c2) - 100% + 16px + var(--r));
+  padding-right: max(16px + var(--r), 100% - var(--c2) + 16px + var(--l));
+}
 .section { padding: clamp(64px, 10vw, 128px) 0 0; }
 
 .card { background: var(--card); border-radius: 22px; }
