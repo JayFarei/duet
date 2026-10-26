@@ -1,0 +1,5 @@
+host/build/
+host/*.xcodeproj/
+host/Host/Info.plist
+reports/
+.venv/

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif } from "next/font/google";
 import "./site.css";
+import { E2EReporter } from "./e2e-reporter";
 
 // Headings only: a high-contrast serif against the system sans of the text.
 const serif = Instrument_Serif({ weight: "400", style: ["normal", "italic"], subsets: ["latin"], variable: "--serif" });
@@ -18,7 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={serif.variable} suppressHydrationWarning>
       {/* The visitor's light/dark pick (theme.ts), on <html> before first paint. */}
       <head><script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("duet-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-lg-theme",t)}catch(e){}` }} /></head>
-      <body>{children}</body>
+      <body>{children}<E2EReporter /></body>
     </html>
   );
 }
