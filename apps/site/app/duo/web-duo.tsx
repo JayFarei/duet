@@ -57,6 +57,7 @@ const ease = "cubic-bezier(0.32, 0.72, 0, 1)";
 const TURN = 650; // rotation, ms
 const FOLD = 900;
 const MOVE = 520; // the page frame moving between apps
+const HOLD = 1600; // the tour's pause at each stop, once settled
 
 interface Box { x: number; y: number; w: number; h: number }
 interface Size { w: number; h: number }
@@ -316,9 +317,17 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
   useEffect(() => {
     if (!tour || !onScreen) return;
-    let i = TOUR.findIndex((t) => JSON.stringify(t) === JSON.stringify(s));
-    const t = setInterval(() => { i = (i + 1) % TOUR.length; go(TOUR[i], true); }, 3600);
-    return () => clearInterval(t);
+    // Each stop holds for HOLD once the device has settled, however long the move there took.
+    let i = TOUR.findIndex((t) => JSON.stringify(t) === JSON.stringify(s)), t = 0, on = true;
+    const next = () => { t = window.setTimeout(async () => {
+      i = (i + 1) % TOUR.length;
+      const start = performance.now();
+      await go(TOUR[i], true);
+      if (!on) return;
+      t = window.setTimeout(next, Math.max(0, MOVE * k.current - (performance.now() - start))); // an app change only slides
+    }, HOLD); };
+    next();
+    return () => { on = false; clearTimeout(t); };
   }, [tour, onScreen]); // eslint-disable-line react-hooks/exhaustive-deps -- the tour starts from the current state
 
   useEffect(() => {
@@ -409,7 +418,8 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
           transform: `translate(-50%, -50%) scale(${scale}) rotate(${s.rotated ? 90 : 0}deg)`,
           transition: `transform ${turn}ms ${ease}`,
         }}>
-        <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: 2600 }}>
+        {/* Perspective only while the flap swings: left on, Chrome rasterizes the scaled device at full size and it reads blurry. */}
+        <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: folding ? 2600 : undefined }}>
         {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned. */}
         <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${s.rotated ? "40px 0" : "0 40px"} 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
         <div style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
