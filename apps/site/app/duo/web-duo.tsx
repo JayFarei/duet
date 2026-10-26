@@ -49,6 +49,8 @@ const BODY = {
   closed: { w: 505, h: 706, x: 26, y: 14, r: [C.hinge, C.free, C.free, C.hinge], screenR: [C.spine, C.screen, C.screen, C.spine] },
   open: { w: 977, h: 697, x: 13, y: 14, r: [C.free, C.free, C.free, C.free], screenR: [C.inner, C.inner, C.inner, C.inner] },
 };
+// The folding assembly is the right half of the open body; closed, the device is a little larger (its spine).
+const GROW = { x: BODY.closed.w / (BODY.open.w / 2), y: BODY.closed.h / BODY.open.h };
 /** Corners as the device draws them, for an element marked `data-wd-shape`: site.css swaps in the superellipse
  *  radii where corner-shape works, and other browsers keep the closest circle. */
 const corners = (c: Corner[]) => ({
@@ -71,7 +73,11 @@ const PANE = { w: 469, page: { w: 385, h: 571 } }; // a split-view pane, either 
 const WINDOW = { w: 451, h: 666, page: { w: 369, h: 591 } }; // a window beside the Home Screen (device: 450-453 x 661-670)
 
 const ease = "cubic-bezier(0.32, 0.72, 0, 1)";
-const TURN = 650; // rotation, ms
+// The turn runs on a near-critical spring (SETTLE): it leaves rest with no jolt, carries its weight through the
+// middle and lands with a degree of give. The interface swaps to the new orientation SWAP of the way in, when the
+// device is all but round and the page is fully soft, and sharpens once Duet has laid out (REFLOW ms later).
+const TURN = 800; // rotation, ms
+const SWAP = 0.5, REFLOW = 160;
 const FOLD = 900;
 const MOVE = 520; // the page frame moving between apps
 // While the device folds or turns the page never blanks, like iOS on the Duo: it starts to blur and dim (VEIL ms), the
@@ -82,6 +88,7 @@ const EDGE = 24; // the folding half's thickness, as the device's ~5mm at its sc
 const SWING = "cubic-bezier(0.45, 0, 0.2, 1)"; // the fold, eased both ends so the swing reads
 const smooth = (a: number, b: number, t: number) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
 const HOLD = 1600; // the tour's pause at each stop, once settled
+const REDUCE = "(prefers-reduced-motion: reduce)";
 
 interface Box { x: number; y: number; w: number; h: number }
 interface Size { w: number; h: number }
@@ -294,6 +301,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   // A fold or turn is in flight: the page is faded out and its frame jumps instead of animating.
   const [instant, setInstant] = useState(false);
   const [folding, setFolding] = useState(false);
+  // Live Activities drawing back into the camera before the device unfolds.
+  const [retract, setRetract] = useState(false);
+  // The reader asked for less motion: folds and turns cross-fade instead of moving.
+  const calm = useSyncExternalStore((f) => { const m = matchMedia(REDUCE); m.addEventListener("change", f); return () => m.removeEventListener("change", f); }, () => matchMedia(REDUCE).matches, () => false);
   // The posture the stage is sized for: the one a fold is heading to, so the stage settles with the swing, not after it.
   const [shape, setShape] = useState<Posture | null>(null);
   const [tour, setTour] = useState(false);
@@ -332,9 +343,16 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const swing = (open: boolean, easing = SWING) => {
     const o = { duration: FOLD * k.current, easing, fill: "both" as const };
     const [a, b] = open ? [0, 1] : [1, 0];
-    const shift = (t: number) => `translateX(${-(1 - t) * BODY.open.w / 4}px)`;
+    // The recentring follows the flap's footprint, cos of its angle, so the device comes to rest as the flap lands
+    // instead of sliding on. Folded, the swinging assembly (half the open body) grows to the closed body's size, so
+    // neither end of the swing changes the device's size.
+    const shift = (t: number) => {
+      const c = (1 - Math.cos(Math.PI * (1 - t))) / 2, u = smooth(0, 1, t);
+      return `translateX(${-c * BODY.open.w / 4}px) scale(${1 + (1 - u) * (GROW.x - 1)}, ${1 + (1 - u) * (GROW.y - 1)})`;
+    };
     // The drop shadow follows the device's footprint: the right half, plus the flap's reach left of the hinge.
-    const half = BODY.open.w / 2, reach = (t: number) => `${half * (1 - Math.max(0, Math.cos(Math.PI * (1 - t))))}px`;
+    // A scale from its right edge, so it stays on the compositor.
+    const half = BODY.open.w / 2, reach = (t: number) => `scaleX(${0.5 + 0.5 * Math.max(0, Math.cos(Math.PI * (1 - t)))})`;
     const steps = Array.from({ length: 25 }, (_, i) => a + (b - a) * i / 24);
     // Near flat, each face of the flap turns clear and the page shows through it, so content flows from screen to
     // screen with no flat panel popping in: the outer display at the closed end, the inner screen at the open end.
@@ -363,9 +381,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       fold.current?.animate(steps.map((t) => ({ clipPath: `inset(-40px -40px -40px ${edge(t)}px)` })), o),
       // The half that stays put shades towards the hinge while the other half stands over it.
       crease.current?.animate(steps.map((t) => ({ opacity: 0.45 * Math.sin(Math.PI * t) })), o),
-      hinge.current?.animate([{ transform: shift(a) }, { transform: shift(b) }], o),
+      hinge.current?.animate(steps.map((t) => ({ transform: shift(t) })), o),
       flap.current?.animate([{ transform: `rotateY(${180 * (1 - a)}deg)` }, { transform: `rotateY(${180 * (1 - b)}deg)` }], o),
-      shadow.current?.animate(steps.map((t) => ({ left: reach(t) })), o),
+      shadow.current?.animate(steps.map((t) => ({ transform: reach(t) })), o),
     ].filter((x): x is Animation => !!x);
   };
   const finished = (as: Animation[]) => Promise.all(as.map((a) => a.finished)).catch(() => {});
@@ -388,11 +406,12 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     Object.assign(c.style, { position: "absolute", left: "0", top: "0", filter: `blur(${BLUR_PX}px)`, width: face ? "100%" : `${c.dataset.w}px`, height: face ? "100%" : `${c.dataset.h}px` });
     el.replaceChildren(c);
   };
-  // Fill both faces for a swing from `from` (as painted in `before`) towards the other posture.
-  const dress = (from: State, before?: HTMLCanvasElement) => {
-    const closed = layout(fit({ ...from, posture: "closed" }));
-    if (from.posture === "closed") { put(1, before); sleep(FOLD * 0.3).then(() => put(0, snap())); }
-    else { put(0, before); put(1, snaps.current.get(closed)); }
+  // Fill both faces for a swing from `from` (as painted in `before`) towards `to`, the other posture.
+  const dress = (from: State, before?: HTMLCanvasElement, to = fit({ ...from, posture: from.posture === "closed" ? "open" : "closed" })) => {
+    // Unfolding, the open layout's last snapshot saves painting one mid-swing, on the main thread.
+    const ahead = snaps.current.get(layout(to));
+    if (from.posture === "closed") { put(1, before); if (ahead) put(0, ahead); else sleep(FOLD * 0.3).then(() => put(0, snap())); }
+    else { put(0, before); put(1, ahead); }
   };
   const go = async (next: Partial<State>, fromTour = false) => {
     if (!fromTour) setTour(false);
@@ -404,25 +423,38 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     if (!fromTour) setAt(TOUR.findIndex((t) => sameView(t, n)));
     // Upside down the interface does not turn, so only the device moves.
     if (n.posture === p.posture && n.turn === p.turn) return setS(n);
-    // One overlapping timeline: the page softens, the device moves while it is still softening, and the new layout
-    // sharpens in, already while an unfold lands.
     busy.current = true;
-    flushSync(() => setInstant(true));
+    // Asked for less motion: the page cross-fades to the new view and the device is simply there.
+    if (calm) {
+      flushSync(() => setInstant(true));
+      await veil(true, 160);
+      flushSync(() => { setS(n); setUpright(n.turn); });
+      await sleep(REFLOW);
+      busy.current = false;
+      await veil(false, 320);
+      page.current?.getAnimations().forEach((a) => a.cancel());
+      return setInstant(false);
+    }
+    // One overlapping timeline: the page softens, the device moves while it is still softening, and the new layout
+    // sharpens in, already while an unfold lands. A fold waits for the page to be fully soft, so the flap's blurred
+    // faces match it from the first frame; Live Activities draw back into the camera meanwhile.
+    flushSync(() => { setInstant(true); setRetract(n.posture !== p.posture); });
     veil(true, VEIL);
-    await sleep(LEAD);
+    await sleep(n.posture !== p.posture ? VEIL : LEAD);
     let settled: Promise<unknown> | undefined;
     if (n.posture !== p.posture) {
       const open = n.posture === "open", before = snap();
       flushSync(() => { setFolding(true); setShape(n.posture); if (open) setS(n); });
-      dress(p, before);
+      dress(p, before, n);
       const as = swing(open);
       if (open) settled = sleep(FOLD * 0.72).then(() => veil(false, SETTLE_MS));
       await finished(as);
-      flushSync(() => { if (!open) setS(n); setFolding(false); setShape(null); });
+      flushSync(() => { if (!open) setS(n); setFolding(false); setShape(null); setRetract(false); });
       as.forEach((a) => a.cancel()); // only the swing: the page's veil is still sharpening
     } else {
       setS(n);
-      settled = sleep(TURN * 0.6).then(() => veil(false, SETTLE_MS));
+      // The interface turns upright under full blur once the device is nearly round, and sharpens once laid out.
+      settled = sleep(TURN * SWAP).then(() => { flushSync(() => setUpright(n.turn)); return sleep(REFLOW); }).then(() => veil(false, SETTLE_MS));
       await sleep(TURN);
     }
     busy.current = false;
@@ -472,14 +504,16 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     return () => ts.forEach(clearTimeout);
   }, [s, src, folding, instant, upright]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // go() turns the interface itself, under the veil; this catches any other change of turn.
   useEffect(() => {
-    const t = setTimeout(() => setUpright(s.turn), s.turn === upright ? 0 : turn);
+    if (busy.current) return;
+    const t = setTimeout(() => setUpright(s.turn), s.turn === upright ? 0 : turn * SWAP);
     return () => clearTimeout(t);
   }, [s.turn, upright, turn]);
 
   // The embedded stage tours by itself unless the reader asked for less motion, and only while it is on screen.
   useEffect(() => {
-    if (!embed || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!embed || matchMedia(REDUCE).matches) return;
     setTour(true);
     const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.25 });
     if (stage.current) io.observe(stage.current);
@@ -570,7 +604,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const [shine, setShine] = useState<{ x: number; y: number; w: number; h: number }[]>([]);
   const shown = `${s.app}-${s.posture}-${upright}-${seen?.mode}-${src}`;
   useEffect(() => {
-    if (slots || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (slots || matchMedia(REDUCE).matches) return;
     // After the fold and the page's fade-in when the device moved, else once the page has slid into place.
     const wait = (moved.current !== `${s.posture}-${s.turn}` ? LEAD + FOLD + SETTLE_MS * 0.6 : MOVE + 250) * k.current;
     moved.current = `${s.posture}-${s.turn}`;
@@ -636,7 +670,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   spin.current += ((((hw - spin.current) % 360) + 540) % 360) - 180;
   const sized = BODY[shape ?? s.posture], [bw, bh] = s.turn && !s.upside ? [sized.h, sized.w] : [sized.w, sized.h];
   // A fold moves the stage with the swing; a turn with the turn.
-  const settle = (prop: string) => folding ? `${prop} ${FOLD * k.current}ms ${SWING}` : `${prop} ${turn}ms ${ease}`;
+  const settle = (prop: string) => calm ? "none" : folding ? `${prop} ${FOLD * k.current}ms ${SWING}` : `${prop} ${turn}ms ${SETTLE}`;
   const scaleFor = (w: number, h: number) => embed ? Math.min(view.w / w, view.h / h, 1) : Math.min((view.w - 64) / w, (view.h - 320) / h, 1);
   const scale = scaleFor(bw, bh);
   // What the stage shows (Safari or a Home Screen web app) sits beside the device when the widest posture leaves room.
@@ -654,18 +688,22 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       </header>}
 
       <div style={{ position: "relative", alignSelf: "stretch", display: "flex", justifyContent: "center", alignItems: "center", visibility: measured ? undefined : "hidden", ...(embed && { height: view.h }) }}>
-      {beside && <Showing app={s.app} style={{ position: "absolute", right: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 170, top: "50%", translate: "0 -50%", transition: settle("right") }} />}
-      {beside && <Phases at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} style={{ position: "absolute", left: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 200, top: "50%", translate: "0 -50%", transition: settle("left") }} />}
-      <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `${settle("width")}, ${settle("height")}` }}>
+      {beside && <Showing app={s.app} style={{ position: "absolute", right: "50%", width: 170, top: "50%", translate: `${-(bw * scale / 2 + 40)}px -50%`, transition: settle("translate") }} />}
+      {beside && <Phases at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} style={{ position: "absolute", left: "50%", width: 200, top: "50%", translate: `${bw * scale / 2 + 40}px -50%`, transition: settle("translate") }} />}
+      {/* Embedded the stage's height is fixed and the device centred in it, so the box jumps instead of laying out every frame. */}
+      <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: embed ? undefined : `${settle("width")}, ${settle("height")}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
           transform: `translate(-50%, -50%) scale(${scale}) rotate(${spin.current}deg)`,
           transition: settle("transform"),
         }}>
         {/* Perspective only while the flap swings: left on, Chrome rasterizes the scaled device at full size and it reads blurry. */}
-        <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: folding ? 2600 : undefined }}>
-        {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned. */}
-        <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${Math.round(40 * Math.sin(hw * Math.PI / 180))}px ${Math.round(40 * Math.cos(hw * Math.PI / 180))}px 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
+        <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: folding ? 2600 : undefined, transformOrigin: "75% 50%" }}>
+        {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned:
+            its offset is turned back by the device's own angle on the same curve, so mid-turn it still falls straight down, at full length. */}
+        <div style={{ position: "absolute", inset: 0, transform: `rotate(${-spin.current}deg) translateY(40px) rotate(${spin.current}deg)`, transition: settle("transform") }}>
+          <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, transformOrigin: "100% 50%", boxShadow: "0 0 80px rgb(0 0 0 / 0.28)", transition: `border-radius ${turn}ms ${SETTLE}` }} />
+        </div>
         <div ref={fold} style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
           <div data-wd-shape style={{
@@ -693,7 +731,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
               {/* System chrome fades in with each new app or screen; under the veil it is just there, so nothing blanks. */}
               <div key={`${s.app}-${s.posture}-${upright}`} data-wd-callout={slots || undefined} style={{ position: "absolute", inset: 0, pointerEvents: "none", animation: instant ? undefined : `wd-in ${MOVE}ms ${ease} both` }}>{sc.chrome}</div>
             </div>
-            {s.posture === "closed" && <Island live={island(s)} />}
+            {s.posture === "closed" && <Island live={island(s) && !retract} />}
             {s.posture === "open" && <Crease />}
             {folding && <div ref={crease} style={{ position: "absolute", top: 0, bottom: 0, left: "50%", right: 0, opacity: 0, pointerEvents: "none", zIndex: 1, background: "linear-gradient(90deg, rgb(0 0 0 / 0.7), rgb(0 0 0 / 0.25) 30%, transparent 75%)" }} />}
           </div>
