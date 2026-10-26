@@ -63,6 +63,7 @@ const MOVE = 520; // the page frame moving between apps
 // device moves once it is mostly soft (LEAD ms in), the new layout swaps in under the blur, and it sharpens slowly
 // (SETTLE_MS), starting before an unfold has quite landed. DIM is the veil's darkening, as a black overlay.
 const LEAD = 260, VEIL = 380, SETTLE_MS = 900, BLUR_PX = 16, DIM = 0.2;
+const EDGE = 24; // the folding half's thickness, as the device's ~5mm at its scale
 const smooth = (a: number, b: number, t: number) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
 const HOLD = 1600; // the tour's pause at each stop, once settled
 
@@ -211,6 +212,54 @@ const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatM
       return `${m}|${scene(st, W, H, "", () => m).note}${island(st) ? LIVE_NOTE[st.app] ?? "" : ""}`;
     })))))))];
 
+/** A rough picture of what a screen shows, for the swinging flap to carry under its blur: background boxes, images
+ *  and bars for text, from the stage page and the page in its iframe (same origin). Blurred, only colour and layout
+ *  read, so a quarter-resolution canvas does. `page` must be unturned: rects are mapped by its scale alone. */
+function snapshot(page: HTMLElement) {
+  const w = page.offsetWidth, h = page.offsetHeight, S = 0.25, c = document.createElement("canvas");
+  c.width = Math.ceil(w * S); c.height = Math.ceil(h * S);
+  c.dataset.w = `${w}`; c.dataset.h = `${h}`;
+  const g = c.getContext("2d"), pr = page.getBoundingClientRect(), z = pr.width / w;
+  if (!g || !z) return c;
+  g.scale(S, S);
+  g.fillStyle = getComputedStyle(page.parentElement ?? page).backgroundColor;
+  g.fillRect(0, 0, w, h);
+  const range = document.createRange();
+  const paint = (root: Element, win: Window, map: (r: DOMRect) => Box) => {
+    for (const el of root.querySelectorAll("*")) {
+      const cs = win.getComputedStyle(el), op = +cs.opacity;
+      if (cs.visibility === "hidden" || !op) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) continue;
+      const b = map(r);
+      if (el instanceof (win as typeof window).HTMLIFrameElement) {
+        const doc = el.contentDocument, box = el.parentElement && map(el.parentElement.getBoundingClientRect());
+        if (!doc?.body || !box || !el.contentWindow) continue;
+        g.save();
+        g.beginPath(); g.roundRect(box.x, box.y, box.w, box.h, parseFloat(getComputedStyle(el.parentElement!).borderTopLeftRadius) || 0); g.clip();
+        g.fillStyle = win.getComputedStyle(doc.body).backgroundColor; g.fillRect(b.x, b.y, b.w, b.h);
+        paint(doc.body, el.contentWindow, (q) => ({ x: b.x + q.left, y: b.y + q.top, w: q.width, h: q.height }));
+        g.restore();
+        continue;
+      }
+      g.globalAlpha = op;
+      g.fillStyle = cs.backgroundColor;
+      g.beginPath(); g.roundRect(b.x, b.y, b.w, b.h, Math.min(parseFloat(cs.borderTopLeftRadius) || 0, b.w / 2, b.h / 2)); g.fill();
+      if (el instanceof (win as typeof window).HTMLImageElement) try { g.drawImage(el, b.x, b.y, b.w, b.h); } catch {}
+      g.globalAlpha = op * 0.5;
+      g.fillStyle = cs.color;
+      for (const t of el.childNodes) {
+        if (t.nodeType !== 3 || !t.textContent?.trim()) continue;
+        range.selectNodeContents(t);
+        for (const q of range.getClientRects()) { const m = map(q); g.fillRect(m.x, m.y + m.h * 0.2, m.w, m.h * 0.6); }
+      }
+    }
+  };
+  paint(page, window, (r) => ({ x: (r.left - pr.left) / z, y: (r.top - pr.top) / z, w: r.width / z, h: r.height / z }));
+  g.globalAlpha = 1;
+  return c;
+}
+
 /** embed: a stage inside a page, sized to its container, touring on its own while on screen. Its controls stay
  *  hidden behind "Try it yourself", which stops the tour. Otherwise a full-window playground. */
 export function WebDuo({ src: first, sources, title = "Duet", intro = "This is the site on a web iPhone Duo. Fold it, turn it, split it. On a phone, the site opens directly.", embed = false }: { src: string; sources?: [string, string][]; title?: string; intro?: string; embed?: boolean }) {
@@ -296,6 +345,24 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     return { filter: `blur(${(BLUR_PX * v * v).toFixed(2)}px) brightness(${(1 - DIM * smooth(0, 1, v)).toFixed(3)})` };
   }), { duration: ms * k.current, fill: "forwards" }).finished.catch(() => {});
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms * k.current));
+  // The flap's faces carry a blurred snapshot of their screen: the layout being left is painted as the swing starts,
+  // the one arriving once it has laid out (unfolding) or from the last time it settled (folding: it is not there yet).
+  const snaps = useRef(new Map<string, HTMLCanvasElement>());
+  const layout = (x: State) => `${x.app}-${x.posture}-${x.pane}-${x.live}-${src}-${document.documentElement.getAttribute("data-lg-theme")}-${matchMedia("(prefers-color-scheme: dark)").matches}`;
+  const snap = () => (page.current && !cur.current.rotated ? snapshot(page.current) : undefined);
+  const put = (face: 0 | 1, c?: HTMLCanvasElement) => {
+    const el = flap.current?.querySelectorAll("[data-wd-snap]")[face];
+    if (!el || !c) return;
+    // The inner face shows the left half of the open screen at its size; the outer one stretches to its window.
+    Object.assign(c.style, { position: "absolute", left: "0", top: "0", filter: `blur(${BLUR_PX}px)`, width: face ? "100%" : `${c.dataset.w}px`, height: face ? "100%" : `${c.dataset.h}px` });
+    el.replaceChildren(c);
+  };
+  // Fill both faces for a swing from `from` (as painted in `before`) towards the other posture.
+  const dress = (from: State, before?: HTMLCanvasElement) => {
+    const closed = layout(fit({ ...from, posture: "closed" }));
+    if (from.posture === "closed") { put(1, before); sleep(FOLD * 0.3).then(() => put(0, snap())); }
+    else { put(0, before); put(1, snaps.current.get(closed)); }
+  };
   const go = async (next: Partial<State>, fromTour = false) => {
     if (!fromTour) setTour(false);
     if (busy.current) return;
@@ -313,8 +380,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     await sleep(LEAD);
     let settled: Promise<unknown> | undefined;
     if (n.posture !== p.posture) {
-      const open = n.posture === "open";
+      const open = n.posture === "open", before = snap();
       flushSync(() => { setFolding(true); if (open) setS(n); });
+      dress(p, before);
       const as = swing(open);
       if (open) settled = sleep(FOLD * 0.72).then(() => veil(false, SETTLE_MS));
       await finished(as);
@@ -339,7 +407,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       setTour(false);
       busy.current = true;
       veil(true, 160);
-      flushSync(() => { setInstant(true); setFolding(true); setS((p) => fit({ ...p, posture: "open" })); });
+      const p = cur.current, before = snap();
+      flushSync(() => { setInstant(true); setFolding(true); setS(fit({ ...p, posture: "open" })); });
+      dress(p, before);
       held.current = swing(true, "linear");
       held.current.forEach((a) => a.pause());
     }
@@ -360,6 +430,14 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     page.current?.getAnimations().forEach((a) => a.cancel());
     setInstant(false);
   };
+
+  // Remember each settled layout's snapshot, for the next fold into it. Again later, in case the page was still loading.
+  useEffect(() => {
+    if (folding || instant || s.rotated || upright) return;
+    const keep = () => { const c = !busy.current && snap(); if (c) snaps.current.set(layout(cur.current), c); };
+    const ts = [700, 2500].map((ms) => setTimeout(keep, ms));
+    return () => ts.forEach(clearTimeout);
+  }, [s, src, folding, instant, upright]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const t = setTimeout(() => setUpright(s.rotated), s.rotated === upright ? 0 : turn);
@@ -701,6 +779,7 @@ function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const screen = (style: CSSProperties) => (
     <div data-wd-shape style={{ ...style, position: "absolute", overflow: "hidden", boxShadow: `0 0 0 400px ${FINISH.front}` }}>
       <div data-wd-fill style={{ position: "absolute", inset: 0, background: "var(--bg)" }}>
+        <div data-wd-snap style={{ position: "absolute", inset: 0 }} />
         <div style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)" }} />
       </div>
       <div data-wd-shade style={{ position: "absolute", inset: 0, background: "#000", opacity: DIM }} />
@@ -720,6 +799,11 @@ function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
         {/* The camera is hardware: it swings in with the outer display, where the Island takes over once closed. */}
         <div style={{ ...CAMERA_PILL, left: BODY.closed.x + CAMERA.x - CAMERA_PILL.width / 2, top: BODY.closed.y + CAMERA.y - CAMERA_PILL.width / 2, height: CAMERA_PILL.width }} />
       </div>
+      {/* The free edge has depth: a band standing square to the faces, unseen flat and full width upright. */}
+      <div style={{
+        position: "absolute", left: -EDGE / 2, width: EDGE, top: 34, bottom: 34, transform: "rotateY(90deg)", borderRadius: `${EDGE / 2}px / 44px`,
+        background: `linear-gradient(90deg, ${FINISH.rim}, ${FINISH.band} 22%, #1c1c1e 50%, ${FINISH.band} 78%, ${FINISH.rim})`,
+      }} />
     </div>
   );
 }
