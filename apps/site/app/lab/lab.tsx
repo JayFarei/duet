@@ -66,9 +66,9 @@ export function Lab() {
 :root[data-lg-theme="dark"]{--bg:#000;--ink:#fff;--line:#333}
 html,body{margin:0;background:var(--bg)}
 `;
-  const action = (i: number): DuetItem => {
+  const action = (i: number, prefix = "a"): DuetItem => {
     const I = ICONS[i % 5];
-    return { id: `a${i}`, label: NAMES[i % 5], icon: <I size={22} />, badge: i % 5 === 0 ? 12 : undefined, onPress: () => setTapped(NAMES[i % 5]) };
+    return { id: `${prefix}${i}`, label: NAMES[i % 5], icon: <I size={22} />, badge: i % 5 === 0 ? 12 : undefined, onPress: () => setTapped(NAMES[i % 5]) };
   };
   const name = depth ? "Detail" : s.tabs ? TABS[Number(tab)]?.label ?? "Search" : "Root";
 
@@ -79,7 +79,7 @@ html,body{margin:0;background:var(--bg)}
         dark={s.dark ? s.dark > 0 : undefined}
         menuStyle={s.morph ? "morph" : undefined}
         back={depth > 0 && { onPress: () => { setDepth(0); setTapped("Back"); } }}
-        leading={Array.from({ length: s.leading }, (_, i) => action(i + 2))}
+        leading={Array.from({ length: s.leading }, (_, i) => action(i + 2, "l"))}
         actions={Array.from({ length: s.actions }, (_, i) => action(i))}
         tabs={s.tabs ? {
           items: TABS.slice(0, s.tabs), selected: tab, onSelect: (id) => { setTab(id); setTapped(`tab ${id}`); },
