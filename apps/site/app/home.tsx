@@ -108,7 +108,7 @@ function Page({ self = false }: { self?: boolean }) {
       <section id="top" className="hero" style={column(980, 20)}>
         <p className="eyebrow">duet-ui</p>
         <h1 className="display">
-          Vertical controls for the <em>iPhone Duo.</em>
+          Native-feeling controls for web apps on the <em>iPhone Duo.</em>
         </h1>
         <p className="lede">A React library that approximates the Duo&apos;s native side controls.</p>
         <div className="ctas">

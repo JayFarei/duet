@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Activity, ArrowLeftRight, Highlighter, Pause, Play, Pointer, RotateCw, Snail } from "lucide-react";
+import { Activity, AppWindow, ChevronLeft, ChevronRight, Compass, Highlighter, House, PanelLeft, PanelRight, Pause, Play, Pointer, RotateCcw, RotateCw, Smartphone, Snail, Tablet } from "lucide-react";
 import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui/geometry";
 
 // A web iPhone Duo for desktop browsers: the site runs in an iframe shaped like the device's screen, and the
@@ -16,10 +16,12 @@ type Posture = "closed" | "open";
 type App = "home" | "safari" | "split" | "window";
 /** live: Live Activities are running (the visitor's switch, kept across views). They grow the Dynamic Island down
  *  the closed strip, the only place the island is, so `island()` says where they show. */
-interface State { posture: Posture; rotated: boolean; app: App; pane: Side; live: boolean }
+interface State { posture: Posture; turn: Turn; app: App; pane: Side; live: boolean }
+/** Degrees clockwise from the natural orientation. iOS never turns upside down, so a quarter either way is all. */
+type Turn = -90 | 0 | 90;
 
-// Natural orientation: closed is portrait (outer display), open is landscape (inner display). `rotated` turns
-// the device a quarter turn clockwise, so the outer camera ends up bottom right.
+// Natural orientation: closed is portrait (outer display), open is landscape (inner display). A clockwise turn puts
+// the outer camera bottom right, an anticlockwise one top left.
 const SCREEN = { closed: { w: 466, h: 678 }, open: { w: 951, h: 669 } };
 // A graphite finish around a black front: the site stays colourless.
 const FINISH = { band: "#3a3a3c", rim: "#6e6e73", front: "#0b0c10", button: "linear-gradient(#6e6e73, #2c2c2e)" };
@@ -49,6 +51,9 @@ const BUTTONS = [{ right: 271, top: -4, w: 66, h: 6 }, { right: 191, top: -4, w:
 const CAMERA = { x: 418, y: 48, d: 38 };
 const STRIP = 84; // iOS's strip and Safari's column
 const OPEN_BAR = 126; // Safari's chrome above the page, unfolded
+// Safari's bottom row (Duo simulator, 3x captures): the address bar and the +/tabs pill share a bottom 33.3pt above
+// the window's, upright and sideways. The pill is 103.4 tall; Duet budgets it as SAFARI.pill above DUO.bottom, the same top.
+const BAR = { bottom: 33.3, h: 49, w: 335.4, pill: 103.4 };
 // Safari windows as the device reports them: outer is the window with its column, page is innerWidth x innerHeight.
 // Safari's `screen.*` keeps the closed screen in every state.
 const TAB = { w: 466, h: 678, page: { w: 382, h: 580 } }; // closed portrait: the window is the screen
@@ -64,6 +69,7 @@ const MOVE = 520; // the page frame moving between apps
 // (SETTLE_MS), starting before an unfold has quite landed. DIM is the veil's darkening, as a black overlay.
 const LEAD = 260, VEIL = 380, SETTLE_MS = 900, BLUR_PX = 16, DIM = 0.2;
 const EDGE = 24; // the folding half's thickness, as the device's ~5mm at its scale
+const SWING = "cubic-bezier(0.45, 0, 0.2, 1)"; // the fold, eased both ends so the swing reads
 const smooth = (a: number, b: number, t: number) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
 const HOLD = 1600; // the tour's pause at each stop, once settled
 
@@ -96,8 +102,10 @@ const safariScreen = (page: Size): Size => page.w > page.h ? { w: SCREEN.closed.
 /** A Safari window: the page at the top on its inner side, Safari's column on the `col` edge, the address bar
  *  below the page. In column mode Duet paints into the column, so the frame spans it (in a split pane both
  *  possible columns, and the pane shows only its own); otherwise the frame is just the page. */
-function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?: number; host: string; mode: Mode; split?: boolean; rounded?: boolean }) {
-  const { win, page, col, mode } = o, colW = win.w - page.w, pageX = col === "left" ? colW : 0, column = mode === "column", bar = win.h - page.h;
+function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?: number; low?: number; barX?: number; host: string; mode: Mode; split?: boolean; rounded?: boolean }) {
+  const { win, page, col, mode, low = BAR.bottom } = o, colW = win.w - page.w, pageX = col === "left" ? colW : 0, column = mode === "column", bar = win.h - page.h;
+  // The address bar centres on the page, or where given (sideways, on the screen); its bottom is the pill's.
+  const barW = Math.min(BAR.w, page.w - 36), barX = o.barX ?? pageX + page.w / 2;
   const frame: Box = !column ? { x: pageX, y: 0, ...page }
     : o.split ? { x: col === "right" ? -colW : 0, y: 0, w: page.w + 2 * colW, h: win.h }
     : { x: 0, y: 0, w: win.w, h: win.h };
@@ -108,8 +116,8 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
       <div style={{ position: "absolute", left: win.x, top: win.y, width: win.w, height: win.h, borderRadius: o.rounded ? 30 : undefined, overflow: "hidden", pointerEvents: "none" }}>
         {/* In column mode the page runs on under the pill (Duet extends it by outer minus inner height). */}
         {!column && <div style={{ position: "absolute", left: pageX, top: page.h, width: page.w, height: bar, background: "var(--card)" }} />}
-        <UrlBar left={pageX + 18} top={page.h + Math.min(22, (bar - 46) / 2)} width={page.w - 36} host={o.host} />
-        <SafariColumn x={col === "left" ? 0 : page.w} h={win.h} col={col} back={o.back} clock={o.clock} over={column} />
+        <UrlBar left={barX - barW / 2} top={win.h - BAR.bottom - BAR.h} width={barW} host={o.host} />
+        <SafariColumn x={col === "left" ? 0 : page.w} h={win.h} col={col} back={o.back} clock={o.clock} low={low} over={column} />
       </div>
     ),
   };
@@ -156,9 +164,13 @@ function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals
     };
   }
   if (s.posture === "closed") {
-    const portrait = W < H, page = portrait ? TAB.page : { w: W - STRIP, h: H - 98 };
+    // Sideways Safari moves its column to the camera's side and drops the clock. Its buttons keep clear of the camera:
+    // back and reader sit below it when it is at the top, the pill rises above it when it is at the bottom.
+    const portrait = W < H, page = portrait ? TAB.page : { w: W - STRIP, h: H - 98 }, high = s.turn < 0;
     const signals = sig(page, full, { screen: safariScreen(page) }), mode = modeOf(signals);
-    const w = safariWindow({ win: screen, page, col: "right", back: portrait ? DUO.top + push : 62, clock: portrait ? 84 + push : 24, host, mode });
+    const w = safariWindow(portrait
+      ? { win: screen, page, col: "right", back: DUO.top + push, clock: 84 + push, host, mode }
+      : { win: screen, page, col: high ? "left" : "right", back: high ? 81.3 : 23.3, low: high ? BAR.bottom : 81.3, barX: W / 2, host, mode });
     return {
       ...w, signals, mode,
       note: portrait
@@ -174,10 +186,10 @@ function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals
   };
 }
 
-const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, rotated: false, app, pane: "right", live: false, ...o });
+const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, turn: 0, app, pane: "right", live: false, ...o });
 const TOUR: State[] = [
   stop("closed", "home"), stop("closed", "home", { live: true }),
-  stop("open", "home"), stop("open", "home", { rotated: true }), stop("closed", "home", { rotated: true }), stop("closed", "home"),
+  stop("open", "home"), stop("open", "home", { turn: 90 }), stop("closed", "home", { turn: 90 }), stop("closed", "home"),
   stop("closed", "safari"), stop("closed", "safari", { live: true }), stop("open", "safari"),
   stop("open", "split"), stop("open", "split", { pane: "left" }), stop("open", "window"),
 ];
@@ -185,7 +197,7 @@ const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
 /** The same view, whatever the Live Activities switch says: the phase list follows views, not the switch. */
 const sameView = (a: State, b: State) => same({ ...a, live: false }, { ...b, live: false });
 /** Live Activities show: the island exists on the closed outer display only, and is measured upright only. */
-const island = (s: State) => s.live && s.posture === "closed" && !s.rotated;
+const island = (s: State) => s.live && s.posture === "closed" && !s.turn;
 /** The phase list: each row starts at a tour stop and lasts until the next row's. */
 const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
   { group: "Home Screen web app", rows: [["Closed", 0], ["Unfolded and turned", 2]] },
@@ -195,7 +207,7 @@ const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
 const ONLY: Partial<Record<App, Posture>> = { split: "open", window: "open" };
 const fit = (s: State): State => {
   const only = ONLY[s.app];
-  return !only || (s.posture === only && !s.rotated) ? s : { ...s, app: "safari" };
+  return !only || (s.posture === only && !s.turn) ? s : { ...s, app: "safari" };
 };
 
 const LIVE_NOTE: Partial<Record<App, string>> = {
@@ -205,10 +217,10 @@ const LIVE_NOTE: Partial<Record<App, string>> = {
 /** Every caption the stage can show, rendered invisibly under the real one so the text below never moves.
  *  Built on first use: `scene` needs the styles defined further down. */
 let notes: string[] | undefined;
-const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => [false, true].flatMap((rotated) =>
+const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => ([0, 90, -90] as const).flatMap((turn) =>
   (["home", "safari", "split", "window"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
     (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
-      const n = SCREEN[posture], [W, H] = rotated ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, rotated, app, pane, live });
+      const n = SCREEN[posture], [W, H] = turn ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, turn, app, pane, live });
       return `${m}|${scene(st, W, H, "", () => m).note}${island(st) ? LIVE_NOTE[st.app] ?? "" : ""}`;
     })))))))];
 
@@ -266,10 +278,12 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const [src, setSrc] = useState(first);
   const [s, setS] = useState<State>(TOUR[0]);
   // The page inside turns upright only once the device has finished turning, like iOS.
-  const [upright, setUpright] = useState(false);
+  const [upright, setUpright] = useState<Turn>(0);
   // A fold or turn is in flight: the page is faded out and its frame jumps instead of animating.
   const [instant, setInstant] = useState(false);
   const [folding, setFolding] = useState(false);
+  // The posture the stage is sized for: the one a fold is heading to, so the stage settles with the swing, not after it.
+  const [shape, setShape] = useState<Posture | null>(null);
   const [tour, setTour] = useState(false);
   const [manual, setManual] = useState(false);
   const [slots, setSlots] = useState(false);
@@ -300,7 +314,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   // Folding: the right half stays put and the left half swings round the hinge towards the viewer, like a book
   // closing, so the inner screens meet face to face and the outer display ends up in front. The
   // device recentres, so it unfolds from the middle. Web Animations, so timing never depends on React or timers.
-  const swing = (open: boolean, easing = "cubic-bezier(0.45, 0, 0.2, 1)") => { // eased both ends, so the swing reads
+  const swing = (open: boolean, easing = SWING) => {
     const o = { duration: FOLD * k.current, easing, fill: "both" as const };
     const [a, b] = open ? [0, 1] : [1, 0];
     const shift = (t: number) => `translateX(${-(1 - t) * BODY.open.w / 4}px)`;
@@ -309,12 +323,14 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const steps = Array.from({ length: 25 }, (_, i) => a + (b - a) * i / 24);
     // Near flat, each face of the flap turns clear and the page shows through it, so content flows from screen to
     // screen with no flat panel popping in: the outer display at the closed end, the inner screen at the open end.
+    // Closing, the outer face stays filled to the end: the page under it is still the open layout's right half until
+    // the closed one takes over, and showing it would flash Duet's controls in the wrong place.
     // Turned away, a face fills with the page's veiled tone and darkens as it goes edge-on.
     const [fillIn, fillOut] = flap.current?.querySelectorAll<HTMLElement>("[data-wd-fill]") ?? [];
     const [shadeIn, shadeOut] = flap.current?.querySelectorAll<HTMLElement>("[data-wd-shade]") ?? [];
     // Each face also hides once turned away: WebKit ignores backface-visibility here, and a clear face would show it.
     const [faceIn, faceOut] = flap.current?.querySelectorAll<HTMLElement>("[data-wd-face]") ?? [];
-    const fill = (t: number, face: 0 | 1) => face ? smooth(0.03, 0.42, t) : 1 - smooth(0.55, 0.97, t);
+    const fill = (t: number, face: 0 | 1) => face ? (open ? smooth(0.03, 0.42, t) : 1) : 1 - smooth(0.55, 0.97, t);
     const shade = (t: number, face: 0 | 1) => fill(t, face) * DIM + 0.32 * Math.sin(Math.PI / 2 * Math.min(1, 2 * (face ? t : 1 - t)));
     // The body shows left of the hinge only where the flap already covers it (its free edge in perspective, with
     // `P` matching the hinge's perspective), so the page under a clear inner screen lines up as it lands.
@@ -349,7 +365,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   // the one arriving once it has laid out (unfolding) or from the last time it settled (folding: it is not there yet).
   const snaps = useRef(new Map<string, HTMLCanvasElement>());
   const layout = (x: State) => `${x.app}-${x.posture}-${x.pane}-${x.live}-${src}-${document.documentElement.getAttribute("data-lg-theme")}-${matchMedia("(prefers-color-scheme: dark)").matches}`;
-  const snap = () => (page.current && !cur.current.rotated ? snapshot(page.current) : undefined);
+  const snap = () => (page.current && !cur.current.turn ? snapshot(page.current) : undefined);
   const put = (face: 0 | 1, c?: HTMLCanvasElement) => {
     const el = flap.current?.querySelectorAll("[data-wd-snap]")[face];
     if (!el || !c) return;
@@ -368,10 +384,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     if (busy.current) return;
     const p = cur.current, n = { ...p, ...next };
     const only = ONLY[n.app];
-    if (next.app && only) [n.posture, n.rotated] = [only, false]; // picking the app moves the device there
+    if (next.app && only) [n.posture, n.turn] = [only, 0]; // picking the app moves the device there
     Object.assign(n, fit(n));
     if (!fromTour) setAt(TOUR.findIndex((t) => sameView(t, n)));
-    if (n.posture === p.posture && n.rotated === p.rotated) return setS(n);
+    if (n.posture === p.posture && n.turn === p.turn) return setS(n);
     // One overlapping timeline: the page softens, the device moves while it is still softening, and the new layout
     // sharpens in, already while an unfold lands.
     busy.current = true;
@@ -381,12 +397,12 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     let settled: Promise<unknown> | undefined;
     if (n.posture !== p.posture) {
       const open = n.posture === "open", before = snap();
-      flushSync(() => { setFolding(true); if (open) setS(n); });
+      flushSync(() => { setFolding(true); setShape(n.posture); if (open) setS(n); });
       dress(p, before);
       const as = swing(open);
       if (open) settled = sleep(FOLD * 0.72).then(() => veil(false, SETTLE_MS));
       await finished(as);
-      flushSync(() => { if (!open) setS(n); setFolding(false); });
+      flushSync(() => { if (!open) setS(n); setFolding(false); setShape(null); });
       as.forEach((a) => a.cancel()); // only the swing: the page's veil is still sharpening
     } else {
       setS(n);
@@ -420,10 +436,11 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const as = held.current;
     if (!as.length) return;
     const open = (scrub ?? 0) >= 0.5;
+    setShape(open ? "open" : "closed");
     as.forEach((a) => { a.playbackRate = open ? 1 : -1; a.play(); });
     await finished(as);
     held.current = [];
-    flushSync(() => { if (!open) setS((p) => fit({ ...p, posture: "closed" })); setFolding(false); setScrub(null); });
+    flushSync(() => { if (!open) setS((p) => fit({ ...p, posture: "closed" })); setFolding(false); setShape(null); setScrub(null); });
     as.forEach((a) => a.cancel());
     busy.current = false;
     await veil(false, SETTLE_MS);
@@ -433,16 +450,16 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
   // Remember each settled layout's snapshot, for the next fold into it. Again later, in case the page was still loading.
   useEffect(() => {
-    if (folding || instant || s.rotated || upright) return;
+    if (folding || instant || s.turn || upright) return;
     const keep = () => { const c = !busy.current && snap(); if (c) snaps.current.set(layout(cur.current), c); };
     const ts = [700, 2500].map((ms) => setTimeout(keep, ms));
     return () => ts.forEach(clearTimeout);
   }, [s, src, folding, instant, upright]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const t = setTimeout(() => setUpright(s.rotated), s.rotated === upright ? 0 : turn);
+    const t = setTimeout(() => setUpright(s.turn), s.turn === upright ? 0 : turn);
     return () => clearTimeout(t);
-  }, [s.rotated, upright, turn]);
+  }, [s.turn, upright, turn]);
 
   // The embedded stage tours by itself unless the reader asked for less motion, and only while it is on screen.
   useEffect(() => {
@@ -487,7 +504,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const n = SCREEN[s.posture], b = BODY[s.posture];
   const [W, H] = upright ? [n.h, n.w] : [n.w, n.h];
   const modeOf = (x: Signals) => { const j = JSON.stringify(x); return seen?.signals === j ? seen.mode : detect(x).mode; };
-  const sc = scene({ ...s, rotated: upright }, W, H, host, modeOf);
+  const sc = scene({ ...s, turn: upright }, W, H, host, modeOf);
 
   // Tell the page what the device would tell it: now, and whenever it (re)loads and says it is listening.
   const signals = JSON.stringify(sc.signals);
@@ -539,8 +556,8 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   useEffect(() => {
     if (slots || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     // After the fold and the page's fade-in when the device moved, else once the page has slid into place.
-    const wait = (moved.current !== `${s.posture}-${s.rotated}` ? LEAD + FOLD + SETTLE_MS * 0.6 : MOVE + 250) * k.current;
-    moved.current = `${s.posture}-${s.rotated}`;
+    const wait = (moved.current !== `${s.posture}-${s.turn}` ? LEAD + FOLD + SETTLE_MS * 0.6 : MOVE + 250) * k.current;
+    moved.current = `${s.posture}-${s.turn}`;
     const on = setTimeout(() => {
       const d = frame.current?.contentDocument;
       if (!d) return;
@@ -554,7 +571,29 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   }, [shown, slots]);
 
   // Fit the turned device and the controls in the window.
-  const [bw, bh] = s.rotated ? [b.h, b.w] : [b.w, b.h];
+  // What a person can do to the device: fold it, turn it, pick an app, and, open and upright, multitask Safari.
+  // One pill of icons, so it fits beside Duet on a phone: fold, turn, pick what runs. Split View and a window need
+  // the device open and upright, and picking one gets it there; picking Split View again swaps Safari's side.
+  const split = s.app === "split", Pane = s.pane === "left" ? PanelLeft : PanelRight;
+  const commands = (
+    <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
+      <Tool label={s.posture === "open" ? "Fold" : "Unfold"} onClick={() => go({ posture: s.posture === "open" ? "closed" : "open" })}>
+        {s.posture === "open" ? <Tablet size={18} style={{ rotate: "90deg" }} /> : <Smartphone size={18} />}
+      </Tool>
+      <Rule />
+      {([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
+        <Tool key={by} label={label} off={Math.abs(s.turn + by) > 90} onClick={() => go({ turn: (s.turn + by) as Turn })}><Icon size={18} /></Tool>
+      ))}
+      <Rule />
+      <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
+      <Tool label="Safari" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
+      <Tool label={split ? "Swap Split View sides" : "Split View"} on={split} onClick={() => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" })}><Pane size={18} /></Tool>
+      <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
+    </div>
+  );
+  const sized = BODY[shape ?? s.posture], [bw, bh] = s.turn ? [sized.h, sized.w] : [sized.w, sized.h];
+  // A fold moves the stage with the swing; a turn with the turn.
+  const settle = (prop: string) => folding ? `${prop} ${FOLD * k.current}ms ${SWING}` : `${prop} ${turn}ms ${ease}`;
   const scaleFor = (w: number, h: number) => embed ? Math.min(view.w / w, view.h / h, 1) : Math.min((view.w - 64) / w, (view.h - 320) / h, 1);
   const scale = scaleFor(bw, bh);
   // What the stage shows (Safari or a Home Screen web app) sits beside the device when the widest posture leaves room.
@@ -572,18 +611,18 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       </header>}
 
       <div style={{ position: "relative", alignSelf: "stretch", display: "flex", justifyContent: "center", alignItems: "center", visibility: measured ? undefined : "hidden", ...(embed && { height: view.h }) }}>
-      {beside && <Showing app={s.app} style={{ position: "absolute", right: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 170, top: "50%", translate: "0 -50%", transition: `right ${turn}ms ${ease}` }} />}
-      {beside && <Phases at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} style={{ position: "absolute", left: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 200, top: "50%", translate: "0 -50%", transition: `left ${turn}ms ${ease}` }} />}
-      <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `width ${turn}ms ${ease}, height ${turn}ms ${ease}` }}>
+      {beside && <Showing app={s.app} style={{ position: "absolute", right: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 170, top: "50%", translate: "0 -50%", transition: settle("right") }} />}
+      {beside && <Phases at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} style={{ position: "absolute", left: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 200, top: "50%", translate: "0 -50%", transition: settle("left") }} />}
+      <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `${settle("width")}, ${settle("height")}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
-          transform: `translate(-50%, -50%) scale(${scale}) rotate(${s.rotated ? 90 : 0}deg)`,
-          transition: `transform ${turn}ms ${ease}`,
+          transform: `translate(-50%, -50%) scale(${scale}) rotate(${s.turn}deg)`,
+          transition: settle("transform"),
         }}>
         {/* Perspective only while the flap swings: left on, Chrome rasterizes the scaled device at full size and it reads blurry. */}
         <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: folding ? 2600 : undefined }}>
         {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned. */}
-        <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${s.rotated ? "40px 0" : "0 40px"} 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
+        <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${s.turn ? `${Math.sign(s.turn) * 40}px 0` : "0 40px"} 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
         <div ref={fold} style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
           <div data-wd-shape style={{
@@ -594,7 +633,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
             {/* The page, upright for the user: counter-turned when the device is turned. */}
             <div style={{
               position: "absolute", left: 0, top: 0, width: W, height: H, transformOrigin: "0 0",
-              transform: upright ? `translateY(${n.h}px) rotate(-90deg)` : undefined,
+              transform: upright > 0 ? `translateY(${n.h}px) rotate(-90deg)` : upright < 0 ? `translateX(${n.w}px) rotate(90deg)` : undefined,
             }} ref={page}>
               {sc.under}
               {/* The window the page shows through, and the page in it. */}
@@ -630,33 +669,23 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
           <Pointer size={18} strokeWidth={2.2} />Try it yourself
         </button>
       )}
-      <div aria-hidden={(embed && !manual) || undefined} style={{ gridArea: "1/1", visibility: embed && !manual ? "hidden" : undefined, display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "center", padding: "0 16px", maxWidth: 1100 }}>
+      <div aria-hidden={(embed && !manual) || undefined} style={{ gridArea: "1/1", visibility: embed && !manual ? "hidden" : undefined, display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 1100 }}>
         {embed ? <>
-        <Segmented value={s.posture} onChange={(posture) => go({ posture })} options={[["closed", "Closed"], ["open", "Open"]]} />
-        <Segmented value={s.app} onChange={(app) => go({ app })} options={[["home", "Home"], ["safari", "Safari"], ["split", "Split"], ["window", "Window"]]} />
-        <Button onClick={() => go({ rotated: !s.rotated })} label="Rotate"><RotateCw size={17} /></Button>
-        <Button onClick={() => setTour((t) => !t)} label={tour ? "Pause" : "Play"} on={tour}>{tour ? <Pause size={17} /> : <Play size={17} />}</Button>
+        {commands}
         </> : <>
         {sources && <Segmented value={src} onChange={setSrc} options={sources} />}
-        <Segmented value={s.posture} onChange={(posture) => go({ posture })} options={[["closed", "Closed"], ["open", "Open"]]} />
-        <Button onClick={() => go({ rotated: !s.rotated })} label="Rotate"><RotateCw size={17} /></Button>
-        <Segmented value={s.app} onChange={(app) => go({ app })}
-          options={[["home", "Home Screen"], ["safari", "Safari"], ["split", "Split View"], ["window", "Window"]]} />
-        {s.app === "split" && <Button onClick={() => go({ pane: s.pane === "right" ? "left" : "right" })} label="Swap"><ArrowLeftRight size={17} /></Button>}
-        <Button onClick={() => go({ live: !s.live })} label="Live Activities" on={s.live}><Activity size={17} /></Button>
+        {commands}
         <label title="Drag to fold and unfold by hand" style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
           Fold
           <input type="range" aria-label="Fold" min={0} max={1} step={0.001} value={scrub ?? (s.posture === "open" ? 1 : 0)}
             onChange={(e) => hold(+e.currentTarget.value)} onPointerUp={release} onKeyUp={release} onBlur={release} style={{ width: 120, accentColor: "var(--accent)" }} />
         </label>
-        <Button onClick={() => setSlow((v) => !v)} label="¼ speed" on={slow}><Snail size={17} /></Button>
-        <Button onClick={() => setSlots((v) => !v)} label="Slots" on={slots}><Highlighter size={17} /></Button>
-        <Button onClick={() => setTour((t) => !t)} label={tour ? "Pause" : "Tour"} on={tour}>{tour ? <Pause size={17} /> : <Play size={17} />}</Button>
+        <Button onClick={() => setSlow((v) => !v)} label="¼ speed" on={slow}><Snail size={18} /></Button>
+        <Button onClick={() => setSlots((v) => !v)} label="Slots" on={slots}><Highlighter size={18} /></Button>
         </>}
       </div>
       </div>
-      {!beside && <Showing app={s.app} row />}
-      {!beside && <Phases at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />}
+      {!beside && <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />}
       <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
         <Note mode={sc.mode} text={sc.note + (island(s) ? LIVE_NOTE[s.app] ?? "" : "")} />
         {allNotes().map((n) => { const [m, t] = n.split("|"); return <Note key={n} mode={m} text={t} hidden />; })}
@@ -695,7 +724,7 @@ function Showing({ app, row, style }: { app: App; row?: boolean; style?: CSSProp
 
 /** The tour's phases, grouped by where the page runs: the current one follows the tour, and picking one jumps there
  *  (which pauses the tour). `row`: chips under the stage, where there is no room beside it. */
-function Phases({ at, tour, onPick, onTour, live, onLive, row, style }: { at: number; tour: boolean; onPick: (i: number) => void; onTour: () => void; live: boolean; onLive: () => void; row?: boolean; style?: CSSProperties }) {
+function Phases({ app, at, tour, onPick, onTour, live, onLive, row, style }: { app?: App; at: number; tour: boolean; onPick: (i: number) => void; onTour: () => void; live: boolean; onLive: () => void; row?: boolean; style?: CSSProperties }) {
   const starts = PHASES.flatMap((g) => g.rows.map(([, i]) => i)).sort((a, b) => a - b);
   const current = at < 0 ? -1 : starts.filter((i) => i <= at).at(-1);
   const item = (label: string, i: number) => {
@@ -724,11 +753,42 @@ function Phases({ at, tour, onPick, onTour, live, onLive, row, style }: { at: nu
       Live Activities
     </button>
   );
-  if (row) return (
-    <div data-wd-phases style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", padding: "0 16px", maxWidth: 760 }}>
-      {PHASES.flatMap((g) => g.rows.map(([label, i]) => item(label, i)))}{activities}{toggle}
-    </div>
-  );
+  if (row) {
+    // Narrow, the list folds into one line: play, step back, what is showing, step on, Live Activities; dots below.
+    const rows = PHASES.flatMap((g) => g.rows.map(([label, i]) => ({ label, i, group: g.group })));
+    const k = rows.findIndex((x) => x.i === current), now = rows[k], [title, sub] = SHOWING[app ?? "safari"];
+    const round = (onClick: () => void, label: string, glyph: ReactNode, o: { on?: boolean; role?: string } = {}) => (
+      <button onClick={onClick} aria-label={label} title={label} role={o.role} aria-checked={o.role ? o.on : undefined}
+        style={{ ...control, width: 36, height: 36, flex: "none", display: "grid", placeItems: "center", background: o.on ? "var(--card)" : "transparent", color: o.on ? "var(--ink)" : "var(--dim)", boxShadow: o.on ? "0 0 0 0.5px var(--line)" : undefined }}>{glyph}</button>
+    );
+    const step = (by: number) => onPick(rows[(Math.max(k, 0) + by + rows.length) % rows.length].i);
+    return (
+      <div data-wd-phases style={{ display: "grid", justifyItems: "center", gap: 8, padding: "0 16px", width: "100%", maxWidth: 420, boxSizing: "border-box" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%" }}>
+          {round(onTour, tour ? "Pause the tour" : "Play the tour", tour ? <Pause size={16} /> : <Play size={16} />)}
+          {round(() => step(-1), "Previous", <ChevronLeft size={18} />)}
+          <div data-wd-showing style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            {app === "home"
+              ? <img src="/apple-touch-icon.png" alt="" width={32} height={32} style={{ borderRadius: 7, boxShadow: "0 0 0 0.5px var(--line)", flex: "none" }} />
+              : <SafariIcon size={32} />}
+            <div style={{ font: "400 13px/1.3 -apple-system, system-ui", color: "var(--dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              <b style={{ display: "block", color: "var(--ink)", fontWeight: 600, fontSize: 15 }}>{now?.label ?? title}</b>{now ? now.group : sub}
+            </div>
+          </div>
+          {round(() => step(1), "Next", <ChevronRight size={18} />)}
+          {round(onLive, "Live Activities", <Activity size={16} />, { on: live, role: "switch" })}
+        </div>
+        <div style={{ display: "flex", gap: 2 }}>
+          {rows.map((x) => (
+            <button key={x.i} onClick={() => onPick(x.i)} aria-label={x.label} aria-current={x.i === current || undefined} data-wd-phase={x.i}
+              style={{ ...control, width: 20, height: 20, display: "grid", placeItems: "center", background: "transparent", padding: 0 }}>
+              <i style={{ width: x.i === current ? 16 : 6, height: 6, borderRadius: 99, background: x.i === current ? "var(--accent)" : "var(--line)", transition: `width 0.25s ${ease}, background 0.25s` }} />
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <nav data-wd-phases aria-label="Tour phases" style={{ display: "grid", gap: 14, ...style }}>
       {PHASES.map((g) => (
@@ -890,24 +950,24 @@ function Battery() {
 }
 
 /** Safari's own column: clock, back and reader at the top (`back`: the back button's top), the +/tabs pill at the
- *  bottom, centred DUO.centerFromEdge from the window's outer edge. `over`: drawn over a frame that includes the
+ *  bottom (`low`: its bottom above the window's), centred DUO.centerFromEdge from the window's outer edge. `over`: drawn over a frame that includes the
  *  column, where the page paints the rest. */
-function SafariColumn({ x, h, col, back, clock, over }: { x: number; h: number; col: Side; back: number; clock?: number; over?: boolean }) {
+function SafariColumn({ x, h, col, back, clock, low, over }: { x: number; h: number; col: Side; back: number; clock?: number; low: number; over?: boolean }) {
   const cx = col === "right" ? STRIP - DUO.centerFromEdge : DUO.centerFromEdge, at = (top: number): CSSProperties => ({ position: "absolute", left: cx - DUO.control / 2, top, transition: `top ${MOVE}ms ${ease}` });
   return (
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
       {clock !== undefined && <Status x={cx} top={clock} />}
       <div data-wd-system data-wd-col style={{ ...column, ...at(back) }}><Glyph d="m15 18-6-6 6-6" /></div>
       <div data-wd-system data-wd-col style={{ ...column, ...at(back + DUO.control + DUO.gap) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
-      <div data-wd-system data-wd-col style={{ ...at(h - DUO.bottom - SAFARI.pill), width: DUO.control, height: SAFARI.pill, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
+      <div data-wd-system data-wd-col style={{ ...at(h - low - BAR.pill), width: DUO.control, height: BAR.pill, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" /><Glyph d="M8 8h12v12H8zM4 16V4h12" />
       </div>
     </div>
   );
 }
 
-function UrlBar({ left, top, width, host }: { left: number; top: number; width: number; host: string }) {
-  return <div data-wd-system style={{ position: "absolute", left, top, width, height: 46, borderRadius: 99, ...glass, display: "flex", alignItems: "center", justifyContent: "center", font: "500 17px -apple-system, system-ui", color: "var(--ink)", pointerEvents: "none" }}>{host}</div>;
+function UrlBar({ left, top, width, host, h = BAR.h }: { left: number; top: number; width: number; host: string; h?: number }) {
+  return <div data-wd-system style={{ position: "absolute", left, top, width, height: h, borderRadius: 99, ...glass, display: "flex", alignItems: "center", justifyContent: "center", font: "500 17px -apple-system, system-ui", color: "var(--ink)", pointerEvents: "none" }}>{host}</div>;
 }
 
 /** Safari unfolded (Duo simulator): back and bookmarks, the address field centred, the +/tabs pill, then the clock
@@ -918,7 +978,7 @@ function OpenSafari({ w, host }: { w: number; host: string }) {
     <div style={{ position: "absolute", left: 0, top: 0, width: w, height: OPEN_BAR, background: "var(--card)", borderBottom: "0.5px solid var(--line)", color: "var(--ink)", pointerEvents: "none" }}>
       <div data-wd-system style={at(20)}><Glyph d="m15 18-6-6 6-6" style={{ opacity: 0.35 }} /></div>
       <div data-wd-system style={at(75)}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
-      <UrlBar left={(w - 356) / 2} top={23} width={356} host={host} />
+      <UrlBar left={(w - 356) / 2} top={23} width={356} h={46} host={host} />
       <div data-wd-system style={{ ...at(w - 234, 89), display: "flex", justifyContent: "space-evenly", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" style={{ margin: 0 }} /><Glyph d="M8 8h12v12H8zM4 16V4h12" style={{ margin: 0 }} />
       </div>
@@ -980,10 +1040,22 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
   );
 }
 
+const group: CSSProperties = { display: "flex", padding: 3, gap: 2, borderRadius: 99, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" };
+const glyphBox: CSSProperties = { width: 32, height: 34, padding: 0, display: "grid", placeItems: "center" };
+
+/** One icon in a toolbar, named by its tooltip. `on`: the current choice; `off`: not possible from here. */
+function Tool({ label, on, off, onClick, children }: { label: string; on?: boolean; off?: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button onClick={onClick} disabled={off} aria-label={label} title={label} aria-pressed={on}
+      style={{ ...control, ...glyphBox, background: on ? "var(--accent)" : "transparent", color: on ? "var(--bg)" : "var(--ink)", opacity: off ? 0.3 : 1, cursor: off ? "default" : "pointer", transition: "background 0.2s, color 0.2s" }}>{children}</button>
+  );
+}
+const Rule = () => <i aria-hidden style={{ width: 1, height: 18, margin: "0 3px", background: "var(--line)" }} />;
+
 function Button({ onClick, label, on, children }: { onClick: () => void; label: string; on?: boolean; children: ReactNode }) {
   return (
-    <button onClick={onClick} style={{ ...control, display: "flex", alignItems: "center", gap: 7, padding: "0 16px", background: on ? "var(--accent)" : "var(--card)", color: on ? "var(--bg)" : "var(--ink)", boxShadow: "0 0 0 0.5px var(--line)" }}>
-      {children}{label}
+    <button onClick={onClick} aria-label={label} title={label} aria-pressed={on} style={{ ...control, width: 40, display: "grid", placeItems: "center", background: on ? "var(--accent)" : "var(--card)", color: on ? "var(--bg)" : "var(--ink)", boxShadow: "0 0 0 0.5px var(--line)" }}>
+      {children}
     </button>
   );
 }
