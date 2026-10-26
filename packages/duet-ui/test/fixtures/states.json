@@ -1,0 +1,14 @@
+{
+  "source": "Duo Lab simulators (iOS 18.7 Safari, 3x), /probe beacons every 100ms, 2026-10-26. screen.* as Safari reported it: the closed window in portrait, turned in landscape.",
+  "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.7 Mobile/15E148 Safari/604.1",
+  "states": [
+    { "name": "tab, fresh load", "s": { "innerWidth": 382, "innerHeight": 580, "outerWidth": 466, "outerHeight": 678 }, "expect": { "mode": "column", "side": "right" } },
+    { "name": "tab, URL bar collapsing", "s": { "innerWidth": 382, "innerHeight": 592, "outerWidth": 466, "outerHeight": 678 }, "expect": { "mode": "column", "side": "right" } },
+    { "name": "tab, scrolled, URL bar collapsed (chrome 80, the closest tab state to the preview)", "s": { "innerWidth": 382, "innerHeight": 598, "outerWidth": 466, "outerHeight": 678 }, "expect": { "mode": "column", "side": "right" } },
+    { "name": "tab, keyboard up", "s": { "innerWidth": 382, "innerHeight": 598, "outerWidth": 466, "outerHeight": 678, "visualHeight": 272 }, "expect": { "mode": "column", "side": "right", "keyboard": true } },
+    { "name": "tab, landscape turned left", "s": { "innerWidth": 594, "innerHeight": 368, "outerWidth": 678, "outerHeight": 466, "screenWidth": 678, "screenHeight": 466, "angle": 90 }, "expect": { "mode": "column", "side": "left" } },
+    { "name": "tab, landscape turned right", "s": { "innerWidth": 594, "innerHeight": 368, "outerWidth": 678, "outerHeight": 466, "screenWidth": 678, "screenHeight": 466, "angle": 270 }, "expect": { "mode": "column", "side": "right" } },
+    { "name": "in-app preview, full screen", "s": { "innerWidth": 382, "innerHeight": 603, "outerWidth": 466, "outerHeight": 678, "insetBottom": 34 }, "expect": { "mode": "inline", "side": "left", "preview": true } },
+    { "name": "in-app preview, page sheet (known limitation: reads as windowed Safari)", "s": { "innerWidth": 366, "innerHeight": 600, "outerWidth": 450, "outerHeight": 670, "insetBottom": 34 }, "expect": { "mode": "column", "side": "right" } }
+  ]
+}

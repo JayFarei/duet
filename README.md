@@ -79,13 +79,21 @@ Duet re-reads the signals on resize, orientation change (including `screen.orien
 
 | Order | Mode | Conditions (all must hold) | Controls |
 | --- | --- | --- | --- |
-| 1 | `strip` | Running as a Home Screen app (`navigator.standalone` or `display-mode: standalone`), and the left or right safe-area inset is at least 60px. The right side wins if both are. Does not check for a Duo. | In the strip iOS gives the app, beside the page |
-| 2 | `column` | Not a Home Screen app; not inside an iframe; not the in-app Safari preview (below); the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the keyboard is down (visual viewport height at least `innerHeight - 1`); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column its own buttons leave empty, so the page keeps its full width |
-| 3 | `inline` | Everything else: unfolded at full width, landscape of unknown turn, keyboard up, other browsers, in-app web views, the in-app Safari preview, other phones, desktops | An 84px strip inside the page, on the side the user picks |
+| 1 | `strip` | Running as a Home Screen app (`navigator.standalone` or `display-mode: standalone`) on a Duo (`duo` true), and the left or right safe-area inset is at least 76px (the Duo's strip is 84; an iPhone's landscape sensor inset is 59, an Android cutout 62). The right side wins if both are. | In the strip iOS gives the app, beside the page |
+| 2 | `column` | Not a Home Screen app; not inside an iframe; not the in-app Safari preview (below); the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the page is not zoomed (`visualViewport.scale` 1); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column its own buttons leave empty, so the page keeps its full width |
+| 3 | `inline` | Everything else: unfolded at full width, landscape of unknown turn, other browsers, in-app web views, the in-app Safari preview, other phones, desktops | An 84px strip inside the page, on the side the user picks |
 
 "Safari" means the user agent has `Version/x Safari/` and none of the tokens of other iOS browsers and apps (`CriOS`, `FxiOS`, `EdgiOS`, `OPiOS`, `GSA/`, `Ddg/`); an in-app web view drops the `Safari/` token. `useDuet().browser` reports the result: `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` or `"other"`. Other browsers draw their own chrome where Safari has its column, so they always get `inline`.
 
 There is no fold signal. The mode follows the geometry: folding or unfolding changes the window size, and the mode follows on the next read.
+
+How a new reading is committed:
+
+- **Keyboard.** The keyboard does not change the mode. `useDuet().keyboard` is true while the visual viewport is shorter than the page, and `<Duet>` sets `data-keyboard`; in `column` mode the controls hide until it closes (it covers the lower column).
+- **Zoom.** While the page is zoomed (`visualViewport.scale` not 1, for example Safari zooming out when an input takes focus) the window signature is unreadable, so Duet keeps the last context.
+- **Drift.** While the window is still settling, a mode change at the same window size, page width and turn is held until the sizes stop moving; a change of window size, page width or turn commits at once.
+- **Loops.** A mode that flips twice in 2s at a stable window is pinned for 3s, doubling on each repeat up to 60s.
+- `useDuet().confidence` says how the context was reached: `"sure"` (settled signals), `"settling"` (the window is still moving) or `"held"` (the last context, kept through zoom or drift).
 
 ### Column mode: how it works
 
@@ -112,7 +120,9 @@ Links opened from social and mail apps can open in the in-app Safari preview (`S
 - the closed screen's 466x678 window with the column signature, at most 77px of chrome below the page (the preview has 75, a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
 - exactly 375x667 at `devicePixelRatio` 3, the size earlier builds gave the preview.
 
-Limits: a page-sheet preview (450x670 window) reads exactly like windowed Safari and still gets `column`; the open posture preview was not measured. When "Open in Safari" hands the page to a tab, the `pageshow`/`visibilitychange` re-read switches to `column`. Measurements are in [docs/research-notes.md](docs/research-notes.md).
+The verdict is sticky: a page that loaded as a tab stays a tab while its page height and insets move (scrolling collapses the URL bar to 80px of chrome), and is only re-decided when the window size, page width, turn, standalone or framing changes, or on `pageshow` or when the page becomes visible again. A preview that stops matching becomes a tab at once.
+
+Limits: a page-sheet preview (450x670 window) reads exactly like windowed Safari and still gets `column`; the open posture preview was not measured. When "Open in Safari" hands the page to a tab, the `pageshow`/`visibilitychange` re-read switches to `column`. The [/probe page](https://getduet.dev/probe) logs every signal the rule reads, every 100ms. Measurements are in [docs/research-notes.md](docs/research-notes.md).
 
 ### Oscillation guard
 
@@ -221,7 +231,7 @@ Both are live on the [site](https://getduet.dev): scroll until the tabs shrink, 
 
 ### `useDuet()`
 
-Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split` and `preview` (when true), `width` and `height` (the page viewport), `stableHeight` (the smallest page height seen at this window width and orientation, like CSS `svh`: it does not grow when Safari's URL bar collapses), plus the screen size and insets the placement uses. It works outside `<Duet>`.
+Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split`, `preview` and `keyboard` (when true), `confidence`, `width` and `height` (the page viewport), `stableHeight` (the smallest page height seen at this window width and orientation, like CSS `svh`: it does not grow when Safari's URL bar collapses), plus the screen size and insets the placement uses. It works outside `<Duet>`.
 
 ### Lower-level exports
 
@@ -286,7 +296,7 @@ Try it on the [site](https://getduet.dev/panes).
 - **Live Activities and the Dynamic Island are invisible to the page**, so the top band always reserves the worst case, which leaves empty space when no activity runs.
 - **Split-view panes can't tell their side**: column mode draws both edges, inline mode relies on the user's choice.
 - **Server rendering** starts from a fixed Duo snapshot (see [Server rendering](#server-rendering-and-hydration)).
-- Other iOS browsers, in-app web views, iframes, landscape other than the closed Safari tab, the open screen at full width and the keyboard all get `inline`.
+- Other iOS browsers, in-app web views, iframes, landscape other than the closed Safari tab and the open screen at full width all get `inline`.
 - Measured on the iPhone Duo simulator (iOS 27.1) and checked on a device in October 2026.
 
 ## Examples

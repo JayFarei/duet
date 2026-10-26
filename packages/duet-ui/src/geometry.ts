@@ -4,7 +4,7 @@
 /** strip: Home Screen web app, iOS gives us the right-hand strip.
  *  column: Safari tab, closed (portrait or landscape) or a split-view pane; Safari owns the strip and we paint
  *  into the free space of its column (an undocumented WebKit behaviour, so only when every signal matches).
- *  inline: anything else (open posture full width, keyboard up, other browsers); a right-edge strip inside
+ *  inline: anything else (open posture full width, other browsers); a right-edge strip inside
  *  the page viewport. */
 export type Mode = "strip" | "column" | "inline";
 /** Which screen edge the controls hug. strip: wherever iOS puts the strip (its safe-area inset). column:
@@ -83,6 +83,9 @@ export interface Signals {
   /** screen.orientation.angle: in closed landscape, which way the Duo is turned and so which side Safari's column
    *  is on (90: left, 270: right). Unknown keeps landscape inline. */
   angle?: number;
+  /** visualViewport.scale: above 1 under pinch zoom, when innerWidth is in zoomed px and says nothing about the
+   *  column. Unknown counts as 1. */
+  scale?: number;
 }
 
 export interface Context {
@@ -103,6 +106,13 @@ export interface Context {
   insetBottom: number;
   /** In-app Safari preview (SFSafariViewController, opened from a social or mail app). */
   preview?: boolean;
+  /** The on-screen keyboard is up (visual viewport shorter than the page). The mode stays as it was; in column
+   *  mode the controls hide until it goes down. */
+  keyboard?: boolean;
+  /** From stable() only. "sure": nothing is moving. "settling": the window is still settling after an event, so
+   *  the mode may still change. "held": the last committed context, kept while the page is pinch-zoomed or while a
+   *  drifting signal (viewport height) alone asks for another mode before the window settles. */
+  confidence?: "sure" | "settling" | "held";
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
@@ -135,11 +145,20 @@ const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "na
  *    (450x670, page 366x600, inset 34) it reads exactly like windowed Safari, so it is not told apart.
  *    In landscape the preview's bar is above the page, no column width, so it is inline anyway.
  *  - Older builds (device screenshot 2026-10-25): a fixed 375x667 window at 3x, a size no iPhone has natively. */
-const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: 77 } as const;
-export const isPreview = (s: Signals) => !s.standalone && browserOf(s.userAgent) === "safari" && (
-  (s.pixelRatio === PREVIEW.pixelRatio && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height)
-  || (s.insetBottom > 0 && hasColumn(s) && s.outerHeight - s.innerHeight <= PREVIEW.chrome
-    && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1));
+/** chrome: a band around the 75pt measured, clear of a tab's 98 and 80 (compact or scrolled URL bar). Windowed
+ *  Safari (70) and a compact split pane (75) have other window sizes. stable() also keeps a tab's verdict while it
+ *  scrolls, so a tab whose chrome drifts into the band mid-scroll is not taken for the preview. */
+const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [73, 77] } as const;
+/** Why the signals read as the in-app preview, for probes and logs; undefined when they do not. */
+export function previewReason(s: Signals): string | undefined {
+  if (s.standalone || browserOf(s.userAgent) !== "safari") return;
+  if (s.pixelRatio === PREVIEW.pixelRatio && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height) return "375x667 window at 3x";
+  const chrome = s.outerHeight - s.innerHeight;
+  // A tab measured inset 0 in every state (fresh, scrolled, keyboard, landscape); the preview 34.
+  if (s.insetBottom >= 20 && hasColumn(s) && within(chrome, PREVIEW.chrome)
+    && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1) return `466x678 window, ${chrome}pt chrome, inset ${s.insetBottom}`;
+}
+export const isPreview = (s: Signals) => previewReason(s) !== undefined;
 
 /** Window and screen sizes only the Duo has, as [short, long] sides: the closed screen (Safari's `screen.*` keeps
  *  466x678 after unfolding, so it holds in every Safari state), the open screen, and a split-view pane's window.
@@ -196,14 +215,20 @@ const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 102] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
 const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome);
 
-/** preferred: the side the user picked for inline controls, if any. */
-export function detect(s: Signals, preferred?: Side, allowColumn = true): Context {
+/** Side inset of a Home Screen app on the Duo: 84 measured (closed portrait). iPhones have up to 59 in landscape. */
+const STRIP_INSET = 76;
+
+/** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
+ *  caller holds a sticky one (stable()). */
+export function detect(s: Signals, preferred?: Side, allowColumn = true, preview = isPreview(s)): Context {
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
-  if (s.standalone && (s.insetRight >= 60 || s.insetLeft >= 60)) {
-    return { mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+  const keyboard = s.visualHeight < s.innerHeight - 1;
+  const kb = keyboard ? { keyboard } : {};
+  if (s.standalone && duo && (s.insetRight >= STRIP_INSET || s.insetLeft >= STRIP_INSET)) {
+    return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
-  const base = { duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
+  const base = { ...kb, duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
   // Closed landscape: the column is on the side the Duo is turned to, and the turn is the only signal for it.
   const landscape = s.innerWidth > s.innerHeight;
   const turned = s.angle === 90 ? "left" : s.angle === 270 ? "right" : undefined;
@@ -211,9 +236,11 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
   const columnSide: Side | undefined = !landscape ? "right" : closed ? turned : undefined;
   // Other iOS browsers draw their own chrome where Safari has its column: inline for them.
   // An in-app preview has the column signature too, but its column is full of its own buttons.
-  const preview = isPreview(s), split = isSplit(s);
+  // Pinch zoom puts innerWidth in zoomed px, so the column signature means nothing then (stable() holds instead).
+  // The keyboard leaves Safari's column in place (only the visual viewport shrinks), so it does not change the mode.
+  const split = isSplit(s);
   const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari" && !preview
-    && hasColumn(s) && s.visualHeight >= s.innerHeight - 1; // keyboard up
+    && hasColumn(s) && (s.scale ?? 1) === 1;
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
   if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight };
@@ -227,35 +254,67 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
  *  the wait, so a real loop settles instead of flickering. */
 export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: string; until?: number; ttl?: number;
   /** Smallest viewport height per width and orientation (Context.stableHeight). */
-  heights?: Record<string, number> }
+  heights?: Record<string, number>;
+  /** Sticky in-app preview verdict, and the window it was taken in. */
+  preview?: boolean; previewKey?: string;
+  /** Last context returned, and the stable signals it was committed under. */
+  last?: Context; stableKey?: string }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
+/** Longest pin: a loop that keeps resuming doubles the wait up to this. */
+export const PIN_MAX = 60000;
 
 /** settling: the window is still moving after a geometry event (signals.ts settling()). A fold lands the viewport
  *  first and outerWidth up to ~2s later, flipping the mode on the way at an unchanged window size, so flips then are
- *  the transition, not a loop, and do not count. */
-export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false): Context {
+ *  the transition, not a loop, and do not count.
+ *  epoch: signals.ts epoch(), bumped on pageshow and when the page becomes visible again.
+ *
+ *  Signals come in two kinds. Stable ones (window size, page width, turn, standalone, frame, epoch) change only on
+ *  load, fold, rotation or a new page show, and a mode they ask for is taken at once. Drifting ones (page height
+ *  with the URL bar or find bar, the visual viewport with the keyboard, pinch zoom) move while the user scrolls or
+ *  types, and never move the controls mid-gesture: a mode only they ask for waits until the window settles, and
+ *  under pinch zoom the last context holds.
+ *
+ *  The preview verdict is sticky the same way: a page that loaded as a tab stays a tab while it scrolls, since the
+ *  URL bar collapsing changes only the page height. A tab becomes a preview only on a stable change; a preview
+ *  becomes a tab as soon as the rule stops matching (Open in Safari). */
+export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false, epoch = 0): Context {
+  if ((s.scale ?? 1) !== 1 && d.last) {
+    const keyboard = s.visualHeight < s.innerHeight - 1 || undefined;
+    return { ...d.last, keyboard, confidence: "held" };
+  }
   const key = `${s.outerWidth}x${s.outerHeight}`;
+  const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`, raw = isPreview(s);
+  if (d.preview === undefined || !raw || stableKey !== d.previewKey) d.preview = raw;
+  d.previewKey = stableKey;
+  const preview = d.preview;
   // A loop keeps the window size; a fold or rotation passes through other sizes, so only same-size flips count.
   if (d.key !== key) Object.assign(d, { key, pinned: undefined, ttl: undefined, flips: [] });
   if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
-  let c = detect(s, preferred, !d.pinned);
+  let c = detect(s, preferred, !d.pinned, preview);
+  // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once.
+  if (d.last && c.mode !== d.last.mode && settling && stableKey === d.stableKey && !!d.last.preview === preview) {
+    const { width, height, insetTop, insetBottom, keyboard } = c;
+    return { ...d.last, width, height, insetTop, insetBottom, keyboard, confidence: "held" };
+  }
+  d.stableKey = stableKey;
   if (d.mode && c.mode !== d.mode && !settling) {
     d.flips = [...d.flips.filter((t) => now - t < FLIP_WINDOW), now];
     if (d.flips.length >= 3) {
       // Doubles only when the loop resumes as the last pin lifts; a later pane move starts from PIN_TTL again.
-      d.ttl = d.ttl && d.until !== undefined && now - d.until < FLIP_WINDOW ? d.ttl * 2 : PIN_TTL;
+      d.ttl = d.ttl && d.until !== undefined && now - d.until < FLIP_WINDOW ? Math.min(d.ttl * 2, PIN_MAX) : PIN_TTL;
       Object.assign(d, { pinned: key, until: now + d.ttl });
-      c = detect(s, preferred, false);
+      c = detect(s, preferred, false, preview);
     }
   }
   d.mode = c.mode;
+  c = { ...c, confidence: settling ? "settling" : "sure" };
   // A mobile browser's URL bar grows and shrinks the viewport as the page scrolls, while the window keeps its
   // width and orientation. A desktop window has no such bar: its height is the user's, so it stays current.
-  if (c.device === "desktop") return c;
+  if (c.device === "desktop") return d.last = c;
   const h = `${s.innerWidth}${s.outerWidth > s.outerHeight ? "L" : "P"}`, heights = d.heights ??= {};
   heights[h] = Math.min(heights[h] ?? Infinity, s.innerHeight);
-  return { ...c, stableHeight: heights[h] };
+  return d.last = { ...c, stableHeight: heights[h] };
 }
 
 /** Inline side drag, like a magnet: the controls resist leaving their edge (rubber band up to MAGNET.hold),

@@ -48,6 +48,7 @@ export function readSignals(): Signals {
     touchPoints: navigator.maxTouchPoints,
     angle: screen.orientation?.angle ?? ((((window as Window & { orientation?: number }).orientation ?? 0) + 360) % 360),
     standalone: (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches,
+    scale: visualViewport?.scale ?? 1,
   };
 }
 
@@ -60,7 +61,9 @@ export function readSignals(): Signals {
 export const SETTLE = { poll: 100, quiet: 500, cap: 2000, lag: 100 } as const;
 const subs = new Set<() => void>();
 let settle: { start: number; since: number; last: string; capped: boolean; timer: ReturnType<typeof setInterval> } | undefined;
-const sizes = () => `${outerWidth}x${outerHeight} ${innerWidth}x${innerHeight} ${visualViewport?.height ?? innerHeight}`;
+// Insets count too: the bottom inset lands only after viewport-fit=cover is set, and the preview rule reads it.
+const insets = () => { if (!probe) return ""; const p = getComputedStyle(probe); return `${p.paddingBottom} ${p.paddingLeft} ${p.paddingRight}`; };
+const sizes = () => `${outerWidth}x${outerHeight} ${innerWidth}x${innerHeight} ${visualViewport?.height ?? innerHeight} ${insets()}`;
 const notify = () => subs.forEach((f) => f());
 function kick() {
   if (settle) { settle.since = Date.now(); return; }
@@ -78,6 +81,11 @@ function tick() {
 }
 /** True while the window is still settling after a geometry event, for at most SETTLE.cap: mode flips then are the
  *  transition, not a feedback loop, so stable() must not count them. */
+let pages = 0;
+/** Bumped on pageshow and whenever the page becomes visible: the page may now be in another container (the in-app
+ *  preview's "Open in Safari" hands it to a tab without reloading), so stable() decides the preview afresh. */
+export const epoch = () => pages;
+
 export const settling = () => !!settle && Date.now() - settle.start < SETTLE.cap;
 
 /** Calls `cb` whenever the signals may have changed, so it can call readSignals() and detect() again: on resize,
@@ -88,9 +96,11 @@ export const settling = () => !!settle && Date.now() - settle.start < SETTLE.cap
  *  Returns the unsubscribe. Browser only. */
 export function watchSignals(cb: () => void): () => void {
   const on = () => { kick(); cb(); };
-  const visible = () => { if (document.visibilityState === "visible") on(); };
-  const win = ["resize", "orientationchange", "pageshow"] as const;
+  const shown = () => { pages++; on(); };
+  const visible = () => { if (document.visibilityState === "visible") shown(); };
+  const win = ["resize", "orientationchange"] as const;
   win.forEach((e) => addEventListener(e, on));
+  addEventListener("pageshow", shown);
   document.addEventListener("visibilitychange", visible);
   screen.orientation?.addEventListener("change", on);
   visualViewport?.addEventListener("resize", on);
@@ -104,6 +114,7 @@ export function watchSignals(cb: () => void): () => void {
     clearTimeout(t);
     if (!subs.size && settle) { clearInterval(settle.timer); settle = undefined; }
     win.forEach((e) => removeEventListener(e, on));
+    removeEventListener("pageshow", shown);
     document.removeEventListener("visibilitychange", visible);
     screen.orientation?.removeEventListener("change", on);
     visualViewport?.removeEventListener("resize", on);
