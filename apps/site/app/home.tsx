@@ -5,7 +5,7 @@ import { BookOpen, Layers, Moon, PanelBottom, PanelRight, Sparkles, Sun } from "
 import { Duet, DuoCookie, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { WebDuo } from "./duo/web-duo";
-import { useTheme } from "./theme";
+import { TINTS, useTheme, useTint } from "./theme";
 
 const REPO = "https://github.com/JayFarei/duet";
 const SECTIONS: DuetItem[] = [
@@ -14,9 +14,9 @@ const SECTIONS: DuetItem[] = [
   { id: "examples", label: "Examples", icon: <Layers size={24} /> },
 ];
 
-const QUICK = `import { Duet } from "duet-ui";
+const quick = (tint?: string) => `import { Duet } from "duet-ui";
 
-<Duet tabs={{ items: TABS, selected: tab, onSelect: setTab }}>
+<Duet tabs={{ items: TABS, selected: tab, onSelect: setTab }}${tint ? `\n  tint="${tint}"` : ""}>
   <App />
 </Duet>`;
 
@@ -45,6 +45,7 @@ function Site({ self }: { self: boolean }) {
   const { device, width, height } = useDuet();
   const [sides, setSides] = useState(false);
   const theme = useTheme();
+  const { tint } = useTint();
   const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
   if (device === "iphone" && height > width && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
@@ -56,7 +57,8 @@ function Site({ self }: { self: boolean }) {
         ...(device === "iphone" ? [{ id: "bars", label: "Top and bottom bars", icon: <PanelBottom size={22} />, onPress: () => setSides(false) }] : []),
       ]}
       minimizeOnScroll
-      dark={theme.forced}
+      appearance={theme.appearance}
+      tint={tint}
     >
       <Page self={self} />
     </Duet>
@@ -130,7 +132,7 @@ function Page({ self = false }: { self?: boolean }) {
       </section>
 
       <Section id="code" title="Integrate" lede="Wrap your app and pass your tabs. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
-        <Snippet code={QUICK} />
+        <Integrate />
         <div className="ctas" style={{ justifyContent: "flex-start" }}>
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
           <a href="/panes" className="pill">Panes example</a>
@@ -170,6 +172,23 @@ function Section({ id, title, lede, children }: { id: string; title: string; led
       <p className="lede lede-l">{lede}</p>
       {children}
     </section>
+  );
+}
+
+/** The quick start, with a tint picker: the stage and this page's own controls take the colour. */
+function Integrate() {
+  const { tint, setTint } = useTint();
+  const on = tint ?? TINTS[0][1];
+  return (
+    <>
+      <Snippet code={quick(tint)} />
+      <div className="tints" role="radiogroup" aria-label="Tint">
+        <span className="tints-k">Tint</span>
+        {TINTS.map(([name, c]) => (
+          <button key={c} role="radio" aria-checked={c === on} aria-label={name} className="tint" style={{ "--c": c } as CSSProperties} onClick={() => setTint(c)} />
+        ))}
+      </div>
+    </>
   );
 }
 

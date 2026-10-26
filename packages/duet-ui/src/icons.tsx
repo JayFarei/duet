@@ -1,4 +1,5 @@
-// The few system glyphs the chrome draws itself, inlined so the package has no icon dependency.
+// The few system glyphs the chrome draws itself, inlined so the package has no icon dependency. They carry
+// data-duet-glyph, so the icon theme (size, weight) leaves them at their native sizes.
 // Paths from Lucide (ISC, https://lucide.dev): chevron-left, ellipsis, search, x, arrow-left-right,
 // maximize-2, minimize-2.
 import type { ReactNode } from "react";
@@ -6,7 +7,7 @@ import type { ReactNode } from "react";
 const icon = (paths: ReactNode) => function Icon({ size = 22, strokeWidth = 2 }: { size?: number; strokeWidth?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth}
-      strokeLinecap="round" strokeLinejoin="round" aria-hidden>{paths}</svg>
+      strokeLinecap="round" strokeLinejoin="round" data-duet-glyph="" aria-hidden>{paths}</svg>
   );
 };
 

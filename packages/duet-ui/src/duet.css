@@ -1,6 +1,20 @@
 /* iOS 27 Duo strip controls on GlassyUI surfaces. Colours sampled from the native lab captures.
    Theme follows GlassyUI's [data-lg-theme] on <html> (system light/dark unless forced), with the media
-   query as the fallback before hydration. */
+   query as the fallback before hydration.
+
+   Theme tokens, a stable surface: set them on .duet (or any ancestor) in your own CSS, or through the
+   tint, appearance and icons props, which write the same vars.
+     --duet-tint            accent: selected tab, active menu item, primary button (system blue)
+     --duet-ink             text and default icon colour (black / white)
+     --duet-icon            icon colour when not selected (--duet-ink)
+     --duet-icon-size       icons in round buttons, groups and menus (22px)
+     --duet-tab-icon-size   icons in the tab pill (24px)
+     --duet-icon-weight     stroke width of SVG line icons (2)
+     --duet-badge, --duet-badge-neutral, --duet-badge-ink   badge fills (alert, neutral) and text
+     --duet-solid           opaque surface: menus in Safari's column, the badge's ring
+     --duet-frost, --duet-menu   glass veil of controls and of menus
+     --duet-sel, --duet-lift     selection and press highlight
+   Icons size and weigh your own SVGs and font glyphs (font-size: 1em); the system glyphs keep theirs. */
 .duet {
   -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
   --duet-solid: rgb(246 247 250);
@@ -13,6 +27,8 @@
   --duet-menu: rgb(255 255 255 / 0.55);
   --duet-ink: #000;
   --duet-tint: #0088ff;
+  --duet-icon-size: 22px; --duet-tab-icon-size: 24px; --duet-icon-weight: 2;
+  --duet-badge: #ff3b30; --duet-badge-neutral: #6e6e73; --duet-badge-ink: #fff;
   color: var(--duet-ink);
   -webkit-tap-highlight-color: transparent;
   /* A held press would otherwise start text selection and iOS's loupe instead of the lift. */
@@ -23,18 +39,24 @@
   :root:not([data-lg-theme="light"]) .duet {
     --duet-solid: rgb(38 38 40); --duet-ring: rgb(255 255 255 / 0.16);
     --duet-frost: rgb(0 0 0 / 0.24); --duet-lift: rgb(255 255 255 / 0.16);
-    --duet-sel: rgb(0 0 0 / 0.22); --duet-menu: rgb(0 0 0 / 0.4); --duet-ink: #fff;
+    --duet-sel: rgb(0 0 0 / 0.22); --duet-menu: rgb(0 0 0 / 0.4); --duet-ink: #fff; --duet-badge-neutral: #636366;
   }
 }
 [data-lg-theme="dark"] .duet {
   --duet-solid: rgb(38 38 40); --duet-ring: rgb(255 255 255 / 0.16);
   --duet-frost: rgb(0 0 0 / 0.24); --duet-lift: rgb(255 255 255 / 0.16);
-    --duet-sel: rgb(0 0 0 / 0.22); --duet-menu: rgb(0 0 0 / 0.4); --duet-ink: #fff;
+    --duet-sel: rgb(0 0 0 / 0.22); --duet-menu: rgb(0 0 0 / 0.4); --duet-ink: #fff; --duet-badge-neutral: #636366;
 }
 .duet button {
   appearance: none; border: 0; background: none; color: inherit; padding: 0; margin: 0; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
+/* Your icons: one size per context and one weight, like SF Symbols in a native bar. */
+.duet :is(.duet-item, .duet-tab, .duet-menu-item) { color: var(--duet-icon, var(--duet-ink)); font-size: var(--duet-icon-size); }
+.duet .duet-tab { font-size: var(--duet-tab-icon-size); }
+.duet :is(.duet-item, .duet-menu-item) > svg:not([data-duet-glyph]) { width: var(--duet-icon-size); height: var(--duet-icon-size); stroke-width: var(--duet-icon-weight); }
+.duet .duet-tab > svg:not([data-duet-glyph]) { width: var(--duet-tab-icon-size); height: var(--duet-tab-icon-size); stroke-width: var(--duet-icon-weight); }
+.duet .duet-primary .duet-item { color: var(--duet-tint); }
 .duet-glass {
   position: fixed; z-index: 50; box-sizing: border-box; border-radius: 999px; color: var(--duet-ink);
   box-shadow: 0 4px 14px rgb(0 0 0 / 0.06);
@@ -144,9 +166,10 @@
 .duet-glass:has(.duet-badge) { overflow: visible; contain: layout style; }
 .duet .duet-badge {
   position: absolute; top: 2px; left: calc(50% + 5px); min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
-  border-radius: 9px; background: #ff3b30; color: #fff; font: 600 12px/18px -apple-system, system-ui; text-align: center;
+  border-radius: 9px; background: var(--duet-badge); color: var(--duet-badge-ink); font: 600 12px/18px -apple-system, system-ui; text-align: center;
   font-variant-numeric: tabular-nums; pointer-events: none; box-shadow: 0 0 0 1.5px var(--duet-solid);
 }
+.duet .duet-badge[data-tone="neutral"] { background: var(--duet-badge-neutral); }
 .duet[data-side="right"] .duet-badge { left: auto; right: calc(50% + 5px); }
 .duet-accessory { display: flex; align-items: center; padding: 0 18px; font: 600 17px -apple-system, system-ui; gap: 12px; }
 .duet-accessory { transition: opacity 0.2s, transform 0.2s; }
@@ -195,7 +218,7 @@
 .duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
 /* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */
-.duet-menu-item[data-destructive] { color: #ff3b30; }
+.duet .duet-menu-item[data-destructive] { color: #ff3b30; }
 .duet-menu[data-style="morph"] > .duet-menu-item[data-sep] { box-shadow: 0 -0.5px 0 var(--duet-ring); border-top-left-radius: 0; border-top-right-radius: 0; }
 /* The primary action: the one tinted button, so the thumb finds it. */
 .duet-primary { color: var(--duet-tint); }
@@ -210,8 +233,9 @@
 .duet[data-side="left"] .duet-menu[data-style="morph"] { flex-direction: column; }
 .duet-menu[data-style="morph"] > .duet-menu-item {
   width: auto; height: 44px; border-radius: 16px; display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 0 12px;
-  font: 400 17px -apple-system, system-ui; text-align: left; white-space: nowrap;
+  font-weight: 400; text-align: left; white-space: nowrap;
 }
+.duet-menu[data-style="morph"] .duet-menu-label { font-size: 17px; color: var(--duet-ink); }
 .duet-menu[data-style="morph"] > .duet-menu-item > svg { flex: none; }
 .duet-menu-label { overflow: hidden; text-overflow: ellipsis; }
 .duet-menu[data-style="morph"] > .duet-menu-item { animation: duet-rise 0.15s 0.02s ease-out both; }
@@ -249,13 +273,12 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
    over dark and cream pages); ours match so the two sets read as one. The accessory sits over the page,
    not the column, so it keeps real glass; menus unroll over page content without blur, so they stay opaque. */
 .duet[data-mode="column"] { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 50; }
-:root .duet[data-mode="column"] .duet-glass:not(.duet-accessory) {
-  --duet-col: rgb(240 239 236 / 0.55); --duet-solid: rgb(246 247 250); --duet-ink: #000; --duet-edge: 0.3; --duet-rim: 0.15;
-}
+/* Menus open over the page, not the column, so they keep the page's appearance (the base tokens). */
+:root .duet[data-mode="column"] .duet-glass:not(.duet-accessory) { --duet-col: rgb(240 239 236 / 0.55); --duet-edge: 0.3; --duet-rim: 0.15; }
+:root .duet[data-mode="column"] .duet-glass:not(.duet-accessory, .duet-menu) { --duet-solid: rgb(246 247 250); --duet-ink: #000; }
 @media (prefers-color-scheme: dark) {
-  :root .duet[data-mode="column"] .duet-glass:not(.duet-accessory) {
-    --duet-col: rgb(90 89 84 / 0.43); --duet-solid: rgb(38 38 40); --duet-ink: #fff; --duet-edge: 0.6; --duet-rim: 0;
-  }
+  :root .duet[data-mode="column"] .duet-glass:not(.duet-accessory) { --duet-col: rgb(90 89 84 / 0.43); --duet-edge: 0.6; --duet-rim: 0; }
+  :root .duet[data-mode="column"] .duet-glass:not(.duet-accessory, .duet-menu) { --duet-solid: rgb(38 38 40); --duet-ink: #fff; }
 }
 .duet[data-mode="column"] .duet-glass { position: absolute; }
 /* Rim, measured at device pixels against Safari's buttons on cream and near-black pages, light and dark UI.

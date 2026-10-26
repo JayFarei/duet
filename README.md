@@ -164,10 +164,44 @@ Pass `onChange={() => router.refresh()}` from a client component to re-render wi
 | `accessory` | `ReactNode` | A view docked by the tabs, like `.tabViewBottomAccessory` (a mini player) |
 | `minimizeOnScroll` | `boolean` | Scrolling down shrinks the tabs to the selected one, like `.tabBarMinimizeBehavior(.onScrollDown)`. Follows the inner scroller and any pane |
 | `menuStyle` | `"island" \| "morph"` | How "…" and the minimized tab open their menu. Default `"island"` |
-| `dark` | `boolean` | Force a theme. Default: follow the system |
+| `appearance` | `"auto" \| "light" \| "dark"` | Light or dark, like `overrideUserInterfaceStyle`. Default `"auto"`: follow the system. `dark` (boolean) still works but is deprecated |
+| `tint` | `string` | Accent for the selected tab, the active menu item and the primary button, like iOS's `tintColor`. Default: system blue |
+| `icons` | `{ size?, tabSize?, weight?, color? }` | How your icons are drawn. See [Theming](#theming) |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
-`DuetItem` is `{ id, label, icon, onPress?, badge?, tint?, destructive? }`: `badge` is a number or short text in a red badge, `tint` the colour of a selected tab or a primary button. `DuetTab<T>` is a `DuetItem` whose `id` is `T`.
+`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey, for plain counts like a balance. `tint` overrides the strip's tint for that tab or primary button. `DuetTab<T>` is a `DuetItem` whose `id` is `T`.
+
+### Theming
+
+Deliberately small, like iOS: an accent, an appearance and your icons. The glass itself stays native.
+
+```tsx
+<Duet appearance="auto" tint="#ff2d55" icons={{ size: 21, tabSize: 24, weight: 1.75 }} tabs={...}>
+```
+
+- `tint` colours only what is active: the selected tab, the checked menu item, the primary button. Everything else stays ink (black in light, white in dark).
+- `appearance` sets the page theme. Menus follow it. In Safari's column the buttons keep following the system, so they match Safari's own; menus open over the page, so they keep `appearance`.
+- `icons` sizes and weighs your icons, the way the system sizes SF Symbols in a native bar: `size` (round buttons, groups, menus, default 22px), `tabSize` (tab pill, default 24px), `weight` (stroke width of SVG line icons such as Lucide, default 2) and `color` (unselected icons, default ink). SVGs are resized directly; font icons take the size as `font-size`, so give them `font-size: 1em` or leave it unset. The chrome's own glyphs (back, close, "…", search) keep their native sizes.
+
+Every prop writes a CSS custom property on `.duet`, so plain CSS can set the same tokens instead, globally or per appearance. These are stable:
+
+| Token | What it is | Default |
+| --- | --- | --- |
+| `--duet-tint` | Accent: selected tab, active menu item, primary button | `#0088ff` |
+| `--duet-ink` | Text and icon colour | black / white |
+| `--duet-icon` | Unselected icon colour | `--duet-ink` |
+| `--duet-icon-size` | Icons in round buttons, groups and menus | `22px` |
+| `--duet-tab-icon-size` | Icons in the tab pill | `24px` |
+| `--duet-icon-weight` | Stroke width of SVG line icons | `2` |
+| `--duet-badge`, `--duet-badge-neutral`, `--duet-badge-ink` | Badge fills (alert, neutral) and text | red, grey, white |
+| `--duet-solid` | Opaque surface: menus in Safari's column, the badge ring | near white / near black |
+| `--duet-frost`, `--duet-menu` | Glass veil of controls and of menus | sampled from iOS |
+| `--duet-sel`, `--duet-lift` | Selection and press highlight | sampled from iOS |
+
+```css
+:root .duet { --duet-tint: #ff2d55; --duet-icon-size: 21px; }
+:root[data-lg-theme="dark"] .duet { --duet-tint: #ff6482; }
+```
 
 ### Menu styles
 
