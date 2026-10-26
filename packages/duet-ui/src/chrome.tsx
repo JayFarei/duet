@@ -220,7 +220,8 @@ function useColumnLayer(on: boolean, split: boolean, column: number) {
     const html = document.documentElement.style, prev = html.touchAction;
     html.touchAction = "pan-y"; // the layer widens the document; keep the page from panning sideways
     const follow = () => {
-      if (split && Math.round(scrollX) !== column) scrollTo(column, scrollY);
+      // An emulating host already frames both columns; pinning there loops in iOS Safari, whose frame overflows a few px.
+      if (split && !emulated && Math.round(scrollX) !== column) scrollTo(column, scrollY);
       for (const el of els) el.style.transform = scrollY ? `translateY(${scrollY}px)` : "";
     };
     const tap = (e: PointerEvent) => {
