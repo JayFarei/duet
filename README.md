@@ -123,6 +123,8 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 - **Below:** Safari's +/tabs pill, or the bottom edge.
 - **Closed landscape:** Safari moves its back and reader rows and its pill on each side (left column: back slot top 81.5pt, pill top 327pt; right column: 23.5pt and 279pt), and Duet takes the gap between. Measured with a bare island; how Live Activities grow it sideways is not yet known.
 - **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item.
+- **The free middle of Safari's column:** before `leading` or `primary` fold, they may rise into the space the island only takes with Live Activities (up to 91.7pt above the band, in a closed portrait tab and the right split pane), and the stack packs down onto the tabs so it rises as little as it can. Back, actions and "…" never do. With no activity running the item sits clear of Safari's reader button; with two activities the reader can cover part of it.
+- **Safari's column buttons are an exclusion zone for menus too.** Native chrome always paints over the page, so z-index can't help. A menu that reaches into the column keeps its top at or below `columnTop` (the reader button's worst-case bottom plus 11pt) and its bottom above Safari's pill, opening flush with the column like Safari's own menus. A morph list too tall for that band opens wholly over the page, beside the column, where it may rise to the top of the page. One too tall even there caps its height and scrolls inside. `plan()` returns `columnTop` and `columnBottom` in `column` mode, and Duet sets `--duet-safe-top-column` on `<html>` for your own popovers (0 outside `column` mode).
 
 ## Server rendering and hydration
 
@@ -182,7 +184,7 @@ Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wid
 
 ### Lower-level exports
 
-`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `plan`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests. `duet-ui/geometry` exports the geometry module alone, without React.
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `plan`, `columnBand`, `morphBox`, `islandBox`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests. `duet-ui/geometry` exports the geometry module alone, without React.
 
 ## Laying out content
 
@@ -191,7 +193,7 @@ The page spans the whole window and the controls float over it, so backgrounds r
 - `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
 - `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image). The `duet-bleed` class does the same in CSS.
 
-Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right`, `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear). Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
+Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right`, `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear) and `--duet-safe-top-column` (in `column` mode, the top of the part of Safari's column clear of its back and reader buttons: keep popovers that cross the column below it). Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
 
 ## Panes
 
