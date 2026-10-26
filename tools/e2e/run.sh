@@ -15,10 +15,9 @@ STARTED=""
 up() { curl -s -o /dev/null -m 2 "$1"; }
 alive() { curl -s -m 2 localhost:3141/runner | grep -q true; }
 cleanup() {
-  for p in $STARTED; do
-    [ "$p" = runner ] && { curl -s -m 5 -XPOST localhost:3141/cmd?timeout=3000 -d '{"op":"stop"}' >/dev/null || true; continue; }
-    kill "$p" 2>/dev/null || true
-  done
+  # The runner is stopped through the beacon, so before the beacon is killed (else it outlives the run, stale).
+  case " $STARTED " in *" runner "*) curl -s -m 5 -XPOST localhost:3141/cmd?timeout=3000 -d '{"op":"stop"}' >/dev/null || true ;; esac
+  for p in $STARTED; do [ "$p" = runner ] || kill "$p" 2>/dev/null || true; done
 }
 trap cleanup EXIT INT TERM
 

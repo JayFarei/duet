@@ -86,7 +86,13 @@ final class Runner: XCTestCase {
       let label = c["label"] as! String
       let b = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", label)).firstMatch
       guard b.waitForExistence(timeout: 5) else { throw NSError(domain: "e2e", code: 1, userInfo: [NSLocalizedDescriptionKey: "no button \(label)"]) }
-      b.tap(); return [:]
+      // Tap the button's centre through SpringBoard, not b.tap(): XCUITest first waits for the target app to idle,
+      // and SafariViewService over a page with running animations never reports idle (60s stall, then the beacon's
+      // command timeout). SpringBoard idles at once and the touch lands on the same screen point.
+      let f = b.frame
+      XCUIApplication(bundleIdentifier: "com.apple.springboard").coordinate(withNormalizedOffset: .zero)
+        .withOffset(CGVector(dx: f.midX, dy: f.midY)).tap()
+      return ["x": f.midX, "y": f.midY]
     case "tapAt":
       let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
       sb.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: c["x"] as! Double, dy: c["y"] as! Double)).tap()

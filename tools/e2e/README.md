@@ -37,7 +37,7 @@ The only thing that rotates the Duo outer display is the Claude Code iOS Simulat
 
 Per step, over 2.5s of samples filtered to the step's page id:
 
-- preview flag, mode and side match the expected state (Safari tab: column right at 0 and 270, column left at 90; preview: column inside the native gap).
+- preview flag, mode and side match the expected state (Safari tab: column right at 0 and 270, column left at 90; preview: column in the native gap in portrait; turned, inline on the side away from the preview's column, right at 90 and left at 270, since its gap is ~26pt).
 - every slot is on screen and does not overlap a native button. In the preview, slots must sit in the gap of the native column between Page Menu (or Cancel/Done/Close) and Back, if that gap is at least 49pt tall; otherwise any non-overlapping fallback passes, noted.
 - no clipped text or overflowing block within the visible band; content not under controls.
 - settle: the last placement change is within 0.5s of the step's first sample and nothing moves after (drift).

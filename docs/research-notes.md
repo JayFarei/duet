@@ -1,6 +1,6 @@
 > **Historical lab notes from 2026-10-24**, written while column mode was being built, before `duet-ui` was published. Paths, names (`native-chrome`, `DuoChrome`) and some conclusions are out of date, for example split-view panes now use Safari's column on both sides instead of always falling back to inline. For current behaviour, read the [README](../README.md#how-duet-decides) and `packages/duet-ui/src/geometry.ts`.
 >
-> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait or a known landscape turn, not zoomed; the keyboard keeps the mode) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here. An in-app Safari preview (a 466x678 window with 75pt of chrome and a bottom inset, or the older 375x667 at 3x) is inline, on the left.
+> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait or a known landscape turn, not zoomed; the keyboard keeps the mode) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here. An in-app Safari preview (a 466x678 window with 75pt of chrome and a bottom inset, a sheet inside the screen, or the older 375x667 at 3x) is `column` in portrait, in the gap of its own column between reader/menu and back; turned, `inline` on the side away from its column (see "Preview placement in the gap").
 
 # Handoff: our controls inside Safari's column on the iPhone Duo
 
@@ -269,3 +269,21 @@ Real Duo, iOS 18.7, Safari UA Version/27.0, angle 0, pixelRatio 3, link opened f
 
 - Preview sheet: inner 366x600, outer 450x670, screen 466x678, chrome 70, column 84. `safe-area-inset-bottom` reads 0 on the first sample and 34 about 100ms later. Rule: Safari, not standalone, inset >= 20, the column signature, screen exactly 466x678, and a portrait window at least 4pt inside it on both sides. No tab is inside the screen: closed 466x678, open 951x669, split pane 469x669 (wider than the 466 screen Safari keeps reporting), and tabs read inset 0 in every state. iOS has no windowed Safari or Stage Manager; the 2026-10-25 "windowed Safari" trace (453x661 and 450x670) was most likely this sheet. `stable()` lets a tab verdict rise to preview in the first second of a window (`PREVIEW_RISE`) for the late inset.
 - Slow slide after a back/forward cache restore (split left pane, back from /probe): the column layer pins `scrollX` to the column width with `scrollTo` on every scroll event. Under the site's `html { scroll-behavior: smooth }` each call started a smooth scroll and the next scroll event restarted it, so the controls crept from x 80 into the column over 2 to 3s. Fix: `behavior: "instant"`, a pin on `pageshow`, and transitions off again for 1.1s after a persisted `pageshow`, as at first mount.
+
+## Preview placement in the gap (2026-10-26, user decision)
+
+Native frames from the e2e runner (XCUITest on `com.apple.SafariViewService`, Duo Lab, iOS 27.1), screen points, buttons 48x48:
+
+| Presentation | Page on screen | Column x | Close / reader | Back / share / reload / Safari | Free gap |
+| --- | --- | --- | --- | --- | --- |
+| Sheet, portrait | 366x600 at (8, 78) | 386 | 174 / 234 | 428 / 488 / 542 / 596 | y 282 to 428, 146pt |
+| Full screen and default, portrait | 382x603 at (0, 75) | 394 | 174 / 234 | 428 / 488 / 542 / 596 | y 282 to 428, 146pt |
+| Sheet, angle 90 (662x458 outer, 578x388 inner) | column left | 32 | 82 / 142 | 216 / 276 / 330 / 384 | 26pt |
+| Sheet, angle 270 | column right | 598 | 32 / 92 | 168 / ... | 28pt |
+
+- The real Duo (iOS 18.7, Messages, screenshot) matches portrait: reader bottom ~281, back top ~429.
+- A probe page confirmed that in-document absolute content paints into the preview's column under its buttons (fixed content is clipped to the viewport), as in a tab, so the column layer works there.
+- Portrait: `column`, band = the gap less `DUO.gap` each side, converted to page coordinates by `678 - innerHeight` (the page reaches the screen bottom); centre `outerWidth - 48.2`, the native buttons' centre. 124pt holds "…" and the minimized selected tab (49 + 11 + 49).
+- Turned: no usable gap, so `inline` on the side away from the preview's column; the preview rule now accepts the sheet in either orientation.
+- Unknown: the preview's buttons with Live Activities (the old note's ~31pt worst case assumed the island pushes them like Safari's rows; not measured).
+

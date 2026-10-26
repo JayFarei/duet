@@ -42,10 +42,10 @@ test("the sheet's late inset (0, then 34 ~100ms later, real Duo) still rises to 
   const sheet = at("in-app preview, page sheet (real"), first = at("in-app preview, page sheet, first sample");
   assert.deepEqual([stable(d, first, undefined, 0).mode, d.preview], ["column", false]);
   const c = stable(d, sheet, undefined, 100, true);
-  assert.deepEqual([c.mode, c.side, c.preview], ["inline", "left", true]);
+  assert.deepEqual([c.mode, c.side, c.preview], ["column", "right", true]);
   assert.match(previewReason(sheet), /450x670 sheet in the 466x678 screen/);
 });
-test("the sheet rule wants the inset, the column, a portrait window inside the closed screen and Safari", () => {
+test("the sheet rule wants the inset, the column, a window inside the closed screen and Safari", () => {
   const sheet = at("in-app preview, page sheet (real");
   assert.equal(isPreview({ ...sheet, insetBottom: 0 }), false);
   assert.equal(isPreview({ ...sheet, innerWidth: 450 }), false, "no column");

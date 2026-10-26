@@ -21,6 +21,9 @@ ROT_TIMEOUT = 120
 
 # Expected per state (EXPECTED.md). angle -> (mode, side) for a closed Safari tab; None = record only.
 TAB = {0: ("column", "right"), 90: ("column", "left"), 270: ("column", "right"), 180: None}
+# In-app preview (EXPECTED.md, user decision 2026-10-26): portrait, in the gap of the preview's own column. Turned,
+# that gap is ~26pt, so inline on the side away from the preview's column (on the side the Duo is turned to).
+PREVIEW = {0: {"mode": "column", "side": "right", "gap": True}, 90: {"mode": "inline", "side": "right"}, 270: {"mode": "inline", "side": "left"}}
 # Rotation cycle, all counter-clockwise ("left") turns so any rotator (the agent, a human, a future CLI) can follow
 # it: 0 -> 90 is one turn, 90 -> 270 is two (through upside down, which Safari and the preview do not adopt, so the
 # page jumps landscape to landscape like a real flip), 270 -> 0 is one. Angle 180 is not a UI state on the Duo.
@@ -328,15 +331,14 @@ class Run:
 
     def scenario_preview(s, style, rotations=True):
         tok = f"pv{style}{int(time.time())}"
-        exp = {"preview": True, "mode": "column", "gap": True}
-        s.step(f"preview-{style}-0", "preview", tok, s.open_preview(tok, style), exp, f"in-app preview ({style}), portrait")
+        s.step(f"preview-{style}-0", "preview", tok, s.open_preview(tok, style), {"preview": True, **PREVIEW[0]}, f"in-app preview ({style}), portrait")
         if rotations:
             for a in CYCLE:
-                s.step(f"preview-{style}-{s.angle}to{a}", "preview", tok, s.rotate(tok, a), exp, f"in-app preview ({style}), rotate to angle {a}")
+                s.step(f"preview-{style}-{s.angle}to{a}", "preview", tok, s.rotate(tok, a), {"preview": True, **PREVIEW[a]}, f"in-app preview ({style}), rotate to angle {a}")
 
     def scenario_open_safari(s):
         tok = "pvos" + str(int(time.time()))
-        s.step("openinsafari-preview", "preview", tok, s.open_preview(tok, "sheet"), {"preview": True, "mode": "column", "gap": True}, "in-app preview (sheet) before Open in Safari")
+        s.step("openinsafari-preview", "preview", tok, s.open_preview(tok, "sheet"), {"preview": True, **PREVIEW[0]}, "in-app preview (sheet) before Open in Safari")
         s.step("openinsafari-tab", "tab", tok, s.open_in_safari(tok), {"preview": False, "mode": "column", "side": "right"}, "preview -> Open in Safari -> Safari tab, portrait")
 
     SCENARIOS = {

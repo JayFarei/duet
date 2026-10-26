@@ -37,7 +37,9 @@ function sample() {
   // Visible elements that stick out of the layout viewport (clipped content), Duet's own layer and content inside
   // a deliberate inner horizontal scroller narrower than the page (a code block) excluded. Full-bleed wrappers are reported too: the assertion
   // decides what counts, this only measures.
-  const W = document.documentElement.clientWidth, out: { el: string; rect: ReturnType<typeof rect>; over: number; text: boolean }[] = [];
+  // The visible band follows the horizontal scroll offset: a landscape preview reports scrollX = +-84 (the native
+  // column's inset) with static content shifted by it and still fully visible (e2e.py applies the same band).
+  const W = document.documentElement.clientWidth, lo = Math.min(0, -scrollX), hi = Math.max(W, W - scrollX), out: { el: string; rect: ReturnType<typeof rect>; over: number; text: boolean }[] = [];
   const slots = navs.flatMap((n) => n.slots.map((s) => s.rect));
   const under: { el: string; rect: ReturnType<typeof rect>; slot: number }[] = [];
   const scroller = (el: Element) => {
@@ -46,7 +48,7 @@ function sample() {
       if ((ox === "auto" || ox === "scroll") && a.scrollWidth > a.clientWidth + 1) {
         // A page-wide scroller (Duet's own) is the page, not a deliberate inner scroller.
         const b = a.getBoundingClientRect();
-        if (b.width < W - 1 && b.right <= W + 1 && b.left >= -1) return true;
+        if (b.width < W - 1 && b.right <= hi + 1 && b.left >= lo - 1) return true;
       }
     }
     return false;
@@ -56,7 +58,7 @@ function sample() {
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
     const text = [...el.childNodes].some((c) => c.nodeType === 3 && (c.textContent ?? "").trim()) || /^(IMG|SVG|BUTTON|INPUT|VIDEO|CANVAS|A)$/i.test(el.tagName);
-    const over = Math.max(r.right - W, -r.left);
+    const over = Math.max(r.right - hi, lo - r.left);
     if (over > 1 && shown(el) && !scroller(el)) out.push({ el: label(el), rect: rect(el), over: Math.round(over), text });
     if (text && r.top < innerHeight && r.bottom > 0) {
       const i = slots.findIndex((s) => r.left < s.x + s.w - 2 && r.right > s.x + 2 && r.top < s.y + s.h - 2 && r.bottom > s.y + 2);
