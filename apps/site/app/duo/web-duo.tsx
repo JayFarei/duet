@@ -59,6 +59,9 @@ const ease = "cubic-bezier(0.32, 0.72, 0, 1)";
 const TURN = 650; // rotation, ms
 const FOLD = 900;
 const MOVE = 520; // the page frame moving between apps
+// While the device folds or turns the page never blanks: it blurs and dims first (VEIL ms), the swinging half shows the
+// same dimmed tone, and the new layout sharpens in (SETTLE_MS), like iOS on the Duo.
+const VEIL = 220, SETTLE_MS = 450, BLUR = "blur(10px) brightness(0.62)", DIM = 0.38;
 const HOLD = 1600; // the tour's pause at each stop, once settled
 
 interface Box { x: number; y: number; w: number; h: number }
@@ -252,13 +255,19 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     // The drop shadow follows the device's footprint: the right half, plus the flap's reach left of the hinge.
     const half = BODY.open.w / 2, reach = (t: number) => `${half * (1 - Math.max(0, Math.cos(Math.PI * (1 - t))))}px`;
     const steps = Array.from({ length: 25 }, (_, i) => a + (b - a) * i / 24);
+    // Each face of the flap darkens as it turns edge-on, from the page's veiled tone.
+    const [inner, outer] = flap.current?.querySelectorAll<HTMLElement>("[data-wd-shade]") ?? [];
+    const shade = (t: number, face: 0 | 1) => { const deg = 180 * (1 - t), off = face ? 180 - deg : deg; return Math.min(0.9, DIM + 0.45 * Math.min(1, off / 90)); };
     return [
+      inner?.animate(steps.map((t) => ({ opacity: shade(t, 0) })), o),
+      outer?.animate(steps.map((t) => ({ opacity: shade(t, 1) })), o),
       hinge.current?.animate([{ transform: shift(a) }, { transform: shift(b) }], o),
       flap.current?.animate([{ transform: `rotateY(${180 * (1 - a)}deg)` }, { transform: `rotateY(${180 * (1 - b)}deg)` }], o),
       shadow.current?.animate(steps.map((t) => ({ left: reach(t) })), o),
     ].filter((x): x is Animation => !!x);
   };
   const finished = (as: Animation[]) => Promise.all(as.map((a) => a.finished)).catch(() => {});
+  const veil = (on: boolean, ms: number) => page.current?.animate([{ filter: on ? "none" : BLUR }, { filter: on ? BLUR : "none" }], { duration: ms * k.current, easing: "ease", fill: "forwards" }).finished.catch(() => {});
   const go = async (next: Partial<State>, fromTour = false) => {
     if (!fromTour) setTour(false);
     if (busy.current) return;
@@ -268,19 +277,23 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     Object.assign(n, fit(n));
     if (!fromTour) setAt(TOUR.findIndex((t) => sameView(t, n)));
     if (n.posture === p.posture && n.rotated === p.rotated) return setS(n);
-    // The page fades out while the device moves and back in once it has settled, laid out for the new screen.
+    // The page veils before the device moves and sharpens once it has settled, laid out for the new screen.
     busy.current = true;
     flushSync(() => setInstant(true));
-    const fade = page.current?.animate([{ opacity: 1 }, { opacity: 0, offset: 0.12 }, { opacity: 0, offset: 0.78 }, { opacity: 1 }], { duration: (FOLD + 450) * k.current, easing: "ease" }).finished;
+    await veil(true, VEIL);
     if (n.posture !== p.posture) {
       const open = n.posture === "open";
       flushSync(() => { setFolding(true); if (open) setS(n); });
       await finished(swing(open));
       flushSync(() => { if (!open) setS(n); setFolding(false); });
       hinge.current?.getAnimations({ subtree: true }).forEach((a) => a.cancel());
-    } else setS(n);
+    } else {
+      setS(n);
+      await new Promise((r) => setTimeout(r, TURN * k.current));
+    }
     busy.current = false;
-    await fade?.catch(() => {});
+    await veil(false, SETTLE_MS);
+    page.current?.getAnimations().forEach((a) => a.cancel());
     setInstant(false);
   };
 
@@ -291,7 +304,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       if (busy.current) return;
       setTour(false);
       busy.current = true;
-      page.current?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160 * k.current, fill: "forwards" });
+      veil(true, 160);
       flushSync(() => { setInstant(true); setFolding(true); setS((p) => fit({ ...p, posture: "open" })); });
       held.current = swing(true, "linear");
       held.current.forEach((a) => a.pause());
@@ -309,7 +322,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     flushSync(() => { if (!open) setS((p) => fit({ ...p, posture: "closed" })); setFolding(false); setScrub(null); });
     as.forEach((a) => a.cancel());
     busy.current = false;
-    await page.current?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450 * k.current, easing: "ease" }).finished.catch(() => {});
+    await veil(false, SETTLE_MS);
     page.current?.getAnimations().forEach((a) => a.cancel());
     setInstant(false);
   };
@@ -414,7 +427,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   useEffect(() => {
     if (slots || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     // After the fold and the page's fade-in when the device moved, else once the page has slid into place.
-    const wait = (moved.current !== `${s.posture}-${s.rotated}` ? FOLD + 450 : MOVE + 250) * k.current;
+    const wait = (moved.current !== `${s.posture}-${s.rotated}` ? VEIL + FOLD + SETTLE_MS : MOVE + 250) * k.current;
     moved.current = `${s.posture}-${s.rotated}`;
     const on = setTimeout(() => {
       const d = frame.current?.contentDocument;
@@ -424,7 +437,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         return r.width && r.height && cs.visibility !== "hidden" && +cs.opacity > 0.05 ? [{ x: r.left, y: r.top, w: r.width, h: r.height }] : [];
       }));
     }, wait);
-    const off = setTimeout(() => setShine([]), wait + 2000);
+    const off = setTimeout(() => setShine([]), wait + 1500);
     return () => { clearTimeout(on); clearTimeout(off); setShine([]); };
   }, [shown, slots]);
 
@@ -648,17 +661,19 @@ function Note({ mode, text, hidden }: { mode: string; text: string; hidden?: boo
 function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const half = BODY.open.w / 2, face: CSSProperties = { position: "absolute", inset: 0, backfaceVisibility: "hidden", background: FINISH.front, boxShadow: BODY_SHADE };
   // A soft sheen across each face, so the swinging half reads against a dark page.
+  // The screen under the flap, at the veiled page's tone; swing() darkens it as the face turns away.
+  const shadeEl = <div data-wd-shade style={{ position: "absolute", inset: 0, background: "#000", opacity: DIM }} />;
   const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", cornerShape: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" } as CSSProperties} />;
   return (
     <div ref={ref} style={{ position: "absolute", left: 0, top: 0, width: half, height: BODY.open.h, transformOrigin: "100% 50%", transformStyle: "preserve-3d", transform: "rotateY(180deg)" }}>
       <div data-wd-shape style={{ ...face, boxShadow: undefined, overflow: "hidden", ...corners([C.free, C.none, C.none, C.free]) }}>
         {/* The rim runs past the hinge edge, where this half meets the other, so no seam shows down the middle. */}
         <div style={{ position: "absolute", inset: "0 -4px 0 0", borderRadius: "inherit", cornerShape: "inherit", boxShadow: BODY_SHADE } as CSSProperties} />
-        <div data-wd-shape style={{ position: "absolute", left: BODY.open.x, top: BODY.open.y, right: 0, bottom: BODY.open.y, ...corners([C.inner, C.none, C.none, C.inner]), background: "var(--bg)" }} />
+        <div data-wd-shape style={{ position: "absolute", left: BODY.open.x, top: BODY.open.y, right: 0, bottom: BODY.open.y, ...corners([C.inner, C.none, C.none, C.inner]), background: "var(--bg)", overflow: "hidden" }}>{shadeEl}</div>
         {sheen}
       </div>
       <div data-wd-shape style={{ ...face, transform: "rotateY(180deg)", ...corners(BODY.closed.r) }}>
-        <div data-wd-shape style={{ position: "absolute", left: BODY.closed.x, top: BODY.open.y, right: 13, bottom: BODY.open.y, ...corners(BODY.closed.screenR), background: "var(--bg)" }} />
+        <div data-wd-shape style={{ position: "absolute", left: BODY.closed.x, top: BODY.open.y, right: 13, bottom: BODY.open.y, ...corners(BODY.closed.screenR), background: "var(--bg)", overflow: "hidden" }}>{shadeEl}</div>
         {/* The camera is hardware: it swings in with the outer display, where the Island takes over once closed. */}
         <div style={{ ...CAMERA_PILL, left: BODY.closed.x + CAMERA.x - CAMERA_PILL.width / 2, top: BODY.closed.y + CAMERA.y - CAMERA_PILL.width / 2, height: CAMERA_PILL.width }} />
         {sheen}
@@ -778,10 +793,10 @@ function OpenSafari({ w, host }: { w: number; host: string }) {
       <div data-wd-system style={at(20)}><Glyph d="m15 18-6-6 6-6" style={{ opacity: 0.35 }} /></div>
       <div data-wd-system style={at(75)}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
       <UrlBar left={(w - 356) / 2} top={23} width={356} host={host} />
-      <div data-wd-system style={{ ...at(w - 235, 109), display: "flex", justifyContent: "space-evenly", alignItems: "center" }}>
+      <div data-wd-system style={{ ...at(w - 234, 89), display: "flex", justifyContent: "space-evenly", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" style={{ margin: 0 }} /><Glyph d="M8 8h12v12H8zM4 16V4h12" style={{ margin: 0 }} />
       </div>
-      <div data-wd-system style={{ position: "absolute", right: 30, top: 21, display: "flex", alignItems: "center", gap: 11 }}><Clock /><Battery /></div>
+      <div data-wd-system style={{ position: "absolute", right: 26, top: 21, display: "flex", alignItems: "center", gap: 17 }}><Clock /><Battery /></div>
       <div data-wd-system style={{ position: "absolute", left: 20, right: 20, top: 80, height: 33, borderRadius: 99, background: "var(--bg)", display: "flex", alignItems: "center", padding: 2, gap: 2, font: "500 13px -apple-system, system-ui" }}>
         {["Duo Lab", "Duo Lab", "Duet"].map((t, i, all) => (
           <div key={i} style={{ flex: 1, height: "100%", borderRadius: 99, display: "grid", placeItems: "center", ...(i === all.length - 1 && { ...glass, flex: 1.4 }) }}>{t}</div>
