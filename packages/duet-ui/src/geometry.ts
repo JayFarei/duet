@@ -291,25 +291,65 @@ export interface Plan {
   tabs?: Box & { min: boolean };
   searchButton?: Box;
   accessory?: { left: number; width: number; top: number; height: number };
+  /** Column mode: the band clear of Safari's column buttons (columnBand). Menus crossing the column stay inside
+   *  it; only leading items and the primary action may rise above columnTop, into the island's reach. */
+  columnTop?: number;
+  columnBottom?: number;
 }
 
 /** Closed landscape Safari tab: its column's buttons sit apart from portrait's (SAFARI.landscape). */
 const landscapeColumn = (c: Context) => !c.split && c.screenWidth > c.screenHeight;
 const groupHeight = (n: number) => DUO.control + (n - 1) * DUO.groupItem;
 
+/** Safari's column buttons are an exclusion zone like the insets: native chrome always paints over the page, so
+ *  nothing of ours shows over its back + reader rows or its +/tabs pill. `top`: the reader row's bottom plus
+ *  DUO.gap, at its worst-case (island-pushed) position. `bottom`: DUO.gap above the pill. `reach`: how far the
+ *  island can push the rows, so with a bare island the free band starts that much higher; Live Activities, which
+ *  nothing tells the page, take it back. Column mode only; landscape rows are measured with a bare island. */
+export function columnBand(c: Context): { top: number; bottom: number; reach: number } | undefined {
+  if (c.mode !== "column") return undefined;
+  const rows = SAFARI.rows * (DUO.control + DUO.gap), pill = c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap;
+  if (c.split) return { top: SAFARI.splitTop[c.side] + rows, bottom: pill, reach: c.side === "right" ? DUO.island : 0 };
+  if (landscapeColumn(c)) return { top: SAFARI.landscape[c.side].top + rows, bottom: SAFARI.landscape[c.side].pill - DUO.gap, reach: 0 };
+  return { top: DUO.top + DUO.island + rows, bottom: pill, reach: DUO.island };
+}
+
+/** Morph menu placement: the button grows into a labelled list, outer edge on the button's, opening down from
+ *  its top or up from its bottom. Where it crosses Safari's column it stays inside the column band (flush with
+ *  the column, as Safari's own menus open); a list too tall for that band moves wholly over the page, beside the
+ *  column, where it may rise to the top; one too tall even there caps its height and scrolls. x0/y0: the button's
+ *  top-left, where the morph starts. */
+export function morphBox(c: Context, p: Plan, b: Box, n: number) {
+  const w = MORPH.width, full = 2 * MORPH.pad + n * MORPH.row, x0 = p.left, y0 = b.top + b.height / 2 - DUO.control / 2;
+  const place = (lo: number, hi: number) => {
+    const height = Math.min(full, hi - lo), down = y0 >= lo && y0 + height <= hi;
+    return { top: Math.min(Math.max(down ? y0 : y0 + DUO.control - height, lo), hi - height), height };
+  };
+  const flush = c.side === "left" ? p.left : p.left + DUO.control - w;
+  const viewport = [c.insetTop + MORPH.pad, c.height - MORPH.pad] as const;
+  if (p.columnTop !== undefined && p.columnBottom !== undefined && full > p.columnBottom - p.columnTop) {
+    // Beside the column: its page-side edge a pad in from the column's inner edge.
+    const column = c.screenWidth - c.width, left = c.side === "left" ? column + MORPH.pad : c.width - MORPH.pad - w;
+    return { left, width: w, ...place(...viewport), scroll: full > viewport[1] - viewport[0], x0, y0 };
+  }
+  const band = p.columnTop !== undefined && p.columnBottom !== undefined ? [p.columnTop, Math.min(p.columnBottom, viewport[1])] as const : viewport;
+  return { left: flush, width: w, ...place(...band), scroll: full > band[1] - band[0], x0, y0 };
+}
+
+/** Island menu placement: the button stretches sideways into a pill as tall as itself, outer edge on the
+ *  button's. In the column it never rises above columnTop. */
+export function islandBox(p: Plan, b: Box, n: number, side: Side) {
+  const w = 2 * ISLAND.pad + n * ISLAND.item, top = Math.max(b.top + b.height / 2 - DUO.control / 2, p.columnTop ?? -Infinity);
+  return { top, left: side === "left" ? p.left : p.left + DUO.control - w, width: w, height: DUO.control, x0: p.left };
+}
+
 export function plan(c: Context, s: Spec): Plan {
   // column: screen coordinates (the layer is in-document), in the band Safari's column never uses: below
   // its back + reader rows at their worst-case (island-pushed) position, above its +/tabs pill. strip and
   // inline: viewport coordinates.
-  const top = c.mode === "strip" ? DUO.top + DUO.island - c.offsetTop
-    : c.mode === "column" && c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap)
-    : c.mode === "column" && landscapeColumn(c) ? SAFARI.landscape[c.side].top + SAFARI.rows * (DUO.control + DUO.gap)
-    : c.mode === "column" ? DUO.top + DUO.island + SAFARI.rows * (DUO.control + DUO.gap)
-    : c.insetTop + DUO.gap;
-  const bottom = c.mode === "strip" ? c.height - DUO.bottom
-    : c.mode === "column" && landscapeColumn(c) ? SAFARI.landscape[c.side].pill - DUO.gap
-    : c.mode === "column" ? c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap
-    : c.height - Math.max(c.insetBottom, DUO.gap);
+  const col = columnBand(c);
+  const top = col ? col.top : c.mode === "strip" ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap;
+  const bottom = col ? col.bottom : c.mode === "strip" ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
   const centerX = c.side === "left" ? DUO.centerFromEdge : (c.mode === "column" ? c.screenWidth : c.width) - DUO.centerFromEdge;
   const step = DUO.control + DUO.gap;
 
@@ -335,17 +375,30 @@ export function plan(c: Context, s: Spec): Plan {
     return parts.reduce((a, b) => a + b, 0) + Math.max(0, parts.length - 1) * DUO.gap;
   };
   // With nothing above it, the low primary slot needs only its own room, not a gap under the stack.
-  const fits = () => height() ? height() <= floor() - top : !(primaryLow && primary) || lowTop >= top;
-  while (!fits()) {
+  const fitsFrom = (t: number) => height() ? height() <= floor() - t : !(primaryLow && primary) || lowTop >= t;
+  while (!fitsFrom(top)) {
     if (actions) actions--; else if (leading) leading--; else if (back) back--; else if (primary) primary = false; else break;
   }
+  // The free middle of Safari's column: before folding, the primary action and leading items may rise into the
+  // zone the island only takes with Live Activities, the stack packed down onto the tabs so it rises as little as
+  // it can. Only they do: back mirrors Safari's own, and "…" stays under the reader row so its menu opens clear of
+  // Safari's buttons (morphBox).
+  const reachTop = top - (col?.reach ?? 0);
+  const reaches = () => fitsFrom(reachTop) && (!menuCount() || floor() - DUO.control >= top);
+  if (reachTop < top && fitsFrom(top) && !back) {
+    if (s.primary && !primary) { primary = true; if (!reaches()) primary = false; }
+    while (leading < s.leading) { leading++; if (!reaches()) { leading--; break; } }
+  }
+  const fits = () => fitsFrom(top) || (reachTop < top && reaches());
 
   const p: Plan = { centerX, left: centerX - DUO.control / 2, menu: { primary: !!s.primary && !primary, back: s.back && !back, leading: s.leading - leading, actions: s.actions - actions } };
   if (s.tabs) p.tabs = { top: bottom - bottomH, height: bottomH, min: tabsMin };
   else if (s.searchButton) p.searchButton = { top: bottom - DUO.control, height: DUO.control };
   if (primaryLow && primary) p.primary = { top: lowTop, height: DUO.control };
 
-  let y = top;
+  if (col) Object.assign(p, { columnTop: top, columnBottom: bottom });
+  // Risen into the island's reach: packed down onto the floor instead of hanging from the top.
+  let y = fitsFrom(top) ? top : floor() - height();
   if (fits()) {
     if (back) { p.back = { top: y, height: DUO.control }; y += step; }
     if (primaryTop && primary) { p.primary = { top: y, height: DUO.control }; y += step; }

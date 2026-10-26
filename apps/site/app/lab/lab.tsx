@@ -22,9 +22,9 @@ const BACKDROPS = ["", "linear-gradient(#7f00ff, #e100ff, #ff4e50)",
 const ICONS = [Bell, Share, Bookmark, Trash2, Pencil];
 const NAMES = ["Alerts", "Share", "Save", "Delete", "Edit"];
 
-type S = Record<"tabs" | "back" | "actions" | "search" | "title" | "leading" | "searchTab" | "accessory" | "minimize" | "list" | "dark" | "feed" | "bg", number>;
+type S = Record<"tabs" | "back" | "actions" | "search" | "title" | "leading" | "searchTab" | "accessory" | "minimize" | "list" | "dark" | "feed" | "bg" | "morph", number>;
 function parse(q: string): S {
-  const s = { tabs: 0, back: 0, actions: 0, search: 0, title: 0, leading: 0, searchTab: 0, accessory: 0, minimize: 0, list: 0, dark: 0, feed: 0, bg: 0 };
+  const s = { tabs: 0, back: 0, actions: 0, search: 0, title: 0, leading: 0, searchTab: 0, accessory: 0, minimize: 0, list: 0, dark: 0, feed: 0, bg: 0, morph: 0 };
   for (const kv of q.replace(/^\?/, "").split(/[,&]/)) {
     const [k, v] = kv.split("=");
     if (k in s) s[k as keyof S] = Number(v) || 0;
@@ -77,6 +77,7 @@ html,body{margin:0;background:var(--bg)}
       <style>{theme}</style>
       <Duet
         dark={s.dark ? s.dark > 0 : undefined}
+        menuStyle={s.morph ? "morph" : undefined}
         back={depth > 0 && { onPress: () => { setDepth(0); setTapped("Back"); } }}
         leading={Array.from({ length: s.leading }, (_, i) => action(i + 2))}
         actions={Array.from({ length: s.actions }, (_, i) => action(i))}
