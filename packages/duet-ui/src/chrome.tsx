@@ -210,7 +210,9 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
       // (touch-action stops at the scroller), leaving page and controls panned off their rails: hold it.
       // An emulating host already frames both columns; pinning there loops in iOS Safari, whose frame overflows a few px.
       const x = split || left ? column : 0;
-      if (!emulatedSignals() && Math.round(scrollX) !== x) scrollTo(x, scrollY);
+      // Instant: under a page's `scroll-behavior: smooth` a plain scrollTo animates, and each scroll event restarted
+      // it, so the controls crept into the column over seconds (#66, back from /probe in a split left pane).
+      if (!emulatedSignals() && Math.round(scrollX) !== x) scrollTo({ left: x, top: scrollY, behavior: "instant" });
       if (timeline) range();
       else for (const el of els) el.style.transform = scrollY ? `translateY(${scrollY}px)` : "";
     };
@@ -225,16 +227,18 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
       }
     };
     follow();
-    // Safari restores or resets the sideways scroll on load and resize.
+    // Safari restores or resets the sideways scroll on load, resize and a back/forward cache restore.
     const t = [0, 300, 1000].map((ms) => setTimeout(follow, ms));
     addEventListener("scroll", follow, { passive: true });
     addEventListener("resize", follow);
+    addEventListener("pageshow", follow);
     addEventListener("pointerdown", tap);
     return () => {
       html.touchAction = prev; sizes?.disconnect();
       for (const el of els) { el.style.transform = ""; el.style.removeProperty("--duet-scroll-max"); delete el.dataset.follow; }
       t.forEach(clearTimeout);
-      removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pointerdown", tap);
+      removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pageshow", follow);
+      removeEventListener("pointerdown", tap);
     };
   }, [on, split, left, column]); // eslint-disable-line react-hooks/exhaustive-deps -- refs are stable
   return refs;
@@ -304,7 +308,17 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   // The first render is the server's guess (ssr) and the window geometry settles over the next second (subscribe):
   // until then the controls jump to where they belong instead of gliding in from the guess.
   const [settled, setSettled] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setSettled(true), 1100); return () => clearTimeout(t); }, []);
+  // A back/forward cache restore keeps the old state but not the old window (a split pane, a turn), so it settles
+  // afresh: the controls land where they belong instead of gliding there.
+  useEffect(() => {
+    let t = setTimeout(() => setSettled(true), 1100);
+    const restored = (e: PageTransitionEvent) => {
+      if (!e.persisted) return;
+      clearTimeout(t); setSettled(false); t = setTimeout(() => setSettled(true), 1100);
+    };
+    addEventListener("pageshow", restored);
+    return () => { clearTimeout(t); removeEventListener("pageshow", restored); };
+  }, []);
   const glideTimer = useRef(0);
   useEffect(() => () => { clearTimeout(glideTimer.current); if (press.current) clearTimeout(press.current.timer); }, []);
   const setMenu = (n: "more" | "tabs" | null) => {

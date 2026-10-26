@@ -228,7 +228,7 @@ Measured on the Duo Lab Preview simulator (iOS 27.1, closed portrait) with a sma
 | State | inner | outer | inset bottom | Column signature (84 wide, 68 to 102 tall) |
 |---|---|---|---|---|
 | Preview, full screen, default and over-full-screen presentations | 382x603 | 466x678 | 34 | yes (84, 75) |
-| Preview, page sheet | 366x600 | 450x670 | 34 | yes (84, 70), the same window as windowed Safari |
+| Preview, page sheet | 366x600 | 450x670 | 34 | yes (84, 70); preview since #66 (see below) |
 | Preview, landscape (angle 90 and 270) | 678x391 | 678x466 | 34 | no (width 0): bar above the page |
 | Safari tab, closed (after "Open in Safari", and a fresh tab) | 382x580 | 466x678 | 0 | yes (84, 98) |
 
@@ -236,7 +236,7 @@ Measured on the Duo Lab Preview simulator (iOS 27.1, closed portrait) with a sma
 - This column (close, reader, share/reload/compass pill) is the "compact column state" from the 2026-10-24 report above that could not be reproduced in a tab: it was most likely the preview.
 - The window reads 466x678 at load with no column, then resizes to 382x603 about 0.1s later; `screen.*` read 375x667 on one launch and 466x678 on the next, so it is not used.
 - Detection (`isPreview`): not standalone, Safari, and either the older 375x667 window at 3x, or the closed screen's 466x678 window with the column signature, at most 77pt of chrome below the page and a bottom inset. A closed tab has 98pt (80 with the compact URL bar) and inset 0. Windowed Safari (453x661) and a compact split pane (385x594) also report inset 34 on device, so the inset alone is not enough; the window size and chrome height are.
-- Not told apart: a page-sheet preview reads exactly like windowed Safari at 450x670, so it still takes the column. The open posture preview was not measured (the simulator could not be unfolded from here).
+- Page sheet: told apart since #66, see "Real Duo: preview sheet and bfcache restore". The open posture preview was not measured (the simulator could not be unfolded from here).
 - "Open in Safari" on the simulator reloaded the page in a tab (load, then pageshow with persisted false), and the tab took the column. On device RegTail reports no reload; `watchSignals` re-reads on pageshow and visibilitychange for that case.
 
 ### Settling after a fold (RegTail ask #8)
@@ -255,10 +255,17 @@ Folding open to closed in a portrait Safari tab could leave the controls inline 
 | Tab, keyboard up | 382x598, visual 272 | 80 | 0 | not preview | column |
 | Landscape, both turns | 594x368 / 678x466 | 98 | 0 | not preview | column left (90), right (270) |
 | Preview, full screen | 382x603 / 466x678 | 75 | 34 | preview | inline |
-| Preview, page sheet | 366x600 / 450x670 | 70 | 34 | not preview | column (known limit) |
+| Preview, page sheet | 366x600 / 450x670 | 70 | 34 | preview since #66 | inline |
 
 - The closest tab state is chrome 80 with inset 0; the preview is 75 with 34. The chrome band stays [73,77] and the rule now also wants inset >= 20. The verdict is sticky (README), so a scroll-time resize cannot flip a tab.
 - Non-geometric signals (display-mode, referrer, history length, screen, ApplePaySession, serviceWorker, share, Notification) are identical in tab and preview, so geometry is all there is.
 - Keyboard: focusing an input made Safari zoom out to scale 0.941 (inner 406x635). The old build read inline, then oscillated column/inline after dismissal and stuck inline. The zoom hold keeps column. Cause of the zoom: the document's scrollWidth is 442, the column nav (`.duet-pill`, absolute, x 393 to 442) overflows `innerWidth` in no-children mode. The overflow is what lets the layer paint in the column: `overflow-x: clip` on html, an `overflow-clip-margin` on the layer, and rtl all either keep scrollWidth 442 or stop the paint. Fix (#61): from a text field's focus (`html:has(:read-write:focus)`), before the zoom, the layer is clipped and hidden; measured scrollWidth 382 and scale 1 on focus, the layer back after dismissal.
 - One 100ms sample read inline during rotation before column.
 - Not measured: Reader, Hide Toolbar, find bar, private tab, Home Screen app, WKWebView, preview scrolled or landscape, a pinch zoom (two-finger simulator input did not zoom). These need the real-device /probe test.
+
+## Real Duo: preview sheet and bfcache restore (#66, 2026-10-26)
+
+Real Duo, iOS 18.7, Safari UA Version/27.0, angle 0, pixelRatio 3, link opened from Messages.
+
+- Preview sheet: inner 366x600, outer 450x670, screen 466x678, chrome 70, column 84. `safe-area-inset-bottom` reads 0 on the first sample and 34 about 100ms later. Rule: Safari, not standalone, inset >= 20, the column signature, screen exactly 466x678, and a portrait window at least 4pt inside it on both sides. No tab is inside the screen: closed 466x678, open 951x669, split pane 469x669 (wider than the 466 screen Safari keeps reporting), and tabs read inset 0 in every state. iOS has no windowed Safari or Stage Manager; the 2026-10-25 "windowed Safari" trace (453x661 and 450x670) was most likely this sheet. `stable()` lets a tab verdict rise to preview in the first second of a window (`PREVIEW_RISE`) for the late inset.
+- Slow slide after a back/forward cache restore (split left pane, back from /probe): the column layer pins `scrollX` to the column width with `scrollTo` on every scroll event. Under the site's `html { scroll-behavior: smooth }` each call started a smooth scroll and the next scroll event restarted it, so the controls crept from x 80 into the column over 2 to 3s. Fix: `behavior: "instant"`, a pin on `pageshow`, and transitions off again for 1.1s after a persisted `pageshow`, as at first mount.
