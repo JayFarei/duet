@@ -214,7 +214,9 @@
 /* Switching sides moves every control in the same frame: nothing glides across the page on its own. */
 .duet[data-drag="switch"] * { transition: none !important; }
 /* Loading: the controls appear where they settle, without transitions or entrance animations. */
-.duet[data-settling], .duet[data-settling] * { transition: none !important; animation: none !important; }
+/* The root itself keeps its animation: in Safari's column it is the scroll follow (duet-follow), not an entrance. */
+.duet[data-settling], .duet[data-settling] * { transition: none !important; }
+.duet[data-settling] * { animation: none !important; }
 .duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
 /* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */
@@ -273,6 +275,14 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
    over dark and cream pages); ours match so the two sets read as one. The accessory sits over the page,
    not the column, so it keeps real glass; menus unroll over page content without blur, so they stay opaque. */
 .duet[data-mode="column"] { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 50; }
+/* No children (no .duet-scroller): the document scrolls, and the layer rides it on a scroll timeline that Safari
+   runs with the scroll itself, so it holds through momentum and smooth scrollTo/scrollIntoView (chrome.tsx sets
+   data-follow and --duet-scroll-max, the document's scroll range, or a transform where this is unsupported). */
+.duet[data-mode="column"][data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
+@keyframes duet-follow { from { transform: translateY(0); } to { transform: translateY(var(--duet-scroll-max, 0px)); } }
+/* A swipe that runs off the end of a sideways scroller chains to the widened document and pans it, chrome and
+   all, into the column. Zero specificity, so a page's own overscroll-behavior wins. */
+:where(html[data-duet-mode="column"]) :where(*) { overscroll-behavior-x: contain; }
 /* Menus open over the page, not the column, so they keep the page's appearance (the base tokens). */
 :root .duet[data-mode="column"] .duet-glass:not(.duet-accessory) { --duet-col: rgb(240 239 236 / 0.55); --duet-edge: 0.3; --duet-rim: 0.15; }
 :root .duet[data-mode="column"] .duet-glass:not(.duet-accessory, .duet-menu) { --duet-solid: rgb(246 247 250); --duet-ink: #000; }

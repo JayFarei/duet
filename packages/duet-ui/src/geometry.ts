@@ -90,6 +90,10 @@ export interface Context {
   side: Side;
   width: number;
   height: number;
+  /** The smallest `height` seen at this width and orientation, like CSS `100svh`: it ignores Safari's URL bar
+   *  collapsing and expanding mid-scroll, so content sized from it does not jump. On a desktop it is `height`.
+   *  Also set as `--duet-vh` (px). From `detect` alone (no history) it is `height`; `useDuet` remembers. */
+  stableHeight: number;
   /** Screen-y minus viewport-y (status area above a standalone viewport). */
   offsetTop: number;
   /** strip: screen size. column: Safari window size. inline: safe-area insets top/bottom. */
@@ -188,9 +192,9 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
   if (s.standalone && (s.insetRight >= 60 || s.insetLeft >= 60)) {
-    return { mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+    return { mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
-  const base = { duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
+  const base = { duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
   // Closed landscape: the column is on the side the Duo is turned to, and the turn is the only signal for it.
   const landscape = s.innerWidth > s.innerHeight;
   const turned = s.angle === 90 ? "left" : s.angle === 270 ? "right" : undefined;
@@ -213,7 +217,9 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
  *  Flips only count while the window keeps its size. The pin lifts when the window changes size, or after `until`: moving a split-view pane to the other side
  *  flips the mode a few times without changing the window's size. Each re-pin for the same window doubles
  *  the wait, so a real loop settles instead of flickering. */
-export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: string; until?: number; ttl?: number }
+export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: string; until?: number; ttl?: number;
+  /** Smallest viewport height per width and orientation (Context.stableHeight). */
+  heights?: Record<string, number> }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 
@@ -233,7 +239,12 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     }
   }
   d.mode = c.mode;
-  return c;
+  // A mobile browser's URL bar grows and shrinks the viewport as the page scrolls, while the window keeps its
+  // width and orientation. A desktop window has no such bar: its height is the user's, so it stays current.
+  if (c.device === "desktop") return c;
+  const h = `${s.innerWidth}${s.outerWidth > s.outerHeight ? "L" : "P"}`, heights = d.heights ??= {};
+  heights[h] = Math.min(heights[h] ?? Infinity, s.innerHeight);
+  return { ...c, stableHeight: heights[h] };
 }
 
 /** Inline side drag, like a magnet: the controls resist leaving their edge (rubber band up to MAGNET.hold),
