@@ -190,6 +190,8 @@
 .duet[data-drag="held"], .duet[data-drag="switch"] { transition: none; }
 /* Switching sides moves every control in the same frame: nothing glides across the page on its own. */
 .duet[data-drag="switch"] * { transition: none !important; }
+/* Loading: the controls appear where they settle, without transitions or entrance animations. */
+.duet[data-settling], .duet[data-settling] * { transition: none !important; animation: none !important; }
 .duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
 /* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */

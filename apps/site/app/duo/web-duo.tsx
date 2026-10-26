@@ -12,8 +12,8 @@ import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui
 
 type Posture = "closed" | "open";
 /** home: added to the Home Screen. safari: a full-screen tab. split: Safari in a split-view pane. window: a Safari
- *  window beside the Home Screen. preview: Safari's in-app preview, opened from another app. */
-type App = "home" | "safari" | "split" | "window" | "preview";
+ *  window beside the Home Screen. */
+type App = "home" | "safari" | "split" | "window";
 interface State { posture: Posture; rotated: boolean; app: App; pane: Side }
 
 // Natural orientation: closed is portrait (outer display), open is landscape (inner display). `rotated` turns
@@ -52,7 +52,6 @@ const OPEN_BAR = 126; // Safari's chrome above the page, unfolded
 const TAB = { w: 466, h: 678, page: { w: 382, h: 580 } }; // closed portrait: the window is the screen
 const PANE = { w: 469, page: { w: 385, h: 571 } }; // a split-view pane, either side, 669 tall
 const WINDOW = { w: 451, h: 666, page: { w: 369, h: 591 } }; // a window beside the Home Screen (device: 450-453 x 661-670)
-const PREVIEW = { w: 375, h: 667 }; // in-app preview: a fixed 375x667 page at 3x, its buttons in a column beside it
 
 const ease = "cubic-bezier(0.32, 0.72, 0, 1)";
 const TURN = 650; // rotation, ms
@@ -145,15 +144,6 @@ function scene(s: State, W: number, H: number, host: string, live: boolean, mode
         : "In this Safari window Duet keeps its controls inside the page.",
     };
   }
-  if (s.app === "preview") {
-    const signals = sig(PREVIEW, PREVIEW, { screen: SCREEN.closed });
-    return {
-      clip: { x: 0, y: Math.round((H - PREVIEW.h) / 2), ...PREVIEW }, frame: { x: 0, y: 0, ...PREVIEW }, signals, mode: modeOf(signals),
-      under: <div style={{ position: "absolute", inset: 0, background: "var(--card)" }} />,
-      chrome: <PreviewColumn x={PREVIEW.w} h={H} top={CAMERA.y + CAMERA.d / 2 + 24 + push} />,
-      note: "Opened from another app, Safari's preview keeps its own buttons in the column, out of the page's reach. Duet goes inline, on the left, away from them.",
-    };
-  }
   if (s.posture === "closed") {
     const portrait = W < H, page = portrait ? TAB.page : { w: W - STRIP, h: H - 98 };
     const signals = sig(page, full, { screen: safariScreen(page) }), mode = modeOf(signals);
@@ -180,14 +170,13 @@ const TOUR: State[] = [
   { posture: "closed", rotated: true, app: "home", pane: "right" },
   { posture: "closed", rotated: false, app: "home", pane: "right" },
   { posture: "closed", rotated: false, app: "safari", pane: "right" },
-  { posture: "closed", rotated: false, app: "preview", pane: "right" },
   { posture: "open", rotated: false, app: "safari", pane: "right" },
   { posture: "open", rotated: false, app: "split", pane: "right" },
   { posture: "open", rotated: false, app: "split", pane: "left" },
   { posture: "open", rotated: false, app: "window", pane: "right" },
 ];
 /** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. */
-const ONLY: Partial<Record<App, Posture>> = { split: "open", window: "open", preview: "closed" };
+const ONLY: Partial<Record<App, Posture>> = { split: "open", window: "open" };
 const fit = (s: State): State => {
   const only = ONLY[s.app];
   return !only ? s : s.posture === only && !s.rotated ? s : { ...s, app: "safari" };
@@ -198,7 +187,7 @@ const LIVE_NOTE = " Live Activities grow the Dynamic Island down the strip witho
  *  Built on first use: `scene` needs the styles defined further down. */
 let notes: string[] | undefined;
 const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => [false, true].flatMap((rotated) =>
-  (["home", "safari", "split", "window", "preview"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
+  (["home", "safari", "split", "window"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
     (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
       const n = SCREEN[posture], [W, H] = rotated ? [n.h, n.w] : [n.w, n.h];
       const sc = scene(fit({ posture, rotated, app, pane }), W, H, "", live, () => m);
@@ -221,6 +210,8 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const [live, setLive] = useState(false);
   const [view, setView] = useState({ w: 1280, h: 800 });
   const [onScreen, setOnScreen] = useState(true);
+  // Until the stage has measured its container it stays hidden, and then appears at its size without growing into it.
+  const [measured, setMeasured] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   // Slow motion (a quarter speed) and the fold scrubber's position (0 closed, 1 open) while it is held.
   const [slow, setSlow] = useState(false);
@@ -231,7 +222,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const sent = useRef("");
   const k = useRef(1), held = useRef<Animation[]>([]);
   k.current = slow ? 4 : 1;
-  const turn = TURN * k.current;
+  const turn = measured ? TURN * k.current : 0;
   const frame = useRef<HTMLIFrameElement>(null);
   const page = useRef<HTMLDivElement>(null), hinge = useRef<HTMLDivElement>(null), flap = useRef<HTMLDivElement>(null), shadow = useRef<HTMLDivElement>(null);
   const cur = useRef(s), busy = useRef(false);
@@ -338,10 +329,11 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       setView({ w, h: Math.max(260, Math.min(w * 0.85, 600, innerHeight * 0.62)) });
     };
     fit();
+    const raf = requestAnimationFrame(() => setMeasured(true));
     const ro = new ResizeObserver(fit);
     if (stage.current) ro.observe(stage.current);
     addEventListener("resize", fit);
-    return () => { ro.disconnect(); removeEventListener("resize", fit); };
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); removeEventListener("resize", fit); };
   }, []);
 
   const n = SCREEN[s.posture], b = BODY[s.posture];
@@ -393,8 +385,12 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
   // Fit the turned device and the controls in the window.
   const [bw, bh] = s.rotated ? [b.h, b.w] : [b.w, b.h];
-  const scale = embed ? Math.min(view.w / bw, view.h / bh, 1) : Math.min((view.w - 64) / bw, (view.h - 320) / bh, 1);
-  const motion = (props: string[]) => instant ? "none" : props.map((x) => `${x} ${MOVE}ms ${ease}`).join(", ");
+  const scaleFor = (w: number, h: number) => embed ? Math.min(view.w / w, view.h / h, 1) : Math.min((view.w - 64) / w, (view.h - 320) / h, 1);
+  const scale = scaleFor(bw, bh);
+  // What the stage shows (Safari or a Home Screen web app) sits beside the device when the widest posture leaves room.
+  const widest = Math.max(...[BODY.closed, BODY.open].flatMap((x) => [x.w * scaleFor(x.w, x.h), x.h * scaleFor(x.h, x.w)]));
+  const beside = (view.w - widest) / 2 >= 230;
+  const motion = (props: string[]) => instant || !measured ? "none" : props.map((x) => `${x} ${MOVE}ms ${ease}`).join(", ");
 
   return (
     <div ref={stage} style={embed ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 18, width: "100%" } : { minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22, padding: "28px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
@@ -405,7 +401,8 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         </div>
       </header>}
 
-      <div style={{ ...(embed && { height: view.h, display: "flex", alignItems: "center" }) }}>
+      <div style={{ position: "relative", alignSelf: "stretch", display: "flex", justifyContent: "center", alignItems: "center", visibility: measured ? undefined : "hidden", ...(embed && { height: view.h }) }}>
+      {beside && <Showing app={s.app} style={{ position: "absolute", right: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 170, top: "50%", translate: "0 -50%", transition: `right ${turn}ms ${ease}` }} />}
       <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `width ${turn}ms ${ease}, height ${turn}ms ${ease}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
@@ -470,7 +467,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         <Segmented value={s.posture} onChange={(posture) => go({ posture })} options={[["closed", "Closed"], ["open", "Open"]]} />
         <Button onClick={() => go({ rotated: !s.rotated })} label="Rotate"><RotateCw size={17} /></Button>
         <Segmented value={s.app} onChange={(app) => go({ app })}
-          options={[["home", "Home Screen"], ["safari", "Safari"], ["preview", "In-app"], ["split", "Split View"], ["window", "Window"]]} />
+          options={[["home", "Home Screen"], ["safari", "Safari"], ["split", "Split View"], ["window", "Window"]]} />
         {s.app === "split" && <Button onClick={() => go({ pane: s.pane === "right" ? "left" : "right" })} label="Swap"><ArrowLeftRight size={17} /></Button>}
         {s.posture === "closed" && <Button onClick={() => setLive((v) => !v)} label="Live Activity" on={live}><Activity size={17} /></Button>}
         <label title="Drag to fold and unfold by hand" style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
@@ -484,6 +481,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         </>}
       </div>
       </div>
+      {!beside && <Showing app={s.app} row />}
       <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
         <Note mode={sc.mode} text={sc.note + (live && s.posture === "closed" ? LIVE_NOTE : "")} />
         {allNotes().map((n) => { const [m, t] = n.split("|"); return <Note key={n} mode={m} text={t} hidden />; })}
@@ -496,6 +494,46 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         </div>
       )}
     </div>
+  );
+}
+
+/** Where the page is running: in Safari (a tab, a split-view pane, a window) or added to the Home Screen as a web app. */
+const SHOWING: Record<App, [string, string]> = {
+  home: ["Home Screen", "Web app (PWA)"],
+  safari: ["Safari", "Full-screen tab"],
+  split: ["Safari", "Split View"],
+  window: ["Safari", "Window"],
+};
+function Showing({ app, row, style }: { app: App; row?: boolean; style?: CSSProperties }) {
+  const [title, sub] = SHOWING[app], size = row ? 36 : 60;
+  return (
+    <div data-wd-showing style={{ display: "flex", flexDirection: row ? "row" : "column", alignItems: "center", gap: row ? 10 : 10, textAlign: row ? "left" : "center", ...style }}>
+      {app === "home"
+        ? <img src="/apple-touch-icon.png" alt="" width={size} height={size} style={{ borderRadius: size * 0.225, boxShadow: "0 0 0 0.5px var(--line)" }} />
+        : <SafariIcon size={size} />}
+      <div style={{ font: `400 ${row ? 14 : 15}px/1.3 -apple-system, system-ui`, color: "var(--dim)" }}>
+        <b style={{ display: "block", color: "var(--ink)", fontWeight: 600 }}>{title}</b>{sub}
+      </div>
+    </div>
+  );
+}
+
+/** Safari's icon: a compass on a white tile. */
+function SafariIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden>
+      <defs>
+        <linearGradient id="wd-safari" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#19d7ff" /><stop offset="1" stopColor="#1e64f0" /></linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="14.4" fill="#fff" />
+      <rect width="64" height="64" rx="14.4" fill="none" stroke="rgb(0 0 0 / 0.12)" />
+      <circle cx="32" cy="32" r="26" fill="url(#wd-safari)" />
+      {Array.from({ length: 36 }, (_, i) => <line key={i} x1="32" y1="8.5" x2="32" y2={i % 3 ? 10.5 : 12} stroke="#fff" strokeOpacity={0.85} strokeWidth={i % 3 ? 0.6 : 1} transform={`rotate(${i * 10} 32 32)`} />)}
+      <g transform="rotate(45 32 32)">
+        <polygon points="28.6,32 35.4,32 32,12" fill="#ff3b30" />
+        <polygon points="28.6,32 35.4,32 32,52" fill="#fff" />
+      </g>
+    </svg>
   );
 }
 
@@ -594,26 +632,6 @@ function SafariColumn({ x, h, col, back, clock, over }: { x: number; h: number; 
       <div data-wd-system style={{ ...circle, ...at(back + DUO.control + DUO.gap) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
       <div data-wd-system style={{ ...glass, ...at(h - DUO.bottom - SAFARI.pill), width: DUO.control, height: SAFARI.pill, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" /><Glyph d="M8 8h12v12H8zM4 16V4h12" />
-      </div>
-    </div>
-  );
-}
-
-/** The in-app preview's own buttons, in the column beside its page: done, reader and back under the camera,
- *  share, reload and open-in-Safari at the bottom. */
-function PreviewColumn({ x, h, top }: { x: number; h: number; top: number }) {
-  const w = SCREEN.closed.w - x;
-  return (
-    <div style={{ position: "absolute", left: x, top: 0, width: w, height: h, color: "var(--ink)", pointerEvents: "none" }}>
-      <div style={{ position: "absolute", top, left: (w - 49) / 2, display: "grid", gap: DUO.gap, transition: `top ${MOVE}ms ${ease}` }}>
-        <div data-wd-system style={circle}><Glyph d="M18 6 6 18M6 6l12 12" /></div>
-        <div data-wd-system style={circle}><Glyph d="M4 6h16M4 12h16M4 18h10" /></div>
-        <div data-wd-system style={circle}><Glyph d="m15 18-6-6 6-6" /></div>
-      </div>
-      <div data-wd-system style={{ ...glass, position: "absolute", left: (w - 49) / 2, bottom: DUO.bottom, width: 49, height: 160, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
-        <Glyph d="M12 2v13M16 6l-4-4-4 4M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-        <Glyph d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />
-        <Glyph d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM16.2 7.8l-2.1 6.3-6.3 2.1 2.1-6.3z" />
       </div>
     </div>
   );

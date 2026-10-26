@@ -309,6 +309,10 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const press = useRef<{ y0: number; y: number; timer: number } | null>(null);
   // A tap glides the lens to the new tab as a clear magnifier, without swelling the pill, like Apple News.
   const [glide, setGlide] = useState(false);
+  // The first render is the server's guess (ssr) and the window geometry settles over the next second (subscribe):
+  // until then the controls jump to where they belong instead of gliding in from the guess.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setSettled(true), 1100); return () => clearTimeout(t); }, []);
   const glideTimer = useRef(0);
   useEffect(() => () => { clearTimeout(glideTimer.current); if (press.current) clearTimeout(press.current.timer); }, []);
   const setMenu = (n: "more" | "tabs" | null) => {
@@ -509,7 +513,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
       ...destructive,
     ];
     return (
-      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} style={split && i ? { left: column } : undefined}>
+      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || undefined} style={split && i ? { left: column } : undefined}>
         {p.close && pl.back && (
           <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
             <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>

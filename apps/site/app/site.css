@@ -35,10 +35,6 @@ section[id] { scroll-margin-top: 24px; }
 .eyebrow { margin: 0 0 10px; color: var(--dim); font: 600 clamp(15px, 1.6vw, 19px)/1.2 -apple-system, system-ui; }
 .display { margin: 0 auto; max-width: 10em; font: 400 clamp(48px, 8vw, 96px)/1 var(--serif), Georgia, serif; letter-spacing: -0.02em; }
 .display em, .h2 em { font-style: italic; white-space: nowrap; }
-.rise { display: inline-block; overflow: clip; overflow-clip-margin: 0.12em; vertical-align: top; padding-bottom: 0.08em; }
-.rise > span { display: inline-block; animation: rise 0.9s cubic-bezier(0.32, 0.72, 0, 1) both; }
-@keyframes rise { from { transform: translateY(105%); } }
-@media (prefers-reduced-motion: reduce) { .rise > span { animation: none; } }
 .h2 { margin: 0; font: 400 clamp(42px, 6.6vw, 72px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.015em; }
 .lede { margin: 20px auto 0; max-width: 640px; color: var(--dim); font: 500 clamp(19px, 2.2vw, 24px)/1.35 -apple-system, system-ui; letter-spacing: -0.01em; }
 .lede-l { margin-left: 0; margin-bottom: 36px; }
@@ -70,6 +66,7 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 .bar-top > * { pointer-events: auto; }
 /* iOS's scroll-edge effect: the page blurs and fades under the status bar and the top bar. */
 .bars::before { content: ""; position: fixed; z-index: 49; top: 0; left: 0; right: 0; height: calc(max(12px, env(safe-area-inset-top)) + 64px); pointer-events: none; background: linear-gradient(var(--bg) 30%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); -webkit-mask-image: linear-gradient(#000 50%, transparent); mask-image: linear-gradient(#000 50%, transparent); }
+.bar-end { display: flex; gap: 8px; }
 .bar-round { display: grid; place-items: center; width: 44px; height: 44px; }
 .bar-try { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; font: 600 15px/1 -apple-system, system-ui; cursor: pointer; }
 .bar-tabs { position: fixed; z-index: 50; bottom: calc(10px + env(safe-area-inset-bottom)); left: 50%; translate: -50% 0; display: flex; padding: 4px; }
