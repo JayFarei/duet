@@ -1,8 +1,8 @@
-:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); }
+:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); --wd-island-rim: transparent; --wd-col: rgb(240 239 236 / 0.55); --wd-edge: 0.3; --wd-rim: 0.15; --wd-shine: rgb(10 132 255 / 0.35); --wd-shine-ring: rgb(10 132 255 / 0.55); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); }
+  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --wd-shine-ring: rgb(100 210 255 / 0.6); }
 }
-:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); }
+:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --wd-shine-ring: rgb(100 210 255 / 0.6); }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); text-decoration: none; }
 code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
@@ -84,3 +84,19 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 @supports (corner-shape: squircle) {
   [data-wd-shape] { border-radius: var(--wd-r) !important; }
 }
+/* Safari's column buttons on the stage, in Duet's column look (duet.css, measured against Safari) so the two sets
+   read as one. The rim is a flat white band, not Duet's backdrop filter: Chrome ignores the mask on a backdrop
+   filter this deep in the stage and lights the whole button. web-duo.tsx gives Duet's own buttons the same band. */
+[data-wd-col] { background: var(--wd-col); box-shadow: -0.5px 0 0 rgb(0 0 0 / var(--wd-edge)), 0.5px 0 0 rgb(0 0 0 / var(--wd-edge)), 0 0 0 0.35px rgb(0 0 0 / var(--wd-rim)), 0 3px 10px rgb(0 0 0 / 0.03); }
+[data-wd-col]::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; padding: 1px; background: rgb(255 255 255 / 0.2);
+  -webkit-mask: linear-gradient(rgb(0 0 0 / 0.3), transparent 8px, transparent calc(100% - 8px), rgb(0 0 0 / 0.3)), linear-gradient(#000, transparent 35%, transparent 65%, #000), linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: source-over, source-in, xor;
+  mask: linear-gradient(rgb(0 0 0 / 0.3), transparent 8px, transparent calc(100% - 8px), rgb(0 0 0 / 0.3)), linear-gradient(#000, transparent 35%, transparent 65%, #000), linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: add, intersect, exclude;
+}
+/* The glimmer over Duet's buttons on the stage (web-duo.tsx): a ring that fades in and out, and a sheen across. */
+[data-wd-shine] { position: absolute; border-radius: 99px; overflow: hidden; pointer-events: none; box-shadow: inset 0 0 0 1.5px var(--wd-shine-ring); animation: wd-ring 1.7s ease var(--wd-at) both; }
+[data-wd-shine]::before { content: ""; position: absolute; inset: -20%; background: linear-gradient(105deg, transparent 35%, var(--wd-shine) 50%, transparent 65%); animation: wd-sweep 0.9s cubic-bezier(0.4, 0, 0.2, 1) calc(var(--wd-at) + 0.15s) both; }
+@keyframes wd-ring { 0% { opacity: 0; } 15%, 65% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes wd-sweep { from { translate: -120% 0; } to { translate: 120% 0; } }

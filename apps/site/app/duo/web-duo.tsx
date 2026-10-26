@@ -14,7 +14,8 @@ type Posture = "closed" | "open";
 /** home: added to the Home Screen. safari: a full-screen tab. split: Safari in a split-view pane. window: a Safari
  *  window beside the Home Screen. */
 type App = "home" | "safari" | "split" | "window";
-/** live: Live Activities are running, which grows the Dynamic Island down the closed strip (closed only). */
+/** live: Live Activities are running (the visitor's switch, kept across views). They grow the Dynamic Island down
+ *  the closed strip, the only place the island is, so `island()` says where they show. */
 interface State { posture: Posture; rotated: boolean; app: App; pane: Side; live: boolean }
 
 // Natural orientation: closed is portrait (outer display), open is landscape (inner display). `rotated` turns
@@ -72,7 +73,10 @@ const SLOTS: [slot: string, color: string, label: string][] = [
   ["search", "#bf5af2", "searchButton"], ["more", "#ffd60a", "overflow"], ["accessory", "#ff9f0a", "accessory"],
 ];
 const CALLOUT = "html[data-wd-slots] [data-duet-slot] { outline: 2.5px solid var(--wd-c); outline-offset: 2px; box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--wd-c) 30%, transparent) !important; }\n"
-  + SLOTS.map(([slot, c]) => `[data-duet-slot="${slot}"] { --wd-c: ${c}; }`).join("\n");
+  + SLOTS.map(([slot, c]) => `[data-duet-slot="${slot}"] { --wd-c: ${c}; }`).join("\n")
+  // Duet's column rim as the flat band the stage's Safari buttons use (site.css [data-wd-col]): in the stage Chrome
+  // drops the rim's mask and lights the whole button. Only here, never on the page itself.
+  + '\n.duet[data-mode="column"] .duet-glass:not(.duet-accessory)::after { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(255 255 255 / 0.2); }';
 
 /** What the device tells the page. `screen`: what `screen.*` reports, the window unless given. */
 const sig = (inner: Size, outer: Size, { screen = outer, ...o }: Partial<Signals> & { screen?: Size } = {}): Signals => ({
@@ -110,7 +114,7 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
  *  clock and Safari's rows down, telling the page nothing. */
 function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode): Scene {
   const full = { w: W, h: H }, screen = { x: 0, y: 0, w: W, h: H };
-  const push = s.live ? DUO.island : 0;
+  const push = island(s) ? DUO.island : 0;
   if (s.app === "home") {
     const strip = W < H ? s.posture === "closed" : s.posture === "open"; // natural orientation only
     const signals = sig(full, full, { insetRight: strip ? STRIP : 0, standalone: true });
@@ -172,17 +176,20 @@ const TOUR: State[] = [
   stop("open", "split"), stop("open", "split", { pane: "left" }), stop("open", "window"),
 ];
 const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
+/** The same view, whatever the Live Activities switch says: the phase list follows views, not the switch. */
+const sameView = (a: State, b: State) => same({ ...a, live: false }, { ...b, live: false });
+/** Live Activities show: the island exists on the closed outer display only, and is measured upright only. */
+const island = (s: State) => s.live && s.posture === "closed" && !s.rotated;
 /** The phase list: each row starts at a tour stop and lasts until the next row's. */
 const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
-  { group: "Home Screen web app", rows: [["Closed", 0], ["Live Activity", 1], ["Unfolded and turned", 2]] },
-  { group: "Safari", rows: [["Closed tab", 6], ["Live Activity", 7], ["Unfolded", 8], ["Split view", 9], ["Window", 11]] },
+  { group: "Home Screen web app", rows: [["Closed", 0], ["Unfolded and turned", 2]] },
+  { group: "Safari", rows: [["Closed tab", 6], ["Unfolded", 8], ["Split view", 9], ["Window", 11]] },
 ];
-/** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. The island exists
- *  on the closed screen only. */
+/** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. */
 const ONLY: Partial<Record<App, Posture>> = { split: "open", window: "open" };
 const fit = (s: State): State => {
-  const only = ONLY[s.app], live = s.live && s.posture === "closed" && !s.rotated;
-  return !only ? { ...s, live } : s.posture === only && !s.rotated ? { ...s, live } : { ...s, app: "safari", live };
+  const only = ONLY[s.app];
+  return !only || (s.posture === only && !s.rotated) ? s : { ...s, app: "safari" };
 };
 
 const LIVE_NOTE: Partial<Record<App, string>> = {
@@ -196,7 +203,7 @@ const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatM
   (["home", "safari", "split", "window"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
     (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
       const n = SCREEN[posture], [W, H] = rotated ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, rotated, app, pane, live });
-      return `${m}|${scene(st, W, H, "", () => m).note}${st.live ? LIVE_NOTE[st.app] ?? "" : ""}`;
+      return `${m}|${scene(st, W, H, "", () => m).note}${island(st) ? LIVE_NOTE[st.app] ?? "" : ""}`;
     })))))))];
 
 /** embed: a stage inside a page, sized to its container, touring on its own while on screen. Its controls stay
@@ -259,7 +266,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const only = ONLY[n.app];
     if (next.app && only) [n.posture, n.rotated] = [only, false]; // picking the app moves the device there
     Object.assign(n, fit(n));
-    if (!fromTour) setAt(TOUR.findIndex((t) => same(t, n)));
+    if (!fromTour) setAt(TOUR.findIndex((t) => sameView(t, n)));
     if (n.posture === p.posture && n.rotated === p.rotated) return setS(n);
     // The page fades out while the device moves and back in once it has settled, laid out for the new screen.
     busy.current = true;
@@ -324,7 +331,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   useEffect(() => {
     if (!tour || !onScreen) return;
     // Each stop holds for HOLD once the device has settled, however long the move there took.
-    let i = same(TOUR[at] ?? s, s) ? at : TOUR.findIndex((t) => same(t, s)), t = 0, on = true;
+    let i = sameView(TOUR[at] ?? s, s) ? at : TOUR.findIndex((t) => sameView(t, s)), t = 0, on = true;
     const next = () => { t = window.setTimeout(async () => {
       i = (i + 1) % TOUR.length;
       setAt(i);
@@ -399,6 +406,28 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     return () => el?.removeEventListener("load", apply);
   }, [slots]);
 
+  // The glimmer: once each new screen settles, a sheen runs over the buttons Duet put in the page, so the web's own
+  // controls stand apart from iOS's. Read from the page itself, in the frame's coordinates.
+  const moved = useRef("");
+  const [shine, setShine] = useState<{ x: number; y: number; w: number; h: number }[]>([]);
+  const shown = `${s.app}-${s.posture}-${upright}-${seen?.mode}-${src}`;
+  useEffect(() => {
+    if (slots || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // After the fold and the page's fade-in when the device moved, else once the page has slid into place.
+    const wait = (moved.current !== `${s.posture}-${s.rotated}` ? FOLD + 450 : MOVE + 250) * k.current;
+    moved.current = `${s.posture}-${s.rotated}`;
+    const on = setTimeout(() => {
+      const d = frame.current?.contentDocument;
+      if (!d) return;
+      setShine([...d.querySelectorAll<HTMLElement>("[data-duet-slot]")].flatMap((e) => {
+        const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+        return r.width && r.height && cs.visibility !== "hidden" && +cs.opacity > 0.05 ? [{ x: r.left, y: r.top, w: r.width, h: r.height }] : [];
+      }));
+    }, wait);
+    const off = setTimeout(() => setShine([]), wait + 2000);
+    return () => { clearTimeout(on); clearTimeout(off); setShine([]); };
+  }, [shown, slots]);
+
   // Fit the turned device and the controls in the window.
   const [bw, bh] = s.rotated ? [b.h, b.w] : [b.w, b.h];
   const scaleFor = (w: number, h: number) => embed ? Math.min(view.w / w, view.h / h, 1) : Math.min((view.w - 64) / w, (view.h - 320) / h, 1);
@@ -419,7 +448,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
       <div style={{ position: "relative", alignSelf: "stretch", display: "flex", justifyContent: "center", alignItems: "center", visibility: measured ? undefined : "hidden", ...(embed && { height: view.h }) }}>
       {beside && <Showing app={s.app} style={{ position: "absolute", right: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 170, top: "50%", translate: "0 -50%", transition: `right ${turn}ms ${ease}` }} />}
-      {beside && <Phases at={at} tour={tour} onPick={(i) => go(TOUR[i])} onTour={() => setTour((t) => !t)} style={{ position: "absolute", left: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 200, top: "50%", translate: "0 -50%", transition: `left ${turn}ms ${ease}` }} />}
+      {beside && <Phases at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} style={{ position: "absolute", left: `calc(50% + ${bw * scale / 2 + 40}px)`, width: 200, top: "50%", translate: "0 -50%", transition: `left ${turn}ms ${ease}` }} />}
       <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `width ${turn}ms ${ease}, height ${turn}ms ${ease}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
@@ -452,11 +481,12 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
                   position: "absolute", left: sc.frame.x, top: sc.frame.y, width: sc.frame.w, height: sc.frame.h,
                   border: 0, display: "block", background: "var(--bg)", pointerEvents: embed ? "none" : undefined, transition: motion(["left", "top", "width", "height"]),
                 }} />
+                {shine.map((g, i) => <div key={`${shown}-${i}`} data-wd-shine style={{ left: sc.frame.x + g.x, top: sc.frame.y + g.y, width: g.w, height: g.h, "--wd-at": `${i * 90}ms` } as CSSProperties} />)}
               </div>
               {/* System chrome fades in with each new app or screen. */}
               <div key={`${s.app}-${s.posture}-${upright}`} data-wd-callout={slots || undefined} style={{ position: "absolute", inset: 0, pointerEvents: "none", animation: `wd-in ${MOVE}ms ${ease} both` }}>{sc.chrome}</div>
             </div>
-            {s.posture === "closed" && <Island live={s.live} />}
+            {s.posture === "closed" && <Island live={island(s)} />}
             {s.posture === "open" && <Crease />}
           </div>
         </div>
@@ -487,7 +517,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         <Segmented value={s.app} onChange={(app) => go({ app })}
           options={[["home", "Home Screen"], ["safari", "Safari"], ["split", "Split View"], ["window", "Window"]]} />
         {s.app === "split" && <Button onClick={() => go({ pane: s.pane === "right" ? "left" : "right" })} label="Swap"><ArrowLeftRight size={17} /></Button>}
-        {s.posture === "closed" && !s.rotated && <Button onClick={() => go({ live: !s.live })} label="Live Activity" on={s.live}><Activity size={17} /></Button>}
+        <Button onClick={() => go({ live: !s.live })} label="Live Activities" on={s.live}><Activity size={17} /></Button>
         <label title="Drag to fold and unfold by hand" style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
           Fold
           <input type="range" aria-label="Fold" min={0} max={1} step={0.001} value={scrub ?? (s.posture === "open" ? 1 : 0)}
@@ -500,9 +530,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       </div>
       </div>
       {!beside && <Showing app={s.app} row />}
-      {!beside && <Phases at={at} tour={tour} onPick={(i) => go(TOUR[i])} onTour={() => setTour((t) => !t)} row />}
+      {!beside && <Phases at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />}
       <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
-        <Note mode={sc.mode} text={sc.note + (s.live ? LIVE_NOTE[s.app] ?? "" : "")} />
+        <Note mode={sc.mode} text={sc.note + (island(s) ? LIVE_NOTE[s.app] ?? "" : "")} />
         {allNotes().map((n) => { const [m, t] = n.split("|"); return <Note key={n} mode={m} text={t} hidden />; })}
       </p>
       {slots && (
@@ -539,16 +569,16 @@ function Showing({ app, row, style }: { app: App; row?: boolean; style?: CSSProp
 
 /** The tour's phases, grouped by where the page runs: the current one follows the tour, and picking one jumps there
  *  (which pauses the tour). `row`: chips under the stage, where there is no room beside it. */
-function Phases({ at, tour, onPick, onTour, row, style }: { at: number; tour: boolean; onPick: (i: number) => void; onTour: () => void; row?: boolean; style?: CSSProperties }) {
+function Phases({ at, tour, onPick, onTour, live, onLive, row, style }: { at: number; tour: boolean; onPick: (i: number) => void; onTour: () => void; live: boolean; onLive: () => void; row?: boolean; style?: CSSProperties }) {
   const starts = PHASES.flatMap((g) => g.rows.map(([, i]) => i)).sort((a, b) => a - b);
   const current = at < 0 ? -1 : starts.filter((i) => i <= at).at(-1);
   const item = (label: string, i: number) => {
-    const on = i === current, live = label === "Live Activity";
+    const on = i === current;
     return (
       <button key={i} onClick={() => onPick(i)} aria-current={on || undefined} data-wd-phase={i}
         style={{ ...control, height: row ? 32 : 30, padding: row ? "0 12px" : "0 10px", display: "flex", alignItems: "center", gap: 7, width: row ? undefined : "100%", textAlign: "left", font: "500 14px -apple-system, system-ui", whiteSpace: "nowrap",
           background: on ? "var(--card)" : "transparent", color: on ? "var(--ink)" : "var(--dim)", boxShadow: on ? "0 0 0 0.5px var(--line)" : undefined, transition: "background 0.25s, color 0.25s" }}>
-        {live ? <Activity size={14} style={{ marginLeft: row ? 0 : 12 }} /> : <i style={{ width: 6, height: 6, borderRadius: 99, flex: "none", background: on ? "var(--accent)" : "var(--line)" }} />}
+        <i style={{ width: 6, height: 6, borderRadius: 99, flex: "none", background: on ? "var(--accent)" : "var(--line)" }} />
         {label}
       </button>
     );
@@ -558,9 +588,19 @@ function Phases({ at, tour, onPick, onTour, row, style }: { at: number; tour: bo
       {tour ? <Pause size={13} /> : <Play size={13} />}{tour ? "Pause" : "Play tour"}
     </button>
   );
+  // Live Activities are a switch, not a phase: they run on top of whichever view is showing.
+  const activities = (
+    <button role="switch" aria-checked={live} onClick={onLive} data-wd-live title="Live Activities grow the Dynamic Island on the closed display"
+      style={{ ...control, height: row ? 32 : 30, padding: "0 10px", display: "flex", alignItems: "center", gap: 8, background: "transparent", color: live ? "var(--ink)" : "var(--dim)", font: "500 14px -apple-system, system-ui", whiteSpace: "nowrap" }}>
+      <i style={{ width: 26, height: 16, borderRadius: 99, flex: "none", position: "relative", background: live ? "#30d158" : "var(--line)", transition: "background 0.25s" }}>
+        <i style={{ position: "absolute", top: 2, left: live ? 12 : 2, width: 12, height: 12, borderRadius: 99, background: "#fff", boxShadow: "0 1px 2px rgb(0 0 0 / 0.2)", transition: `left 0.25s ${ease}` }} />
+      </i>
+      Live Activities
+    </button>
+  );
   if (row) return (
     <div data-wd-phases style={{ display: "flex", flexWrap: "wrap", gap: 4, justifyContent: "center", padding: "0 16px", maxWidth: 760 }}>
-      {PHASES.flatMap((g) => g.rows.map(([label, i]) => item(label, i)))}{toggle}
+      {PHASES.flatMap((g) => g.rows.map(([label, i]) => item(label, i)))}{activities}{toggle}
     </div>
   );
   return (
@@ -571,7 +611,7 @@ function Phases({ at, tour, onPick, onTour, row, style }: { at: number; tour: bo
           {g.rows.map(([label, i]) => item(label, i))}
         </div>
       ))}
-      <div>{toggle}</div>
+      <div style={{ display: "grid", justifyItems: "start", gap: 2 }}>{activities}{toggle}</div>
     </nav>
   );
 }
@@ -619,6 +659,8 @@ function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
       </div>
       <div data-wd-shape style={{ ...face, transform: "rotateY(180deg)", ...corners(BODY.closed.r) }}>
         <div data-wd-shape style={{ position: "absolute", left: BODY.closed.x, top: BODY.open.y, right: 13, bottom: BODY.open.y, ...corners(BODY.closed.screenR), background: "var(--bg)" }} />
+        {/* The camera is hardware: it swings in with the outer display, where the Island takes over once closed. */}
+        <div style={{ ...CAMERA_PILL, left: BODY.closed.x + CAMERA.x - CAMERA_PILL.width / 2, top: BODY.closed.y + CAMERA.y - CAMERA_PILL.width / 2, height: CAMERA_PILL.width }} />
         {sheen}
       </div>
     </div>
@@ -630,22 +672,48 @@ function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
 const glass: CSSProperties = { background: "var(--wd-glass)", boxShadow: "0 0 0 0.5px rgb(0 0 0 / 0.12), 0 4px 14px rgb(0 0 0 / 0.08)", backdropFilter: "blur(12px)" };
 const windowBg: CSSProperties = { position: "absolute", top: 0, borderRadius: 30, overflow: "hidden", background: "var(--card)", transition: `left 0.7s ${ease}` };
 const circle: CSSProperties = { ...glass, width: 49, height: 49, borderRadius: 99, display: "grid", placeItems: "center" };
+/** Safari's column buttons take their look from site.css ([data-wd-col]), Duet's column look. */
+const column: CSSProperties = { width: 49, height: 49, borderRadius: 99, display: "grid", placeItems: "center" };
 
-/** The outer display's camera, in the Dynamic Island. Live Activities (two of them, the worst case measured on the
- *  device) grow it down the strip by DUO.island. In device coordinates, so it stays with the hardware when turned. */
-function Island({ live }: { live: boolean }) {
-  const w = live ? 58 : CAMERA.d, top = live ? CAMERA.y - 29 : CAMERA.y - CAMERA.d / 2;
+/** A damped spring as a CSS easing (`linear()` points): the Dynamic Island's overshoot and settle. */
+const spring = (damping: number, n = 40) => {
+  const end = Math.log(400) / damping, wd = Math.sqrt(1 - damping * damping);
+  const x = (t: number) => 1 - Math.exp(-damping * t) * (Math.cos(wd * t) + (damping / wd) * Math.sin(wd * t));
+  return `linear(${Array.from({ length: n + 1 }, (_, i) => +x((end * i) / n).toFixed(4)).join(", ")})`;
+};
+const SPRING = spring(0.55), SETTLE = spring(0.8);
+
+/** The Dynamic Island at rest, around the outer display's camera. */
+const CAMERA_PILL = { position: "absolute", width: CAMERA.d + 2, borderRadius: 99, background: "#000", boxShadow: "0 0 0 1px var(--wd-island-rim)" } satisfies CSSProperties;
+
+/** The outer display's camera, in the Dynamic Island. Two Live Activities, the worst case measured on the device
+ *  (call + Maps), grow it down the strip within DUO.island: the first activity joins the camera's pill, the second
+ *  splits off below as its own bubble. They spring out of the camera and back into it, like iOS. In device
+ *  coordinates, so it stays with the hardware when turned. */
+function Island({ live: want }: { live: boolean }) {
+  // Mounted closed, then grown: a device that closes with activities running springs them out of the camera.
+  const [live, setLive] = useState(false);
+  useEffect(() => { const r = requestAnimationFrame(() => setLive(want)); return () => cancelAnimationFrame(r); }, [want]);
+  const w = CAMERA_PILL.width, left = CAMERA.x - w / 2, top = CAMERA.y - w / 2, icon = 30, gap = 6;
+  const pill = live ? w + icon + 6 : w, bubble = top + pill + gap;
+  // Out: the pill stretches, then the bubble pinches off it. In: the bubble is drawn back first, then the pill.
+  const t = (props: string, ms: number, delay: number, easing = SPRING) => props.split(" ").map((p) => `${p} ${ms}ms ${easing} ${delay}ms`).join(", ");
+  const shape: CSSProperties = { ...CAMERA_PILL, left, zIndex: 2, overflow: "hidden" };
+  const content = (delay: number): CSSProperties => ({
+    position: "absolute", left: (w - icon) / 2, bottom: (w - icon) / 2, width: icon, height: icon, borderRadius: 99, display: "grid", placeItems: "center", color: "#fff",
+    opacity: live ? 1 : 0, scale: live ? "1" : "0.4", filter: live ? "none" : "blur(4px)",
+    transition: live ? t("opacity scale filter", 420, delay) : t("opacity scale filter", 160, 0, "ease-in"),
+  });
   return (
-    <div data-wd-system data-wd-island style={{
-      position: "absolute", left: CAMERA.x - w / 2, top, width: w, height: live ? 58 + DUO.island : CAMERA.d, borderRadius: 99, background: "#000", zIndex: 2,
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 8, paddingBottom: live ? 12 : 0, boxSizing: "border-box", overflow: "hidden",
-      transition: `all ${MOVE}ms ${ease}`,
-    }}>
-      {live && <>
-        <i style={{ width: 30, height: 30, borderRadius: 99, background: "#30d158", display: "grid", placeItems: "center", color: "#fff" }}><Glyph d="M13.83 10.17a8 8 0 0 0 0 3.66M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" size={16} /></i>
-        <i style={{ width: 30, height: 30, borderRadius: 99, background: "#0a84ff", display: "grid", placeItems: "center", color: "#fff" }}><Glyph d="m3 11 19-9-9 19-2-8-8-2z" size={15} /></i>
-      </>}
-    </div>
+    <>
+      <div data-wd-system data-wd-island style={{ ...shape, top: live ? bubble : top + pill - w, height: w, scale: live ? "1" : "0.5", opacity: live ? 1 : 0,
+        transition: live ? t("top scale", 620, 140) + ", opacity 80ms linear 140ms" : t("top scale", 300, 0, SETTLE) + ", opacity 80ms linear 220ms" }}>
+        <i style={{ ...content(320), background: "#0a84ff" }}><Glyph d="m3 11 19-9-9 19-2-8-8-2z" size={15} /></i>
+      </div>
+      <div data-wd-system data-wd-island style={{ ...shape, top, height: pill, transition: live ? t("height", 560, 0) : t("height", 420, 160) }}>
+        <i style={{ ...content(160), color: "#30d158", boxShadow: "inset 0 0 0 1.5px #30d158" }}><Glyph d="M13.83 10.17a8 8 0 0 0 0 3.66M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" size={16} /></i>
+      </div>
+    </>
   );
 }
 
@@ -688,9 +756,9 @@ function SafariColumn({ x, h, col, back, clock, over }: { x: number; h: number; 
   return (
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
       {clock !== undefined && <Status x={cx} top={clock} />}
-      <div data-wd-system style={{ ...circle, ...at(back) }}><Glyph d="m15 18-6-6 6-6" /></div>
-      <div data-wd-system style={{ ...circle, ...at(back + DUO.control + DUO.gap) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
-      <div data-wd-system style={{ ...glass, ...at(h - DUO.bottom - SAFARI.pill), width: DUO.control, height: SAFARI.pill, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
+      <div data-wd-system data-wd-col style={{ ...column, ...at(back) }}><Glyph d="m15 18-6-6 6-6" /></div>
+      <div data-wd-system data-wd-col style={{ ...column, ...at(back + DUO.control + DUO.gap) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
+      <div data-wd-system data-wd-col style={{ ...at(h - DUO.bottom - SAFARI.pill), width: DUO.control, height: SAFARI.pill, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" /><Glyph d="M8 8h12v12H8zM4 16V4h12" />
       </div>
     </div>
