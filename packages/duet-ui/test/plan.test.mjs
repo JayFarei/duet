@@ -26,6 +26,8 @@ test("strip mode hugs iOS's strip; column mode Safari's; inline the chosen side"
   assert.equal(detect(INLINE, "left").side, "left");
   assert.equal(plan(detect(INLINE, "left"), spec({ back: true })).centerX, DUO.centerFromEdge);
   assert.equal(plan(detect(COLUMN), spec({ back: true })).centerX, 466 - DUO.centerFromEdge);
+  assert.equal(plan(detect(sig(594, 368, 678, 466, { angle: 90 })), spec({ back: true })).centerX, DUO.centerFromEdge);
+  assert.equal(plan(detect(sig(594, 368, 678, 466, { angle: 270 })), spec({ back: true })).centerX, 678 - DUO.centerFromEdge);
 });
 
 for (const [name, s] of [["strip", STRIP], ["column", COLUMN], ["inline", INLINE]]) {

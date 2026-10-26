@@ -15,11 +15,15 @@ const CONTEXTS = {
   "column, split left": { ...detect(sig(385, 571, 469, 669)), side: "left" },
   "column, split right": { ...detect(sig(385, 571, 469, 669)), side: "right" },
   "inline, unfolded": detect(sig(951, 543, 951, 669)),
+  "column, landscape left": detect(sig(594, 368, 678, 466, { angle: 90 })),
+  "column, landscape right": detect(sig(594, 368, 678, 466, { angle: 270 })),
   "inline, landscape": detect(sig(594, 368, 678, 466)),
 };
 // Safari's rows above, its pill below (simulator measurements, see plan.test.mjs); the strip and inline
 // bands are the viewport less the island and home indicator.
 function band(c) {
+  if (c.mode === "column" && !c.split && c.screenWidth > c.screenHeight) return [
+    SAFARI.landscape[c.side].top + SAFARI.rows * (DUO.control + DUO.gap), SAFARI.landscape[c.side].pill - DUO.gap];
   if (c.mode === "column") return [
     c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap) : DUO.top + DUO.island + SAFARI.rows * (DUO.control + DUO.gap),
     c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap];

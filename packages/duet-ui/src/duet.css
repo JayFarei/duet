@@ -229,7 +229,7 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    column() or bleed(). Safari's column only shows in-document content and clips fixed boxes at the viewport
    edge, so there the scroller is an in-document box that runs on under the column. The document still never
    scrolls, so the chrome layer never moves. */
-html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-right)); bottom: auto; height: calc(100% + var(--duet-inset-bottom)); }
+html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left) + var(--duet-inset-right)); bottom: auto; height: calc(100% + var(--duet-inset-bottom)); }
 /* That overflow widens the document, and touch-action on <html> stops at this scroll container, so without its own
    a sideways swipe pans the whole page, chrome and all, into the column. Carousels inside are scrollers of their own
    and still pan. */
@@ -237,9 +237,8 @@ html[data-duet-mode="column"] .duet-scroller { touch-action: pan-y; }
 /* Safari's URL pill floats under the page's bottom edge: the scroller runs on under it (above) and this spacer lets
    the last content scroll clear of it. */
 .duet-scroller::after { content: ""; display: block; height: var(--duet-inset-bottom, 0px); }
-/* Split pane: a column on each side (the pane's own is on its outer edge, which the page cannot see); the
-   document is scrolled one column across (chrome.tsx). */
-html[data-duet-mode="column"][data-duet-split] .duet-scroller { width: calc(100% + var(--duet-inset-left) + var(--duet-inset-right)); }
+/* A column on the left (closed landscape turned left, or a split pane, which spans one on each side since its own
+   is on its outer edge, which the page cannot see): the document is scrolled one column across (chrome.tsx). */
 /* Emulated (the site's web Duo): the frame already spans the column and runs under the pill. */
 html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; height: 100%; }
 

@@ -75,13 +75,13 @@ Possible false positives: an iPad (which also sends a Mac user agent with touch)
 
 ### Which mode
 
-Duet re-reads the signals on resize, orientation change and visual viewport resize (again 300 and 600ms later, since the window size and insets settle late), and picks the first mode that matches:
+Duet re-reads the signals on resize, orientation change (including `screen.orientation` change: turning from one landscape to the other keeps the window size) and visual viewport resize (again 300 and 600ms later, since the window size and insets settle late), and picks the first mode that matches:
 
 | Order | Mode | Conditions (all must hold) | Controls |
 | --- | --- | --- | --- |
 | 1 | `strip` | Running as a Home Screen app (`navigator.standalone` or `display-mode: standalone`), and the left or right safe-area inset is at least 60px. The right side wins if both are. Does not check for a Duo. | In the strip iOS gives the app, beside the page |
-| 2 | `column` | Not a Home Screen app; not inside an iframe; the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`); the keyboard is down (visual viewport height at least `innerHeight - 1`); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column its own buttons leave empty, so the page keeps its full width |
-| 3 | `inline` | Everything else: unfolded at full width, landscape, keyboard up, other browsers, in-app web views, the in-app Safari preview, other phones, desktops | An 84px strip inside the page, on the side the user picks |
+| 2 | `column` | Not a Home Screen app; not inside an iframe; the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the keyboard is down (visual viewport height at least `innerHeight - 1`); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column its own buttons leave empty, so the page keeps its full width |
+| 3 | `inline` | Everything else: unfolded at full width, landscape of unknown turn, keyboard up, other browsers, in-app web views, the in-app Safari preview, other phones, desktops | An 84px strip inside the page, on the side the user picks |
 
 "Safari" means the user agent has `Version/x Safari/` and none of the tokens of other iOS browsers and apps (`CriOS`, `FxiOS`, `EdgiOS`, `OPiOS`, `GSA/`, `Ddg/`); an in-app web view drops the `Safari/` token. `useDuet().browser` reports the result: `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` or `"other"`. Other browsers draw their own chrome where Safari has its column, so they always get `inline`.
 
@@ -101,7 +101,7 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 
 ### Side
 
-`useDuet().side` is the edge the controls are on. It is only detected in `strip` mode (from which safe-area inset is large). In `column` mode it is always `"right"`, Safari's column on the closed Duo, and in a split pane it is nominal, since both edges are drawn. In `inline` mode it is the user's choice: drag the controls across the middle of the page, or use "Move controls" in "…". The choice is stored in `localStorage` per site (`duet-side`, or `duet-side-split` in split view). Without one, it is `"right"`, or `"left"` in the in-app preview.
+`useDuet().side` is the edge the controls are on. It is only detected in `strip` mode (from which safe-area inset is large). In `column` mode it is Safari's column on the closed Duo: `"right"` in portrait; turned sideways, the side the camera is on, `"left"` at angle 90 (turned anticlockwise) and `"right"` at 270. A left column widens the document on the left and keeps it scrolled across, as in split view. In a split pane it is nominal, since both edges are drawn. In `inline` mode it is the user's choice: drag the controls across the middle of the page, or use "Move controls" in "…". The choice is stored in `localStorage` per site (`duet-side`, or `duet-side-split` in split view). Without one, it is `"right"`, or `"left"` in the in-app preview.
 
 ### In-app preview
 
@@ -121,6 +121,7 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 
 - **Above:** the status bar and Dynamic Island, and in Safari its own back and reader buttons at the top of the column. Live Activities grow the island down the strip and push Safari's buttons with it, and a page can't tell, so the band always assumes the worst case measured on device (two activities). That space stays empty even when none are running. A split-view pane on the right sits under the same status column, so it gets the same band as a closed tab, while the left pane uses the full column.
 - **Below:** Safari's +/tabs pill, or the bottom edge.
+- **Closed landscape:** Safari moves its back and reader rows and its pill on each side (left column: back slot top 81.5pt, pill top 327pt; right column: 23.5pt and 279pt), and Duet takes the gap between. Measured with a bare island; how Live Activities grow it sideways is not yet known.
 - **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item.
 
 ## Server rendering and hydration
@@ -235,7 +236,7 @@ Try it on the [site](https://getduet.dev/panes).
 - **Live Activities and the Dynamic Island are invisible to the page**, so the top band always reserves the worst case, which leaves empty space when no activity runs.
 - **Split-view panes can't tell their side**: column mode draws both edges, inline mode relies on the user's choice.
 - **Server rendering** starts from a fixed Duo snapshot (see [Server rendering](#server-rendering-and-hydration)).
-- Other iOS browsers, in-app web views, iframes, landscape, the open screen at full width and the keyboard all get `inline`.
+- Other iOS browsers, in-app web views, iframes, landscape other than the closed Safari tab, the open screen at full width and the keyboard all get `inline`.
 - Measured on the iPhone Duo simulator (iOS 27.1) and checked on a device in October 2026.
 
 ## Examples

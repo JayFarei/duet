@@ -95,6 +95,7 @@ function signals(): Signals {
     pixelRatio: devicePixelRatio,
     userAgent: navigator.userAgent,
     touchPoints: navigator.maxTouchPoints,
+    angle: screen.orientation?.angle ?? ((((window as Window & { orientation?: number }).orientation ?? 0) + 360) % 360),
     standalone: (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches,
   };
 }
@@ -140,6 +141,7 @@ function subscribe(cb: () => void) {
   const on = () => { cb(); setTimeout(cb, 300); setTimeout(cb, 600); };
   addEventListener("resize", on);
   addEventListener("orientationchange", on);
+  screen.orientation?.addEventListener("change", on); // a turn from one landscape to the other keeps the window size
   visualViewport?.addEventListener("resize", on);
   // A fresh Safari tab can hydrate before its window geometry settles, with no resize afterwards.
   const t = [0, 300, 1000].map((ms) => setTimeout(cb, ms));
@@ -148,6 +150,7 @@ function subscribe(cb: () => void) {
     listeners.delete(cb);
     t.forEach(clearTimeout);
     removeEventListener("resize", on); removeEventListener("orientationchange", on);
+    screen.orientation?.removeEventListener("change", on);
     visualViewport?.removeEventListener("resize", on);
   };
 }
@@ -200,7 +203,8 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
  *  them by coordinates on pointerdown. Nothing in the column scrolls, so a touch there is always a tap.
  *  Split pane: the column is on the pane's outer edge, which the page cannot see, so the document spans a column
  *  on each side, scrolled 84 across, and the controls are drawn in both (refs[0] left, refs[1] right). Each pane
- *  shows only its own column, and a tap there names the side (`tapSide`). */
+ *  shows only its own column, and a tap there names the side (`tapSide`). A left-hand column (closed landscape,
+ *  turned left) works the same way, with the document spanning that column alone. */
 let tapSide: Side = "right";
 /** Without shrink-to-fit=no Safari zooms a split pane out to fit the layer's overflow, which reads as another
  *  window size and flips the mode. It applies even when set late, but must land before the first column paint.
@@ -212,7 +216,7 @@ function viewport(key: string, value: string) {
   for (const meta of metas) if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
-function useColumnLayer(on: boolean, split: boolean, column: number) {
+function useColumnLayer(on: boolean, split: boolean, left: boolean, column: number) {
   const refs = [useRef<HTMLElement>(null), useRef<HTMLElement>(null)] as const;
   useEffect(() => {
     const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
@@ -221,7 +225,7 @@ function useColumnLayer(on: boolean, split: boolean, column: number) {
     html.touchAction = "pan-y"; // the layer widens the document; keep the page from panning sideways
     const follow = () => {
       // An emulating host already frames both columns; pinning there loops in iOS Safari, whose frame overflows a few px.
-      if (split && !emulated && Math.round(scrollX) !== column) scrollTo(column, scrollY);
+      if ((split || left) && !emulated && Math.round(scrollX) !== column) scrollTo(column, scrollY);
       for (const el of els) el.style.transform = scrollY ? `translateY(${scrollY}px)` : "";
     };
     const tap = (e: PointerEvent) => {
@@ -245,7 +249,7 @@ function useColumnLayer(on: boolean, split: boolean, column: number) {
       t.forEach(clearTimeout);
       removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pointerdown", tap);
     };
-  }, [on, split, column]); // eslint-disable-line react-hooks/exhaustive-deps -- refs are stable
+  }, [on, split, left, column]); // eslint-disable-line react-hooks/exhaustive-deps -- refs are stable
   return refs;
 }
 
@@ -341,10 +345,12 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   useEffect(() => {
     // The page spans the window and the controls float over it; these insets are how far text and buttons keep
     // clear on each edge (layout.ts). In Safari's column the scroller runs on under the column (an emulated
-    // column's frame already spans it), so either way the inset there is the column's width.
+    // column's frame already spans it), so either way the inset there is the column's width; a tab has no safe
+    // areas, so the other edge is 0.
     const r = document.documentElement.style;
     const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
-    const right = ctx.side === "right" || split ? inset : envInset("right"), left = ctx.side === "left" || split ? inset : envInset("left");
+    const other = (side: Side) => ctx.mode === "column" ? "0px" : envInset(side);
+    const right = ctx.side === "right" || split ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
     // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
     for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
@@ -357,7 +363,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulated);
     document.documentElement.toggleAttribute("data-duet-split", split);
   }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, split]);
-  const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, column);
+  const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, ctx.side === "left", column);
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
     if (!menu) return;

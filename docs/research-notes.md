@@ -59,7 +59,7 @@ On the Duo Lab simulator, recorded with screenshots for each state (portrait def
 | Closed portrait, default toolbar | 382x580 | 466x678 | 382x580 @0,0, scale 1 | resize + vv resize | yes, right |
 | Closed portrait, compact URL bar (after scroll) | 382x598 | 466x678 | 382x598 | vv resize only | yes, unchanged |
 | Closed portrait, keyboard up | 382x580 | 466x678 | height 345 or 413 | vv resize | yes |
-| Closed landscape | 594x368 | 678x466 (lags ~400ms) | matches inner | resize, orientationchange | Safari moves buttons (top toolbar or a different column) |
+| Closed landscape | 594x368 | 678x466 (lags ~400ms) | matches inner | resize, orientationchange | yes, on the camera's side: left at angle 90 (back slot top 81.5, pill top 327), right at angle 270 (back 23.5, pill 279); remeasured 2026-10-26, iOS 27.1 |
 | Open posture | 951x543 (669 wide when rotated) | 951x669 (lags) | matches inner | resize | no, top toolbar |
 | Split view pane (device) | 385x571 | 469x669 | matches inner | resize | Safari draws its column, but our in-document paint does not show there (round 5) |
 
@@ -67,7 +67,7 @@ Findings: `screen.*` is stale after posture changes (stays 466x678), never use i
 
 ### Step 2: decision
 
-Painting into Safari's column is an undocumented WebKit artefact (in-document content painted outside the layout viewport), so it is only used under a strict whitelist: not standalone, column signature present, portrait (`innerHeight > innerWidth`), keyboard down. Everything else, including split view and anything we cannot identify, gets `inline` mode: a right-edge strip 84px wide inside the page viewport, page inset by `--duo-right: 84px`. Standalone keeps `strip` mode (real iOS strip). `position: fixed` and `position: sticky` both get clipped at the viewport edge, so column mode keeps the absolute layer, with the inner scroller holding it still.
+Painting into Safari's column is an undocumented WebKit artefact (in-document content painted outside the layout viewport), so it is only used under a strict whitelist: not standalone, column signature present, portrait (`innerHeight > innerWidth`), keyboard down. Update 2026-10-26: closed landscape is whitelisted too, when the window is the closed screen and `screen.orientation.angle` is 90 (column left) or 270 (column right); an unknown angle stays inline. Turning from one landscape to the other fires no resize, so Duet also listens to `screen.orientation` change. Everything else, including split view and anything we cannot identify, gets `inline` mode: a right-edge strip 84px wide inside the page viewport, page inset by `--duo-right: 84px`. Standalone keeps `strip` mode (real iOS strip). `position: fixed` and `position: sticky` both get clipped at the viewport edge, so column mode keeps the absolute layer, with the inner scroller holding it still.
 
 ### Step 3: verification captures (`duo-lab/captures/`)
 
