@@ -66,3 +66,8 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 
 /* A server-rendered phone page, hidden on desktops until the web Duo replaces it (same query as useDesktop). */
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) { .ssr-site { visibility: hidden; } }
+
+/* The emulator's device corners: superellipse radii where corner-shape is supported, circles elsewhere. */
+@supports (corner-shape: squircle) {
+  [data-wd-shape] { border-radius: var(--wd-r) !important; }
+}

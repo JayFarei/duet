@@ -22,11 +22,25 @@ const SCREEN = { closed: { w: 466, h: 678 }, open: { w: 951, h: 669 } };
 // A graphite finish around a black front: the site stays colourless.
 const FINISH = { band: "#3a3a3c", rim: "#6e6e73", front: "#0b0c10", button: "linear-gradient(#6e6e73, #2c2c2e)" };
 const BODY_SHADE = `inset 0 0 0 1.5px ${FINISH.rim}, inset 0 0 0 3.5px ${FINISH.band}`;
-// Closed: hinge spine on the left (26pt), free edge on the right. Open: 13pt sides, both free edges.
+// Corners fitted to Apple's iPhone Duo simulator artwork (body and screen masks): a superellipse of radius `r` and
+// CSS corner-shape `k` (1 is a circle), and the closest circle where corner-shape is unsupported.
+interface Corner { r: number; k: number; round: number }
+const C = {
+  free: { r: 103.5, k: 1.6, round: 75 }, hinge: { r: 40, k: 2.25, round: 30 }, // the body: free edge, hinge spine
+  screen: { r: 74.5, k: 1.4, round: 60.5 }, inner: { r: 67.5, k: 1.4, round: 55 }, // outer and inner display
+  spine: { r: 9, k: 1, round: 9 }, none: { r: 0, k: 1, round: 0 },
+} satisfies Record<string, Corner>;
+// Closed: hinge spine on the left (26pt), free edge on the right (13pt). Open: 13pt sides, both free edges.
+// Corners run top left, top right, bottom right, bottom left.
 const BODY = {
-  closed: { w: 514, h: 706, x: 26, y: 14, r: "22px 72px 72px 22px", screenR: "9px 56.5px 56.5px 9px" },
-  open: { w: 977, h: 697, x: 13, y: 14, r: "72px", screenR: "56.5px" },
+  closed: { w: 505, h: 706, x: 26, y: 14, r: [C.hinge, C.free, C.free, C.hinge], screenR: [C.spine, C.screen, C.screen, C.spine] },
+  open: { w: 977, h: 697, x: 13, y: 14, r: [C.free, C.free, C.free, C.free], screenR: [C.inner, C.inner, C.inner, C.inner] },
 };
+/** Corners as the device draws them, for an element marked `data-wd-shape`: site.css swaps in the superellipse
+ *  radii where corner-shape works, and other browsers keep the closest circle. */
+const corners = (c: Corner[]) => ({
+  borderRadius: c.map((x) => `${x.round}px`).join(" "), "--wd-r": c.map((x) => `${x.r}px`).join(" "), cornerShape: c.map((x) => `superellipse(${x.k})`).join(" "),
+}) as CSSProperties;
 // Volume on top and power on the right, relative to the free edge (body right).
 const BUTTONS = [{ right: 271, top: -4, w: 66, h: 6 }, { right: 191, top: -4, w: 66, h: 6 }, { right: -3, top: 196, w: 5, h: 113 }];
 // Outer display camera, screen coordinates in natural portrait (seen in recordings at the top of the strip).
@@ -397,11 +411,11 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: 2600 }}>
         <div style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
-          <div style={{
-            position: "absolute", inset: 0, borderRadius: b.r, cornerShape: "squircle", background: FINISH.front,
+          <div data-wd-shape style={{
+            ...corners(b.r), position: "absolute", inset: 0, background: FINISH.front,
             boxShadow: `${BODY_SHADE}, 0 40px 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}`,
-          } as CSSProperties} />
-          <div data-wd-screen style={{ position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, borderRadius: b.screenR, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
+          }} />
+          <div data-wd-shape data-wd-screen style={{ ...corners(b.screenR), position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
             {/* The page, upright for the user: counter-turned when the device is turned. */}
             <div style={{
               position: "absolute", left: 0, top: 0, width: W, height: H, transformOrigin: "0 0",
@@ -492,15 +506,15 @@ function Note({ mode, text, hidden }: { mode: string; text: string; hidden?: boo
 function Flap({ ref }: { ref: React.Ref<HTMLDivElement> }) {
   const half = BODY.open.w / 2, face: CSSProperties = { position: "absolute", inset: 0, backfaceVisibility: "hidden", background: FINISH.front, boxShadow: BODY_SHADE };
   // A soft sheen across each face, so the swinging half reads against a dark page.
-  const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" }} />;
+  const sheen = <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", cornerShape: "inherit", background: "linear-gradient(90deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.02) 70%)", pointerEvents: "none" }} />;
   return (
     <div ref={ref} style={{ position: "absolute", left: 0, top: 0, width: half, height: BODY.open.h, transformOrigin: "100% 50%", transformStyle: "preserve-3d", transform: "rotateY(180deg)" }}>
-      <div style={{ ...face, borderRadius: "72px 0 0 72px" }}>
-        <div style={{ position: "absolute", left: BODY.open.x, top: BODY.open.y, right: 0, bottom: BODY.open.y, borderRadius: "56.5px 0 0 56.5px", background: "var(--bg)" }} />
+      <div data-wd-shape style={{ ...face, ...corners([C.free, C.none, C.none, C.free]) }}>
+        <div data-wd-shape style={{ position: "absolute", left: BODY.open.x, top: BODY.open.y, right: 0, bottom: BODY.open.y, ...corners([C.inner, C.none, C.none, C.inner]), background: "var(--bg)" }} />
         {sheen}
       </div>
-      <div style={{ ...face, transform: "rotateY(180deg)", borderRadius: BODY.closed.r }}>
-        <div style={{ position: "absolute", left: BODY.closed.x, top: BODY.open.y, right: BODY.open.y, bottom: BODY.open.y, borderRadius: BODY.closed.screenR, background: "var(--bg)" }} />
+      <div data-wd-shape style={{ ...face, transform: "rotateY(180deg)", ...corners(BODY.closed.r) }}>
+        <div data-wd-shape style={{ position: "absolute", left: BODY.closed.x, top: BODY.open.y, right: 13, bottom: BODY.open.y, ...corners(BODY.closed.screenR), background: "var(--bg)" }} />
         {sheen}
       </div>
     </div>
