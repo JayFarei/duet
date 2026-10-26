@@ -244,3 +244,22 @@ test("the context carries device and standalone", () => {
   assert.equal(home.standalone, true);
   assert.equal(home.device, "duo");
 });
+
+// #54 (RegTail feedback 2026-10-26): a gallery sized from the height jumped as Safari's URL bar collapsed mid-scroll.
+test("stableHeight keeps the smallest height per width and orientation, like 100svh", () => {
+  const d = { flips: [] }, phone = (ih) => on(sig(402, ih, 402, 874, { screenWidth: 402, screenHeight: 874 }), "safari");
+  assert.equal(stable(d, phone(700), "right", 0).stableHeight, 700);
+  const tall = stable(d, phone(790), "right", 100); // bar collapsed
+  assert.deepEqual([tall.height, tall.stableHeight], [790, 700]);
+  assert.equal(stable(d, phone(680), "right", 200).stableHeight, 680);
+  // Another orientation keeps its own.
+  assert.equal(stable(d, on(sig(874, 370, 874, 402), "safari"), "right", 300).stableHeight, 370);
+  assert.equal(stable(d, phone(790), "right", 400).stableHeight, 680);
+  // detect alone has no history.
+  assert.equal(detect(phone(790)).stableHeight, 790);
+});
+test("stableHeight on a desktop follows the window", () => {
+  const d = { flips: [] }, mac = (ih) => on(sig(1440, ih, 1440, 900, { screenWidth: 1440, screenHeight: 900 }), "safariDesktopSite", 0);
+  stable(d, mac(600), "right", 0);
+  assert.equal(stable(d, mac(800), "right", 100).stableHeight, 800);
+});

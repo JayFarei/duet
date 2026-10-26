@@ -165,7 +165,7 @@ function subscribe(cb: () => void) {
     visualViewport?.removeEventListener("resize", on);
   };
 }
-const ssr: Context = { mode: "column", duo: true, browser: "safari", device: "duo", standalone: false, layout: "narrow", side: "right", width: 382, height: 580, offsetTop: 0, screenWidth: 466, screenHeight: 678, insetTop: 0, insetBottom: 0 };
+const ssr: Context = { mode: "column", duo: true, browser: "safari", device: "duo", standalone: false, layout: "narrow", side: "right", width: 382, height: 580, stableHeight: 580, offsetTop: 0, screenWidth: 466, screenHeight: 678, insetTop: 0, insetBottom: 0 };
 
 export function useDuet(): Context {
   return useSyncExternalStore(subscribe, read, () => ssr);
@@ -208,8 +208,12 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
 
 /** Safari tab: fixed content is clipped to the page viewport (so is sticky), but in-document content paints
  *  into Safari's column. So the chrome is an absolute layer at the document top, and the inner scroller keeps
- *  the document itself from scrolling, so the layer never moves. A scroll-driven transform lags momentum
- *  scrolling and drifts (issue #1); `follow` only covers pages without the scroller. Touches there reach the page
+ *  the document itself from scrolling, so the layer never moves. Without children the document scrolls, and the
+ *  layer rides it on a CSS scroll timeline (duet.css, duet-follow): Safari runs that with the scroll itself, so
+ *  it holds through momentum and smooth programmatic scrolls, where a transform set from scroll events lags and
+ *  drifts (#55; simulator, 2026-10-26: up to 300pt during scrollIntoView, under 2pt on the timeline).
+ *  The keyframe ends at the timeline's scroll range (--duet-scroll-max); a fixed 100000px range drifted ~12pt in
+ *  momentum. Browsers without scroll timelines get the transform. Touches there reach the page
  *  but are not hit-tested to our elements, and Safari keeps the touch end (no pointerup, no click), so we route
  *  them by coordinates on pointerdown. Nothing in the column scrolls, so a touch there is always a tap.
  *  Split pane: the column is on the pane's outer edge, which the page cannot see, so the document spans a column
@@ -234,10 +238,30 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     if (!on || !els.length) return;
     const html = document.documentElement.style, prev = html.touchAction;
     html.touchAction = "pan-y"; // the layer widens the document; keep the page from panning sideways
+    const root = document.documentElement;
+    for (const el of els) el.dataset.follow = "";
+    // A page reset such as `* { animation: none !important }` (common under reduced motion) drops the timeline.
+    const timeline = typeof CSS !== "undefined" && CSS.supports("animation-timeline: scroll()") && getComputedStyle(els[0]).animationName === "duet-follow";
+    if (!timeline) for (const el of els) delete el.dataset.follow;
+    // The keyframe ends at the timeline's own scroll range, which in Safari is scrollHeight - innerHeight: when the
+    // URL bar collapses innerHeight grows 18px but clientHeight does not, and scrollHeight - clientHeight drifted
+    // 6pt 1000pt down (simulator, 2026-10-26). Content can outgrow the body (absolute, overflowing), so every
+    // scroll re-measures as well as resizes.
+    let max = "";
+    const range = () => {
+      const m = `${Math.max(0, root.scrollHeight - innerHeight)}px`;
+      if (m !== max) { max = m; for (const el of els) el.style.setProperty("--duet-scroll-max", m); }
+    };
+    const sizes = timeline ? new ResizeObserver(range) : undefined;
+    if (sizes) { range(); sizes.observe(root); sizes.observe(document.body); }
     const follow = () => {
+      // The layer widens the document, and a swipe that runs off the end of a sideways scroller chains to it
+      // (touch-action stops at the scroller), leaving page and controls panned off their rails: hold it.
       // An emulating host already frames both columns; pinning there loops in iOS Safari, whose frame overflows a few px.
-      if ((split || left) && !emulated && Math.round(scrollX) !== column) scrollTo(column, scrollY);
-      for (const el of els) el.style.transform = scrollY ? `translateY(${scrollY}px)` : "";
+      const x = split || left ? column : 0;
+      if (!emulated && Math.round(scrollX) !== x) scrollTo(x, scrollY);
+      if (timeline) range();
+      else for (const el of els) el.style.transform = scrollY ? `translateY(${scrollY}px)` : "";
     };
     const tap = (e: PointerEvent) => {
       if (e.clientX >= 0 && e.clientX < innerWidth) return; // inside the viewport, normal hit-testing applies
@@ -256,7 +280,8 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     addEventListener("resize", follow);
     addEventListener("pointerdown", tap);
     return () => {
-      html.touchAction = prev; for (const el of els) el.style.transform = "";
+      html.touchAction = prev; sizes?.disconnect();
+      for (const el of els) { el.style.transform = ""; el.style.removeProperty("--duet-scroll-max"); delete el.dataset.follow; }
       t.forEach(clearTimeout);
       removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pointerdown", tap);
     };
@@ -374,10 +399,12 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // this (columnBand). Split view takes the lower of the two panes' limits, since nothing tells which pane it is.
     const bands = sides.map((side) => columnBand({ ...ctx, side }));
     r.setProperty("--duet-safe-top-column", `${Math.max(0, ...bands.map((b) => b?.top ?? 0))}px`);
+    // The page's height without Safari's URL bar bouncing it mid-scroll (Context.stableHeight), like 100svh.
+    r.setProperty("--duet-vh", `${ctx.stableHeight}px`);
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulated);
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, split]);
+  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split]);
   const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, ctx.side === "left", column);
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
