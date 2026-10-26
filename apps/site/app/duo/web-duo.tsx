@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Activity, AppWindow, ChevronLeft, ChevronRight, Compass, Highlighter, House, PanelLeft, PanelRight, Pause, Play, Pointer, RotateCcw, RotateCw, Smartphone, Snail, Tablet } from "lucide-react";
 import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui/geometry";
@@ -286,6 +286,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const [shape, setShape] = useState<Posture | null>(null);
   const [tour, setTour] = useState(false);
   const [manual, setManual] = useState(false);
+  // "Try it yourself" becomes the toolbar: the pill under the button springs from the button's width to the toolbar's.
+  const bar = useRef<HTMLDivElement>(null), tryBtn = useRef<HTMLButtonElement>(null);
+  const [widths, setWidths] = useState<{ from: number; to: number } | null>(null);
   const [slots, setSlots] = useState(false);
   // The tour stop last reached (-1: somewhere the tour never goes), for the phase list.
   const [at, setAt] = useState(0);
@@ -576,7 +579,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   // the device open and upright, and picking one gets it there; picking Split View again swaps Safari's side.
   const split = s.app === "split", Pane = s.pane === "left" ? PanelLeft : PanelRight;
   const commands = (
-    <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
+    <div ref={bar} role="toolbar" aria-label="Device" data-wd-pop={embed ? (manual ? 1 : 0) : undefined} style={{ ...group, alignItems: "center", ...(embed && widths && { position: "relative",
+      width: manual ? widths.to : widths.from, background: manual ? "var(--card)" : "var(--accent)", justifyContent: "center", ["--wd-spring" as string]: SPRING,
+      transition: `width 760ms ${SPRING}, background 260ms ease, box-shadow 260ms ease`, boxShadow: manual ? group.boxShadow : "none",
+    }) }}>
       <Tool label={s.posture === "open" ? "Fold" : "Unfold"} onClick={() => go({ posture: s.posture === "open" ? "closed" : "open" })}>
         {s.posture === "open" ? <Tablet size={18} style={{ rotate: "90deg" }} /> : <Smartphone size={18} />}
       </Tool>
@@ -591,6 +597,27 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
     </div>
   );
+  // The icons burst out of the middle: each starts pulled to the centre and leaves later the further out it lands.
+  // Measured once laid out, and again on the press, when the stage has surely settled.
+  const gather = () => {
+    const el = bar.current, kids = el && [...el.children] as HTMLElement[];
+    if (!embed || !el || !kids?.length || !tryBtn.current || !el.offsetWidth) return;
+    // Layout offsets, not rects: the hidden icons are scaled and pulled in, and rects would see that.
+    const mid = el.clientWidth / 2, first = kids[0], last = kids[kids.length - 1];
+    const to = Math.round(last.offsetLeft + last.offsetWidth - first.offsetLeft + 6), half = to / 2;
+    for (const c of kids) {
+      const x = mid - (c.offsetLeft + c.offsetWidth / 2);
+      c.style.setProperty("--wd-x", `${x}px`);
+      c.style.setProperty("--wd-delay", `${Math.round(40 + (Math.abs(x) / half) * 130)}ms`);
+    }
+    setWidths({ from: tryBtn.current.offsetWidth, to });
+  };
+  useLayoutEffect(gather, [embed, measured]);
+  const open = () => {
+    gather(); setManual(true); setTour(false);
+    // A squeeze before the burst, the way the Dynamic Island gathers before it grows.
+    bar.current?.animate([{ scale: "1" }, { scale: "0.9", offset: 0.22 }, { scale: "1" }], { duration: 520, easing: "cubic-bezier(0.3, 0, 0.2, 1)" });
+  };
   const sized = BODY[shape ?? s.posture], [bw, bh] = s.turn ? [sized.h, sized.w] : [sized.w, sized.h];
   // A fold moves the stage with the swing; a turn with the turn.
   const settle = (prop: string) => folding ? `${prop} ${FOLD * k.current}ms ${SWING}` : `${prop} ${turn}ms ${ease}`;
@@ -664,12 +691,13 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       {/* Embedded, the button and the controls it reveals share one grid cell, so swapping them moves nothing below. */}
       <div style={{ display: "grid", justifyItems: "center", alignItems: "center", order: embed ? 1 : undefined }}>
       {embed && (
-        <button onClick={() => { setManual(true); setTour(false); }} data-wd-try aria-hidden={manual || undefined} tabIndex={manual ? -1 : undefined}
-          style={{ ...control, gridArea: "1/1", visibility: manual ? "hidden" : undefined, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
+        <button ref={tryBtn} onClick={open} data-wd-try aria-hidden={manual || undefined} tabIndex={manual ? -1 : undefined}
+          style={{ ...control, gridArea: "1/1", zIndex: 1, ...(manual && { opacity: 0, scale: "0.8", filter: "blur(4px)", pointerEvents: "none", visibility: "hidden" }),
+            transition: "opacity 140ms ease, scale 200ms ease, filter 140ms ease, visibility 0s 200ms", display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
           <Pointer size={18} strokeWidth={2.2} />Try it yourself
         </button>
       )}
-      <div aria-hidden={(embed && !manual) || undefined} style={{ gridArea: "1/1", visibility: embed && !manual ? "hidden" : undefined, display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 1100 }}>
+      <div aria-hidden={(embed && !manual) || undefined} style={{ gridArea: "1/1", visibility: embed && !manual && !widths ? "hidden" : undefined, display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", maxWidth: 1100 }}>
         {embed ? <>
         {commands}
         </> : <>
@@ -1041,7 +1069,7 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
 }
 
 const group: CSSProperties = { display: "flex", padding: 3, gap: 2, borderRadius: 99, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" };
-const glyphBox: CSSProperties = { width: 32, height: 34, padding: 0, display: "grid", placeItems: "center" };
+const glyphBox: CSSProperties = { width: 31, height: 34, padding: 0, display: "grid", placeItems: "center" };
 
 /** One icon in a toolbar, named by its tooltip. `on`: the current choice; `off`: not possible from here. */
 function Tool({ label, on, off, onClick, children }: { label: string; on?: boolean; off?: boolean; onClick: () => void; children: ReactNode }) {

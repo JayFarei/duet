@@ -22,6 +22,11 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 [data-wd-try]::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accent); pointer-events: none; will-change: transform, opacity; animation: wd-try 2.4s ease-out infinite; }
 [data-wd-try]:hover { transform: scale(1.03); }
 @media (prefers-reduced-motion: reduce) { [data-wd-try]::after { animation: none; opacity: 0; } }
+[data-wd-try][aria-hidden]::after { animation: none; opacity: 0; }
+/* The toolbar "Try it yourself" opens into: icons spring out from the middle, the outer ones last (web-duo.tsx sets --wd-x and --wd-delay). The !important beats the buttons' inline transition and opacity. */
+[data-wd-pop] > * { flex-shrink: 0; transition: opacity 220ms ease var(--wd-delay), scale 700ms var(--wd-spring) var(--wd-delay), translate 700ms var(--wd-spring) var(--wd-delay), filter 300ms ease var(--wd-delay), background 0.2s, color 0.2s !important; }
+[data-wd-pop="0"] > * { opacity: 0 !important; scale: 0.3; translate: var(--wd-x) 0; filter: blur(6px); }
+@media (prefers-reduced-motion: reduce) { [data-wd-pop], [data-wd-pop] > * { transition: none !important; } }
 [data-wd-callout] [data-wd-system] { outline: 1.5px dashed rgb(142 142 147); outline-offset: 2px; }
 
 /* The home page (app/home.tsx): one responsive page, Apple-style. Horizontal layout comes from duet-ui's column(). */
