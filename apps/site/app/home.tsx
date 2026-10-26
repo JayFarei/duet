@@ -1,10 +1,11 @@
 "use client";
 
-import { Fragment, useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { BookOpen, Layers, PanelBottom, PanelRight, Sparkles } from "lucide-react";
-import { Duet, DuoCookie, bleed, column, useDuet, type DuetItem } from "duet-ui";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { BookOpen, Layers, Moon, PanelBottom, PanelRight, Sparkles, Sun } from "lucide-react";
+import { Duet, DuoCookie, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { WebDuo } from "./duo/web-duo";
+import { useTheme } from "./theme";
 
 const REPO = "https://github.com/JayFarei/duet";
 const SECTIONS: DuetItem[] = [
@@ -43,16 +44,19 @@ function Site({ self }: { self: boolean }) {
   // A portrait iPhone gets an iPhone's bars, with a button to try the Duo's side controls on it.
   const { device, width, height } = useDuet();
   const [sides, setSides] = useState(false);
+  const theme = useTheme();
   const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
-  if (device === "iphone" && height > width && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} />;
+  if (device === "iphone" && height > width && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
       tabs={{ items: SECTIONS, selected: tab, onSelect: go }}
       actions={[
         { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
+        { id: "theme", label: theme.dark ? "Light mode" : "Dark mode", icon: theme.dark ? <Sun size={22} /> : <Moon size={22} />, onPress: theme.toggle },
         ...(device === "iphone" ? [{ id: "bars", label: "Top and bottom bars", icon: <PanelBottom size={22} />, onPress: () => setSides(false) }] : []),
       ]}
       minimizeOnScroll
+      dark={theme.forced}
     >
       <Page self={self} />
     </Duet>
@@ -61,7 +65,7 @@ function Site({ self }: { self: boolean }) {
 
 /** The page as an iPhone app would show it: actions in a top bar, sections in a tab bar at the bottom. The document
  *  itself scrolls, so the page runs on under Safari's toolbar. */
-function Bars({ tab, setTab, go, onSides }: { tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void }) {
+function Bars({ tab, setTab, go, onSides, theme }: { tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void; theme: ReturnType<typeof useTheme> }) {
   useEffect(() => {
     // Duet leaves its insets on <html> when it steps aside; here nothing floats beside the page.
     const html = document.documentElement;
@@ -82,7 +86,10 @@ function Bars({ tab, setTab, go, onSides }: { tab: string; setTab: (id: string) 
       <Page />
       <div className="bar-top">
         <button className="bar-glass bar-try" onClick={onSides}><PanelRight size={18} />Side controls</button>
-        <a className="bar-glass bar-round" href={REPO} target="_blank" rel="noreferrer" aria-label="GitHub"><GitHub /></a>
+        <span className="bar-end">
+          <button className="bar-glass bar-round" onClick={theme.toggle} aria-label={theme.dark ? "Light mode" : "Dark mode"}>{theme.dark ? <Sun size={20} /> : <Moon size={20} />}</button>
+          <a className="bar-glass bar-round" href={REPO} target="_blank" rel="noreferrer" aria-label="GitHub"><GitHub /></a>
+        </span>
       </div>
       <nav className="bar-glass bar-tabs" role="tablist">
         {SECTIONS.map((s) => (
@@ -101,8 +108,7 @@ function Page({ self = false }: { self?: boolean }) {
       <section id="top" className="hero" style={column(980, 20)}>
         <p className="eyebrow">duet-ui</p>
         <h1 className="display">
-          <Rise words={["Vertical", "controls", "for", "the"]} />{" "}
-          <em><Rise words={["iPhone", "Duo."]} from={4} /></em>
+          Native-feeling controls for web apps on the <em>iPhone Duo.</em>
         </h1>
         <p className="lede">A React library that approximates the Duo&apos;s native side controls.</p>
         <div className="ctas">
@@ -110,7 +116,7 @@ function Page({ self = false }: { self?: boolean }) {
         </div>
       </section>
 
-      <section className="stage" style={bleed(16)}>
+      <section className="stage">
         {self ? (
           <div style={{ ...column(980, 20), width: "100%" }}>
             <div className="card self">
@@ -149,13 +155,6 @@ function Page({ self = false }: { self?: boolean }) {
   );
 }
 
-/** Words that rise into place one by one, on the same ease as Duet's islands. */
-function Rise({ words, from = 0 }: { words: string[]; from?: number }) {
-  return <>{words.map((w, i) => (
-    <Fragment key={w}>{i > 0 && " "}<span className="rise"><span style={{ animationDelay: `${(from + i) * 70}ms` }}>{w}</span></span></Fragment>
-  ))}</>;
-}
-
 function GitHub() {
   return (
     <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -191,23 +190,9 @@ function Npm() {
 /** A screen recording of the real device in its frame: silent, looping, poster first. Each clip is composed twice,
  *  on the card colour of each theme (`name` and `name-dark`), so the device sits on the card with no seam. */
 function Clip({ name, style }: { name: string; style?: CSSProperties }) {
-  const src = useDark() ? `${name}-dark` : name;
+  const src = useTheme().dark ? `${name}-dark` : name;
   return (
     <video key={src} src={`/media/${src}.mp4`} poster={`/media/${src}.jpg`} autoPlay muted loop playsInline preload="metadata" aria-hidden
       style={{ display: "block", width: "100%", height: "auto", aspectRatio: "4 / 5", objectFit: "contain", background: "var(--card)", borderRadius: 18, ...style }} />
   );
-}
-
-/** Dark mode as site.css applies it: the system setting, unless data-lg-theme forces one. */
-function useDark() {
-  const get = () => {
-    const forced = document.documentElement.getAttribute("data-lg-theme");
-    return forced ? forced === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  };
-  return useSyncExternalStore((cb) => {
-    const mq = matchMedia("(prefers-color-scheme: dark)"), mo = new MutationObserver(cb);
-    mq.addEventListener("change", cb);
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-lg-theme"] });
-    return () => { mq.removeEventListener("change", cb); mo.disconnect(); };
-  }, get, () => false);
 }

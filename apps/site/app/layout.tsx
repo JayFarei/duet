@@ -15,7 +15,9 @@ export const viewport: Viewport = { viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={serif.variable}>
+    <html lang="en" className={serif.variable} suppressHydrationWarning>
+      {/* The visitor's light/dark pick (theme.ts), on <html> before first paint. */}
+      <head><script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("duet-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-lg-theme",t)}catch(e){}` }} /></head>
       <body>{children}</body>
     </html>
   );

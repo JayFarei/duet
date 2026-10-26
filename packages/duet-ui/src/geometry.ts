@@ -2,14 +2,14 @@
 // iPhone Duo simulator, iOS 27.1, closed portrait, in iOS points (= CSS px).
 
 /** strip: Home Screen web app, iOS gives us the right-hand strip.
- *  column: Safari tab, closed portrait or a split-view pane; Safari owns the strip and we paint into the
- *  free space of its column (an undocumented WebKit behaviour, so only when every signal matches).
- *  inline: anything else (landscape, open posture full width, keyboard up, other browsers); a right-edge
- *  strip inside the page viewport. */
+ *  column: Safari tab, closed (portrait or landscape) or a split-view pane; Safari owns the strip and we paint
+ *  into the free space of its column (an undocumented WebKit behaviour, so only when every signal matches).
+ *  inline: anything else (open posture full width, keyboard up, other browsers); a right-edge strip inside
+ *  the page viewport. */
 export type Mode = "strip" | "column" | "inline";
 /** Which screen edge the controls hug. strip: wherever iOS puts the strip (its safe-area inset). column:
- *  always right, Safari owns it. inline: the user's choice; no API tells a split-view pane which side of
- *  the screen it is on. */
+ *  wherever Safari puts its column: right in portrait, the side the closed Duo is turned to in landscape.
+ *  inline: the user's choice; no API tells a split-view pane which side of the screen it is on. */
 export type Side = "left" | "right";
 
 export const DUO = {
@@ -44,7 +44,13 @@ export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem,
    *  under the same status column as a closed tab and grows the same way (bare: 124, recording: 178, a
    *  2-slot music activity: ~224), so it takes the closed tab's worst case. The pill sits DUO.bottom above
    *  the window bottom. */
-  splitTop: { left: 23.5, right: DUO.top + DUO.island } } as const;
+  splitTop: { left: 23.5, right: DUO.top + DUO.island },
+  /** Closed landscape (Duo Lab simulator, iOS 27.1, 2026-10-26): the column is on the side the Duo is turned to,
+   *  48pt centre line from that edge as in portrait, and its buttons sit differently on each side. `top`: the back
+   *  slot's top (reader under it, a step apart); `pill`: the +/tabs pill's top. Turned left (angle 90) the island
+   *  heads the column and pushes the back slot down; turned right (270) it sits at the column's foot, under the
+   *  pill. Measured with a bare island: how Live Activities grow it in landscape is not yet known. */
+  landscape: { left: { top: 81.5, pill: 327 }, right: { top: 23.5, pill: 279 } } } as const;
 
 /** Menu island slots: a button unrolls into a pill of these (Safari's own pill items are 50; 46.5 keeps
  *  every slot above the 44pt touch target). */
@@ -74,6 +80,9 @@ export interface Signals {
    *  emulator's signals) restricts nothing. */
   userAgent?: string;
   touchPoints?: number;
+  /** screen.orientation.angle: in closed landscape, which way the Duo is turned and so which side Safari's column
+   *  is on (90: left, 270: right). Unknown keeps landscape inline. */
+  angle?: number;
 }
 
 export interface Context {
@@ -182,15 +191,19 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true): Contex
     return { mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= 60 ? "right" : "left", width: s.innerWidth, height: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
   const base = { duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
+  // Closed landscape: the column is on the side the Duo is turned to, and the turn is the only signal for it.
+  const landscape = s.innerWidth > s.innerHeight;
+  const turned = s.angle === 90 ? "left" : s.angle === 270 ? "right" : undefined;
+  const closed = Math.abs(s.outerWidth - DUO_SIZES[0][1]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][0]) <= 1;
+  const columnSide: Side | undefined = !landscape ? "right" : closed ? turned : undefined;
   // Other iOS browsers draw their own chrome where Safari has its column: inline for them.
-  const column = allowColumn && !s.standalone && !s.framed && browser === "safari"
+  const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari"
     && within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width)
     && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome)
-    && s.innerHeight > s.innerWidth // landscape moves Safari's column buttons around
     && s.visualHeight >= s.innerHeight - 1; // keyboard up
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column && isSplit(s)) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
-  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight };
+  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight };
   const preview = isPreview(s), split = isSplit(s);
   return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(split && { split }) };
 }
@@ -280,6 +293,8 @@ export interface Plan {
   accessory?: { left: number; width: number; top: number; height: number };
 }
 
+/** Closed landscape Safari tab: its column's buttons sit apart from portrait's (SAFARI.landscape). */
+const landscapeColumn = (c: Context) => !c.split && c.screenWidth > c.screenHeight;
 const groupHeight = (n: number) => DUO.control + (n - 1) * DUO.groupItem;
 
 export function plan(c: Context, s: Spec): Plan {
@@ -288,9 +303,11 @@ export function plan(c: Context, s: Spec): Plan {
   // inline: viewport coordinates.
   const top = c.mode === "strip" ? DUO.top + DUO.island - c.offsetTop
     : c.mode === "column" && c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap)
+    : c.mode === "column" && landscapeColumn(c) ? SAFARI.landscape[c.side].top + SAFARI.rows * (DUO.control + DUO.gap)
     : c.mode === "column" ? DUO.top + DUO.island + SAFARI.rows * (DUO.control + DUO.gap)
     : c.insetTop + DUO.gap;
   const bottom = c.mode === "strip" ? c.height - DUO.bottom
+    : c.mode === "column" && landscapeColumn(c) ? SAFARI.landscape[c.side].pill - DUO.gap
     : c.mode === "column" ? c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap
     : c.height - Math.max(c.insetBottom, DUO.gap);
   const centerX = c.side === "left" ? DUO.centerFromEdge : (c.mode === "column" ? c.screenWidth : c.width) - DUO.centerFromEdge;
@@ -317,7 +334,9 @@ export function plan(c: Context, s: Spec): Plan {
     const parts = [back ? DUO.control : 0, primaryTop && primary ? DUO.control : 0, leading ? groupHeight(leading) : 0, actions ? groupHeight(actions) : 0, menuCount() ? DUO.control : 0].filter(Boolean);
     return parts.reduce((a, b) => a + b, 0) + Math.max(0, parts.length - 1) * DUO.gap;
   };
-  while (height() > floor() - top) {
+  // With nothing above it, the low primary slot needs only its own room, not a gap under the stack.
+  const fits = () => height() ? height() <= floor() - top : !(primaryLow && primary) || lowTop >= top;
+  while (!fits()) {
     if (actions) actions--; else if (leading) leading--; else if (back) back--; else if (primary) primary = false; else break;
   }
 
@@ -327,7 +346,7 @@ export function plan(c: Context, s: Spec): Plan {
   if (primaryLow && primary) p.primary = { top: lowTop, height: DUO.control };
 
   let y = top;
-  if (height() <= floor() - top) {
+  if (fits()) {
     if (back) { p.back = { top: y, height: DUO.control }; y += step; }
     if (primaryTop && primary) { p.primary = { top: y, height: DUO.control }; y += step; }
     if (leading) { const h = groupHeight(leading); p.leading = { top: y, height: h, visible: leading }; y += h + DUO.gap; }
@@ -343,7 +362,9 @@ function accessory(c: Context, s: Spec, centerX: number, bottom: number): Pick<P
   if (c.mode === "column" && c.split) return { accessory: { left: c.screenWidth - c.width + DUO.gap, width: c.width - 2 * DUO.gap, top: c.height - DUO.gap - DUO.accessory.height, height: DUO.accessory.height } };
   const floor = c.mode === "column" ? c.height - DUO.gap : bottom;
   // Mirrored on the left: inner edge clear of the column, outer edge DUO.accessory.left from the screen edge.
-  const left = c.side === "left" ? centerX + DUO.control / 2 + DUO.accessory.gapToColumn : DUO.accessory.left;
-  const right = c.side === "left" ? c.width - DUO.accessory.left : c.mode === "column" ? c.width - DUO.gap : centerX - DUO.control / 2 - DUO.accessory.gapToColumn;
+  // In Safari's column it spans the page, a gap from its edge on the column's side.
+  const column = c.screenWidth - c.width;
+  const left = c.mode === "column" && c.side === "left" ? column + DUO.gap : c.side === "left" ? centerX + DUO.control / 2 + DUO.accessory.gapToColumn : DUO.accessory.left;
+  const right = c.mode === "column" && c.side === "left" ? c.screenWidth - DUO.accessory.left : c.side === "left" ? c.width - DUO.accessory.left : c.mode === "column" ? c.width - DUO.gap : centerX - DUO.control / 2 - DUO.accessory.gapToColumn;
   return { accessory: { left, width: right - left, top: floor - DUO.accessory.height, height: DUO.accessory.height } };
 }

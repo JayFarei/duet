@@ -22,10 +22,17 @@ test("split-view pane is column; zoomed out (no shrink-to-fit=no) it is inline",
   assert.equal(detect(PANE).mode, "column");
   for (const s of PANE_ZOOMED) assert.equal(detect(s).mode, "inline");
 });
-test("standalone, landscape and keyboard up never take the column", () => {
+test("standalone, keyboard up and a landscape of unknown turn never take the column", () => {
   assert.equal(detect({ ...CLOSED, standalone: true }).mode, "inline");
   assert.equal(detect(sig(594, 368, 678, 466)).mode, "inline");
   assert.equal(detect({ ...CLOSED, visualHeight: 300 }).mode, "inline");
+});
+test("closed landscape takes the column on the side the Duo is turned to", () => {
+  const left = detect(sig(594, 368, 678, 466, { angle: 90 })), right = detect(sig(594, 368, 678, 466, { angle: 270 }));
+  assert.deepEqual([left.mode, left.side], ["column", "left"]);
+  assert.deepEqual([right.mode, right.side], ["column", "right"]);
+  // Open and turned, the window is not the closed screen: no column measured there.
+  assert.equal(detect(sig(867, 571, 951, 669, { angle: 90 })).mode, "inline");
 });
 
 // Model of the feedback loop seen on device: in column mode the layer's overflow makes Safari zoom the

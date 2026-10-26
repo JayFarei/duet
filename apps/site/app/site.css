@@ -1,8 +1,8 @@
-:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); }
+:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); --wd-island-rim: transparent; --wd-col: rgb(240 239 236 / 0.55); --wd-edge: 0.3; --wd-rim: 0.15; --wd-shine: rgb(10 132 255 / 0.35); }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); }
+  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); }
 }
-:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); }
+:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); text-decoration: none; }
 code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
@@ -16,11 +16,17 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 /* The web Duo (app/duo/web-duo.tsx). */
 @keyframes wd-in { from { opacity: 0; } }
 @keyframes wd-slide { from { transform: translateX(var(--from)); } }
-/* "Try it yourself": a ring breathes out of the button, so the stage reads as something to play with. */
-@keyframes wd-try { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 35%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }
-[data-wd-try] { animation: wd-try 2.4s ease-out infinite; }
+/* "Try it yourself": a ring breathes out of the button, so the stage reads as something to play with. Transform and opacity only: an animated box-shadow repaints every frame, and each repaint makes Safari redraw the stage's glass buttons a pixel off, so they shimmer. The scale grows the ~170x44 pill by about 12px a side. */
+@keyframes wd-try { 0% { transform: none; opacity: 0.35; } 70%, 100% { transform: scale(1.14, 1.55); opacity: 0; } }
+[data-wd-try] { position: relative; isolation: isolate; }
+[data-wd-try]::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accent); pointer-events: none; will-change: transform, opacity; animation: wd-try 2.4s ease-out infinite; }
 [data-wd-try]:hover { transform: scale(1.03); }
-@media (prefers-reduced-motion: reduce) { [data-wd-try] { animation: none; } }
+@media (prefers-reduced-motion: reduce) { [data-wd-try]::after { animation: none; opacity: 0; } }
+[data-wd-try][aria-hidden]::after { animation: none; opacity: 0; }
+/* The toolbar "Try it yourself" opens into: icons spring out from the middle, the outer ones last (web-duo.tsx sets --wd-x and --wd-delay). The !important beats the buttons' inline transition and opacity. */
+[data-wd-pop] > * { flex-shrink: 0; transition: opacity 220ms ease var(--wd-delay), scale 700ms var(--wd-spring) var(--wd-delay), translate 700ms var(--wd-spring) var(--wd-delay), filter 300ms ease var(--wd-delay), background 0.2s, color 0.2s !important; }
+[data-wd-pop="0"] > * { opacity: 0 !important; scale: 0.3; translate: var(--wd-x) 0; filter: blur(6px); }
+@media (prefers-reduced-motion: reduce) { [data-wd-pop], [data-wd-pop] > * { transition: none !important; } }
 [data-wd-callout] [data-wd-system] { outline: 1.5px dashed rgb(142 142 147); outline-offset: 2px; }
 
 /* The home page (app/home.tsx): one responsive page, Apple-style. Horizontal layout comes from duet-ui's column(). */
@@ -35,10 +41,6 @@ section[id] { scroll-margin-top: 24px; }
 .eyebrow { margin: 0 0 10px; color: var(--dim); font: 600 clamp(15px, 1.6vw, 19px)/1.2 -apple-system, system-ui; }
 .display { margin: 0 auto; max-width: 10em; font: 400 clamp(48px, 8vw, 96px)/1 var(--serif), Georgia, serif; letter-spacing: -0.02em; }
 .display em, .h2 em { font-style: italic; white-space: nowrap; }
-.rise { display: inline-block; overflow: clip; overflow-clip-margin: 0.12em; vertical-align: top; padding-bottom: 0.08em; }
-.rise > span { display: inline-block; animation: rise 0.9s cubic-bezier(0.32, 0.72, 0, 1) both; }
-@keyframes rise { from { transform: translateY(105%); } }
-@media (prefers-reduced-motion: reduce) { .rise > span { animation: none; } }
 .h2 { margin: 0; font: 400 clamp(42px, 6.6vw, 72px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.015em; }
 .lede { margin: 20px auto 0; max-width: 640px; color: var(--dim); font: 500 clamp(19px, 2.2vw, 24px)/1.35 -apple-system, system-ui; letter-spacing: -0.01em; }
 .lede-l { margin-left: 0; margin-bottom: 36px; }
@@ -46,6 +48,14 @@ section[id] { scroll-margin-top: 24px; }
 
 .hero { text-align: center; padding: clamp(40px, 9vw, 110px) 0 28px; }
 .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: clamp(48px, 8vw, 100px); }
+/* The stage centres where the hero's column(980, 20) does (duet-ui layout.ts), so device and title share one axis: --c2 is twice that column's centre. Each side keeps 16px clear of Duet's controls, and the side away from them gives up room to stay on the axis. */
+.stage {
+  --l: var(--duet-inset-left, 0px); --r: var(--duet-inset-right, 0px);
+  --w: min(980px, 100% - var(--l) - var(--r) - 40px);
+  --c2: calc(2 * clamp(var(--l) + 20px, (100% - var(--w)) / 2, 100% - var(--r) - 20px - var(--w)) + var(--w));
+  padding-left: max(16px + var(--l), var(--c2) - 100% + 16px + var(--r));
+  padding-right: max(16px + var(--r), 100% - var(--c2) + 16px + var(--l));
+}
 .section { padding: clamp(64px, 10vw, 128px) 0 0; }
 
 .card { background: var(--card); border-radius: 22px; }
@@ -70,6 +80,7 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 .bar-top > * { pointer-events: auto; }
 /* iOS's scroll-edge effect: the page blurs and fades under the status bar and the top bar. */
 .bars::before { content: ""; position: fixed; z-index: 49; top: 0; left: 0; right: 0; height: calc(max(12px, env(safe-area-inset-top)) + 64px); pointer-events: none; background: linear-gradient(var(--bg) 30%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); -webkit-mask-image: linear-gradient(#000 50%, transparent); mask-image: linear-gradient(#000 50%, transparent); }
+.bar-end { display: flex; gap: 8px; }
 .bar-round { display: grid; place-items: center; width: 44px; height: 44px; }
 .bar-try { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; font: 600 15px/1 -apple-system, system-ui; cursor: pointer; }
 .bar-tabs { position: fixed; z-index: 50; bottom: calc(10px + env(safe-area-inset-bottom)); left: 50%; translate: -50% 0; display: flex; padding: 4px; }
@@ -86,3 +97,19 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 @supports (corner-shape: squircle) {
   [data-wd-shape] { border-radius: var(--wd-r) !important; }
 }
+/* Safari's column buttons on the stage, in Duet's column look (duet.css, measured against Safari) so the two sets
+   read as one. The rim is a flat white band, not Duet's backdrop filter: Chrome ignores the mask on a backdrop
+   filter this deep in the stage and lights the whole button. web-duo.tsx gives Duet's own buttons the same band. */
+[data-wd-col] { background: var(--wd-col); box-shadow: -0.5px 0 0 rgb(0 0 0 / var(--wd-edge)), 0.5px 0 0 rgb(0 0 0 / var(--wd-edge)), 0 0 0 0.35px rgb(0 0 0 / var(--wd-rim)), 0 3px 10px rgb(0 0 0 / 0.03); }
+[data-wd-col]::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; padding: 1px; background: rgb(255 255 255 / 0.2);
+  -webkit-mask: linear-gradient(rgb(0 0 0 / 0.3), transparent 8px, transparent calc(100% - 8px), rgb(0 0 0 / 0.3)), linear-gradient(#000, transparent 35%, transparent 65%, #000), linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: source-over, source-in, xor;
+  mask: linear-gradient(rgb(0 0 0 / 0.3), transparent 8px, transparent calc(100% - 8px), rgb(0 0 0 / 0.3)), linear-gradient(#000, transparent 35%, transparent 65%, #000), linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: add, intersect, exclude;
+}
+/* The glimmer over Duet's buttons on the stage (web-duo.tsx): a ring that fades in and out, and a sheen across. */
+[data-wd-shine] { position: absolute; border-radius: 99px; overflow: hidden; pointer-events: none; animation: wd-ring 1.1s ease var(--wd-at) both; }
+[data-wd-shine]::before { content: ""; position: absolute; inset: -20%; background: linear-gradient(105deg, transparent 35%, var(--wd-shine) 50%, transparent 65%); animation: wd-sweep 0.7s cubic-bezier(0.4, 0, 0.2, 1) calc(var(--wd-at) + 0.15s) both; }
+@keyframes wd-ring { 0% { opacity: 0; } 15%, 65% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes wd-sweep { from { translate: -120% 0; } to { translate: 120% 0; } }

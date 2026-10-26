@@ -3,6 +3,7 @@
 import { useState, type CSSProperties } from "react";
 import { Bell, House, Library, Plus, Search, Share } from "lucide-react";
 import { Duet, bleed, column, type DuetItem } from "duet-ui";
+import { useTheme } from "../theme";
 
 const TABS = [
   { id: "home", label: "Home", icon: <House size={24} /> },
@@ -33,12 +34,14 @@ function Row() {
 
 export function SkeletonApp() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"] | "search">("home");
+  const { forced } = useTheme();
   return (
     <Duet
       tabs={{ items: TABS, selected: tab, onSelect: setTab, search: { id: "search", label: "Search", icon: <Search size={24} /> } }}
       actions={[{ id: "share", label: "Share", icon: <Share size={22} />, onPress: () => {} }]}
       primary={{ id: "new", label: "New", icon: <Plus size={22} />, onPress: () => {} }}
       minimizeOnScroll
+      dark={forced}
     >
       <style>{CSS}</style>
       <main style={{ padding: "calc(24px + env(safe-area-inset-top)) 0 120px" }}>
