@@ -16,9 +16,18 @@ type Posture = "closed" | "open";
 type App = "home" | "safari" | "split" | "window";
 /** live: Live Activities are running (the visitor's switch, kept across views). They grow the Dynamic Island down
  *  the closed strip, the only place the island is, so `island()` says where they show. */
-interface State { posture: Posture; turn: Turn; app: App; pane: Side; live: boolean }
-/** Degrees clockwise from the natural orientation. iOS never turns upside down, so a quarter either way is all. */
+interface State { posture: Posture; turn: Turn; upside: boolean; app: App; pane: Side; live: boolean }
+/** The interface's turn, degrees clockwise from the natural orientation. iOS never turns upside down, so a quarter
+ *  either way is all; turned on to its head (`upside`), the device keeps the quarter turn it came from. */
 type Turn = -90 | 0 | 90;
+/** Where the hardware points, in degrees clockwise. */
+const hardware = (s: State) => s.upside ? 180 : s.turn;
+/** A quarter turn of the hardware either way, round and round: the interface follows, except on to its head. */
+const rotate = (s: State, by: -90 | 90): Partial<State> => {
+  const to = (((hardware(s) + by) % 360) + 360) % 360;
+  return to === 180 ? { upside: true } : { turn: (to === 270 ? -90 : to) as Turn, upside: false };
+};
+const UPSIDE_NOTE = "Upside down, iOS keeps the last way up, so the page stays as it was: Duet sees nothing change.";
 
 // Natural orientation: closed is portrait (outer display), open is landscape (inner display). A clockwise turn puts
 // the outer camera bottom right, an anticlockwise one top left.
@@ -186,7 +195,7 @@ function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals
   };
 }
 
-const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, turn: 0, app, pane: "right", live: false, ...o });
+const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, turn: 0, upside: false, app, pane: "right", live: false, ...o });
 const TOUR: State[] = [
   stop("closed", "home"), stop("closed", "home", { live: true }),
   stop("open", "home"), stop("open", "home", { turn: 90 }), stop("closed", "home", { turn: 90 }), stop("closed", "home"),
@@ -220,9 +229,9 @@ let notes: string[] | undefined;
 const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => ([0, 90, -90] as const).flatMap((turn) =>
   (["home", "safari", "split", "window"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
     (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
-      const n = SCREEN[posture], [W, H] = turn ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, turn, app, pane, live });
+      const n = SCREEN[posture], [W, H] = turn ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, turn, upside: false, app, pane, live });
       return `${m}|${scene(st, W, H, "", () => m).note}${island(st) ? LIVE_NOTE[st.app] ?? "" : ""}`;
-    })))))))];
+    }))))))), ...(["strip", "column", "inline"] as const).map((m) => `${m}|${UPSIDE_NOTE}`)];
 
 /** A rough picture of what a screen shows, for the swinging flap to carry under its blur: background boxes, images
  *  and bars for text, from the stage page and the page in its iframe (same origin). Blurred, only colour and layout
@@ -310,7 +319,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const frame = useRef<HTMLIFrameElement>(null);
   const page = useRef<HTMLDivElement>(null), hinge = useRef<HTMLDivElement>(null), flap = useRef<HTMLDivElement>(null), shadow = useRef<HTMLDivElement>(null);
   const fold = useRef<HTMLDivElement>(null), crease = useRef<HTMLDivElement>(null);
-  const cur = useRef(s), busy = useRef(false);
+  const cur = useRef(s), busy = useRef(false), spin = useRef(0);
   cur.current = s;
   const host = useSyncExternalStore(() => () => {}, () => location.host, () => "");
 
@@ -387,9 +396,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     if (busy.current) return;
     const p = cur.current, n = { ...p, ...next };
     const only = ONLY[n.app];
-    if (next.app && only) [n.posture, n.turn] = [only, 0]; // picking the app moves the device there
+    if (next.app && only) [n.posture, n.turn, n.upside] = [only, 0, false]; // picking the app moves the device there
     Object.assign(n, fit(n));
     if (!fromTour) setAt(TOUR.findIndex((t) => sameView(t, n)));
+    // Upside down the interface does not turn, so only the device moves.
     if (n.posture === p.posture && n.turn === p.turn) return setS(n);
     // One overlapping timeline: the page softens, the device moves while it is still softening, and the new layout
     // sharpens in, already while an unfold lands.
@@ -588,7 +598,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       </Tool>
       <Rule />
       {([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
-        <Tool key={by} label={label} off={Math.abs(s.turn + by) > 90} onClick={() => go({ turn: (s.turn + by) as Turn })}><Icon size={18} /></Tool>
+        <Tool key={by} label={label} onClick={() => go(rotate(s, by))}><Icon size={18} /></Tool>
       ))}
       <Rule />
       <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
@@ -618,7 +628,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     // A squeeze before the burst, the way the Dynamic Island gathers before it grows.
     bar.current?.animate([{ scale: "1" }, { scale: "0.9", offset: 0.22 }, { scale: "1" }], { duration: 520, easing: "cubic-bezier(0.3, 0, 0.2, 1)" });
   };
-  const sized = BODY[shape ?? s.posture], [bw, bh] = s.turn ? [sized.h, sized.w] : [sized.w, sized.h];
+  // The device turns the short way round, so the angle it is drawn at keeps counting past a full turn.
+  const hw = hardware(s);
+  spin.current += ((((hw - spin.current) % 360) + 540) % 360) - 180;
+  const sized = BODY[shape ?? s.posture], [bw, bh] = s.turn && !s.upside ? [sized.h, sized.w] : [sized.w, sized.h];
   // A fold moves the stage with the swing; a turn with the turn.
   const settle = (prop: string) => folding ? `${prop} ${FOLD * k.current}ms ${SWING}` : `${prop} ${turn}ms ${ease}`;
   const scaleFor = (w: number, h: number) => embed ? Math.min(view.w / w, view.h / h, 1) : Math.min((view.w - 64) / w, (view.h - 320) / h, 1);
@@ -643,13 +656,13 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       <div style={{ width: bw * scale, height: bh * scale, position: "relative", transition: `${settle("width")}, ${settle("height")}` }}>
         <div style={{
           position: "absolute", left: "50%", top: "50%", width: b.w, height: b.h,
-          transform: `translate(-50%, -50%) scale(${scale}) rotate(${s.turn}deg)`,
+          transform: `translate(-50%, -50%) scale(${scale}) rotate(${spin.current}deg)`,
           transition: settle("transform"),
         }}>
         {/* Perspective only while the flap swings: left on, Chrome rasterizes the scaled device at full size and it reads blurry. */}
         <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: folding ? 2600 : undefined }}>
         {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned. */}
-        <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${s.turn ? `${Math.sign(s.turn) * 40}px 0` : "0 40px"} 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
+        <div ref={shadow} data-wd-shape style={{ ...corners(b.r), position: "absolute", inset: 0, boxShadow: `${Math.round(40 * Math.sin(hw * Math.PI / 180))}px ${Math.round(40 * Math.cos(hw * Math.PI / 180))}px 80px rgb(0 0 0 / 0.28)`, transition: `border-radius ${turn}ms ${ease}, box-shadow ${turn}ms ${ease}` }} />
         <div ref={fold} style={{ position: "absolute", inset: 0, clipPath: folding ? "inset(-40px -40px -40px 50%)" : undefined }}>
           {BUTTONS.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
           <div data-wd-shape style={{
@@ -715,7 +728,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       </div>
       {!beside && <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />}
       <p data-wd-mode={sc.mode} style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
-        <Note mode={sc.mode} text={sc.note + (island(s) ? LIVE_NOTE[s.app] ?? "" : "")} />
+        <Note mode={sc.mode} text={s.upside ? UPSIDE_NOTE : sc.note + (island(s) ? LIVE_NOTE[s.app] ?? "" : "")} />
         {allNotes().map((n) => { const [m, t] = n.split("|"); return <Note key={n} mode={m} text={t} hidden />; })}
       </p>
       {slots && (
