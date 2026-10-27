@@ -7,8 +7,8 @@ ROOT="$(cd "$E2E/../.." && pwd)"
 [ -n "$DUO_UDID" ] || { echo 'DUO_UDID is required' >&2; exit 2; }
 export DUO_UDID
 export COREPACK_HOME="${COREPACK_HOME:-${WORKER_DERIVED_DATA:-$ROOT/.pilot-cache}/corepack}"
-export E2E_SITE_PORT="${E2E_SITE_PORT:-3190}"
-export BEACON_PORT="${BEACON_PORT:-3191}"
+export E2E_SITE_PORT="${E2E_SITE_PORT:-3300}"
+export BEACON_PORT="${BEACON_PORT:-3301}"
 mkdir -p "$COREPACK_HOME"
 (cd "$ROOT" && corepack pnpm@10.32.0 install --frozen-lockfile)
 OUT="${J04_OUT:-${WORKER_RESULTS:-$E2E/reports}/pilot-j04-$(date +%Y%m%d-%H%M%S)}"
