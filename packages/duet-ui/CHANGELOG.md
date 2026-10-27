@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Column mode without children: the controls no longer ride the rubber band at the top or bottom of the page, where they slid over Safari's own column buttons or vanished until the bounce settled. The document no longer rubber-bands while the controls follow it, like a page with children. A page's own `overscroll-behavior` still wins.
+
 ## 0.4.0-rc.1
 
 - Turning or folding no longer flashes the controls at the wrong edge: while the window is caught halfway they hide (`hidden: "moving"`, `confidence: "moving"`) and reappear where the landed window wants them once it has held for 150ms (`LAND_HOLD`). The full screen in-app preview turned sideways (no page column, 75pt chrome, inset 34) is now recognised as the preview.
