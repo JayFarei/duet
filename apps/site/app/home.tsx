@@ -1,18 +1,28 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { BookOpen, Check, Layers, Moon, PanelBottom, PanelRight, Sparkles, Sun } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Check, CodeXml, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
 import { Duet, DuoCookie, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
+import { ClaudeGlyph, CodexGlyph, GrokGlyph, PiGlyph } from "./agent-glyphs";
 import { WebDuo } from "./duo/web-duo";
 import { TINTS, useTheme, useTint } from "./theme";
 
 const REPO = "https://github.com/JayFarei/duet";
+/** The app icon drawn as a line icon: the page, and the column beside it with a button. */
+function DuetMark() {
+  return (
+    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <rect x="2.5" y="3.5" width="11" height="17" rx="3" /><rect x="16" y="3.5" width="5.5" height="17" rx="2.75" />
+      <circle cx="18.75" cy="13.5" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 const SECTIONS: DuetItem[] = [
-  { id: "top", label: "Duet", icon: <Sparkles size={24} /> },
-  { id: "code", label: "Integrate", icon: <BookOpen size={24} /> },
-  { id: "examples", label: "Examples", icon: <Layers size={24} /> },
+  { id: "top", label: "Duet", icon: <DuetMark /> },
+  { id: "code", label: "Integrate", icon: <CodeXml size={24} /> },
+  { id: "examples", label: "Examples", icon: <TabletSmartphone size={24} /> },
 ];
 
 const quick = (tint?: string) => `import { Duet } from "duet-ui";
@@ -52,13 +62,13 @@ function Site({ self }: { self: boolean }) {
   if (portrait && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
-      tabs={{ items: SECTIONS, selected: tab, onSelect: go }}
+      tabs={{ items: SECTIONS, selected: tab, onSelect: go, labels: device === "desktop" }}
       actions={[
         { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
         { id: "theme", label: theme.dark ? "Light mode" : "Dark mode", icon: theme.dark ? <Sun size={22} /> : <Moon size={22} />, onPress: theme.toggle },
         ...(device === "iphone" ? [{ id: "bars", label: "Top and bottom bars", icon: <PanelBottom size={22} />, onPress: () => setSides(false) }] : []),
       ]}
-      minimizeOnScroll
+      minimizeOnScroll={device !== "desktop"}
       appearance={theme.appearance}
       tint={tint}
     >
@@ -201,14 +211,25 @@ function Snippet({ code }: { code: string }) {
   return <pre className="card code"><code dangerouslySetInnerHTML={{ __html: highlight(code) }} /></pre>;
 }
 
-/** The hero's main call to action: copies a prompt that has a coding agent make the reader's app Duo-ready. */
+/** The hero's main call to action: copies a prompt that has a coding agent make the reader's app Duo-ready. A tilted
+ *  deck of agent glyphs fans out on hover, and the label flips to a check once the prompt is on the clipboard. */
 function AgentPrompt() {
   const [copied, setCopied] = useState(false);
-  const copy = () => navigator.clipboard?.writeText(AGENT_PROMPT).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
+  const timer = useRef(0);
+  const copy = () => {
+    const flip = () => { setCopied(true); clearTimeout(timer.current); timer.current = window.setTimeout(() => setCopied(false), 2000); };
+    navigator.clipboard?.writeText(AGENT_PROMPT).then(flip, flip);
+  };
   return (
-    <button className="pill pill-cta" onClick={copy} aria-label="Copy a prompt that makes your app Duo-ready with a coding agent">
-      {copied ? <Check size={18} strokeWidth={2.4} /> : <Sparkles size={18} strokeWidth={2.2} />}
-      {copied ? "Prompt copied" : "Copy agent prompt"}
+    <button className="pill pill-cta" data-done={copied || undefined} onClick={copy} aria-label="Copy a prompt that makes your app Duo-ready with a coding agent">
+      <span className="cta-face">
+        <span className="cta-deck" aria-hidden>
+          <ClaudeGlyph /><CodexGlyph /><GrokGlyph /><PiGlyph />
+        </span>
+        Copy prompt
+      </span>
+      <span className="cta-face cta-done" aria-hidden><Check size={18} strokeWidth={2.6} />Copied</span>
+      <span className="sr-only" role="status">{copied ? "Prompt copied to the clipboard" : ""}</span>
     </button>
   );
 }
