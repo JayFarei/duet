@@ -163,16 +163,6 @@
 /* The lens copy carries the labels too, or the tab under the finger would lose its label to the hole in the real tabs. */
 .duet-lens-col .duet-tab::after { content: attr(data-label); }
 .duet-pill[data-scrub] .duet-tab > svg { translate: 0 -6px; scale: 0.82; }
-/* Labelled pill (tabs.labels, inline only): each tab is a row, the icon where the round pill draws it and the label
-   beside it, so nothing is clipped and the whole selected row takes the accent. The lens copy is laid out the same,
-   so the lens still lines up, and only glides, without magnifying the text. */
-.duet-glass.duet-pill[data-labels] { border-radius: 24.5px; }
-.duet-pill[data-labels] .duet-tab { display: flex; justify-content: flex-start; gap: 10px; padding: 0 20px 0 9.5px; }
-.duet-pill[data-labels] .duet-tab::after { content: none; }
-.duet-pill[data-labels] .duet-tab > svg { translate: none; scale: none; }
-.duet-pill[data-labels]:is([data-scrub], [data-glide]) { --lx: 0px; --ly: 0px; --lm: 1; scale: none; }
-.duet-tab-label { font: 600 15px/1 -apple-system, system-ui, sans-serif; letter-spacing: -0.2px; white-space: nowrap; }
-.duet .duet-pill[data-labels] .duet-pill-badges .duet-badge { left: 26.5px; right: auto; }
 /* Badges hang off the icon's corner towards the page, over the glass edge, as native tab bars draw them,
    so a surface with one stops clipping (its frost, rim and refraction layers clip themselves). */
 .duet-glass:has(.duet-badge) { overflow: visible; contain: layout style; }
@@ -256,6 +246,9 @@
 .duet-menu-label { overflow: hidden; text-overflow: ellipsis; }
 .duet-menu[data-style="morph"] > .duet-menu-item { animation: duet-rise 0.15s 0.02s ease-out both; }
 .duet-menu[data-style="morph"][data-closing] > .duet-menu-item { animation: duet-rise 0.08s ease-in reverse both; }
+/* tabs.labels: the same list pinned open as the tab bar, so it neither rolls in nor out and sits at the controls' level. */
+.duet .duet-menu[data-pinned], .duet .duet-menu[data-pinned] > .duet-menu-item { animation: none; }
+.duet-menu[data-pinned] { z-index: 50; }
 @keyframes duet-morph { from { left: var(--x0); top: var(--y0); width: 49px; height: 49px; border-radius: 24.5px; } }
 @keyframes duet-unmorph { to { left: var(--x0); top: var(--y0); width: 49px; height: 49px; border-radius: 24.5px; } }
 @keyframes duet-rise { from { opacity: 0; transform: translateY(-6px); } }

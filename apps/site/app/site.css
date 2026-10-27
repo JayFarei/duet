@@ -112,6 +112,8 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
    hairline. The glimmer over the stage's buttons ([data-wd-shine]) is separate and stays. */
 .duet[data-mode="inline"] .duet-glass::after { display: none; }
 .duet[data-mode="inline"] .duet-glass::before { box-shadow: inset 0 0 0 0.5px var(--line); }
+/* The selection as a grey fill, like the phone bar's: Duet's dark default darkens, which vanishes on a flat black control. */
+html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
 
 /* Side controls tried on an iPhone (home.tsx): the page ignores Duet's insets, so the controls float over it. */
 .float { --duet-inset-left: 0px; --duet-inset-right: 0px; }
