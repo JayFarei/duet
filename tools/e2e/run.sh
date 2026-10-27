@@ -14,6 +14,8 @@ ROOT="$(cd "$E2E/../.." && pwd)"
 UDID="${DUO_UDID:-6E0F2BC5-873E-4B6C-BB6C-779BDF7173A4}"   # "Duo Lab"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-27.1.0.app/Contents/Developer}"
 PORT="${BEACON_PORT:-3141}"
+export E2E_SITE_PORT="${E2E_SITE_PORT:-3140}"
+SITE="http://localhost:$E2E_SITE_PORT"
 TMP="$E2E/reports/.run-$PORT"; mkdir -p "$TMP"
 STARTED=""
 
@@ -49,10 +51,10 @@ r=next(k for k,v in j["devices"].items() if any(d["udid"]==u for d in v)); print
   LA_NEW=1
 fi
 
-if ! up http://localhost:3140/; then
-  [ -n "$E2E_SHARED" ] && blocked "site not up on :3140"
-  (cd "$ROOT/apps/site" && exec npx next dev -p 3140 -H 0.0.0.0 >"$TMP/site.log" 2>&1) & STARTED="$STARTED $!"
-  i=0; until up http://localhost:3140/; do i=$((i+1)); [ $i -gt 120 ] && blocked "site did not start, $TMP/site.log"; sleep 1; done
+if ! up "$SITE/"; then
+  [ -n "$E2E_SHARED" ] && blocked "site not up on :$E2E_SITE_PORT"
+  (cd "$ROOT/apps/site" && exec npx next dev -p "$E2E_SITE_PORT" -H 0.0.0.0 >"$TMP/site.log" 2>&1) & STARTED="$STARTED $!"
+  i=0; until up "$SITE/"; do i=$((i+1)); [ $i -gt 120 ] && blocked "site did not start, $TMP/site.log"; sleep 1; done
 fi
 if ! up "http://localhost:$PORT/step"; then
   node "$E2E/beacon.mjs" "$PORT" "$TMP" >"$TMP/beacon.log" 2>&1 & STARTED="$STARTED $!"
@@ -72,7 +74,7 @@ fi
 [ -n "$LA_NEW" ] && xcrun simctl install "$UDID" "$E2E/host/build/Build/Products/Debug-iphonesimulator/DuoE2EHost.app"
 
 # A compile error in the site or the dist answers 500 (or a page without the reporter): stop here, not mid-matrix.
-code=$(curl -s -o "$TMP/page.html" -w '%{http_code}' -m 60 "http://localhost:3140/?e2e=1")
+code=$(curl -s -o "$TMP/page.html" -w '%{http_code}' -m 60 "$SITE/?e2e=1")
 [ "$code" = 200 ] || blocked "site answered $code for /?e2e=1 ($TMP/page.html, $TMP/site.log)"
 
 PY="$E2E/.venv/bin/python"

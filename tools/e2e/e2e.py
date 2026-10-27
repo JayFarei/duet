@@ -24,7 +24,7 @@ import workbench  # noqa: E402
 from catalogue import TAB, LANDSCAPE_TOP_BARS, PREVIEW, preview_expect, UNFOLDED, UNFOLDED_PREVIEW, SPLIT  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SITE = "http://localhost:3140"
+SITE = f"http://localhost:{os.environ.get('E2E_SITE_PORT', '3140')}"
 BEACON = "http://localhost:3141"
 HOST = "dev.duolab.e2e.host"
 SAFARI = "com.apple.mobilesafari"
