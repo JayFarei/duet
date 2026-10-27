@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, INLINE_WIDTH, columnBand, isSplit, islandBox, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { DUO, columnBand, isSplit, pageInsets, islandBox, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
@@ -62,6 +62,12 @@ export interface DuetProps<T extends string = string> {
   /** Page content. When given, it scrolls in an inner scroller and the document itself never moves, so
    *  the chrome (and in Safari the column layer) stays still during momentum scroll and rubber-banding. */
   children?: ReactNode;
+  /** Without children, in Safari's column: Duet places the page beside the controls (default `true`). When the
+   *  document spans a column on the left (a split pane, or the closed Duo turned left) the page is moved into the
+   *  visible viewport with margins on `<html>`, and the insets are 0, so the page needs no padding of its own.
+   *  `false` lets the page run under the column instead: it keeps clear by `--duet-inset-left/right`, through
+   *  column() and bleed(). */
+  reserve?: boolean;
 }
 
 // --- context ------------------------------------------------------------------------------------
@@ -220,7 +226,21 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     };
     const sizes = timeline ? new ResizeObserver(range) : undefined;
     if (sizes) { range(); sizes.observe(root); sizes.observe(document.body); }
-    const follow = () => {
+    // The layer's positions are document coordinates, from an absolute box at the document's left edge. A page whose
+    // <body> (or <html>) is positioned makes that its containing block, which body margins, or the margins that move
+    // the page beside a left column (pageInsets), move off the document's edge: measured, and undone with
+    // `translate` (the scroll timeline animates `transform`, which composes with it).
+    const align = () => {
+      refs.forEach((ref, i) => {
+        const el = ref.current;
+        if (!el) return;
+        el.style.translate = "";
+        const off = Math.round(el.getBoundingClientRect().left + scrollX - (split && i ? column : 0));
+        if (off) el.style.translate = `${-off}px 0`;
+      });
+    };
+    const follow = (e?: Event) => {
+      if (e?.type !== "scroll") align();
       // The layer widens the document, and a swipe that runs off the end of a sideways scroller chains to it
       // (touch-action stops at the scroller), leaving page and controls panned off their rails: hold it.
       // An emulating host already frames both columns; pinning there loops in iOS Safari, whose frame overflows a few px.
@@ -250,7 +270,7 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     addEventListener("pointerdown", tap);
     return () => {
       html.touchAction = prev; sizes?.disconnect();
-      for (const el of els) { el.style.transform = ""; el.style.removeProperty("--duet-scroll-max"); delete el.dataset.follow; }
+      for (const el of els) { el.style.transform = ""; el.style.translate = ""; el.style.removeProperty("--duet-scroll-max"); delete el.dataset.follow; }
       t.forEach(clearTimeout);
       removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pageshow", follow);
       removeEventListener("pointerdown", tap);
@@ -359,20 +379,26 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const [menuSide, setMenuSide] = useState<Side>(ctx.side);
   const inner = p.children !== undefined; // the inner scroller, which runs on under Safari's column
 
+  const reserve = p.reserve !== false;
   useEffect(() => {
     // The page spans the window and the controls float over it; these insets are how far text and buttons keep
     // clear on each edge (layout.ts). In Safari's column the scroller runs on under the column (an emulated
-    // column's frame already spans it), so either way the inset there is the column's width; a tab has no safe
-    // areas, so the other edge is 0. Without children the document is the page: it is laid out in the viewport
-    // and nothing runs under a right column (simulator, 2026-10-26: 84px of padding left a 100px gap), while a
-    // left column has the document scrolled one column across, so the page runs under it.
+    // column's frame already spans it), so the inset there is the column's width; a tab has no safe areas, so the
+    // other edge is 0. Without children the document is the page, and Duet places it beside the column itself
+    // (pageInsets): nothing for the page to do.
     const r = document.documentElement.style;
     // Controls hidden for good in this window (the turned preview) take no room; hidden while moving keeps the
     // last insets, so the page does not reflow twice in one turn.
-    const inset = ctx.hidden === "preview" ? "0px" : ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
-    const other = (side: Side) => ctx.mode === "column" ? "0px" : envInset(side);
-    const under = ctx.mode !== "column" || inner || !!emulatedSignals();
-    const right = (ctx.side === "right" || split) && under ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
+    const { left, right, shift } = pageInsets({
+      mode: ctx.mode, side: ctx.side, split, screenWidth: ctx.screenWidth, width: ctx.width, hiddenPreview: ctx.hidden === "preview",
+      inner, emulated: !!emulatedSignals(), reserve, env: envInset,
+    });
+    // The document is scrolled one column across (useColumnLayer): margins on <html> move the page into the visible
+    // viewport. <html>'s own margins, so the page's body margins, widths and max-widths are untouched, centred
+    // content centres in the visible pane, and position: fixed (already viewport relative) is unaffected.
+    r.marginLeft = shift ? `${shift}px` : "";
+    r.marginRight = shift ? `${-shift}px` : "";
+    document.documentElement.toggleAttribute("data-duet-reserve", !!shift);
     // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
     for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
@@ -390,7 +416,11 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
+  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner, reserve]);
+  useEffect(() => () => {
+    const h = document.documentElement;
+    h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
+  }, []);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
   const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column");

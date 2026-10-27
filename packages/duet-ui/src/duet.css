@@ -309,6 +309,11 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
    data-follow and --duet-scroll-max, the document's scroll range, or a transform where this is unsupported). */
 .duet[data-mode="column"][data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
 @keyframes duet-follow { from { transform: translateY(0); } to { transform: translateY(var(--duet-scroll-max, 0px)); } }
+/* The rubber band at either end moves the document past its scroll range, where the timeline (clamped to it) cannot
+   follow, so the layer rode the bounce: up to 160pt over Safari's own column buttons, or out of the column (#76). The
+   document there does not rubber-band, like a page with children, whose document never scrolls. Zero specificity, so
+   a page's own overscroll-behavior wins. */
+:where(html[data-duet-mode="column"]:has(> body .duet[data-follow])) { overscroll-behavior-y: none; }
 /* A swipe that runs off the end of a sideways scroller chains to the widened document and pans it, chrome and
    all, into the column. Zero specificity, so a page's own overscroll-behavior wins. */
 :where(html[data-duet-mode="column"]) :where(*) { overscroll-behavior-x: contain; }

@@ -468,6 +468,34 @@ export function magnet(side: Side, dx: number): { offset: number; free: boolean 
 /** Width the inline strip takes from the page (same column width as Safari's). */
 export const INLINE_WIDTH = 84;
 
+/** Where the page goes beside the controls, and the insets left for it to keep clear by (chrome.tsx writes them on
+ *  <html>). In Safari's column without children the document is the page, and Duet owns its layout (`reserve`, the
+ *  default): when the document spans a column on the left (a split pane, which spans one on each side, or a left
+ *  column closed) it is scrolled one column across, so the page is moved right by that column (`shift`, margins on
+ *  <html>) and lands exactly in the visible viewport, beside the controls, with nothing to keep clear (insets 0).
+ *  Before, a page that ignored the insets ran under the controls on the left and left a column-wide gap on the
+ *  right (RegTail, split pane, 2026-10-27). With `reserve: false` the page runs under the column and keeps clear by
+ *  the insets itself. With children the scroller runs on under the column and pads by the insets; an emulated
+ *  column (the site's web Duo) already frames both columns and is never scrolled across. */
+export function pageInsets(o: {
+  mode: Mode; side: Side; split: boolean; screenWidth: number; width: number; hiddenPreview: boolean;
+  inner: boolean; emulated: boolean; reserve: boolean; env: (side: Side) => string;
+}): { left: string; right: string; shift: number } {
+  const column = o.screenWidth - o.width, split = o.mode === "column" && o.split;
+  if (o.mode === "column" && !o.inner && !o.emulated && o.reserve)
+    return { left: "0px", right: "0px", shift: split || o.side === "left" ? column : 0 };
+  const inset = o.hiddenPreview ? "0px" : o.mode === "strip" ? o.env(o.side) : o.mode === "inline" ? `${INLINE_WIDTH}px` : `${column}px`;
+  const other = (side: Side) => o.mode === "column" ? "0px" : o.env(side);
+  // Without children nothing runs under a right column: the document is laid out in the viewport (simulator,
+  // 2026-10-26: 84px of padding left a 100px gap).
+  const under = o.mode !== "column" || o.inner || o.emulated;
+  return {
+    right: (o.side === "right" || split) && under ? inset : other("right"),
+    left: o.side === "left" || split ? inset : other("left"),
+    shift: 0,
+  };
+}
+
 export interface Spec {
   back: boolean;
   leading: number;

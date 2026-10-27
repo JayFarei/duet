@@ -162,3 +162,9 @@ test("column layer leaves the document width while a text field has focus", () =
   const css = readFileSync(new URL("../src/duet.css", import.meta.url), "utf8");
   assert.match(css, /html:has\(:read-write:focus\) \.duet\[data-mode="column"\] \{ overflow: clip;/);
 });
+// #76: the follow timeline is clamped to the scroll range, so a rubber band past either end carried the layer over
+// Safari's own column buttons. The document must not rubber-band while the layer follows it.
+test("column follow layer keeps the document from rubber-banding", () => {
+  const css = readFileSync(new URL("../src/duet.css", import.meta.url), "utf8");
+  assert.match(css, /:where\(html\[data-duet-mode="column"\]:has\(> body \.duet\[data-follow\]\)\) \{ overscroll-behavior-y: none; \}/);
+});
