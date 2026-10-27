@@ -62,13 +62,14 @@ function Site({ self }: { self: boolean }) {
   if (portrait && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
-      tabs={{ items: SECTIONS, selected: tab, onSelect: go, labels: device === "desktop" }}
+      tabs={{ items: SECTIONS, selected: tab, onSelect: go }}
       actions={[
         { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
         { id: "theme", label: theme.dark ? "Light mode" : "Dark mode", icon: theme.dark ? <Sun size={22} /> : <Moon size={22} />, onPress: theme.toggle },
         ...(device === "iphone" ? [{ id: "bars", label: "Top and bottom bars", icon: <PanelBottom size={22} />, onPress: () => setSides(false) }] : []),
       ]}
-      minimizeOnScroll={device !== "desktop"}
+      minimizeOnScroll={device === "desktop" ? "always" : true}
+      menuStyle={device === "desktop" ? "morph" : undefined}
       appearance={theme.appearance}
       tint={tint}
     >

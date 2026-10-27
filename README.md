@@ -204,11 +204,11 @@ Pass `onChange={() => router.refresh()}` from a client component to re-render wi
 | `leading` | `DuetItem[]` | Its own group under back, like SwiftUI `.topBarLeading` |
 | `actions` | `DuetItem[]` | Like `.primaryAction`; folds into "…" when it would reach the tabs. Items with `destructive: true` only show in "…", last, in red |
 | `primary` | `DuetItem` | The screen's main action (compose, new), a tinted round button. Narrow: just above the tabs. Wide: under back. Folds into "…" last |
-| `tabs` | `{ items, selected, onSelect, search?, labels? }` | Tab pill at the bottom. `search` is a `DuetTab` added as the last tab. Each tab keeps its scroll position. `labels`: in inline mode the tabs show as the morph menu's labelled list (icon plus label rows), pinned open in place of the pill, bottom on the pill's, as wide as the longest label and widening towards the page (the insets don't grow, so keep content clear of it). Use it where icons alone don't say enough, like a desktop table of contents |
+| `tabs` | `{ items, selected, onSelect, search? }` | Tab pill at the bottom. `search` is a `DuetTab` added as the last tab. Each tab keeps its scroll position |
 | `searchButton` | `() => void` | A round search button at the bottom, when there are no tabs |
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the strip holds only a close button, where back goes, until it is cleared |
 | `accessory` | `ReactNode` | A view docked by the tabs, like `.tabViewBottomAccessory` (a mini player) |
-| `minimizeOnScroll` | `boolean` | Scrolling down shrinks the tabs to the selected one, like `.tabBarMinimizeBehavior(.onScrollDown)`. Follows the inner scroller and any pane |
+| `minimizeOnScroll` | `boolean \| "always"` | Scrolling down shrinks the tabs to the selected one, like `.tabBarMinimizeBehavior(.onScrollDown)`. Follows the inner scroller and any pane. `"always"`: the tabs stay minimized and the selected tab opens the full list, with `menuStyle: "morph"` as icon plus label rows. Use it where icons alone don't say enough, like a desktop table of contents |
 | `menuStyle` | `"island" \| "morph"` | How "…" and the minimized tab open their menu. Default `"island"` |
 | `appearance` | `"auto" \| "light" \| "dark"` | Light or dark, like `overrideUserInterfaceStyle`. Default `"auto"`: follow the system. `dark` (boolean) still works but is deprecated |
 | `tint` | `string` | Accent for the selected tab, the active menu item and the primary button, like iOS's `tintColor`. Default: system blue |
@@ -446,7 +446,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You see:** without the handling, holding and dragging on the tab pill shows every label except the one under your finger.
 - **Cause:** the real tabs are cut away under the lens, so only its magnified copy shows there, and that copy had icons only.
 - **Duet does:** draws the labels in the lens copy too, magnified with the icon.
-- **You do:** keep labels short (about 10 characters); longer ones are clipped to the tab's width. On a wide screen, `tabs.labels` shows them in full at all times.
+- **You do:** keep labels short (about 10 characters); longer ones are clipped to the tab's width. Where they matter, `minimizeOnScroll="always"` with `menuStyle="morph"` lists them in full.
 - **Status:** [#93](https://github.com/JayFarei/duet/issues/93).
 
 ### Viewport meta and `viewport-fit=cover`

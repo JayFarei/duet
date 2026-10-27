@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, isSplit, pageInsets, islandBox, magnet, morphBox, MORPH, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { DUO, columnBand, isSplit, pageInsets, islandBox, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
@@ -36,8 +36,7 @@ export interface DuetProps<T extends string = string> {
   /** Tab pill at the bottom of the strip. `search` adds a `role: .search` tab as the last item. The ids are typed
    *  from `items`: declare them `as const` and `onSelect` gets the union, so `setTab` fits without a cast. Each tab
    *  keeps its own scroll position, and tapping the selected tab scrolls it to the top, like a native tab bar. */
-  /** labels: inline only, the full pill shows each tab's label beside its icon, widening towards the page. */
-  tabs?: { items: readonly DuetTab<T>[]; selected: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; search?: DuetTab<T>; labels?: boolean };
+  tabs?: { items: readonly DuetTab<T>[]; selected: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; search?: DuetTab<T> };
   /** Searchable without tabs: a round search button at the bottom of the strip. */
   searchButton?: () => void;
   /** A sheet or card is open: the strip holds only a close button, where back goes, like an iOS sheet. Every
@@ -45,8 +44,9 @@ export interface DuetProps<T extends string = string> {
   close?: false | { label?: string; onPress: () => void };
   /** `.tabViewBottomAccessory`, e.g. a mini player. */
   accessory?: ReactNode;
-  /** `.tabBarMinimizeBehavior(.onScrollDown)`. */
-  minimizeOnScroll?: boolean;
+  /** `.tabBarMinimizeBehavior(.onScrollDown)`. "always": the tabs stay minimized, the selected tab opening the
+   *  full list, e.g. where a pill of icons alone wouldn't say enough, like a desktop table of contents. */
+  minimizeOnScroll?: boolean | "always";
   /** Light or dark, like overrideUserInterfaceStyle. Default "auto": follow the system. Menus follow it too; in
    *  Safari's column the buttons keep following the system, so they match Safari's own. */
   appearance?: Appearance;
@@ -331,7 +331,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const p = props as unknown as DuetProps; // tab ids are only typed at the boundary
   const ctx = useDuet();
   const scroller = useRef<HTMLDivElement>(null);
-  const minimized = useMinimized(!!p.minimizeOnScroll, scroller);
+  const minimized = useMinimized(!!p.minimizeOnScroll, scroller) || p.minimizeOnScroll === "always";
   const [menu, setMenuNow] = useState<"more" | "tabs" | null>(null);
   // The menu that is rolling back into its button; it stays mounted until its animation ends.
   const [closing, setClosing] = useState<"more" | "tabs" | null>(null);
@@ -554,13 +554,6 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const bar = (side: Side, i: number) => {
     const pl = planFor(side), left = side === "left", anchor = anchors(pl);
     const at = (b: Box) => ({ top: b.top, left: pl.left, width: DUO.control, height: b.height });
-    // tabs.labels: the tabs as a labelled list (the morph menu's), bottom on the pill's, as wide as its longest
-    // label, outer edge on the column's, so it widens towards the page only.
-    const labelled = !!p.tabs?.labels && ctx.mode === "inline" && !!pl.tabs && !pl.tabs.min;
-    const labelledAt = (b: Box, n: number): CSSProperties => {
-      const height = 2 * MORPH.pad + n * MORPH.row;
-      return { top: b.top + b.height - height, height, width: "max-content", ...(left ? { left: pl.left } : { right: ctx.width - pl.left - DUO.control }) };
-    };
     // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
     // as tall as the button, outer edge on the button's, widening towards the page centre only.
     const menuAt = (b: Box, n: number) => {
@@ -600,16 +593,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
         {pl.leading && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="leading" style={at(pl.leading)}>{shownLeading.map(item)}</GlassSurface>}
         {pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>}
         {!p.close && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
-        {p.tabs && pl.tabs && labelled && (
-          // The morph menu's labelled list, pinned open in the tabs slot: the same rows, without the roll in or out.
-          <GlassSurface preset="control" className="duet-glass duet-menu" data-style="morph" data-pinned data-duet-slot="tabs" role="tablist" style={labelledAt(pl.tabs, tabItems.length)}>
-            {tabItems.map((t) => (
-              <button key={t.id} role="tab" aria-selected={t.id === selected} aria-label={t.label} className="duet-menu-item" data-on={t.id === selected || undefined}
-                data-tint={t.tint ? "" : undefined} style={tint(t)} onClick={() => select(t.id)}>{t.icon}<span className="duet-menu-label">{t.label}</span>{badge(t)}</button>
-            ))}
-          </GlassSurface>
-        )}
-        {p.tabs && pl.tabs && !labelled && (
+        {p.tabs && pl.tabs && (
           <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
             data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
             {!pl.tabs.min && (
