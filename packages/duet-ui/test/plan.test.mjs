@@ -106,3 +106,25 @@ test("split pane: column mode, both columns planned in the band beside Safari's 
   assert.ok(!r.back && !r.more && r.menu.back && r.menu.actions === 3 && r.tabs.min && r.tabs.merged);
   for (const p of [l, r]) { assert.ok(p.tabs.top + p.tabs.height <= 533 - DUO.gap + 0.5); assertNoOverlap(p); }
 });
+test("a prominent primary (the page's call to action) outranks the tabs where it would fold", () => {
+  const LANDSCAPE = sig(594, 368, 678, 466, { angle: 90 });
+  // Closed Safari tab: the call to action takes the rail's low slot, the tabs lead "…".
+  const tabs = plan(detect(COLUMN), spec({ back: true, actions: 3, tabs: 4, primary: true, prominent: true }));
+  assert.ok(tabs.rail && tabs.more && tabs.primary && !tabs.tabs, "rail: … over the call to action");
+  assert.equal(tabs.primary.top, tabs.rail.top + tabs.rail.height / 2);
+  assert.ok(tabs.menu.tabs && !tabs.menu.primary);
+  // Without tabs, it shares the rail with "…" rather than fold into it.
+  const alone = plan(detect(COLUMN), spec({ back: true, actions: 3, primary: true, prominent: true }));
+  assert.ok(alone.rail && alone.primary && !alone.menu.primary);
+  const search = plan(detect(COLUMN), spec({ back: true, searchButton: true, primary: true, prominent: true }));
+  assert.ok(search.rail && search.primary && !search.searchButton && search.menu.search);
+  // Where the band holds one button, the selected tab keeps it, as without a call to action.
+  const one = plan(detect(LANDSCAPE), spec({ back: true, tabs: 4, primary: true, prominent: true }));
+  assert.deepEqual(one, plan(detect(LANDSCAPE), spec({ back: true, tabs: 4, primary: true })));
+  // Where it fits anyway, nothing changes.
+  for (const s of [STRIP, INLINE]) {
+    const o = spec({ back: true, actions: 2, tabs: 4, primary: true });
+    assert.deepEqual(plan(detect(s), { ...o, prominent: true }), plan(detect(s), o));
+  }
+  for (const p of [tabs, alone, search]) assertNoOverlap(p);
+});

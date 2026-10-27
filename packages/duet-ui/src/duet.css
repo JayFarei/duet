@@ -68,10 +68,12 @@
 /* GlassyUI's grain reads as dirt on iOS-flat controls. */
 .duet .lg-noise { display: none; }
 /* Press lift, as iOS Liquid Glass: a separate button swells to ~1.4x and its glass turns lighter, then springs
-   back on release. Items inside a shared surface (groups, the full tab pill) lift as a bubble of their own. */
-.duet-glass { transition: top 0.35s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1), scale 0.5s var(--duet-spring-in); }
+   back on release. Items inside a shared surface (groups, the full tab pill) lift as a bubble of their own.
+   A slot that moves on a page change (a group grows, the call to action takes the tabs' place) slides on the same
+   spring, so the strip reshapes as one elastic motion rather than a cut. */
+.duet-glass { transition: top 0.5s var(--duet-spring-in), height 0.5s var(--duet-spring-in), scale 0.5s var(--duet-spring-in); }
 /* Minimizing on scroll, as native .onScrollDown: the pill shrinks to the one button in about 0.24s. */
-.duet-pill[data-min] { transition-duration: 0.24s, 0.24s, 0.4s; }
+.duet-pill[data-min] { transition: top 0.24s cubic-bezier(0.32, 0.72, 0, 1), height 0.24s cubic-bezier(0.32, 0.72, 0, 1), scale 0.4s var(--duet-spring-in); }
 .duet-glass::before { transition: background-color 0.25s; }
 :is(.duet-round, .duet-pill[data-min]):has(:active) { scale: 1.4; z-index: 52; transition-duration: 0.35s, 0.35s, 0.45s; transition-timing-function: ease, ease, var(--duet-spring-out); }
 :is(.duet-round, .duet-pill[data-min]):has(:active)::before { background-color: var(--duet-lift); }
@@ -201,9 +203,7 @@
 @keyframes duet-roll { to { left: var(--x0); width: 49px; } }
 @keyframes duet-thin { 35% { transform: scaleY(0.93); } 70% { transform: scaleY(1.02); } }
 @keyframes duet-fade { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
-/* The close button pops in where back sits when a sheet opens. */
-.duet-close { animation: duet-fade 0.35s var(--duet-spring-out) both; }
-@media (prefers-reduced-motion: reduce) { .duet-lens, .duet-close, .duet-menu, .duet-menu > *, .duet-menu[data-closing], .duet-menu[data-closing] > * { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .duet-lens, .duet-menu, .duet-menu > *, .duet-menu[data-closing], .duet-menu[data-closing] > * { animation: none; } }
 /* The button became the island: hide it so it does not show through the island's end slot. */
 .duet-glass[data-unrolled] { visibility: hidden; }
 /* On the left the island grows rightwards: the close slot (or first tab) sits by the button. */
@@ -423,3 +423,56 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 .duet-pane-menu > button[data-sep] { margin-top: 7px; position: relative; }
 .duet-pane-menu > button[data-sep]::before { content: ""; position: absolute; top: -4px; left: 12px; right: 12px; border-top: 0.5px solid var(--duet-pane-ring); }
 @media (prefers-reduced-motion: reduce) { .duet-pane-menu { animation: none; } }
+
+/* Page changes (Presence in chrome.tsx). A slot that arrives pops out of nothing on the spring, its ink unblurring as
+   it lands; one that goes stays put while it shrinks into itself and fades, so the slots that stay can slide into its
+   place at once. The first paint, a fold and a side switch skip both (data-settling, data-drag="switch"). */
+.duet-glass[data-enter] { animation: duet-enter 0.5s var(--duet-spring-out) backwards; }
+.duet-glass[data-enter] > button { animation: duet-ink-in 0.35s ease-out backwards; }
+.duet-glass[data-leaving] { animation: duet-leave 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; pointer-events: none; }
+.duet-glass[data-leaving] > button { animation: duet-ink-out 0.2s ease-in forwards; }
+@keyframes duet-enter { from { opacity: 0; scale: 0.6; } }
+@keyframes duet-leave { to { opacity: 0; scale: 0.6; } }
+@keyframes duet-ink-in { from { opacity: 0; filter: blur(6px); } }
+@keyframes duet-ink-out { to { opacity: 0; filter: blur(6px); } }
+
+/* The call to action: a tinted pill whose icon sits where the round button's would, with the label beside it. Its
+   width follows the measured row on the same spring as its slot, so a new label or a move from the rail stretches
+   and settles like the island; the label crossfades in from a blur as it changes. */
+.duet-glass.duet-cta {
+  overflow: hidden;
+  transition: top 0.5s var(--duet-spring-in), height 0.5s var(--duet-spring-in), scale 0.5s var(--duet-spring-in),
+    left 0.5s var(--duet-spring-in), width 0.5s var(--duet-spring-in);
+}
+.duet[data-mode] .duet-glass.duet-cta::before { background-color: var(--duet-tint); transition: background-color 0.3s; }
+.duet .duet-cta .duet-item { color: #fff; min-width: 0; overflow: hidden; justify-content: flex-start; }
+.duet[data-side="right"] .duet-cta .duet-item { justify-content: flex-end; }
+.duet-cta-row {
+  display: flex; flex: none; align-items: center; gap: 8px;
+  padding: 0 16px 0 calc((49px - var(--duet-icon-size)) / 2);
+}
+.duet[data-side="right"] .duet-cta-row { flex-direction: row-reverse; padding: 0 calc((49px - var(--duet-icon-size)) / 2) 0 16px; }
+.duet-cta-row > svg { flex: none; }
+.duet-cta-row > svg:not([data-duet-glyph]) { width: var(--duet-icon-size); height: var(--duet-icon-size); stroke-width: var(--duet-icon-weight); }
+.duet-cta-label {
+  flex: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 15px/20px -apple-system, system-ui, sans-serif; animation: duet-tab-in 0.3s ease-out backwards;
+}
+/* Closed, the pill is the round button: the label stays laid out (so opening knows its width) but fades out. */
+.duet-glass.duet-cta:not([data-expanded]) .duet-cta-label { opacity: 0; }
+.duet-cta-label { transition: opacity 0.2s; }
+.duet-glass.duet-cta:has(:active) { scale: 1.08; }
+.duet-glass.duet-cta:has(:active)::before { background-color: var(--duet-tint); filter: brightness(1.15); }
+/* In the rail the call to action keeps its slot by the thumb as a tinted bubble under "…". */
+.duet .duet-rail > .duet-rail-cta { flex: 1; height: auto; margin: 3px; background: var(--duet-tint); color: #fff; }
+.duet .duet-rail > .duet-rail-cta:active { background: var(--duet-tint); filter: brightness(1.15); }
+
+@media (prefers-reduced-motion: reduce) {
+  .duet-glass[data-enter] { animation: duet-appear 0.2s ease-out backwards; }
+  .duet-glass[data-leaving] { animation: duet-vanish 0.2s ease-in forwards; }
+  .duet-glass[data-enter] > button, .duet-glass[data-leaving] > button { animation: none; }
+  .duet-cta-label { animation: duet-appear 0.2s ease-out backwards; }
+  .duet-glass.duet-cta { transition: none; }
+}
+@keyframes duet-appear { from { opacity: 0; } }
+@keyframes duet-vanish { to { opacity: 0; } }

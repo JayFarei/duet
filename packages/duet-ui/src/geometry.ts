@@ -518,6 +518,9 @@ export interface Spec {
    *  under back where two do, never at the bottom of a wide screen (blueprint). It folds into "…" last, only
    *  where the band has no room for it and "…" both. */
   primary?: boolean;
+  /** The primary action is the page's call to action (DuetPrimary.prominent): where it would fold, it takes the tabs'
+   *  (or search button's) slot by the thumb instead, and they lead the "…" menu; where only the rail fits, its low slot. */
+  prominent?: boolean;
 }
 
 export interface Box { top: number; height: number }
@@ -532,8 +535,9 @@ export interface Plan {
   /** "…": its own round button under the actions, so it alone unrolls into the menu island. */
   more?: Box;
   primary?: Box;
-  /** What did not fit, in order, behind the "…" slot: primary first, then back, leading, actions (indexes). */
-  menu: { primary: boolean; back: boolean; leading: number; actions: number; search?: boolean };
+  /** What did not fit, in order, behind the "…" slot: the tabs (a prominent primary took their rail slot) or
+   *  search, then primary, back, leading, actions (indexes). */
+  menu: { primary: boolean; back: boolean; leading: number; actions: number; search?: boolean; tabs?: boolean };
   /** min: only the selected tab shows (minimized, or the full pill does not fit). merged: the band holds one
    *  button, so the selected tab is the only one and its menu lists the tabs, then everything in `menu`. */
   tabs?: Box & { min: boolean; merged?: boolean };
@@ -657,6 +661,17 @@ export function plan(c: Context, s: Spec): Plan {
     while (leading < s.leading) { leading++; if (!reaches()) { leading--; break; } }
   }
   const fits = () => fitsFrom(top) || (reachTop < top && reaches());
+  // The page's call to action outranks the tabs (or search button): where it would fold, it takes their slot by the
+  // thumb instead, and they lead the "…" menu (Spec.prominent). Where even "…" and it alone do not fit, they share
+  // the rail. Where the band holds one button (closed landscape), it stays the selected tab, as without one.
+  const cta = !!s.primary && !!s.prominent && !s.tabs && !s.searchButton;
+  if (s.primary && s.prominent && !primary && (s.tabs || s.searchButton)) {
+    const q = plan(c, { ...s, tabs: 0, searchButton: false, menuExtra: (s.menuExtra ?? 0) + 1 });
+    if (q.primary) {
+      if (s.tabs) q.menu.tabs = true; else q.menu.search = true;
+      return q;
+    }
+  }
 
   const p: Plan = { centerX, left: centerX - DUO.control / 2, menu: { primary: !!s.primary && !primary, back: s.back && !back, leading: s.leading - leading, actions: s.actions - actions } };
   if (s.tabs) p.tabs = { top: bottom - bottomH, height: bottomH, min: tabsMin };
@@ -666,18 +681,20 @@ export function plan(c: Context, s: Spec): Plan {
   if (col) Object.assign(p, { columnTop: top, columnBottom: bottom });
   // Risen into the island's reach: packed down onto the floor instead of hanging from the top.
   let y = fitsFrom(top) ? top : floor() - height();
-  if (fits()) {
+  const railFits = (bottom - top + 2 * DUO.gap - groupHeight(2)) / 2 >= RAIL.gap;
+  if (fits() && !(cta && !primary && railFits)) {
     if (back) { p.back = { top: y, height: DUO.control }; y += step; }
     if (primaryTop && primary) { p.primary = { top: y, height: DUO.control }; y += step; }
     if (leading) { const h = groupHeight(leading); p.leading = { top: y, height: h, visible: leading }; y += h + DUO.gap; }
     if (actions) { const h = groupHeight(actions); p.actions = { top: y, height: h, visible: actions }; y += h + DUO.gap; }
     if (menuCount()) p.more = { top: y, height: DUO.control };
-  } else if ((p.tabs || p.searchButton) && (bottom - top + 2 * DUO.gap - groupHeight(2)) / 2 >= RAIL.gap) {
+  } else if ((p.tabs || p.searchButton || cta) && railFits) {
     const h = groupHeight(2), railTop = (top + bottom - h) / 2, low = { top: railTop + h / 2, height: h / 2 };
     p.rail = { top: railTop, height: h };
     if (col) Object.assign(p, { columnTop: railTop, columnBottom: railTop + h }); // menus may use the rail's reach too
     p.more = { top: railTop, height: h / 2 };
-    if (p.tabs) p.tabs = { ...low, min: true }; else p.searchButton = low;
+    if (p.tabs) p.tabs = { ...low, min: true }; else if (p.searchButton) p.searchButton = low;
+    else { p.primary = low; p.menu.primary = false; } // the call to action, its tabs already in "…" (above)
   } else if (p.tabs) {
     // One slot: the selected tab is the only button, and its menu lists the tabs, then what folded.
     p.tabs = { top: bottom - DUO.control, height: DUO.control, min: true, merged: true };
