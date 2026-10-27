@@ -363,13 +363,16 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const [shadeIn, shadeOut] = flap.current?.querySelectorAll<HTMLElement>("[data-wd-shade]") ?? [];
     // Each face also hides once turned away: WebKit ignores backface-visibility here, and a clear face would show it.
     const [faceIn, faceOut] = flap.current?.querySelectorAll<HTMLElement>("[data-wd-face]") ?? [];
-    const fill = (t: number, face: 0 | 1) => face ? (open ? smooth(0.03, 0.42, t) : 1) : 1 - smooth(0.55, 0.97, t);
-    const shade = (t: number, face: 0 | 1) => fill(t, face) * DIM + 0.32 * Math.sin(Math.PI / 2 * Math.min(1, 2 * (face ? t : 1 - t)));
-    // The body shows left of the hinge only where the flap already covers it (its free edge in perspective, with
-    // `P` matching the hinge's perspective), so the page under a clear inner screen lines up as it lands.
-    const P = 2600, edge = (t: number) => {
+    // The inner face stays opaque until it lies within a degree or so of flat, so the page under it never shows
+    // through a tilted face as a doubled, washed-out image; it then hands over to the page it matches.
+    const fill = (t: number, face: 0 | 1) => face ? (open ? smooth(0.03, 0.42, t) : 1) : 1 - smooth(0.92, 0.99, t);
+    // The darkening as a face turns from the viewer goes to nothing as it lies flat (1 - |cos|, not sin), so a face
+    // landing on the page matches its tone and no seam shows down the hinge.
+    const shade = (t: number, face: 0 | 1) => fill(t, face) * DIM + 0.32 * (1 - Math.abs(Math.cos(Math.PI * t)));
+    // The body shows left of the hinge only where the flap already covers it (its free edge, cos of its angle).
+    const edge = (t: number) => {
       const f = Math.PI * (1 - t);
-      return t >= 1 ? -40 : f >= Math.PI / 2 ? half : half - half * Math.cos(f) * P / (P - half * Math.sin(f)) + 2;
+      return t >= 1 ? -40 : f >= Math.PI / 2 ? half : half - half * Math.cos(f) + 2;
     };
     return [
       faceIn?.animate(steps.map((t) => ({ opacity: t >= 0.5 ? 1 : 0 })), o),
@@ -380,7 +383,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       shadeOut?.animate(steps.map((t) => ({ opacity: shade(t, 1) })), o),
       fold.current?.animate(steps.map((t) => ({ clipPath: `inset(-40px -40px -40px ${edge(t)}px)` })), o),
       // The half that stays put shades towards the hinge while the other half stands over it.
-      crease.current?.animate(steps.map((t) => ({ opacity: 0.45 * Math.sin(Math.PI * t) })), o),
+      crease.current?.animate(steps.map((t) => ({ opacity: 0.45 * Math.sin(Math.PI * t) ** 3 })), o),
       hinge.current?.animate(steps.map((t) => ({ transform: shift(t) })), o),
       flap.current?.animate([{ transform: `rotateY(${180 * (1 - a)}deg)` }, { transform: `rotateY(${180 * (1 - b)}deg)` }], o),
       shadow.current?.animate(steps.map((t) => ({ transform: reach(t) })), o),
@@ -697,8 +700,9 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
           transform: `translate(-50%, -50%) scale(${scale}) rotate(${spin.current}deg)`,
           transition: settle("transform"),
         }}>
-        {/* Perspective only while the flap swings: left on, Chrome rasterizes the scaled device at full size and it reads blurry. */}
-        <div ref={hinge} style={{ position: "absolute", inset: 0, perspective: folding ? 2600 : undefined, transformOrigin: "75% 50%" }}>
+        {/* No perspective: the flap swings in orthographic projection, so it never reaches past the body's outline
+            (in perspective its near edge grows past the body, a second, flared frame outside the device). */}
+        <div ref={hinge} style={{ position: "absolute", inset: 0, transformOrigin: "75% 50%" }}>
         {/* The drop shadow sits outside the fold's clip, so the clip never cuts it, and is cast down the page however the device is turned:
             its offset is turned back by the device's own angle on the same curve, so mid-turn it still falls straight down, at full length.
             A blurred fill, not a box-shadow: a box-shadow is hollow, and moved out from under the body its hole shows as a pale slab. */}
