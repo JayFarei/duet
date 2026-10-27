@@ -3,7 +3,7 @@
 // nothing overlaps, and whatever does not fit folds into "…", which is always reachable.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { columnBand, detect, plan, DUO, SAFARI } from "../src/geometry.ts";
+import { columnBand, detect, plan, DUO, RAIL, SAFARI } from "../src/geometry.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -23,9 +23,9 @@ const CONTEXTS = {
 // bands are the viewport less the island and home indicator.
 function band(c) {
   if (c.mode === "column" && !c.split && c.screenWidth > c.screenHeight) return [
-    SAFARI.landscape[c.side].top + SAFARI.rows * (DUO.control + DUO.gap), SAFARI.landscape[c.side].pill - DUO.gap];
+    SAFARI.landscape[c.side].top + (SAFARI.rows * (DUO.control + DUO.gap) + SAFARI.forward), SAFARI.landscape[c.side].pill - DUO.gap];
   if (c.mode === "column") return [
-    c.split ? SAFARI.splitTop[c.side] + SAFARI.rows * (DUO.control + DUO.gap) : DUO.top + DUO.island + SAFARI.rows * (DUO.control + DUO.gap),
+    c.split ? SAFARI.splitTop[c.side] + (SAFARI.rows * (DUO.control + DUO.gap) + SAFARI.forward) : DUO.top + DUO.island + (SAFARI.rows * (DUO.control + DUO.gap) + SAFARI.forward),
     c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap];
   if (c.mode === "strip") return [DUO.top + DUO.island - c.offsetTop, c.height - DUO.bottom];
   return [c.insetTop + DUO.gap, c.height - Math.max(c.insetBottom, DUO.gap)];
@@ -43,17 +43,21 @@ for (const [name, c] of Object.entries(CONTEXTS)) {
       // Leading items and the primary action may rise into the island's reach (the free middle of Safari's column
       // with a bare island); everything else, "…" included, stays under Safari's reader row.
       const reach = columnBand(c)?.reach ?? 0;
+      // A rail may reach closer to Safari's buttons than the band's gap, never closer than RAIL.gap.
+      const slack = p.rail ? DUO.gap - RAIL.gap : 0;
       for (const b of boxes) {
-        const lo = b === p.leading || b === p.primary ? top - reach : top;
-        assert.ok(b.top >= lo - 0.01 && b.top + b.height <= bottom + 0.01, `outside [${lo}, ${bottom}]: ${why}`);
+        const lo = b === p.leading || b === p.primary ? top - reach : top - slack;
+        assert.ok(b.top >= lo - 0.01 && b.top + b.height <= bottom + slack + 0.01, `outside [${lo}, ${bottom}]: ${why}`);
       }
+      if (p.rail) assert.ok(p.more && (p.tabs || p.searchButton) && p.more.top === p.rail.top, `rail without its slots: ${why}`);
       for (let i = 1; i < boxes.length; i++) assert.ok(boxes[i].top >= boxes[i - 1].top + boxes[i - 1].height - 0.01, `overlap: ${why}`);
       const shown = (p.back ? 1 : 0) + (p.leading?.visible ?? 0) + (p.actions?.visible ?? 0);
       const folded = (p.menu.primary ? 1 : 0) + (p.menu.back ? 1 : 0) + p.menu.leading + p.menu.actions;
       assert.equal(shown + (p.primary ? 1 : 0) + folded, (s.primary ? 1 : 0) + (s.back ? 1 : 0) + s.leading + s.actions, `lost items: ${why}`);
-      if (folded) assert.ok(p.more, `folded items with no "…": ${why}`);
+      // Folded items sit behind "…", or behind the selected tab where the band holds that one button.
+      if (folded) assert.ok(p.more || p.tabs?.merged, `folded items with no "…": ${why}`);
       // The primary action folds only when "…" is needed and there is no room for both.
-      if (p.menu.primary) assert.ok(folded > 1 && bottom - top < 3 * DUO.control + 2 * DUO.gap, `primary folded needlessly: ${why}`);
+      if (p.menu.primary) assert.ok(folded + (p.menu.search || p.tabs?.merged || p.rail ? 1 : 0) > 1 && bottom - top < 3 * DUO.control + 2 * DUO.gap, `primary folded needlessly: ${why}`);
     }
   });
 }

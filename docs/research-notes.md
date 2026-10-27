@@ -94,6 +94,7 @@ On device, two Live Activities (call + Maps, or call + music, same size) grow th
 - Band: 385 to ~531 (146pt), between Safari's pushed reader row and its pill.
 - That fits two controls: one "…" launcher (back, leading and actions fold into it, in that order) and the tab pill minimized to the selected tab, which opens a tab menu.
 - When the activities end, Safari's rows move back up and ~103pt above our band stays empty. That is the price of never moving our controls when an activity starts or ends; the page gets no signal for island state, so following it is not possible.
+- With forward history, Safari's back grows into a back + forward pill (Duo Lab, bare island: 175 to 276, 102.7 tall incl. its rounding, `SAFARI.forward = DUO.groupItem + 2`) and the reader sits 13pt under it, not 11. Under two Live Activities the reader then ends at ~427.7 and the band (to the pill at 541.6) is ~92pt: one button. Duet then puts "…" and the selected tab in a 100.7pt two-item rail centred between the reader and the pill, ~6.6pt clear of each (`RAIL.gap` 5 minimum) (#97).
 - Live Activities cannot be started on the simulator (no Clock / Phone / Maps activity), so the push is the device measurement (`SAFARI.islandPush`), not a simulator capture.
 
 ### Home Screen (standalone)

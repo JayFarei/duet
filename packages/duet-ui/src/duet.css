@@ -85,12 +85,14 @@
 .duet-pill[data-min] { padding: 3px; }
 .duet-tab { height: 50px; flex: none; }
 .duet-pill[data-min] .duet-tab { height: 43px; }
+/* The rail's tab fills its slot like the group's items, inset as in the minimized pill. */
+.duet-rail > .duet-tab { flex: 1; height: auto; margin: 3px; }
 .duet-tab, .duet-menu-item { position: relative; }
 .duet-tab > *, .duet-menu-item > * { position: relative; } /* icons paint above the selection */
 /* Only the active item is coloured ([data-on]: the selected one, or the one under the finger while
    scrubbing); custom icons can key off the same attribute. */
 :is(.duet-tab, .duet-menu-item)[data-on] { color: var(--duet-tint); }
-:is(.duet-pill[data-min] .duet-tab, .duet-menu-item)[data-on]::before {
+:is(.duet-pill[data-min] .duet-tab, .duet-rail > .duet-tab, .duet-menu-item)[data-on]::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--duet-sel);
 }
 /* Full pill: one lens marks the selected tab and glides between tabs. Scrubbing (Apple News, Wise), the pill
@@ -215,16 +217,23 @@
 .duet[data-drag="held"], .duet[data-drag="switch"] { transition: none; }
 /* Switching sides moves every control in the same frame: nothing glides across the page on its own. */
 .duet[data-drag="switch"] * { transition: none !important; }
+/* The controls sit above the page like system chrome: a page's modal that turns off pointer events on <body> (Radix,
+   Headless UI) would otherwise leave them dead, the sheet's close included. */
+.duet { pointer-events: auto; }
 /* Mid fold or turn (Context.hidden "moving") and in the turned in-app preview ("preview"): not drawn. */
 .duet[data-hidden] { visibility: hidden; pointer-events: none; }
 /* Loading, and while the window settles after a fold, turn or resize: the controls appear where they settle, without transitions or entrance animations. */
 /* The root itself keeps its animation: in Safari's column it is the scroll follow (duet-follow), not an entrance. */
 .duet[data-settling], .duet[data-settling] * { transition: none !important; }
-.duet[data-settling] * { animation: none !important; }
+/* Zero length, not none: removing an animation and putting it back restarts it, so a control that arrived while settling
+   (a sheet's close as the keyboard goes down, the tabs on load) would fade in again from nothing once settled. */
+.duet[data-settling] * { animation-duration: 0s !important; animation-delay: 0s !important; }
 .duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
 /* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */
 .duet .duet-menu-item[data-destructive] { color: #ff3b30; }
+/* The island sets them apart with a hairline on the item's leading edge (a merged tab menu: tabs, then the rest). */
+.duet-menu:not([data-style="morph"]) > .duet-menu-item[data-sep] { box-shadow: -0.5px 0 0 var(--duet-ring); }
 .duet-menu[data-style="morph"] > .duet-menu-item[data-sep] { box-shadow: 0 -0.5px 0 var(--duet-ring); border-top-left-radius: 0; border-top-right-radius: 0; }
 /* The primary action: the one tinted button, so the thumb finds it. */
 .duet-primary { color: var(--duet-tint); }
@@ -260,7 +269,7 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    fixed box reaches it: a fixed box stops at the viewport edge, and one covering the middle of that edge has its
    colour painted over the column instead (the guard below). So there the scroller is an in-document box that runs
    on under the column. The document still never scrolls, so the chrome layer never moves. */
-html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left) + var(--duet-inset-right)); bottom: auto; height: calc(100% + var(--duet-inset-bottom)); }
+html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left, 0px) + var(--duet-inset-right, 0px)); bottom: auto; height: calc(100% + var(--duet-inset-bottom, 0px)); }
 /* That overflow widens the document, and touch-action on <html> stops at this scroll container, so without its own
    a sideways swipe pans the whole page, chrome and all, into the column. Carousels inside are scrollers of their own
    and still pan. */

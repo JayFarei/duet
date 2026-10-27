@@ -1,6 +1,6 @@
 {
   "name": "duet-ui",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Native-feeling controls for React web apps on the foldable iPhone: the side strip, Safari's column, split view and Home Screen apps.",
   "license": "MIT",
   "type": "module",
@@ -16,7 +16,11 @@
       "types": "./dist/geometry.d.ts",
       "default": "./dist/geometry.js"
     },
-    "./styles.css": "./dist/duet.css"
+    "./styles.css": "./dist/duet.css",
+    "./boot": {
+      "types": "./dist/boot-script.d.ts",
+      "default": "./dist/boot-script.js"
+    }
   },
   "files": [
     "dist",
@@ -24,7 +28,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-css.mjs",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-css.mjs && node scripts/boot.mjs",
     "prepack": "pnpm build && node scripts/pack-docs.mjs",
     "test": "node --test \"test/*.test.mjs\"",
     "typecheck": "tsc --noEmit"
@@ -36,6 +40,7 @@
   "devDependencies": {
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "esbuild": "^0.28.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "typescript": "^5.9.0"

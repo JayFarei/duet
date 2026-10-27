@@ -1,6 +1,7 @@
 // Reads the browser signals detect() works from, and says when they may have changed. No React, so a page can set
 // its own attributes before React mounts with the same reading and triggers as the chrome.
 import type { Signals } from "./geometry.ts";
+import { measure } from "./measure.ts";
 
 const watchers = new Set<() => void>();
 
@@ -29,27 +30,7 @@ export function readSignals(): Signals {
       + "padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
     document.body.appendChild(probe);
   }
-  const pad = getComputedStyle(probe);
-  return {
-    innerWidth: innerWidth,
-    innerHeight: innerHeight,
-    outerWidth: outerWidth,
-    outerHeight: outerHeight,
-    visualHeight: visualViewport?.height ?? innerHeight,
-    insetTop: parseFloat(pad.paddingTop) || 0,
-    insetBottom: parseFloat(pad.paddingBottom) || 0,
-    screenWidth: innerWidth > innerHeight ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height),
-    screenHeight: innerWidth > innerHeight ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height),
-    insetRight: parseFloat(pad.paddingRight) || 0,
-    insetLeft: parseFloat(pad.paddingLeft) || 0,
-    framed: window.top !== window,
-    pixelRatio: devicePixelRatio,
-    userAgent: navigator.userAgent,
-    touchPoints: navigator.maxTouchPoints,
-    angle: screen.orientation?.angle ?? ((((window as Window & { orientation?: number }).orientation ?? 0) + 360) % 360),
-    standalone: (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches,
-    scale: visualViewport?.scale ?? 1,
-  };
+  return measure(probe);
 }
 
 /** Geometry after an event is not final: a fold moves outerWidth up to ~2s after the viewport, and nothing fires when
