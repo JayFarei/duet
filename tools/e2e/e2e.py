@@ -128,7 +128,7 @@ class Run:
         for d in ("steps", "shots"):
             os.makedirs(os.path.join(s.out, d), exist_ok=True)
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
-        s.la = False  # a Live Activity is running (the host's music activity, la())
+        s.la_on = False  # a Live Activity is running (the host's music activity, la())
         s.page_path = a.page
         s.films = []  # (scenario, stitched clips) for the report
         s.split = None  # Safari's split view pane, "left" or "right", or None when Safari is full screen
@@ -265,7 +265,7 @@ class Run:
         bundle = PREVIEW_SVC if kind == "preview" else SAFARI
         if s.position != "open":
             r = cmd("elements", bundle=bundle)
-            return (r or {}).get("elements", []) + (s.island(angle) if s.la else [])
+            return (r or {}).get("elements", []) + (s.island(angle) if s.la_on else [])
         if not s.sim:
             s.native_why = "simulator helper missing"
             return []
@@ -744,7 +744,7 @@ class Run:
             if st is None:
                 s.why = f"Live Activity not {'started' if on else 'ended'} in 15s: {http('GET', '/la/state')}"
                 return None
-            s.la = on
+            s.la_on = on
             time.sleep(1.0)  # the island grows or shrinks, and Safari's buttons move with it
             done = time.time() * 1000
             r = s.wait(sid, tok, lambda r: r["rx"] >= done, t0, page=page)
@@ -903,7 +903,7 @@ class Run:
         if (http("GET", "/la/state") or {}).get("count") and not s.la_state(False, since, timeout=3):
             sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
             s.la_state(False, since)
-        s.la = False
+        s.la_on = False
         sh("xcrun", "simctl", "terminate", s.udid, HOST, check=False)
         if s.split and s.position == "open" and s.sim:  # leave split view: Safari full screen again
             try:
