@@ -11,7 +11,7 @@ import UIKit
 @main struct HostApp: App {
   var body: some Scene {
     WindowGroup {
-      Links().onOpenURL { handle($0) }
+      Links().onOpenURL { handle($0) }.task { Live.shared.start() }
     }
   }
 }
