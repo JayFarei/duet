@@ -1,6 +1,6 @@
 > **Historical lab notes from 2026-10-24**, written while column mode was being built, before `duet-ui` was published. Paths, names (`native-chrome`, `DuoChrome`) and some conclusions are out of date, for example split-view panes now use Safari's column on both sides instead of always falling back to inline. For current behaviour, read the [README](../README.md#how-duet-decides) and `packages/duet-ui/src/geometry.ts`.
 >
-> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait or a known landscape turn, not zoomed; the keyboard keeps the mode) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here. An in-app Safari preview (a 466x678 window with 75pt of chrome and a bottom inset, a sheet inside the screen, or the older 375x667 at 3x) is `column` in portrait, in the gap of its own column between reader/menu and back; turned, `inline` on the side away from its column (see "Preview placement in the gap").
+> Current behaviour in short: `strip` when running as a Home Screen app with a side inset of at least 60px; `column` in Safari (not in an iframe, portrait or a known landscape turn, not zoomed; the keyboard keeps the mode) when the window minus the page is 80 to 88px wide and 68 to 102px tall and the window is a Duo or split-view size; `inline` otherwise. Column placement uses the constants measured here. An in-app Safari preview (a 466x678 window with 44 to 77pt of chrome and a bottom inset, a sheet inside the screen, or the older 375x667 at 3x) is `column` in portrait, in the gap of its own column between reader/menu and back; turned, `inline` on the side away from its column (see "Preview placement in the gap").
 
 # Handoff: our controls inside Safari's column on the iPhone Duo
 
@@ -286,7 +286,7 @@ Native frames from the e2e runner (XCUITest on `com.apple.SafariViewService`, Du
 - A probe page confirmed that in-document absolute content paints into the preview's column under its buttons (fixed content is clipped to the viewport), as in a tab, so the column layer works there.
 - Portrait: `column`, band = the gap less `DUO.gap` each side, converted to page coordinates by `678 - innerHeight` (the page reaches the screen bottom); centre `outerWidth - 48.2`, the native buttons' centre. 124pt holds "…" and the minimized selected tab (49 + 11 + 49).
 - Turned: no usable gap, so `inline` on the side away from the preview's column; the preview rule now accepts the sheet in either orientation.
-- Unknown: the preview's buttons with Live Activities (the old note's ~31pt worst case assumed the island pushes them like Safari's rows; not measured).
+- Unknown: the preview's buttons with Live Activities (the old note's ~31pt worst case assumed the island pushes them like Safari's rows; not measured). Measured since, see "Preview scroll compaction and Live Activities".
 
 
 ## Turns and folds caught halfway (2026-10-26, e2e round 2)
@@ -307,3 +307,17 @@ While hidden mid-turn the column layer still carried the last posture's position
 The full screen preview turned (every presentation but a sheet, iOS 27.1 simulator) is the whole 678x466 window: page 678x391 (no column, chrome 75), inset bottom 34, its buttons in a safe-area inset of 84 on the side the Duo is turned to. The old rule needed a page column, so this read as a tab and showed the inline strip over the page. `previewReason()` now takes it by the chrome band (73 to 77) and inset; a turned tab has 98 with its column or 126 fresh.
 
 The landscape preview's column gap is about 26pt; with no room for a button and an inline strip covering the page, Duet hides its controls there (`hidden: "preview"`).
+
+## Preview scroll compaction and Live Activities (#104, 2026-10-27)
+
+Reported from a real Duo by RegTail on duet-ui 0.4.1; traced on Duo Lab (iOS 27.1) with a beacon reading every frame of `/scroll` in the e2e host's preview.
+
+| Preview | inner / outer | chrome | inset bottom |
+| --- | --- | --- | --- |
+| Full screen and default, at rest | 382x603 / 466x678 | 75 | 34 |
+| Same, scrolling (top bar compacting) | 382x615, 626, 632 | 70, 65, 58, 53, 49, 47, 46 | 34 |
+| Sheet, scrolled | 366x600 / 450x670 | 70 (does not compact) | 34 |
+
+- The old preview rule (chrome 73 to 77) failed below 73 and the column rule (68 to 102) below 68: the page went tab-band column under the preview's buttons, then inline. Now the preview takes 44 to 77, and in the preview column checks the width only. A tab has inset 0 and 80 or 98 of chrome, so it stays apart.
+- Live Activities: one pushes close and reader/menu down about 45pt (real Duo, sheet screenshot); back does not move. Two are taken to push `DUO.island` (91.7) as in a tab, so the worst-case gap is 282 + 91.7 to 428, ~54pt. The band is that gap less `DUO.gap` each side (32pt) with no `reach`, and the one control (the merged tab, "…" or search) is centred in the gap, ~2.6pt clear each side.
+- After the fix the merged tab holds screen y 376.3 through the whole scroll (page 301.3 + 75 at rest, 330.3 + 46 compacted), `column` and `preview` on every frame.
