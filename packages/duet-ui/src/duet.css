@@ -85,12 +85,14 @@
 .duet-pill[data-min] { padding: 3px; }
 .duet-tab { height: 50px; flex: none; }
 .duet-pill[data-min] .duet-tab { height: 43px; }
+/* The rail's tab fills its slot like the group's items, inset as in the minimized pill. */
+.duet-rail > .duet-tab { flex: 1; height: auto; margin: 3px; }
 .duet-tab, .duet-menu-item { position: relative; }
 .duet-tab > *, .duet-menu-item > * { position: relative; } /* icons paint above the selection */
 /* Only the active item is coloured ([data-on]: the selected one, or the one under the finger while
    scrubbing); custom icons can key off the same attribute. */
 :is(.duet-tab, .duet-menu-item)[data-on] { color: var(--duet-tint); }
-:is(.duet-pill[data-min] .duet-tab, .duet-menu-item)[data-on]::before {
+:is(.duet-pill[data-min] .duet-tab, .duet-rail > .duet-tab, .duet-menu-item)[data-on]::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--duet-sel);
 }
 /* Full pill: one lens marks the selected tab and glides between tabs. Scrubbing (Apple News, Wise), the pill
@@ -230,6 +232,8 @@
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
 /* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */
 .duet .duet-menu-item[data-destructive] { color: #ff3b30; }
+/* The island sets them apart with a hairline on the item's leading edge (a merged tab menu: tabs, then the rest). */
+.duet-menu:not([data-style="morph"]) > .duet-menu-item[data-sep] { box-shadow: -0.5px 0 0 var(--duet-ring); }
 .duet-menu[data-style="morph"] > .duet-menu-item[data-sep] { box-shadow: 0 -0.5px 0 var(--duet-ring); border-top-left-radius: 0; border-top-right-radius: 0; }
 /* The primary action: the one tinted button, so the thumb finds it. */
 .duet-primary { color: var(--duet-tint); }

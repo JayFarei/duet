@@ -435,6 +435,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** see [Claimable space](#claimable-space).
 
+### Safari's forward button plus Live Activities
+
+- **You see:** without handling, Duet's buttons hide under Safari's in a closed tab once the page has forward history and two Live Activities run.
+- **Cause:** forward history grows Safari's back button into a 102.7pt back + forward pill, and the Live Activities push it down. The reader then ends at about 428 and the +/tabs pill starts at 541.6, so the band holds one button.
+- **Duet does:** puts "…" and the selected tab (or search) in one two-item rail, as tall as Safari's back + forward pill, centred between Safari's buttons and at least 5pt clear of each. Everything else folds into "…". Where even the rail has no room (closed landscape), the selected tab is the only button and its menu lists the tabs, then what folded. An island menu too wide for the screen opens as a morph instead.
+- **You do:** nothing. Keep the important actions first, they are the last to fold.
+- **Status:** [#97](https://github.com/JayFarei/duet/issues/97).
+
 ### Menus and popovers under Safari's buttons
 
 - **You see:** without the handling, a menu that reaches into the column is drawn under Safari's back, reader or +/tabs buttons.
