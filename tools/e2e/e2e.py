@@ -1309,15 +1309,16 @@ class Run:
         return r2 if r2 and menu_items(r2) else None
 
     def neutral(s, r):
-        """A page point (client px) on no control: the page's own targets, Duet's slots and an open menu avoided."""
+        """A page point (client px) on no control: the page's own targets, Duet's slots and an open menu avoided. Mid
+        page first: the top is under an expanded Live Activity, and a tap there opens its app (la01-03)."""
         g = r["sig"]
         busy = [t["rect"] for t in r.get("targets") or []] + [sl["rect"] for n in r.get("navs") or [] for sl in (n.get("slots") or []) + (n.get("menus") or [])]
-        for fy in (0.12, 0.5, 0.3, 0.7, 0.85):
+        for fy in (0.5, 0.7, 0.85, 0.3, 0.12):
             for fx in (0.15, 0.5, 0.3):
                 x, y = g["innerWidth"] * fx, g["innerHeight"] * fy
                 if not any(b["x"] - 8 <= x <= b["x"] + b["w"] + 8 and b["y"] - 8 <= y <= b["y"] + b["h"] + 8 for b in busy):
                     return {"x": x, "y": y, "w": 0, "h": 0}
-        return {"x": g["innerWidth"] * 0.15, "y": g["innerHeight"] * 0.12, "w": 0, "h": 0}
+        return {"x": g["innerWidth"] * 0.15, "y": g["innerHeight"] * 0.5, "w": 0, "h": 0}
 
     def tap_native(s, kind, ident):
         """Taps a native button by accessibility identifier (never by label: "Book" matches Bookmarks)."""
@@ -1404,8 +1405,11 @@ class Run:
                 time.sleep(0.15)
                 s.sim.button("HOME")
                 time.sleep(1.5)
-                lit = s.sim.lit()
-                s.sim.tap(lit["pointWidth"] / 2, lit["pointHeight"] / 2, hold=0.12)
+                c = s.sim.switcher_card(HOST if kind == "preview" else SAFARI)
+                if c is None:
+                    s.why = "no card for the app under test in the app switcher"
+                    return None
+                s.sim.tap(*c, hold=0.12)
                 land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
             elif k == "expand":
                 isl = s.island(s.angle)
