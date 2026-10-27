@@ -71,6 +71,8 @@ Open item: how long a button may be hidden mid-transition while a gap exists (th
 - Two hosts: the Mac mini (M4 Pro, 64 GB) and the MacBook Pro (M2, 16 GB) through mac-worker (worker/v1 jobs at a pinned commit, artifacts pulled back and hash checked).
 - Each host runs its own site and beacon: the page only reports to a loopback beacon, so simulators, site and beacon share a machine.
 - Simulators per host (N) are calibrated: run the calibration set at increasing N and keep the highest N whose results match a single simulator's (timing contention must not create false flash or settle reds).
+- Measured on the Mac mini (2026-10-27): N=4. Above it, contention adds false flash and settle reds. Every run ends with a confirm pass: each red journey is re-run alone on one simulator. A red that repeats alone is FAIL; a red that passes alone is UNVERIFIED ("red under load, passed alone"), never PASS.
+- A journey whose page the site does not serve (404) is blocked before it starts and reported UNVERIFIED, not FAIL.
 - Shards from both hosts merge into the one results page.
 
 ## 7. Order of delivery
