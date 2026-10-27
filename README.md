@@ -194,6 +194,24 @@ export default async function Page() {
 
 Pass `onChange={() => router.refresh()}` from a client component to re-render without a reload.
 
+### Pre-paint boot
+
+`useDuet()` and `<Duet>` only know the mode once React mounts, so CSS keyed on `html[data-duet-mode="column"]` (a band bled into Safari's column, page controls moved there) would paint the plain layout first. Inline `bootScript` as the first child of `<body>`: it runs `detect()` before the first paint and, in column mode only, sets `data-duet-mode="column"`, `data-duet-boot` and `--duet-column`, `--duet-vh` and `--duet-inset-bottom` on `<html>`. Every other browser and device is left untouched. Once mounted, `<Duet>` takes the values over, or `useDuet()` removes them if the page is not in the column after all.
+
+```tsx
+// app/layout.tsx
+import { bootScript } from "duet-ui/boot";
+
+<html suppressHydrationWarning>
+  <body>
+    <script dangerouslySetInnerHTML={{ __html: bootScript }} />
+    {children}
+  </body>
+</html>
+```
+
+`suppressHydrationWarning` on `<html>` because the script changes its attributes before React hydrates. `--duet-column` is the column's width (0px outside column mode once mounted).
+
 ## Props
 
 ### `<Duet>`
@@ -432,6 +450,22 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** keeps its own menus between `columnTop` and Safari's pill, or opens them wholly over the page when they are too tall.
 - **You do:** keep your own popovers that cross the column below `--duet-safe-top-column` (0 outside column mode).
 - **Status:** see [Claimable space](#claimable-space).
+
+### Plain layout before mount
+
+- **You see:** on load, the page's column-mode styling (a band bled into the column, controls moved there) appears a moment after the plain layout, longer on a slow connection.
+- **Cause:** `data-duet-mode` and the `--duet-*` variables are set from an effect, after the first paint.
+- **Duet does:** ships `bootScript` (`duet-ui/boot`), which sets them before the first paint in column mode only.
+- **You do:** inline it at the top of `<body>`. See [Pre-paint boot](#pre-paint-boot).
+- **Status:** [#94](https://github.com/JayFarei/duet/issues/94).
+
+### Page modal turns off pointer events
+
+- **You see:** without the handling, the `close` passed to `<Duet>` shows in the column while a Radix or Headless UI sheet is open but does nothing.
+- **Cause:** those libraries set `pointer-events: none` on `<body>` while a modal is open, and the column layer inherits it.
+- **Duet does:** sets `pointer-events: auto` on `.duet`, like system chrome over the page.
+- **You do:** nothing.
+- **Status:** [#94](https://github.com/JayFarei/duet/issues/94).
 
 ### Column buttons fire on touch down
 

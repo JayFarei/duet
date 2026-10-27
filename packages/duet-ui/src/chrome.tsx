@@ -5,6 +5,7 @@ import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, columnBand, isSplit, pageInsets, islandBox, islandFits, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
+import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
 import "./duet.css";
@@ -128,7 +129,11 @@ function subscribe(cb: () => void) {
 const ssr: Context = { mode: "column", duo: true, browser: "safari", device: "duo", standalone: false, layout: "narrow", side: "right", width: 382, height: 580, stableHeight: 580, offsetTop: 0, screenWidth: 466, screenHeight: 678, insetTop: 0, insetBottom: 0 };
 
 export function useDuet(): Context {
-  return useSyncExternalStore(subscribe, read, () => ssr);
+  const ctx = useSyncExternalStore(subscribe, read, () => ssr);
+  // The pre-paint boot guessed the column; once mounted a page that is not in it takes the guess back (a page whose
+  // <Duet> is in the column takes it over instead, below).
+  useEffect(() => { if (ctx.mode !== "column") unboot(); }, [ctx.mode]);
+  return ctx;
 }
 
 /** Tells the server whether this browser is an iPhone Duo, so it can render the Duo layout from the first byte.
@@ -414,6 +419,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     r.setProperty("--duet-safe-top-column", `${Math.max(0, ...bands.map((b) => b?.top ?? 0))}px`);
     // The page's height without Safari's URL bar bouncing it mid-scroll (Context.stableHeight), like 100svh.
     r.setProperty("--duet-vh", `${ctx.stableHeight}px`);
+    // How far Safari's column runs beside the page, for a band the page bleeds into it (also set before paint: boot.ts).
+    r.setProperty("--duet-column", ctx.mode === "column" ? `${ctx.screenWidth - ctx.width}px` : "0px");
+    document.documentElement.removeAttribute("data-duet-boot");
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
