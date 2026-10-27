@@ -14,7 +14,13 @@ import UIKit
 // A silent, mixable audio loop keeps the host running in the background so the poll keeps going.
 @MainActor final class Live {
   static let shared = Live()
-  let beacon = UserDefaults.standard.string(forKey: "beacon") ?? "http://localhost:3141"
+  // -beacon <url> (one beacon per simulator, tools/e2e/matrix.sh) is saved, so a launch without it (from the Home
+  // Screen icon, split view) keeps reporting to the same beacon.
+  let beacon: String = {
+    let b = UserDefaults.standard.string(forKey: "beacon") ?? "http://localhost:3141"
+    UserDefaults.standard.set(b, forKey: "beacon")
+    return b
+  }()
   var player: AVAudioPlayer?
   var lastError: String?
 

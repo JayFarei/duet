@@ -4,15 +4,23 @@ and folds (tools/e2e/fold/fold.bin), collects the page's Duet state from the bea
 frames from the UI-test runner (closed screen) or the simulator helper (sim.py, unfolded and split view), a screenshot per step and a video contact sheet per transition, and asserts
 tools/e2e/EXPECTED.md on every sample, not only the last. Writes reports/<ts>/{index.html,steps/*.json,shots/*}.
 
+With --catalogue it plays the journeys of catalogue.py instead (CATALOGUE.md, every state and transition in plain
+English), each filmed; --shard i/N plays every Nth of them so tools/e2e/matrix.sh can spread them over several
+simulators, each with its own beacon (--beacon), and --merge joins the shard reports into one.
+
 Needs (run.sh starts them): site on :3140 (served from this worktree), beacon on :3141, the UI-test runner; split view
 and the unfolded native checks need the Claude desktop app's simulator helper (sim.py), reported BLOCKED without it.
 Usage: e2e.py --udid <sim> [--only <scenario>[,<scenario>]] [--page /path] [--md round.md] [--video]
+       e2e.py --udid <sim> --catalogue [--only j01,j07] [--shard 2/4] [--beacon http://localhost:3152] [--out dir]
+       e2e.py --merge <dir with shard-*/results.json>
 Exit: 0 all PASS, 1 any FAIL, 2 any BLOCKED (a state the run could not reach, or a broken setup).
 """
-import argparse, datetime, html, json, os, signal, subprocess, sys, time, urllib.request
+import argparse, datetime, html, json, os, signal, subprocess, sys, time, urllib.parse, urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # run with python -I, which leaves the script dir out
 from sim import Sim, SimError  # noqa: E402
+import catalogue  # noqa: E402
+from catalogue import TAB, LANDSCAPE_TOP_BARS, PREVIEW, preview_expect, UNFOLDED, UNFOLDED_PREVIEW, SPLIT  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = "http://localhost:3140"
@@ -35,25 +43,7 @@ STATE_TIMEOUT = 30
 # Rotator orientation per closed-screen angle (fold.bin -deviceOrientation). The page reports landscapeRight as 90.
 ORIENT = {0: "portrait", 90: "landscapeRight", 270: "landscapeLeft", 180: "portraitUpsideDown"}
 CLOSED = {"position": "closed"}
-# Expected per state (EXPECTED.md). Closed Safari tab by angle.
-TAB = {0: ("column", "right"), 90: ("column", "left"), 270: ("column", "right")}
-# Folding into closed landscape (like opening a tab there) gives Safari's 678x340 window with its bars at the top and
-# no column, so the page has no column to draw into: inline on the default side (EXPECTED.md).
-LANDSCAPE_TOP_BARS = {"preview": False, "mode": "inline", "side": "right"}
-# In-app preview: portrait, in the gap of the preview's own column. Turned, the sheet's column gap is ~26pt and there
-# is no least-intrusive place left (an inline strip narrows the page, user: "the left inline strip is wrong"), so Duet
-# hides its controls; the page keeps its full width and the preview's own Done/back/share stay (README). The default
-# and full styles turned put every native button in a top bar and leave the 84pt safe-area inset on the turned side
-# free below it: the controls go there, as a strip (round 4).
-PREVIEW = {0: {"mode": "column", "side": "right", "gap": True}, 90: {"hidden": True}, 270: {"hidden": True}}
-PREVIEW_FULL = {**PREVIEW, 90: {"mode": "strip", "side": "left"}, 270: {"mode": "strip", "side": "right"}}
-def preview_expect(style, angle):
-    return {"preview": True, **(PREVIEW if style == "sheet" else PREVIEW_FULL)[angle]}
-UNFOLDED = {"mode": "inline", "side": "right"}
-UNFOLDED_PREVIEW = {"preview": True, **UNFOLDED}
-# Split view (wide inner display only, two 469x669 panes): the page cannot tell which pane it is in, so the column
-# is drawn on both edges and the native column of whichever pane hides the far copy (EXPECTED.md).
-SPLIT = {"mode": "column", "side": "both"}
+# Expected per state (EXPECTED.md): catalogue.py, shared with the journeys.
 SB_SAFARI = "Safari"              # SpringBoard accessibility identifiers (dock icon, our host's icon, menu item)
 SB_HOST = "DuoE2EHost"
 SB_SPLIT = "com.apple.springboardhome.application-shortcut-item.open-in-split"
@@ -124,13 +114,14 @@ def is_split(g):
 class Run:
     def __init__(s, a):
         s.a, s.udid = a, a.udid
-        s.out = os.path.join(HERE, "reports", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        s.out = os.path.abspath(a.out) if a.out else os.path.join(HERE, "reports", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         for d in ("steps", "shots"):
             os.makedirs(os.path.join(s.out, d), exist_ok=True)
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
         s.la_on = False  # a Live Activity is running (the host's music activity, la())
         s.page_path = a.page
         s.films = []  # (scenario, stitched clips) for the report
+        s.journeys = []  # catalogue journeys played (--catalogue): id, title, steps in words, status, film
         s.split = None  # Safari's split view pane, "left" or "right", or None when Safari is full screen
         s.sim = Sim(s.udid) if Sim.available() else None
 
@@ -205,12 +196,15 @@ class Run:
         return sheet if os.path.exists(sheet) and os.path.getsize(sheet) > 0 else None
 
     # ---- one step ---------------------------------------------------------------------------------------------
-    def step(s, sid, kind, tok, action, expect, desc, video=False):
+    def step(s, sid, kind, tok, action, expect, desc, video=False, extra=None):
+        """One action and its assessment. expect: a dict, or a function of the final sample's signals for a state
+        with two valid windows (catalogue.expect: Safari's closed landscape tab, column or top bars)."""
         s.log(f"[{sid}] {desc}")
         http("POST", "/step", {"id": sid})
         prev = s.last  # the previous step's final placement and signals
-        res = {"id": sid, "kind": kind, "desc": desc, "status": "PASS", "reasons": [], "notes": [], "expect": expect,
-               "prev": {"place": prev["place"], "key": prev["key"]} if prev else None}
+        res = {"id": sid, "kind": kind, "desc": desc, "status": "PASS", "reasons": [], "notes": [],
+               "expect": None if callable(expect) else expect,
+               "prev": {"place": prev["place"], "key": prev["key"]} if prev else None, **(extra or {})}
         rec = s.record(sid, s.target_display) if (video or s.a.video) and getattr(s, "target_display", None) else None
         s.target_display = None
         t0 = time.time() * 1000
@@ -224,6 +218,8 @@ class Run:
             return res
         s.page = first.get("page")
         allr = s.collect(sid, tok, t0)
+        if callable(expect):
+            expect = res["expect"] = expect(allr[-1]["sig"] if allr else None)
         res["position"] = s.position
         native = s.native(kind, allr[-1]["sig"]["angle"] if allr else 0)
         shot = s.screenshot(sid)
@@ -639,7 +635,13 @@ class Run:
 
     # ---- drivers ----------------------------------------------------------------------------------------------
     def url(s, tok):
-        return f"{SITE}{s.page_path}?e2e=1&s={tok}"
+        """The page, reporting to this run's beacon (one per simulator in a parallel run, matrix.sh)."""
+        return f"{SITE}{s.page_path}?e2e={urllib.parse.quote(BEACON, safe='')}&s={tok}"
+
+    def host(s, *args, fresh=False):
+        """Launches the e2e host app (fresh: quit it first), pointed at this run's beacon (Live.swift)."""
+        return sh("xcrun", "simctl", "launch", *(["--terminate-running-process"] if fresh else []), s.udid, HOST,
+                  "-beacon", BEACON, *args, check=fresh)
 
     def wait(s, sid, tok, cond, t0, timeout=STATE_TIMEOUT, page=None):
         end = time.time() + timeout
@@ -658,7 +660,7 @@ class Run:
 
     def open_preview(s, tok, style):
         def act(sid, t0):
-            sh("xcrun", "simctl", "launch", "--terminate-running-process", s.udid, HOST, "-url", s.url(tok), "-style", style)
+            s.host("-url", s.url(tok), "-style", style, fresh=True)
             return s.wait(sid, tok, lambda r: True, t0)
         return act
 
@@ -737,7 +739,7 @@ class Run:
             http("POST", "/la", {"on": on})
             fwd = on and kind == "tab"
             if fwd:
-                sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
+                s.host()
             st = s.la_state(on, since)
             if fwd:
                 sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
@@ -751,7 +753,7 @@ class Run:
             if r is None:
                 s.why = "the page stopped reporting after the Live Activity changed"
             return r
-        s.target_display = 1
+        s.target_display = s.display()
         return act
 
     # ---- split view (simulator helper; README, Split view) --------------------------------------------------------
@@ -807,7 +809,7 @@ class Run:
                 if pane == "left":
                     if not s.open_in_split(SB_SAFARI):
                         return None
-                    sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
+                    s.host()
                 else:
                     if not s.open_in_split(SB_HOST):
                         return None
@@ -901,7 +903,7 @@ class Run:
         since = time.time() * 1000
         http("POST", "/la", {"on": False})
         if (http("GET", "/la/state") or {}).get("count") and not s.la_state(False, since, timeout=3):
-            sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
+            s.host()
             s.la_state(False, since)
         s.la_on = False
         sh("xcrun", "simctl", "terminate", s.udid, HOST, check=False)
@@ -1071,6 +1073,82 @@ class Run:
         finally:
             sh("xcrun", "simctl", "ui", s.udid, "appearance", before, check=False)
 
+    # ---- catalogue journeys (catalogue.py, CATALOGUE.md) ------------------------------------------------------------
+    def setup_state(s, state):
+        """A journey's starting condition, before the page opens: posture and angle (fold.bin), then the music (the
+        host in front starts the Live Activity, then Safari comes back in front). False, with s.why, when not reached."""
+        _, posture, angle, music = state
+        if (posture, angle) != ("closed", 0):
+            if not s.fold(posture, angle):
+                return False
+            s.angle = angle
+            time.sleep(1.5)
+        if music:
+            since = time.time() * 1000
+            http("POST", "/la", {"on": True})
+            s.host()
+            st = s.la_state(True, since)
+            sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
+            if st is None:
+                s.why = f"Live Activity not started in 15s: {http('GET', '/la/state')}"
+                return False
+            s.la_on = True
+            time.sleep(1.0)
+        return True
+
+    def journey_action(s, tok, action, state):
+        """The driver for one catalogue action, from the state it starts in."""
+        surface, posture, angle, _ = state
+        preview, k = surface != "tab", action[0]
+        if k == "open":
+            act = s.open_preview(tok, surface) if preview else s.open_tab(tok)
+            s.target_display = s.display()
+            return act
+        if k == "turn":
+            return s.unfold(tok, action[1], preview) if posture == "open" else s.rotate(tok, action[1])
+        if k == "unfold":
+            return s.unfold(tok, angle, preview)
+        if k == "fold":
+            return s.fold_closed(tok, angle)
+        if k == "music":
+            return s.la(tok, action[1], "preview" if preview else "tab")
+        if k == "safari":
+            return s.open_in_safari(tok)
+        raise ValueError(action)
+
+    def play(s, i, start, acts):
+        """One journey: reset, set up the starting condition, open the page, apply each transition, every step filmed
+        and judged against catalogue.expect. A blocked step ends the journey (the next state cannot be reached)."""
+        jid = catalogue.jid(i)
+        steps = catalogue.steps_en(start, acts)
+        rec = {"id": jid, "title": f"{catalogue.SURFACE_EN[start[0]]}, opened {catalogue.state_en(start)}", "steps": [],
+               "words": [w for _, _, w, _ in steps], "status": "PASS", "film": None, "not_run": 0}
+        s.journeys.append(rec)
+        s.log(f"\n== {jid}: {rec['title']}")
+        s.reset()
+        n = len(s.results)
+        if not s.setup_state(start):
+            res = {"id": f"{jid}-00", "kind": "setup", "desc": f"Set up: {catalogue.state_en(start)}", "status": "BLOCKED",
+                   "reasons": ["state not reached: " + s.why], "notes": [], "journey": jid}
+            s.results.append(res)
+            rec["steps"].append(res["id"])
+            rec["not_run"] = len(steps)
+        else:
+            t, cur = s.tok(jid), start
+            for k, (a, nxt, words, exp_en) in enumerate(steps, 1):
+                act = s.journey_action(t, a, cur)
+                res = s.step(f"{jid}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
+                             lambda sig, st=nxt: catalogue.expect(st, sig), words, video=True,
+                             extra={"journey": jid, "expect_en": exp_en})
+                rec["steps"].append(res["id"])
+                cur = nxt
+                if res["status"] == "BLOCKED":
+                    rec["not_run"] = len(steps) - k
+                    break
+        got = {r["status"] for r in s.results[n:]}
+        rec["status"] = "FAIL" if "FAIL" in got else "BLOCKED" if "BLOCKED" in got else "PASS"
+        rec["film"] = s.film(jid, s.results[n:])
+
     SCENARIOS = {
         "tab": lambda s: s.scenario_tab(),
         "preview-sheet": lambda s: s.scenario_preview("sheet"),
@@ -1101,7 +1179,14 @@ class Run:
             s.results.append({"id": "setup", "kind": "setup", "desc": "UI-test runner", "status": "BLOCKED", "reasons": ["UI-test runner not alive"], "notes": []})
         if not os.access(FOLD, os.X_OK):
             s.results.append({"id": "setup", "kind": "setup", "desc": "fold.bin", "status": "BLOCKED", "reasons": [f"{FOLD} missing (fold/build.sh)"], "notes": []})
-        for name, fn in s.SCENARIOS.items():
+        if s.a.catalogue:
+            js = [(i, j) for i, j in enumerate(catalogue.journeys()) if not only or catalogue.jid(i) in only]
+            if s.a.shard:  # i/N: every Nth journey, from the ith
+                k, m = map(int, s.a.shard.split("/"))
+                js = [x for x in js if x[0] % m == k - 1]
+            for i, (start, acts) in js:
+                s.play(i, start, acts)
+        for name, fn in ({} if s.a.catalogue else s.SCENARIOS).items():
             if (only and name not in only) or (not only and name in s.EXPERIMENTAL):
                 continue
             if name in s.NEEDS_SIM and not s.sim:
@@ -1125,7 +1210,7 @@ class Run:
         clips = [(r, os.path.join(s.out, r["frames"].replace("-frames.png", ".mp4"))) for r in results if r.get("frames")]
         clips = [(r, p) for r, p in clips if os.path.exists(p)]
         if not clips:
-            return
+            return None
         parts, lst = [], os.path.join(s.out, "shots", f"{name}-film.txt")
         for i, (r, p) in enumerate(clips):
             cap = f'{r["id"]}  {r["status"]}  {r["desc"]}'
@@ -1146,8 +1231,12 @@ class Run:
         sh("ffmpeg", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", film, check=False)
         for x in parts + [lst]:
             os.remove(x)
-        if os.path.exists(film):
-            s.films.append((name, os.path.relpath(film, s.out)))
+        if not os.path.exists(film):
+            return None
+        rel = os.path.relpath(film, s.out)
+        if not s.a.catalogue:
+            s.films.append((name, rel))
+        return rel
 
     # ---- report -----------------------------------------------------------------------------------------------
     def report(s):
@@ -1158,17 +1247,40 @@ class Run:
             img = r.get("overlay") or r.get("shot")
             fr = r.get("frames")
             timing = f'settle {r.get("settle_ms", "")}ms, hidden {r.get("hidden_ms", 0)}ms, {r.get("samples_n", "")} samples @ {r.get("sample_ms", "")}ms' if f else ""
-            rows.append(f'<tr class="{r["status"]}"><td><b>{e(r["id"])}</b><br><small>{e(r["desc"])}</small></td><td>{r["status"]}</td>'
+            rows.append(f'<tr class="{r["status"]}" id="{e(r["id"])}"><td><b>{e(r["id"])}</b><br><small>{e(r["desc"])}</small></td><td>{r["status"]}</td>'
                         f'<td>{e(json.dumps(f)) if f else ""}<br><small>{timing}</small></td>'
                         f'<td><ul>{"".join("<li>" + e(x) + "</li>" for x in r["reasons"])}</ul><small>{"<br>".join(e(x) for x in r["notes"])}</small></td>'
                         f'<td>{f"<a href={e(img)}><img src={e(img)} width=200></a>" if img else ""}'
                         f'{f"<br><a href={e(fr)}><img src={e(fr)} width=320></a>" if fr else ""}</td></tr>')
+        by_id = {r["id"]: r for r in s.results}
+        page = f" --page {s.a.page}" if s.a.page != "/" else ""
+        jhtml = []
+        for j in s.journeys:
+            items = []
+            for sid in j["steps"]:
+                r = by_id.get(sid) or {"status": "BLOCKED", "desc": sid, "reasons": ["missing"]}
+                why = f' : {e(r["reasons"][0])}' if r["reasons"] else ""
+                items.append(f'<li><a href="#{e(sid)}">{e(r["desc"])}</a>. <small>Expect: {e(r.get("expect_en", ""))}.</small> '
+                             f'<span class="{r["status"]}"><b>{r["status"]}</b></span>{why}</li>')
+            items += [f'<li><small>not run: {e(w)}</small></li>' for w in j["words"][len(j["words"]) - j["not_run"]:]] if j["not_run"] else []
+            film = f'<video src="{e(j["film"])}" controls muted playsinline width=480></video>' if j.get("film") else ""
+            jhtml.append(f'<section class=j><h2 id="{e(j["id"])}">{e(j["id"])}: {e(j["title"])} <span class="{j["status"]}">{j["status"]}</span></h2>'
+                         f'<ol>{"".join(items)}</ol>{film}<p><small>Replay: <code>tools/e2e/run.sh --catalogue --only {e(j["id"])}{e(page)}</code></small></p></section>')
+        if s.journeys:
+            c = {k: sum(j["status"] == k for j in s.journeys) for k in ("PASS", "FAIL", "BLOCKED")}
+            index = "".join(f'<a class="{j["status"]}" href="#{e(j["id"])}">{e(j["id"])}</a> ' for j in s.journeys)
+            jhtml.insert(0, f'<p><b>{len(s.journeys)} journeys: {c["PASS"]} pass, {c["FAIL"]} fail, {c["BLOCKED"]} blocked.</b> '
+                            f'Scenarios in plain English: CATALOGUE.md.</p><p class=idx>{index}</p>')
+        with open(os.path.join(s.out, "results.json"), "w") as fh:
+            json.dump({"results": s.results, "films": s.films, "journeys": s.journeys}, fh)
         with open(os.path.join(s.out, "index.html"), "w") as fh:
             fh.write(f"""<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>Duo e2e report</title>
 <style>body{{font:14px system-ui;margin:16px;background:#fff;color:#111}}table{{border-collapse:collapse;width:100%}}td{{border-top:1px solid #ddd;padding:8px;vertical-align:top}}
-.PASS td:nth-child(2){{color:#080}}.FAIL td:nth-child(2){{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2){{color:#a60;font-weight:bold}}small{{color:#666}}
+.PASS td:nth-child(2),span.PASS,a.PASS{{color:#080}}.FAIL td:nth-child(2),span.FAIL,a.FAIL{{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2),span.BLOCKED,a.BLOCKED{{color:#a60;font-weight:bold}}small{{color:#666}}
+section.j{{border-top:2px solid #ddd;margin-top:24px}}ol li{{margin:4px 0}}.idx a{{display:inline-block;margin:2px 6px 2px 0}}code{{font-size:12px}}
 @media (prefers-color-scheme:dark){{body{{background:#111;color:#eee}}td{{border-color:#333}}}}</style>
 <h1>Duo e2e report</h1><p>{e(s.out)}. Overlay: red = Duet controls, blue = native buttons, green = preview column gap. Frames: 3.2s from 0.3s before the motion onset, one tile per 100ms.</p>
+{"".join(jhtml)}
 {"".join(f'<h2>{e(n)}</h2><video src={e(f)} controls muted playsinline width=480></video>' for n, f in s.films)}
 <table>{"".join(rows)}</table>""")
         if s.a.md:
@@ -1185,15 +1297,47 @@ class Run:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--udid", required=True)
+    ap.add_argument("--udid")
     ap.add_argument("--only", default="")
     ap.add_argument("--md", default="")
     ap.add_argument("--video", action="store_true", help="record a contact sheet for every step, not only transitions")
     ap.add_argument("--page", default="/", help="site path every scenario opens, e.g. /confirm")
     ap.add_argument("--rerender", default="", help="re-assess a saved report dir with the current rules")
+    ap.add_argument("--catalogue", action="store_true", help="play the catalogue journeys (CATALOGUE.md), not the scenarios")
+    ap.add_argument("--shard", default="", help="i/N: play every Nth journey, from the ith (matrix.sh)")
+    ap.add_argument("--beacon", default=BEACON, help="this simulator's beacon origin (matrix.sh: one per simulator)")
+    ap.add_argument("--out", default="", help="report dir (default reports/<timestamp>)")
+    ap.add_argument("--merge", default="", help="join <dir>/shard-*/results.json into <dir>/index.html")
     a = ap.parse_args()
+    BEACON = a.beacon
+    if a.merge:
+        # Shard reports keep their files; the merged report points into them (shard-i/shots/...).
+        r = Run.__new__(Run); r.a, r.out, r.results, r.films, r.journeys = a, os.path.abspath(a.merge), [], [], []
+        for d in sorted(x for x in os.listdir(r.out) if x.startswith("shard-")):
+            f = os.path.join(r.out, d, "results.json")
+            if not os.path.exists(f):
+                r.results.append({"id": d, "kind": "setup", "desc": d, "status": "BLOCKED", "reasons": [f"{d} wrote no results.json (see {d}.log)"], "notes": []})
+                continue
+            got = json.load(open(f))
+            for res in got["results"]:
+                for k in ("shot", "overlay", "frames"):
+                    if res.get(k):
+                        res[k] = f"{d}/{res[k]}"
+                r.results.append(res)
+            for j in got["journeys"]:
+                j["film"] = j["film"] and f"{d}/{j['film']}"
+                r.journeys.append(j)
+            r.films += [(n, f"{d}/{x}") for n, x in got["films"]]
+        r.journeys.sort(key=lambda j: j["id"])
+        r.a.catalogue = True
+        r.report()
+        st = {x["status"] for x in r.results}
+        print(f"{len(r.journeys)} journeys, {len(r.results)} steps, report {r.out}/index.html")
+        sys.exit(1 if "FAIL" in st else 2 if "BLOCKED" in st else 0)
+    if not a.udid:
+        ap.error("--udid is required")
     if a.rerender:
-        r = Run.__new__(Run); r.a, r.out, r.results = a, os.path.abspath(a.rerender), []
+        r = Run.__new__(Run); r.a, r.out, r.results, r.films, r.journeys = a, os.path.abspath(a.rerender), [], [], []
         for f in sorted(os.listdir(os.path.join(r.out, "steps")), key=lambda f: os.path.getmtime(os.path.join(r.out, "steps", f))):
             res = json.load(open(os.path.join(r.out, "steps", f)))
             if res.get("expect") is not None and res.get("samples"):
