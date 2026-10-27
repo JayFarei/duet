@@ -3,8 +3,11 @@ import { useEffect } from "react";
 import { isPreview, previewReason, readSignals } from "duet-ui";
 
 // e2e only (tools/e2e): with ?e2e in the URL (or once seen in this tab), posts Duet's full state to the local
-// beacon every 40ms (a flash of one frame pair is ~33ms; 100ms sampling missed 103ms ones). ?e2e=<origin> picks the beacon, default http://localhost:3141. Renders nothing.
+// beacon every 40ms (a flash of one frame pair is ~33ms; 100ms sampling missed 103ms ones). ?e2e=<loopback origin> picks the beacon, default http://localhost:3141. Renders nothing.
 const KEY = "duet-e2e";
+const loopback = (q: string) => {
+  try { const u = new URL(q); return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname) ? u.origin : undefined; } catch { return undefined; }
+};
 // One id per page load, so the driver can tell two documents with the same URL apart (a dismissing preview and
 // the Safari tab it opened, a stale tab).
 const PAGE = Math.random().toString(36).slice(2, 10);
@@ -106,7 +109,8 @@ export function E2EReporter() {
     let origin: string | null = null;
     try {
       const q = new URLSearchParams(location.search).get("e2e");
-      if (q !== null) sessionStorage.setItem(KEY, q.startsWith("http") ? q : "http://localhost:3141");
+      // Loopback beacons only: a link must not make a visitor's page post its state to another origin.
+      if (q !== null) sessionStorage.setItem(KEY, loopback(q) ?? "http://localhost:3141");
       origin = sessionStorage.getItem(KEY);
     } catch { /* storage blocked: no reporting */ }
     if (!origin) return;

@@ -98,7 +98,7 @@ test("a fold caught halfway (page wider than its window) hides the controls and 
   const d = { flips: [] };
   const before = stable(d, TAB, undefined, 0);
   const c = stable(d, { ...TAB, innerWidth: 951, innerHeight: 543, visualHeight: 543 }, undefined, 100, true);
-  assert.deepEqual([c.mode, c.side, c.hidden, c.confidence, c.width], [before.mode, before.side, "moving", "moving", 951]);
+  assert.deepEqual([c.mode, c.side, c.hidden, c.confidence, c.width], [before.mode, before.side, "moving", "moving", before.width]);
   // Once the settle window closes the same signals are read as they are.
   assert.equal(stable(d, { ...TAB, innerWidth: 951, innerHeight: 543, visualHeight: 543 }, undefined, 2500, false).hidden, undefined);
 });

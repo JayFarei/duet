@@ -409,11 +409,10 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   if (d.key !== key) Object.assign(d, { key, pinned: undefined, ttl: undefined, flips: [] });
   if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
   let c = detect(s, preferred, !d.pinned, preview);
-  // Halfway through a fold or turn: hidden, and nothing committed, so the landing is taken as a stable change.
-  const moving = () => {
-    const { width, height, insetTop, insetBottom, keyboard } = c;
-    return { ...(d.last ?? c), width, height, insetTop, insetBottom, keyboard, hidden: "moving" as const, confidence: "moving" as const };
-  };
+  // Halfway through a fold or turn: hidden, and nothing committed, so the landing is taken as a stable change. The
+  // last context's geometry stays whole: mixing its screenWidth with the half-turned width made the page's insets
+  // jump mid-turn (84, 0, 212, 296px on a left column turn, -485px on an unfold; final review, 2026-10-27).
+  const moving = () => ({ ...(d.last ?? c), keyboard: c.keyboard, hidden: "moving" as const, confidence: "moving" as const });
   if (settling && inTransit(s)) {
     Object.assign(d, { moving: true, landKey: undefined, landUntil: undefined });
     return moving();

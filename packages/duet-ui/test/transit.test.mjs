@@ -180,3 +180,16 @@ test("a pinch in the same window still holds the committed context", () => {
   const z = stable(d, { ...s, scale: 1.6, innerWidth: 240 }, undefined, 1000);
   assert.deepEqual([z.mode, z.side, z.confidence], [a.mode, a.side, "held"]);
 });
+
+test("hidden mid-turn or mid-unfold, the page keeps the last insets", () => {
+  const inset = (c) => [c.screenWidth - c.width, Math.max(0, c.screenHeight - c.height)];
+  for (const [start, path] of [["tab, landscape turned left", TURN_90_TO_0], ["tab, fresh load", UNFOLD]]) {
+    const d = { flips: [] };
+    const first = stable(d, at(start), undefined, 0);
+    path.forEach((s, i) => {
+      const c = stable(d, s, undefined, 100 + 40 * i, true);
+      assert.equal(c.hidden, "moving", `${start} step ${i}`);
+      assert.deepEqual(inset(c), inset(first), `${start} step ${i}`);
+    });
+  }
+});
