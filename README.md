@@ -499,6 +499,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing. Keep the important tabs and actions first, the tab's menu lists them.
 - **Status:** [#104](https://github.com/JayFarei/duet/issues/104).
 
+### Shared with You bar
+
+- **You see:** without handling, a page opened from a link a contact sent in Messages loses the column: the controls drop into the page about a second after load while Safari's own column is still there.
+- **Cause:** Safari heads the page with a "From <name>" bar under the status bar until the user closes it. It adds 40pt to the top chrome (98 to 138 on the closed Duo, also in closed landscape and split panes), which fails the column check. Safari's column buttons don't move, the page starts 40pt lower.
+- **Duet does:** recognises the 40pt bar outside the full open window, keeps column mode and sets `useDuet().offsetTop` to 40, so every control lands where it does without the bar in screen points. `--duet-inset-bottom` stays the URL bar alone. Folding or splitting under the bar still reads as in transit.
+- **You do:** nothing. Unmeasured: the bar at the largest Dynamic Type, in the in-app preview and on scroll.
+- **Status:** [#112](https://github.com/JayFarei/duet/issues/112).
+
 ### Menus and popovers under Safari's buttons
 
 - **You see:** without the handling, a menu that reaches into the column is drawn under Safari's back, reader or +/tabs buttons.

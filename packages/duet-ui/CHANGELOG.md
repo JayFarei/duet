@@ -7,6 +7,7 @@
 - `folded: true` on a `leading` or action item keeps it in "…" even where the strip has room, so a page can fold its secondary actions and change that at runtime (#101).
 - Page transitions: controls that appear scale up out of a blur, controls that go away shrink into one (kept 450ms so they can), and the rest slide to their new places on the same spring. Reduced motion crossfades instead (#101).
 - Site: a call to action example at `/book`, a class list and a class page with "Book · 2 credits" (#101).
+- Column mode: a page opened from a link shared in Messages keeps Safari's column under the Shared with You bar ("From <name>", +40pt top chrome). Before, the controls fell into the page. `offsetTop` is 40 there and every control lands where it does without the bar (#112).
 
 ## 0.4.1
 

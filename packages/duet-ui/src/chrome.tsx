@@ -457,7 +457,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     r.setProperty("--duet-inset-top", ctx.mode === "strip" && ctx.standalone ? `${DUO.edgeBlur}px` : "0px");
     // Safari's URL pill floats below the layout viewport (the column holds nothing above the page), so the scroller
     // runs on under it like a document that scrolls, and the last content scrolls clear of it.
-    r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height)}px` : "0px");
+    r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height - ctx.offsetTop)}px` : "0px");
     // Safari's column buttons paint over the page: a popover that reaches into the column keeps its top at or below
     // this (columnBand). Split view takes the lower of the two panes' limits, since nothing tells which pane it is.
     const bands = sides.map((side) => columnBand({ ...ctx, side }));
@@ -470,7 +470,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner, reserve]);
+  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, ctx.offsetTop, split, inner, reserve]);
   useEffect(() => () => {
     const h = document.documentElement;
     h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
