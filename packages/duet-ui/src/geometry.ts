@@ -103,7 +103,8 @@ export interface Context {
    *  collapsing and expanding mid-scroll, so content sized from it does not jump. On a desktop it is `height`.
    *  Also set as `--duet-vh` (px). From `detect` alone (no history) it is `height`; `useDuet` remembers. */
   stableHeight: number;
-  /** Screen-y minus viewport-y (status area above a standalone viewport). */
+  /** Screen-y minus viewport-y: the status area above a standalone viewport, or the Shared with You bar above a
+   *  Safari tab's page (column mode, BANNER). */
   offsetTop: number;
   /** strip: screen size. column: Safari window size. inline: safe-area insets top/bottom. */
   screenWidth: number;
@@ -259,7 +260,18 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
 // The largest Dynamic Type grows the bottom bar to 106pt (382x572 in 466x678, e2e round 3).
 const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 110] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
-const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome);
+/** Shared with You: a page opened from a link a contact sent in Messages has a "From <name>" bar with a close button
+ *  above it, under the status bar, until the user closes it (real Duo, iOS 27, 2026-10-27: closed tab 382x580 to
+ *  382x540 in 466x678, closed landscape 594x328 in 678x466, split pane 385x531 in 469x669, each chrome 98 to 138 with
+ *  Safari's column buttons and URL bar where they were). The page starts that far down the screen
+ *  (Context.offsetTop). Before, the 138pt chrome failed the column and the controls fell inline. The full open
+ *  window never has the column, so a column there is a stale layout, bar or not (LANDED). */
+const BANNER = 40;
+const bannerOf = (s: Signals) => {
+  const chrome = s.outerHeight - s.innerHeight, open = Math.max(s.outerWidth, s.outerHeight) >= DUO_SIZES[1][1] - 1;
+  return !open && chrome > SAFARI_COLUMN.chrome[1] && within(chrome - BANNER, SAFARI_COLUMN.chrome) ? BANNER : 0;
+};
+const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight - bannerOf(s), SAFARI_COLUMN.chrome);
 
 /** Side inset of a Home Screen app on the Duo: 84 measured (closed portrait). iPhones have up to 59 in landscape. */
 const STRIP_INSET = 76;
@@ -294,8 +306,8 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari" && (!preview || !landscape)
     && hasColumn(s) && (s.scale ?? 1) === 1;
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
-  if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
-  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }) };
+  if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", offsetTop: bannerOf(s), screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
+  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, offsetTop: bannerOf(s), screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }) };
   // The turned full-screen preview (default and full styles, iOS 27.1): its buttons all sit in a top bar, and the 84pt
   // safe-area inset on the side the Duo is turned to (left at 90, right at 270) is page area nothing native uses
   // below that bar. The controls take it, like a Home Screen app's strip (e2e round 4: the sheet turned has only a
@@ -319,7 +331,9 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
 const SHEET_SLACK = 40;
 /** The in-app preview's sheet on the open screen, wide and tall posture (simulator, iOS 27.1). */
 const UNFOLDED_SHEETS = [[653, 661], [653, 869]] as const;
-const LANDED = { page: [[0, 2], [83, 85]], chrome: [0, 160], columnChrome: 110 } as const;
+// chrome tops out at an open tab with its tab bar under the Shared with You bar, 172 (real Duo, 951x497 in 951x669);
+// a fold's page lands at 180 first.
+const LANDED = { page: [[0, 2], [83, 85]], chrome: [0, 176], columnChrome: 110 } as const;
 /** True while a Safari page on the Duo is between postures: the page and its window disagree on orientation, the
  *  turn (screen.orientation.angle) disagrees with the page, or page and window are not a pair Safari settles in
  *  (LANDED, or the window is not a Duo window or the preview's sheet). Only asked while the window settles
@@ -342,7 +356,7 @@ export function inTransit(s: Signals): boolean {
   // Dynamic Type, preview 70 to 75), never with the 126pt bars of a full open window. Anything else is a stale layout
   // handed a new window (e2e round 3: entering split view, 867x543 in 951x669 for ~200ms before the pane; going home
   // from a split pane, the pane's 385x571 page in the closed screen's 466x678 window, an 81pt "column").
-  if (page >= LANDED.page[1][0] && chrome > LANDED.columnChrome) return true;
+  if (page >= LANDED.page[1][0] && chrome - bannerOf(s) > LANDED.columnChrome) return true;
   // A Duo window, or the preview's sheet (a window a few points inside the closed screen; its inset lands ~100ms late,
   // so sizes alone decide).
   const sheet = short <= w - m && long <= h - m && short >= w - SHEET_SLACK && long >= h - SHEET_SLACK;
@@ -565,9 +579,11 @@ export function columnBand(c: Context): { top: number; bottom: number; reach: nu
     const y0 = DUO_SIZES[0][1] - c.height;
     return { top: PREVIEW.gap.top + DUO.gap - y0, bottom: PREVIEW.gap.bottom - DUO.gap - y0, reach: 0 };
   }
-  if (c.split) return { top: SAFARI.splitTop[c.side] + rows, bottom: pill, reach: c.side === "right" ? DUO.island : 0 };
-  if (landscapeColumn(c)) return { top: SAFARI.landscape[c.side].top + rows, bottom: SAFARI.landscape[c.side].pill - DUO.gap, reach: 0 };
-  return { top: DUO.top + DUO.island + rows, bottom: pill, reach: DUO.island };
+  // Safari's buttons stay put in screen points; the layer starts at the page top, below a Shared with You bar.
+  const y = c.offsetTop;
+  if (c.split) return { top: SAFARI.splitTop[c.side] + rows - y, bottom: pill - y, reach: c.side === "right" ? DUO.island : 0 };
+  if (landscapeColumn(c)) return { top: SAFARI.landscape[c.side].top + rows - y, bottom: SAFARI.landscape[c.side].pill - DUO.gap - y, reach: 0 };
+  return { top: DUO.top + DUO.island + rows - y, bottom: pill - y, reach: DUO.island };
 }
 
 /** Morph menu placement: the button grows into a labelled list, outer edge on the button's, opening down from

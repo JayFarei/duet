@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Column mode: a page opened from a link shared in Messages keeps Safari's column under the Shared with You bar ("From <name>", +40pt top chrome). Before, the controls fell into the page. `offsetTop` is 40 there and every control lands where it does without the bar (#112).
+
 ## 0.4.1
 
 - New `duet-ui/boot` export: `bootScript`, an inline script for the top of `<body>` that marks Safari's column on the closed Duo before the first paint (`data-duet-mode="column"`, `--duet-column`, `--duet-vh`, `--duet-inset-bottom` on `<html>`), so column styling no longer flashes the plain layout on load. Nothing is set on any other browser or device, and `useDuet()` takes it back if the mounted reading is not column. New `--duet-column` variable: the column's width, 0px outside column mode (#94).

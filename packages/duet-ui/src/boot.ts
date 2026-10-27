@@ -17,7 +17,7 @@ export function boot(): void {
   if (c.split) h.toggleAttribute("data-duet-split", true);
   h.style.setProperty("--duet-column", `${c.screenWidth - c.width}px`);
   h.style.setProperty("--duet-vh", `${c.stableHeight}px`);
-  h.style.setProperty("--duet-inset-bottom", `${Math.max(0, c.screenHeight - c.height)}px`);
+  h.style.setProperty("--duet-inset-bottom", `${Math.max(0, c.screenHeight - c.height - c.offsetTop)}px`);
 }
 
 /** Takes back what boot() set when the mounted reading is not the column after all. Browser only. */
