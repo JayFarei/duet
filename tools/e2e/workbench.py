@@ -222,9 +222,10 @@ def build(root):
                 "frames": media(root, name, frames), "video": video})
     rank = {"FAIL": 0, "BLOCKED": 1, "PASS": 2}
     for p in places:
-        p["obs"].sort(key=lambda o: (rank.get(o["status"], 3), not o["video"], o["id"]))
         got = {o["status"] for o in p["obs"]}
         p["status"] = "FAIL" if "FAIL" in got else "PASS" if "PASS" in got else "BLOCKED" if got else "untested"
+        # First the steps that give the placement its status, filmed and screenshotted first: the card shows obs[0].
+        p["obs"].sort(key=lambda o: (o["status"] != p["status"], not o["shot"], not o["video"], rank.get(o["status"], 3), o["id"]))
     count = lambda st: sum(p["status"] == st for p in places)
     return {
         "generated": time.strftime("%Y-%m-%d %H:%M"),

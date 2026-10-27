@@ -20,6 +20,7 @@ import argparse, atexit, datetime, html, json, os, signal, subprocess, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # run with python -I, which leaves the script dir out
 from sim import Sim, SimError  # noqa: E402
 import catalogue  # noqa: E402
+import workbench  # noqa: E402
 from catalogue import TAB, LANDSCAPE_TOP_BARS, PREVIEW, preview_expect, UNFOLDED, UNFOLDED_PREVIEW, SPLIT  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1624,6 +1625,13 @@ section.j{{border-top:2px solid #ddd;margin-top:24px}}ol li{{margin:4px 0}}.idx 
                 lines.append(f'| {r["id"]} | {r["status"]} | {st} | {r.get("settle_ms", "")} | {why.replace("|", "/")} | {" ".join(img)} |')
             with open(s.a.md, "w") as fh:
                 fh.write("\n".join(lines) + "\n")
+        # A report among the others (not a matrix shard, not a scratch dir) refreshes the site's /workbench.
+        root = os.path.dirname(s.out)
+        if os.path.basename(root) == "reports":
+            try:
+                workbench.write(root)
+            except Exception as x:  # the report stands without it
+                print(f"workbench not rebuilt: {x}")
 
 
 if __name__ == "__main__":

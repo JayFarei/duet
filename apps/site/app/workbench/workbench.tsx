@@ -111,7 +111,9 @@ function Sketch({ place, screen }: { place: Place; screen: Screen }) {
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.75 }}>
       <rect x={win.x} y={win.y} width={win.w} height={win.h} rx={place.window === "sheet" || place.window === "window" ? 30 : 0} fill="var(--card)" />
       {sides.map((s) => strip(s === "left" ? win.x : win.x + win.w - STRIP))}
-      {e?.mode === "inline" && [-60, 0, 60].map((dx) => <circle key={dx} cx={win.x + win.w / 2 + dx} cy={win.y + 44} r={R} fill="var(--dim)" opacity={0.5} />)}
+      {e?.mode === "inline" && (e.side === "both" ? ["left", "right"] : [e.side]).flatMap((s) => [0, 1, 2].map((i) => (
+        <circle key={`${s}${i}`} cx={s === "left" ? win.x + 34 : win.x + win.w - 34} cy={win.y + 90 + i * 56} r={R} fill="var(--dim)" opacity={0.5} />
+      )))}
       {!e && <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="middle" fontSize={120} fill="var(--dim)">?</text>}
     </svg>
   );
@@ -353,7 +355,7 @@ const CSS = `
 .wb-film { color: var(--cta); font-weight: 600; }
 .wb-small { font-size: 12px; }
 .wb-scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.3); z-index: 10; }
-.wb-detail { position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 100vw); overflow-y: auto; background: var(--bg); z-index: 11; padding: 20px 16px 40px; box-shadow: -10px 0 40px rgb(0 0 0 / 0.2); }
+.wb-detail { position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 100vw); box-sizing: border-box; overflow-y: auto; background: var(--bg); z-index: 11; padding: 20px 16px 40px; box-shadow: -10px 0 40px rgb(0 0 0 / 0.2); }
 .wb-detail-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
 .wb-detail-head h2 { font-size: 17px; font-weight: 600; margin: 6px 0 2px; }
 .wb-close { border: 0; background: var(--card); color: var(--ink); width: 32px; height: 32px; border-radius: 99px; font-size: 20px; line-height: 1; cursor: pointer; flex: none; }
