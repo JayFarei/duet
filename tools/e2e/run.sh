@@ -31,7 +31,12 @@ trap cleanup EXIT INT TERM
 blocked() { echo "BLOCKED: $1"; exit 2; }
 xcrun simctl bootstatus "$UDID" -b >/dev/null || blocked "simulator $UDID did not boot"
 if [ -z "$E2E_SHARED" ]; then
-  (cd "$ROOT/packages/duet-ui" && corepack pnpm@10.32.0 -s build) || blocked "duet-ui build failed"
+  if command -v corepack >/dev/null 2>&1; then
+    (cd "$ROOT/packages/duet-ui" && corepack pnpm@10.32.0 -s build) || blocked "duet-ui build failed"
+  else
+    [ "$(pnpm --version)" = 10.32.0 ] || blocked "pnpm 10.32.0 is required"
+    (cd "$ROOT/packages/duet-ui" && pnpm -s build) || blocked "duet-ui build failed"
+  fi
   [ "$E2E/fold/fold.bin" -nt "$E2E/fold/fold.m" ] || "$E2E/fold/build.sh" || blocked "fold.bin build failed"
 fi
 
