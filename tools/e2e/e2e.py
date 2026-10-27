@@ -1250,6 +1250,13 @@ class Run:
             land = dict(check=check)
             if k == "tap":
                 rc = s.find(r, action[1])
+                more = s.find(r, "More") if rc is None else None
+                if more:  # in a column Duet's back and the overflow are in its "More" menu: open it, as a user would
+                    x0, y0 = s.page_origin(r, kind)
+                    s.sim.tap(x0 + more["x"] + more["w"] / 2, y0 + more["y"] + more["h"] / 2, hold=0.12)
+                    time.sleep(0.8)
+                    r = s.now_sample(sid, tok, time.time() * 1000)
+                    rc = r and s.find(r, action[1])
                 if rc is None:
                     s.why = f'no control named "{action[1]}" on the page'
                     return None

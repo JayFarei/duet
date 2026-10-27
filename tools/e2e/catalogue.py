@@ -199,7 +199,7 @@ CTA = [  # /book: a class row, its call to action toggling Booked, and Duet's ba
     (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
     (("tap", "Book · 2 credits"), "Tap Duet's call to action \"Book · 2 credits\"", {"label": "Booked"}),
     (("tap", "Booked"), "Tap \"Booked\" again", {"label": "Book · 2 credits"}),
-    (("tap", "Classes"), "Tap Duet's back button \"Classes\"", {"path": "/book", "no_label": "Book · 2 credits"}),
+    (("tap", "Classes"), "Tap Duet's back \"Classes\" (in a column, from its More menu)", {"path": "/book", "no_label": "Book · 2 credits"}),
 ]
 SUITES = [
     {"id": "ctl01", "title": "Call to action and back, Safari tab, outer screen upright", "page": "/book", "start": TAB0, "steps": CTA},
