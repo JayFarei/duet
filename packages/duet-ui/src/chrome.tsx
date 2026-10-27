@@ -36,7 +36,8 @@ export interface DuetProps<T extends string = string> {
   /** Tab pill at the bottom of the strip. `search` adds a `role: .search` tab as the last item. The ids are typed
    *  from `items`: declare them `as const` and `onSelect` gets the union, so `setTab` fits without a cast. Each tab
    *  keeps its own scroll position, and tapping the selected tab scrolls it to the top, like a native tab bar. */
-  tabs?: { items: readonly DuetTab<T>[]; selected: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; search?: DuetTab<T> };
+  /** labels: inline only, the full pill shows each tab's label beside its icon, widening towards the page. */
+  tabs?: { items: readonly DuetTab<T>[]; selected: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; search?: DuetTab<T>; labels?: boolean };
   /** Searchable without tabs: a round search button at the bottom of the strip. */
   searchButton?: () => void;
   /** A sheet or card is open: the strip holds only a close button, where back goes, like an iOS sheet. Every
@@ -464,11 +465,11 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const searchButton = <button className="duet-item" aria-label="Search" onClick={p.searchButton}><Search size={22} /></button>;
   // Minimized, the selected tab opens the full list, like tapping a minimized native tab bar. In the full
   // pill a touch selects on release (scrub below); clicks still select for keyboards and routed column taps.
-  const tabButton = (t: DuetItem, min: boolean, i: number) => (
+  const tabButton = (t: DuetItem, min: boolean, i: number, labelled = false) => (
     <button key={t.id} role="tab" aria-selected={t.id === selected} aria-label={t.label} className="duet-tab"
       data-on={(scrub === null ? t.id === selected : scrub === i) || undefined}
       data-tint={t.tint ? "" : undefined} style={{ ...tint(t), "--j": i } as CSSProperties}
-      onClick={(e) => { if (min) toggle("tabs")(); else if (scrub === null && e.detail === 0) glideTo(t.id); }}>{t.icon}{min && badge(t)}</button>
+      onClick={(e) => { if (min) toggle("tabs")(); else if (scrub === null && e.detail === 0) glideTo(t.id); }}>{t.icon}{labelled && <span className="duet-tab-label">{t.label}</span>}{min && badge(t)}</button>
   );
   // The lens keeps its glass while it travels or settles, then melts back into the selection.
   const settle = () => {
@@ -553,6 +554,10 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const bar = (side: Side, i: number) => {
     const pl = planFor(side), left = side === "left", anchor = anchors(pl);
     const at = (b: Box) => ({ top: b.top, left: pl.left, width: DUO.control, height: b.height });
+    // Labelled pill: as wide as its longest label, outer edge on the column's, so it widens towards the page only.
+    // It needs no swell: the labels already show.
+    const labelled = !!p.tabs?.labels && ctx.mode === "inline" && !!pl.tabs && !pl.tabs.min;
+    const labelledAt = (b: Box): CSSProperties => ({ top: b.top, height: b.height, width: "max-content", ...(left ? { left: pl.left } : { right: ctx.width - pl.left - DUO.control }) });
     // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
     // as tall as the button, outer edge on the button's, widening towards the page centre only.
     const menuAt = (b: Box, n: number) => {
@@ -593,18 +598,18 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
         {pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>}
         {!p.close && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
         {p.tabs && pl.tabs && (
-          <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
+          <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...(labelled ? labelledAt(pl.tabs) : swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side)), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined} data-labels={labelled || undefined}
             data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
             {!pl.tabs.min && (
               // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
               // are masked out under the lens (CSS), so only the enlarged copy shows through it.
               <span className="duet-lens" aria-hidden><span className="duet-lens-view"><span className="duet-lens-col">
-                {tabItems.map((t, i) => <span key={t.id} className="duet-tab" data-on={i === lensAt || undefined} style={tint(t)}>{t.icon}</span>)}
+                {tabItems.map((t, i) => <span key={t.id} className="duet-tab" data-label={t.label} data-on={i === lensAt || undefined} style={tint(t)}>{t.icon}{labelled && <span className="duet-tab-label">{t.label}</span>}</span>)}
               </span></span></span>
             )}
             {/* Full-pill badges ride above the lens, so it neither clips nor hides them. */}
             {!pl.tabs.min && <span className="duet-pill-badges" aria-hidden>{tabItems.map((t) => <span key={t.id}>{badge(t)}</span>)}</span>}
-            {pl.tabs.min ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : tabItems.map((t, i) => tabButton(t, false, i))}
+            {pl.tabs.min ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : tabItems.map((t, i) => tabButton(t, false, i, labelled))}
           </GlassSurface>
         )}
         {pl.searchButton && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="search" style={at(pl.searchButton)}>{searchButton}</GlassSurface>}
