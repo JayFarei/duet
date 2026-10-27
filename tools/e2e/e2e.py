@@ -6,7 +6,7 @@ tools/e2e/EXPECTED.md on every sample, not only the last. Writes reports/<ts>/{i
 
 Needs (run.sh starts them): site on :3140 (served from this worktree), beacon on :3141, the UI-test runner; split view
 and the unfolded native checks need the Claude desktop app's simulator helper (sim.py), reported BLOCKED without it.
-Usage: e2e.py --udid <sim> [--only <scenario>[,<scenario>]] [--md round.md] [--video]
+Usage: e2e.py --udid <sim> [--only <scenario>[,<scenario>]] [--page /path] [--md round.md] [--video]
 Exit: 0 all PASS, 1 any FAIL, 2 any BLOCKED (a state the run could not reach, or a broken setup).
 """
 import argparse, datetime, html, json, os, signal, subprocess, sys, time, urllib.request
@@ -19,6 +19,7 @@ SITE = "http://localhost:3140"
 BEACON = "http://localhost:3141"
 HOST = "dev.duolab.e2e.host"
 SAFARI = "com.apple.mobilesafari"
+SPRINGBOARD = "com.apple.springboard"
 PREVIEW_SVC = "com.apple.SafariViewService"
 FOLD = os.path.join(HERE, "fold", "fold.bin")
 MIN_S = 2.5     # each step samples at least this long after its action
@@ -127,6 +128,9 @@ class Run:
         for d in ("steps", "shots"):
             os.makedirs(os.path.join(s.out, d), exist_ok=True)
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
+        s.la = False  # a Live Activity is running (the host's music activity, la())
+        s.page_path = a.page
+        s.films = []  # (scenario, stitched clips) for the report
         s.split = None  # Safari's split view pane, "left" or "right", or None when Safari is full screen
         s.sim = Sim(s.udid) if Sim.available() else None
 
@@ -221,7 +225,7 @@ class Run:
         s.page = first.get("page")
         allr = s.collect(sid, tok, t0)
         res["position"] = s.position
-        native = s.native(kind)
+        native = s.native(kind, allr[-1]["sig"]["angle"] if allr else 0)
         shot = s.screenshot(sid)
         s.assess(res, allr, native, expect, t0, kind, prev)
         s.check_icons(res, shot)
@@ -254,14 +258,14 @@ class Run:
                     break
         return allr
 
-    def native(s, kind):
+    def native(s, kind, angle=0):
         """Native button frames. Closed: the UI-test runner, in closed screen points. Unfolded: XCUITest frames on the
         inner display do not map (README), so the simulator helper describes the app by pid, in points of its window
         (the pane in split view), which works for either split pane."""
         bundle = PREVIEW_SVC if kind == "preview" else SAFARI
         if s.position != "open":
             r = cmd("elements", bundle=bundle)
-            return (r or {}).get("elements", [])
+            return (r or {}).get("elements", []) + (s.island(angle) if s.la else [])
         if not s.sim:
             s.native_why = "simulator helper missing"
             return []
@@ -275,6 +279,25 @@ class Run:
             s.native_why = f"describe failed: {e}"
             return []
         s.native_why = None if out else f"{bundle} (pid {pid}) reported no buttons"
+        return out
+
+    @staticmethod
+    def island(angle):
+        """The Live Activity in the Dynamic Island as a native obstacle, measured live, not assumed: SpringBoard's
+        jindo container for an activity. SpringBoard reports portrait device points (466x678); turned, they map to the
+        page's screen points like its other windows (hidden-windows pill, round 5). None while the island shows no
+        activity (it collapses to the bare sensor housing in closed landscape)."""
+        r = cmd("tree", bundle=SPRINGBOARD)
+        out = []
+        for e in (r or {}).get("elements", []):
+            if not (e["id"].startswith("jindo-container-view") and "activity:" in e["id"]):
+                continue
+            x, y, w, h = e["x"], e["y"], e["w"], e["h"]
+            if angle == 90:
+                x, y, w, h = y, 466 - x - w, h, w
+            elif angle == 270:
+                x, y, w, h = 678 - y - h, x, h, w
+            out.append({"type": 0, "label": "Live Activity", "id": "island", "x": x, "y": y, "w": w, "h": h})
         return out
 
     # ---- assertions -------------------------------------------------------------------------------------------
@@ -616,7 +639,7 @@ class Run:
 
     # ---- drivers ----------------------------------------------------------------------------------------------
     def url(s, tok):
-        return f"{SITE}/?e2e=1&s={tok}"
+        return f"{SITE}{s.page_path}?e2e=1&s={tok}"
 
     def wait(s, sid, tok, cond, t0, timeout=STATE_TIMEOUT, page=None):
         end = time.time() + timeout
@@ -690,6 +713,44 @@ class Run:
             gone = s.page  # the preview's document keeps reporting while it is dismissed: follow the new tab's
             return s.wait(sid, tok, lambda r: r.get("page") != gone and not r.get("preview"), t0)
         s.last = None  # a new document: no old placement to keep
+        s.target_display = 1
+        return act
+
+    def la_state(s, on, since, timeout=15):
+        """Waits for the host to report the wanted Live Activity state after `since` (ms)."""
+        end = time.time() + timeout
+        while time.time() < end:
+            st = http("GET", "/la/state") or {}
+            if st.get("at", 0) >= since and bool(st.get("count")) == on:
+                return st
+            time.sleep(0.2)
+        return None
+
+    def la(s, tok, on, kind):
+        """Starts or ends the host's music Live Activity (host/Host/Live.swift) with the page in front. In the preview
+        the host is the app in front, so its poll starts the activity under the open sheet. In a Safari tab ActivityKit
+        will not start one from the background: the host comes forward (no URL scheme, which would prompt) and Safari
+        goes back in front, as a user does after starting music elsewhere; the tab is not reloaded. Ending works from
+        the background. Waits for a sample taken after the island settled."""
+        def act(sid, t0):
+            page, since = s.page, time.time() * 1000
+            http("POST", "/la", {"on": on})
+            fwd = on and kind == "tab"
+            if fwd:
+                sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
+            st = s.la_state(on, since)
+            if fwd:
+                sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
+            if st is None:
+                s.why = f"Live Activity not {'started' if on else 'ended'} in 15s: {http('GET', '/la/state')}"
+                return None
+            s.la = on
+            time.sleep(1.0)  # the island grows or shrinks, and Safari's buttons move with it
+            done = time.time() * 1000
+            r = s.wait(sid, tok, lambda r: r["rx"] >= done, t0, page=page)
+            if r is None:
+                s.why = "the page stopped reporting after the Live Activity changed"
+            return r
         s.target_display = 1
         return act
 
@@ -835,7 +896,14 @@ class Run:
         return act
 
     def reset(s):
-        """Every scenario starts closed, in portrait, with Safari in front and the host preview gone."""
+        """Every scenario starts closed, in portrait, with Safari in front, the host preview gone and no Live Activity
+        (the host ends it first: an activity outlives its app)."""
+        since = time.time() * 1000
+        http("POST", "/la", {"on": False})
+        if (http("GET", "/la/state") or {}).get("count") and not s.la_state(False, since, timeout=3):
+            sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
+            s.la_state(False, since)
+        s.la = False
         sh("xcrun", "simctl", "terminate", s.udid, HOST, check=False)
         if s.split and s.position == "open" and s.sim:  # leave split view: Safari full screen again
             try:
@@ -922,6 +990,35 @@ class Run:
         s.step("splitturn-split-fold", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "split view, Safari in the right pane, before folding")
         s.step("splitturn-fold", "tab", t, s.fold_closed(t, 0), {"preview": False, "mode": "column", "side": "right"}, "fold from split view to the closed screen", video=True)
 
+    def scenario_live(s, style):
+        """A music Live Activity in the Dynamic Island (host/Host/Live.swift) on one surface: Safari tab or an in-app
+        preview style. Started and ended at every closed angle and turned with it running, then unfolded and folded
+        with it running. The island is a native obstacle measured from SpringBoard on every closed step (island()),
+        so a control under it or under a button it pushed fails check 6. Every step is filmed; the clips of the
+        scenario are stitched into one film (report)."""
+        tab = style == "tab"
+        kind = "tab" if tab else "preview"
+        t = s.tok(f"live{style}")
+        exp = (lambda a: {"preview": False, "mode": TAB[a][0], "side": TAB[a][1]}) if tab else (lambda a: preview_expect(style, a))
+        name = "Safari tab" if tab else f"preview ({style})"
+        p = f"live-{style}"
+        s.step(f"{p}-open", kind, t, s.open_tab(t) if tab else s.open_preview(t, style), exp(0), f"{name}: open, no Live Activity", video=True)
+        s.step(f"{p}-on-0", kind, t, s.la(t, True, kind), exp(0), f"{name}: Live Activity starts at 0", video=True)
+        for a in (90, 270, 0):
+            frm = s.angle
+            s.step(f"{p}-on-{frm}to{a}", kind, t, s.rotate(t, a), exp(a), f"{name} with Live Activity: turn {frm} -> {a}", video=True)
+        s.step(f"{p}-off-0", kind, t, s.la(t, False, kind), exp(0), f"{name}: Live Activity ends at 0", video=True)
+        for a in (90, 270):
+            s.step(f"{p}-to{a}", kind, t, s.rotate(t, a), exp(a), f"{name}: turn to {a}", video=True)
+            s.step(f"{p}-on-{a}", kind, t, s.la(t, True, kind), exp(a), f"{name}: Live Activity starts at {a}", video=True)
+            s.step(f"{p}-off-{a}", kind, t, s.la(t, False, kind), exp(a), f"{name}: Live Activity ends at {a}", video=True)
+        s.step(f"{p}-to0", kind, t, s.rotate(t, 0), exp(0), f"{name}: back to 0", video=True)
+        s.step(f"{p}-on-0b", kind, t, s.la(t, True, kind), exp(0), f"{name}: Live Activity starts again", video=True)
+        s.step(f"{p}-on-unfold", kind, t, s.unfold(t, 0, preview=not tab), UNFOLDED_PREVIEW if not tab else {"preview": False, **UNFOLDED},
+               f"{name} with Live Activity: unfold", video=True)
+        s.step(f"{p}-on-fold", kind, t, s.fold_closed(t, 0), exp(0), f"{name} with Live Activity: fold", video=True)
+        s.step(f"{p}-off-end", kind, t, s.la(t, False, kind), exp(0), f"{name}: Live Activity ends", video=True)
+
     def scenario_preview_unfolded(s):
         """The in-app preview across the unfold: opened closed then unfolded, turned, folded back, and opened unfolded.
         Unfolded, the sheet is a 653x661 window centred on the wide screen with its bars above and below the page,
@@ -948,8 +1045,8 @@ class Run:
 
     def scenario_dynamic_type(s):
         """PREVIEW.gap variant: the preview's column with the largest accessibility text size. Its buttons are fixed
-        size controls, so the gap should not move; the step proves Duet still fits it (a Live Activity in the island
-        cannot be started on the simulator without an app that owns one, README, Limits)."""
+        size controls, so the gap should not move; the step proves Duet still fits it (the island grown by a Live
+        Activity: the live-* scenarios)."""
         before = sh("xcrun", "simctl", "ui", s.udid, "content_size", check=False).stdout.strip() or "large"
         sh("xcrun", "simctl", "ui", s.udid, "content_size", "accessibility-extra-extra-extra-large", check=False)
         try:
@@ -990,6 +1087,10 @@ class Run:
         "split-turn": lambda s: s.scenario_split_turn(),
         "split-drag": lambda s: s.scenario_split_drag(),
         "dynamic-type": lambda s: s.scenario_dynamic_type(),
+        "live-tab": lambda s: s.scenario_live("tab"),
+        "live-preview-sheet": lambda s: s.scenario_live("sheet"),
+        "live-preview-default": lambda s: s.scenario_live("default"),
+        "live-preview-full": lambda s: s.scenario_live("full"),
     }
     NEEDS_SIM = {"split", "split-turn", "split-drag", "open-in-safari-unfold"}
     EXPERIMENTAL = {"split-drag"}  # run only when named with --only
@@ -1007,13 +1108,46 @@ class Run:
                 s.results.append({"id": name, "kind": "setup", "desc": name, "status": "BLOCKED", "reasons": ["simulator helper missing (sim.py, Claude desktop app)"], "notes": []})
                 continue
             s.reset()
+            n = len(s.results)
             fn(s)
+            s.film(name, s.results[n:])
         s.reset()
         s.report()
         fails = [r for r in s.results if r["status"] == "FAIL"]
         blocked = [r for r in s.results if r["status"] == "BLOCKED"]
         s.log(f"\n{len(s.results)} steps, {len(fails)} failed, {len(blocked)} blocked, report {s.out}/index.html")
         return 1 if fails else 2 if blocked else 0
+
+    def film(s, name, results):
+        """Stitches a scenario's step clips into one film, each captioned with its step, result and first reason, at
+        30fps on a 720x720 canvas (the closed and unfolded displays differ in size). simctl's clips are variable frame
+        rate: the fps filter repeats frames through the gaps, as the screen showed them."""
+        clips = [(r, os.path.join(s.out, r["frames"].replace("-frames.png", ".mp4"))) for r in results if r.get("frames")]
+        clips = [(r, p) for r, p in clips if os.path.exists(p)]
+        if not clips:
+            return
+        parts, lst = [], os.path.join(s.out, "shots", f"{name}-film.txt")
+        for i, (r, p) in enumerate(clips):
+            cap = f'{r["id"]}  {r["status"]}  {r["desc"]}'
+            why = (r["reasons"] or [""])[0][:90]
+            esc = lambda x: x.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\u2019").replace("%", "\\%")
+            col = {"PASS": "0x2a9d3a", "FAIL": "0xd62828"}.get(r["status"], "0xe09f1f")
+            out = os.path.join(s.out, "shots", f"{name}-part{i:02}.mp4")
+            vf = (f"fps=30,scale=720:600:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:120:color=black,"
+                  f"drawbox=x=0:y=0:w=720:h=12:color={col}:t=fill,"
+                  f"drawtext=text='{esc(cap)}':x=12:y=24:fontsize=20:fontcolor=white,"
+                  f"drawtext=text='{esc(why)}':x=12:y=60:fontsize=16:fontcolor=0xffb4b4")
+            sh("ffmpeg", "-loglevel", "error", "-y", "-i", p, "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", out, check=False)
+            if os.path.exists(out):
+                parts.append(out)
+        with open(lst, "w") as fh:
+            fh.write("".join(f"file '{x}'\n" for x in parts))
+        film = os.path.join(s.out, "shots", f"{name}.mp4")
+        sh("ffmpeg", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", film, check=False)
+        for x in parts + [lst]:
+            os.remove(x)
+        if os.path.exists(film):
+            s.films.append((name, os.path.relpath(film, s.out)))
 
     # ---- report -----------------------------------------------------------------------------------------------
     def report(s):
@@ -1035,6 +1169,7 @@ class Run:
 .PASS td:nth-child(2){{color:#080}}.FAIL td:nth-child(2){{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2){{color:#a60;font-weight:bold}}small{{color:#666}}
 @media (prefers-color-scheme:dark){{body{{background:#111;color:#eee}}td{{border-color:#333}}}}</style>
 <h1>Duo e2e report</h1><p>{e(s.out)}. Overlay: red = Duet controls, blue = native buttons, green = preview column gap. Frames: 3.2s from 0.3s before the motion onset, one tile per 100ms.</p>
+{"".join(f'<h2>{e(n)}</h2><video src={e(f)} controls muted playsinline width=480></video>' for n, f in s.films)}
 <table>{"".join(rows)}</table>""")
         if s.a.md:
             lines = ["| step | result | final (angle, inner, mode/side) | settle | reason | screenshot / frames |", "|---|---|---|---|---|---|"]
@@ -1054,6 +1189,7 @@ if __name__ == "__main__":
     ap.add_argument("--only", default="")
     ap.add_argument("--md", default="")
     ap.add_argument("--video", action="store_true", help="record a contact sheet for every step, not only transitions")
+    ap.add_argument("--page", default="/", help="site path every scenario opens, e.g. /confirm")
     ap.add_argument("--rerender", default="", help="re-assess a saved report dir with the current rules")
     a = ap.parse_args()
     if a.rerender:

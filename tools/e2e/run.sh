@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs the Duo e2e matrix on the "Duo Lab" simulator. Usage:
-#   tools/e2e/run.sh [--only tab,preview-sheet,...] [--md out.md] [--video]
+#   tools/e2e/run.sh [--only tab,preview-sheet,...] [--page /confirm] [--md out.md] [--video]
 # Builds duet-ui's dist (the site consumes it) and fold.bin (the rotator and hinge), starts what is not already
 # running (site from this worktree on :3140, beacon on :3141, host build + UI-test runner), checks the page renders,
 # runs e2e.py, stops what it started. Report: tools/e2e/reports/<ts>/index.html. Exit: 0 pass, 1 fail, 2 blocked
@@ -27,6 +27,22 @@ xcrun simctl bootstatus "$UDID" -b >/dev/null || blocked "simulator $UDID did no
 (cd "$ROOT/packages/duet-ui" && pnpm -s build) || blocked "duet-ui build failed"
 [ "$E2E/fold/fold.bin" -nt "$E2E/fold/fold.m" ] || "$E2E/fold/build.sh" || blocked "fold.bin build failed"
 
+# Live Activities (scenarios live-*): the simulator runtime ships chronod and liveactivitiesd but leaves them unloaded,
+# so an activity starts without error and never shows. Load them once per boot, then restart SpringBoard so the island
+# picks them up, and reinstall the host below so its widget extension registers.
+LA_NEW=""
+if ! xcrun simctl spawn "$UDID" launchctl print user/501/com.apple.liveactivitiesd >/dev/null 2>&1; then
+  RT=$(xcrun simctl list -j | /usr/bin/python3 -I -c 'import json,sys; j=json.load(sys.stdin); u=sys.argv[1]
+r=next(k for k,v in j["devices"].items() if any(d["udid"]==u for d in v)); print(next(x["runtimeRoot"] for x in j["runtimes"] if x["identifier"]==r))' "$UDID")
+  for d in chronod liveactivitiesd; do
+    xcrun simctl spawn "$UDID" launchctl enable "user/501/com.apple.$d"
+    xcrun simctl spawn "$UDID" launchctl bootstrap user/501 "$RT/System/Library/LaunchDaemons/com.apple.$d.plist" || true
+  done
+  xcrun simctl spawn "$UDID" launchctl kickstart -k user/501/com.apple.SpringBoard
+  sleep 8
+  LA_NEW=1
+fi
+
 if ! up http://localhost:3140/; then
   (cd "$ROOT/apps/site" && exec npx next dev -p 3140 -H 0.0.0.0 >"$TMP/site.log" 2>&1) & STARTED="$STARTED $!"
   i=0; until up http://localhost:3140/; do i=$((i+1)); [ $i -gt 120 ] && blocked "site did not start, $TMP/site.log"; sleep 1; done
@@ -42,6 +58,7 @@ if ! alive; then
     -destination "id=$UDID" -only-testing:DuoE2ERunner/Runner/testServe >"$TMP/runner.log" 2>&1) & STARTED="$STARTED runner"
   i=0; until alive; do i=$((i+1)); [ $i -gt 180 ] && blocked "runner did not start, $TMP/runner.log"; sleep 1; done
 fi
+[ -n "$LA_NEW" ] && xcrun simctl install "$UDID" "$E2E/host/build/Build/Products/Debug-iphonesimulator/DuoE2EHost.app"
 
 # A compile error in the site or the dist answers 500 (or a page without the reporter): stop here, not mid-matrix.
 code=$(curl -s -o "$TMP/page.html" -w '%{http_code}' -m 60 "http://localhost:3140/?e2e=1")
