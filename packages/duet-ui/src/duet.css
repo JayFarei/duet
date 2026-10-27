@@ -215,12 +215,17 @@
 .duet[data-drag="held"], .duet[data-drag="switch"] { transition: none; }
 /* Switching sides moves every control in the same frame: nothing glides across the page on its own. */
 .duet[data-drag="switch"] * { transition: none !important; }
+/* The controls sit above the page like system chrome: a page's modal that turns off pointer events on <body> (Radix,
+   Headless UI) would otherwise leave them dead, the sheet's close included. */
+.duet { pointer-events: auto; }
 /* Mid fold or turn (Context.hidden "moving") and in the turned in-app preview ("preview"): not drawn. */
 .duet[data-hidden] { visibility: hidden; pointer-events: none; }
 /* Loading, and while the window settles after a fold, turn or resize: the controls appear where they settle, without transitions or entrance animations. */
 /* The root itself keeps its animation: in Safari's column it is the scroll follow (duet-follow), not an entrance. */
 .duet[data-settling], .duet[data-settling] * { transition: none !important; }
-.duet[data-settling] * { animation: none !important; }
+/* Zero length, not none: removing an animation and putting it back restarts it, so a control that arrived while settling
+   (a sheet's close as the keyboard goes down, the tabs on load) would fade in again from nothing once settled. */
+.duet[data-settling] * { animation-duration: 0s !important; animation-delay: 0s !important; }
 .duet[data-drag="free"] { transition: --duet-drag 0.12s ease-out; }
 .duet-menu-item { width: 46.5px; height: 43px; flex: none; border-radius: 999px; }
 /* Destructive items (blueprint): only in "…", last, red, set apart by a hairline in the labelled list. */
@@ -260,7 +265,7 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    fixed box reaches it: a fixed box stops at the viewport edge, and one covering the middle of that edge has its
    colour painted over the column instead (the guard below). So there the scroller is an in-document box that runs
    on under the column. The document still never scrolls, so the chrome layer never moves. */
-html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left) + var(--duet-inset-right)); bottom: auto; height: calc(100% + var(--duet-inset-bottom)); }
+html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left, 0px) + var(--duet-inset-right, 0px)); bottom: auto; height: calc(100% + var(--duet-inset-bottom, 0px)); }
 /* That overflow widens the document, and touch-action on <html> stops at this scroll container, so without its own
    a sideways swipe pans the whole page, chrome and all, into the column. Carousels inside are scrollers of their own
    and still pan. */

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.1
+
+- New `duet-ui/boot` export: `bootScript`, an inline script for the top of `<body>` that marks Safari's column on the closed Duo before the first paint (`data-duet-mode="column"`, `--duet-column`, `--duet-vh`, `--duet-inset-bottom` on `<html>`), so column styling no longer flashes the plain layout on load. Nothing is set on any other browser or device, and `useDuet()` takes it back if the mounted reading is not column. New `--duet-column` variable: the column's width, 0px outside column mode (#94).
+- Column mode: the controls take taps while a page modal sets `pointer-events: none` on `<body>` (Radix, Headless UI), so the `close` passed for a sheet works (#94).
+- A control that arrives while the window settles (the sheet's close as the keyboard goes down) no longer fades in a second time once settled (#94).
+- Column mode without children: the in-document scroller keeps its width before the inset variables are set (#94).
+
 ## 0.4.0
 
 Everything from 0.4.0-rc.1 and 0.4.0-rc.2.
