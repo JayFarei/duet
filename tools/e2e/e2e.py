@@ -76,6 +76,23 @@ def samples(step, since=0):
     return http("GET", f"/samples?step={step}&since={since}") or []
 
 
+def mine(r, tok):
+    """A sample of this run: its token in the URL, or in the page's storage once a pushState or a link dropped it."""
+    return f"s={tok}" in r["path"] or r.get("s") == tok
+
+
+def address(path):
+    """A sample's path without the harness's own parameters (e2e, s): "/book?c=sauna"."""
+    p, _, q = path.partition("?")
+    q = [kv for kv in q.split("&") if kv and kv.split("=")[0] not in ("e2e", "s")]
+    return p + ("?" + "&".join(q) if q else "")
+
+
+def duet_buttons(r):
+    """[(label, rect)] of Duet's shown buttons in a sample."""
+    return [(b["label"], b["rect"]) for n in shown_navs(r) for sl in n["slots"] for b in sl.get("buttons") or []]
+
+
 def key(r):
     g = r["sig"]
     return (g["angle"], g["innerWidth"], g["innerHeight"], g["outerWidth"], g["outerHeight"])
@@ -196,7 +213,7 @@ class Run:
         return sheet if os.path.exists(sheet) and os.path.getsize(sheet) > 0 else None
 
     # ---- one step ---------------------------------------------------------------------------------------------
-    def step(s, sid, kind, tok, action, expect, desc, video=False, extra=None):
+    def step(s, sid, kind, tok, action, expect, desc, video=False, extra=None, check=None):
         """One action and its assessment. expect: a dict, or a function of the final sample's signals for a state
         with two valid windows (catalogue.expect: Safari's closed landscape tab, column or top bars)."""
         s.log(f"[{sid}] {desc}")
@@ -225,6 +242,8 @@ class Run:
         shot = s.screenshot(sid)
         s.assess(res, allr, native, expect, t0, kind, prev)
         s.check_icons(res, shot)
+        if check:
+            s.verify(res, allr[-1] if allr else None, check)
         sheet = s.stop_record(rec, t0 + (res.get("t") or {}).get("change", 0)) if rec else None
         if sheet:
             res["frames"] = os.path.relpath(sheet, s.out)
@@ -240,7 +259,7 @@ class Run:
         start = time.time()
         while True:
             time.sleep(0.25)
-            allr = [r for r in samples(sid, t0) if f"s={tok}" in r["path"] and r.get("page") == s.page]
+            allr = [r for r in samples(sid, t0) if mine(r, tok) and r.get("page") == s.page]
             el = time.time() - start
             if el >= MAX_S:
                 break
@@ -649,7 +668,7 @@ class Run:
         end = time.time() + timeout
         while time.time() < end:
             for r in samples(sid, t0):
-                if f"s={tok}" in r["path"] and (page is None or r.get("page") == page) and cond(r):
+                if mine(r, tok) and (page is None or r.get("page") == page) and cond(r):
                     return r
             time.sleep(0.1)
         return None
@@ -691,7 +710,7 @@ class Run:
             if not s.fold("closed", 180):
                 return None
             time.sleep(1.5)
-            rs = [r for r in samples(sid, t0) if f"s={tok}" in r["path"] and r.get("page") == page]
+            rs = [r for r in samples(sid, t0) if mine(r, tok) and r.get("page") == page]
             return rs[-1] if rs else None
         s.target_display = 1
         return act
@@ -1118,6 +1137,227 @@ class Run:
             return s.open_in_safari(tok)
         raise ValueError(action)
 
+    # ---- interaction suites (catalogue.SUITES, issue #107) --------------------------------------------------------
+    def verify(s, res, r, check):
+        """A suite step's own outcome (catalogue.py, interaction suites), on the step's final sample."""
+        bad = []
+        if r is None:
+            bad.append("outcome not checked: no sample from the page")
+        else:
+            labels = [l for l, _ in duet_buttons(r)]
+            for k, v in check.items():
+                if k == "path" and address(r["path"]) != v:
+                    bad.append(f"address is {address(r['path'])}, expected {v}")
+                elif k == "label" and v not in labels:
+                    bad.append(f'Duet does not show "{v}" (it shows {", ".join(map(repr, labels)) or "nothing"})')
+                elif k == "no_label" and v in labels:
+                    bad.append(f'Duet still shows "{v}"')
+                elif k == "keyboard" and any(n.get("keyboard") for n in r.get("navs") or []) != v:
+                    bad.append("Duet did not see the keyboard come up (no data-keyboard)" if v else "Duet still marks the keyboard up (data-keyboard)")
+                elif k == "active" and r.get("active") != v:
+                    bad.append(f"focus is on {r.get('active') or 'nothing'}, expected {v or 'nothing'}")
+                elif k == "dialog" and bool(r.get("dialogs")) != v:
+                    bad.append("no page dialog open" if v else "the page dialog is still open")
+                elif k == "scroll_gt" and not r["scroll"]["y"] > v:
+                    bad.append(f"page scrolled to {r['scroll']['y']}pt, expected more than {v}")
+                elif k == "scroll_lt" and not r["scroll"]["y"] < v:
+                    bad.append(f"page scrolled to {r['scroll']['y']}pt, expected under {v}")
+                elif k == "la" and (http("GET", "/la/state") or {}).get("count", 0) != v:
+                    bad.append(f"Live Activities running: {(http('GET', '/la/state') or {}).get('count', 0)}, expected {v}")
+        if bad:
+            res["reasons"] += bad
+            res["status"] = "FAIL" if res["status"] != "BLOCKED" else res["status"]
+
+    @staticmethod
+    def find(r, name):
+        """The rect of a control by name in a sample: Duet's buttons first, then the page's targets (aria-label,
+        placeholder or text); an exact name, else one that starts with it."""
+        cands = duet_buttons(r) + [(t["name"], t["rect"]) for t in r.get("targets") or []]
+        for ok in (lambda l: l == name, lambda l: l.startswith(name)):
+            for l, rc in cands:
+                if l and ok(l) and rc["w"] > 0 and rc["h"] > 0:
+                    return rc
+        return None
+
+    def page_origin(s, r, kind):
+        """Page origin in points of the lit display (sim.py taps in those)."""
+        return s.origin_open(r, kind, s.native(kind))[:2] if s.position == "open" else s.origin(r, kind)
+
+    def now_sample(s, sid, tok, t0):
+        r = s.wait(sid, tok, lambda r: True, t0, timeout=5, page=s.page)
+        if r is None:
+            s.why = "the page is not reporting"
+        return r
+
+    def landed(s, sid, tok, t0, page, check, delay=0.4, new_page=False, cond=None):
+        """The first sample after the interaction settled: taken delay s after it, at the expected address if the
+        check names one (a link or Back may load a new document), on a new document after a reload. If the address
+        never comes, the latest sample, so the step is judged (and fails its check) rather than blocked."""
+        done = time.time() * 1000 + delay * 1000
+        want = check.get("path")
+        ok = lambda r: r["rx"] >= done and (cond is None or cond(r)) and (not new_page or r.get("page") != page)
+        r = s.wait(sid, tok, lambda r: ok(r) and (want is None or address(r["path"]) == want), t0, timeout=10,
+                   page=None if want or new_page else page)
+        if r is None:
+            r = s.wait(sid, tok, lambda r: r["rx"] >= done, t0, timeout=5, page=page)
+        if r is None:
+            s.why = "the page stopped reporting after the step"
+        return r
+
+    def neutral(s, r):
+        """A page point (client px) on no control: the page's own targets and Duet's slots avoided."""
+        g = r["sig"]
+        busy = [t["rect"] for t in r.get("targets") or []] + [sl["rect"] for n in r.get("navs") or [] for sl in n.get("slots") or []]
+        for fy in (0.12, 0.5, 0.3, 0.7, 0.85):
+            for fx in (0.15, 0.5, 0.3):
+                x, y = g["innerWidth"] * fx, g["innerHeight"] * fy
+                if not any(b["x"] - 8 <= x <= b["x"] + b["w"] + 8 and b["y"] - 8 <= y <= b["y"] + b["h"] + 8 for b in busy):
+                    return {"x": x, "y": y, "w": 0, "h": 0}
+        return {"x": g["innerWidth"] * 0.15, "y": g["innerHeight"] * 0.12, "w": 0, "h": 0}
+
+    def tap_native(s, kind, ident):
+        """Taps a native button by accessibility identifier (never by label: "Book" matches Bookmarks)."""
+        el = next((e for e in s.native(kind, s.angle) if e.get("id") == ident), None)
+        if el is None:
+            s.why = f"no native button {ident}"
+            return False
+        s.sim.tap(el["x"] + el["w"] / 2, el["y"] + el["h"] / 2, hold=0.12)
+        return True
+
+    def to_front(s, kind):
+        """Brings the app under test back in front (Safari, or the host whose preview is open)."""
+        if kind == "preview":
+            s.host()
+        else:
+            sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
+
+    def suite_action(s, tok, action, state, check):
+        """The driver for one suite interaction (a device step goes through journey_action), from the state it starts in."""
+        k = action[0]
+        if k in catalogue.DEVICE_OPS:
+            return s.journey_action(tok, action, state)
+        kind = "tab" if state[0] == "tab" else "preview"
+        s.target_display = s.display()
+
+        def act(sid, t0):
+            if not s.sim:
+                s.why = "simulator helper missing (sim.py, Claude desktop app)"
+                return None
+            page = s.page
+            r = s.now_sample(sid, tok, t0)
+            if r is None:
+                return None
+            land = dict(check=check)
+            if k == "tap":
+                rc = s.find(r, action[1])
+                if rc is None:
+                    s.why = f'no control named "{action[1]}" on the page'
+                    return None
+                x0, y0 = s.page_origin(r, kind)
+                s.sim.tap(x0 + rc["x"] + rc["w"] / 2, y0 + rc["y"] + rc["h"] / 2, hold=0.12)
+            elif k == "scroll":  # slow drags of at most 300pt down the page's left part (clear of a column of controls)
+                g, (x0, y0) = r["sig"], s.page_origin(r, kind)
+                x, n = x0 + g["innerWidth"] * 0.3, -(-abs(action[1]) // 300)
+                d = abs(action[1]) / n * (1 if action[1] > 0 else -1)
+                y1 = y0 + g["innerHeight"] * (0.75 if d > 0 else 0.25)
+                for _ in range(n):
+                    s.sim.drag(x, y1, x, y1 - d, ms=500, steps=12, end_hold_ms=200)
+                    time.sleep(0.3)
+                land["delay"] = 1.5  # let any momentum settle
+            elif k == "native":
+                if not s.tap_native(kind, action[1]):
+                    return None
+                land["new_page"] = action[1] == "ReloadButton"
+            elif k == "forward":  # Safari's Forward is a swipe in from the web view's right edge (no Forward button)
+                g, (x0, y0) = r["sig"], s.page_origin(r, kind)
+                y = y0 + g["innerHeight"] / 2
+                s.sim.drag(x0 + g["innerWidth"] - 1, y, x0 + g["innerWidth"] * 0.3, y, ms=350, steps=12, end_hold_ms=50)
+            elif k == "blur":
+                if not any(e.get("label") == "Done" and s.tap_native(kind, e.get("id")) for e in s.native(kind, s.angle) if e.get("id")):
+                    rc, (x0, y0) = s.neutral(r), s.page_origin(r, kind)
+                    s.sim.tap(x0 + rc["x"], y0 + rc["y"], hold=0.12)
+            elif k == "home":
+                s.sim.button("HOME")
+                time.sleep(2)
+                s.to_front(kind)
+                land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "lock":
+                s.sim.button("LOCK")
+                time.sleep(2)
+                s.sim.button("LOCK")
+                time.sleep(1)
+                lit = s.sim.lit()
+                s.sim.drag(lit["pointWidth"] / 2, lit["pointHeight"] - 3, lit["pointWidth"] / 2, lit["pointHeight"] * 0.3, ms=300, steps=10, end_hold_ms=0)
+                land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "switcher":
+                s.sim.button("HOME")
+                time.sleep(0.15)
+                s.sim.button("HOME")
+                time.sleep(1.5)
+                lit = s.sim.lit()
+                s.sim.tap(lit["pointWidth"] / 2, lit["pointHeight"] / 2, hold=0.12)
+                land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "expand":
+                isl = s.island(s.angle)
+                if not isl:
+                    s.why = "no Live Activity in the Dynamic Island"
+                    return None
+                e = isl[0]
+                s.sim.tap(e["x"] + e["w"] / 2, e["y"] + e["h"] / 2, hold=1.0)
+                land["delay"] = 1.0
+            else:
+                raise ValueError(action)
+            return s.landed(sid, tok, t0, page, **land)
+        return act
+
+    def play_suite(s, suite):
+        """One interaction suite: reset, environment (restored after), starting condition, open the page, then each
+        step, filmed and judged against the placement of the state it ends in plus its own check. A blocked step ends
+        the suite."""
+        sid0 = suite["id"]
+        steps = catalogue.suite_steps(suite)
+        title = suite["title"] + (f' ({", ".join(f"{k} {v}" for k, v in suite["env"].items())})' if suite.get("env") else "")
+        rec = {"id": sid0, "title": title, "steps": [], "words": [w for _, _, w, _, _ in steps], "status": "PASS", "film": None, "not_run": 0}
+        s.journeys.append(rec)
+        s.log(f"\n== {sid0}: {title}")
+        s.reset()
+        n, env = len(s.results), suite.get("env") or {}
+        before = {}
+        for k, v in (("appearance", "dark" if env.get("dark") else None), ("content_size", env.get("content_size"))):
+            if v:
+                before[k] = sh("xcrun", "simctl", "ui", s.udid, k, check=False).stdout.strip() or ("light" if k == "appearance" else "large")
+                sh("xcrun", "simctl", "ui", s.udid, k, v, check=False)
+        old_path = s.page_path
+        s.page_path = suite["page"]
+        try:
+            start = suite["start"]
+            if not s.setup_state(start):
+                res = {"id": f"{sid0}-00", "kind": "setup", "desc": f"Set up: {catalogue.state_en(start)}", "status": "BLOCKED",
+                       "reasons": ["state not reached: " + s.why], "notes": [], "journey": sid0}
+                s.results.append(res)
+                rec["steps"].append(res["id"])
+                rec["not_run"] = len(steps)
+                s.log(f"[{res['id']}] {res['desc']}\n  BLOCKED {res['reasons'][0]}")
+            else:
+                t, cur = s.tok(sid0), start
+                for k, (a, nxt, words, exp_en, check) in enumerate(steps, 1):
+                    act = s.journey_action(t, a, cur) if a[0] == "open" else s.suite_action(t, a, cur, check)
+                    res = s.step(f"{sid0}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
+                                 lambda sig, st=nxt: catalogue.expect(st, sig), words, video=True,
+                                 extra={"journey": sid0, "expect_en": exp_en, "check": check or None}, check=check)
+                    rec["steps"].append(res["id"])
+                    cur = nxt
+                    if res["status"] == "BLOCKED":
+                        rec["not_run"] = len(steps) - k
+                        break
+        finally:
+            s.page_path = old_path
+            for k, v in before.items():
+                sh("xcrun", "simctl", "ui", s.udid, k, v, check=False)
+        got = {r["status"] for r in s.results[n:]}
+        rec["status"] = "FAIL" if "FAIL" in got else "BLOCKED" if "BLOCKED" in got else "PASS"
+        rec["film"] = s.film(sid0, s.results[n:])
+
     def play(s, i, start, acts):
         """One journey: reset, set up the starting condition, open the page, apply each transition, every step filmed
         and judged against catalogue.expect. A blocked step ends the journey (the next state cannot be reached)."""
@@ -1182,13 +1422,15 @@ class Run:
             s.results.append({"id": "setup", "kind": "setup", "desc": "UI-test runner", "status": "BLOCKED", "reasons": ["UI-test runner not alive"], "notes": []})
         if not os.access(FOLD, os.X_OK):
             s.results.append({"id": "setup", "kind": "setup", "desc": "fold.bin", "status": "BLOCKED", "reasons": [f"{FOLD} missing (fold/build.sh)"], "notes": []})
-        if s.a.catalogue:
-            js = [(i, j) for i, j in enumerate(catalogue.journeys()) if not only or catalogue.jid(i) in only]
-            if s.a.shard:  # i/N: every Nth journey, from the ith
+        if s.a.catalogue:  # the journeys, then the interaction suites, one index across both for sharding
+            items = [(catalogue.jid(i), lambda i=i, j=j: s.play(i, *j)) for i, j in enumerate(catalogue.journeys())]
+            items += [(su["id"], lambda su=su: s.play_suite(su)) for su in catalogue.SUITES]
+            js = [(n, run) for n, (name, run) in enumerate(items) if not only or name in only]
+            if s.a.shard:  # i/N: every Nth item, from the ith
                 k, m = map(int, s.a.shard.split("/"))
                 js = [x for x in js if x[0] % m == k - 1]
-            for i, (start, acts) in js:
-                s.play(i, start, acts)
+            for _, run in js:
+                run()
         for name, fn in ({} if s.a.catalogue else s.SCENARIOS).items():
             if (only and name not in only) or (not only and name in s.EXPERIMENTAL):
                 continue

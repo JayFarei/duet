@@ -53,6 +53,10 @@ function label(el: Element) {
 
 // What a slot's buttons say (aria-label), so a step can check a call to action turned into "Booked".
 const labels = (el: Element) => [...el.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? (b.textContent ?? "").trim());
+// Each visible button of a slot with where it is: the driver taps one by its label (a tab of the pill, the back button).
+const buttons = (el: Element) => [...el.querySelectorAll("button")].filter(shown).map((b) => ({
+  label: b.getAttribute("aria-label") ?? (b.textContent ?? "").trim(), rect: rect(b), pressed: b.getAttribute("aria-pressed") ?? b.getAttribute("aria-selected"),
+}));
 
 // The page's own controls and dialogs, outside Duet, with where they are: the driver taps them by rect (README).
 function targets() {
@@ -73,7 +77,7 @@ function sample(s: string | null) {
     hidden: n.getAttribute("data-hidden"), confidence: n.getAttribute("data-confidence"),
     keyboard: n.getAttribute("data-keyboard"), rect: rect(n), shown: shown(n),
     slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({
-      slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), expanded: s.getAttribute("data-expanded"),
+      slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), buttons: buttons(s), expanded: s.getAttribute("data-expanded"),
     })),
   }));
   // Visible elements that stick out of the layout viewport (clipped content), Duet's own layer and content inside

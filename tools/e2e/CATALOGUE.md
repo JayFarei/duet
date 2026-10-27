@@ -12,6 +12,200 @@ Not covered by journeys:
 - Split view: covered by the split, split-turn and open-in-safari-unfold scenarios, not by journeys yet.
 - Upside down (180): Safari and the preview do not adopt it on the Duo, covered by the tab scenario.
 
+# Interaction suites (#107)
+
+Each suite opens one page, then interacts with it; every step is filmed and judged against the placement of the state it ends in, plus its own outcome. Play one: `tools/e2e/run.sh --catalogue --only ctl01`.
+
+Not covered yet:
+
+- Safari's tab bar at the top vs the bottom: the setting is not reachable from the simulator yet.
+- A timer Live Activity, and two Live Activities at once: the host starts only its music activity yet.
+
+## ctl01: Call to action and back, Safari tab, outer screen upright
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right; Duet shows "Booked".
+4. Tap "Booked" again. Expect: controls in a column on the right; Duet shows "Book · 2 credits".
+5. Tap Duet's back button "Classes". Expect: controls in a column on the right; the address is /book; Duet no longer shows "Book · 2 credits".
+
+## ctl02: Call to action and back, in-app preview (sheet)
+
+1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right in the gap of the preview's own column; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right in the gap of the preview's own column; Duet shows "Booked".
+4. Tap "Booked" again. Expect: controls in a column on the right in the gap of the preview's own column; Duet shows "Book · 2 credits".
+5. Tap Duet's back button "Classes". Expect: controls in a column on the right in the gap of the preview's own column; the address is /book; Duet no longer shows "Book · 2 credits".
+
+## ctl03: Call to action and back, Safari tab, unfolded
+
+1. Open /book in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
+2. Tap the class "Sauna and cold plunge". Expect: controls inline on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits". Expect: controls inline on the right; Duet shows "Booked".
+4. Tap "Booked" again. Expect: controls inline on the right; Duet shows "Book · 2 credits".
+5. Tap Duet's back button "Classes". Expect: controls inline on the right; the address is /book; Duet no longer shows "Book · 2 credits".
+
+## ctl04: Call to action and back, Safari tab, outer screen on its side
+
+1. Open /book in a Safari tab, folded, on the outer screen, on its side, landscape right (90), no music. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet shows "Booked".
+4. Tap "Booked" again. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet shows "Book · 2 credits".
+5. Tap Duet's back button "Classes". Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the address is /book; Duet no longer shows "Book · 2 credits".
+
+## scr01: Scroll kept across turn, unfold and fold, Safari tab
+
+1. Open /scroll in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Scroll the page down. Expect: controls in a column on the right; the page stays scrolled down (more than 500pt).
+3. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the page stays scrolled down (more than 300pt).
+4. Turn the phone upright. Expect: controls in a column on the right; the page stays scrolled down (more than 300pt).
+5. Unfold to the inner screen. Expect: controls inline on the right; the page stays scrolled down (more than 300pt).
+6. Fold to the outer screen. Expect: controls in a column on the right; the page stays scrolled down (more than 300pt).
+7. Scroll back to the top. Expect: controls in a column on the right; the page is at the top (under 50pt).
+
+## scr02: Scroll in the in-app preview (its top bar compacts, #104)
+
+1. Open /scroll in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Scroll the page down (the preview's top bar compacts). Expect: controls in a column on the right in the gap of the preview's own column; the page stays scrolled down (more than 500pt).
+3. Scroll back to the top (the top bar grows back). Expect: controls in a column on the right in the gap of the preview's own column; the page is at the top (under 50pt).
+
+## nav01: Link, Safari Back and Forward, outer screen upright
+
+1. Open / in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap the link "Call to action example". Expect: controls in a column on the right; the address is /book.
+3. Tap Safari's Back. Expect: controls in a column on the right; the address is /.
+4. Swipe in from the right edge (Safari Forward). Expect: controls in a column on the right; the address is /book.
+
+## nav02: Link and Safari Back, outer screen on its side
+
+1. Open / in a Safari tab, folded, on the outer screen, on its side, landscape right (90), no music. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+2. Tap the link "Call to action example". Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the address is /book.
+3. Tap Safari's Back. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the address is /.
+
+## nav03: Link and Safari Back, unfolded
+
+1. Open / in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
+2. Tap the link "Call to action example". Expect: controls inline on the right; the address is /book.
+3. Tap Safari's Back. Expect: controls inline on the right; the address is /.
+
+## nav04: Link and the preview's own Back, in-app preview (sheet)
+
+1. Open / in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Tap the link "Call to action example". Expect: controls in a column on the right in the gap of the preview's own column; the address is /book.
+3. Tap the preview's Back. Expect: controls in a column on the right in the gap of the preview's own column; the address is /.
+
+## kb01: Keyboard up and down, Safari tab, outer screen
+
+1. Open /probe in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap the text field (the keyboard comes up). Expect: controls in a column on the right; the text field has focus; the keyboard is up (data-keyboard).
+3. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; nothing has focus; the keyboard is down.
+
+## kb02: Keyboard up and down, Safari tab, unfolded
+
+1. Open /probe in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
+2. Tap the text field (the keyboard comes up). Expect: controls inline on the right; the text field has focus; the keyboard is up (data-keyboard).
+3. Tap the page outside the field (the keyboard goes down). Expect: controls inline on the right; nothing has focus; the keyboard is down.
+
+## mod01: A full-screen page dialog opened and closed (#79), Safari tab
+
+1. Open /sheet in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap "Weekend in Lisbon" (a full-screen dialog opens). Expect: controls in a column on the right; the dialog is open; Duet shows "Close".
+3. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the dialog is open; Duet shows "Close".
+4. Turn the phone upright. Expect: controls in a column on the right; the dialog is open.
+5. Tap Duet's "Close". Expect: controls in a column on the right; the dialog is closed; Duet no longer shows "Close".
+
+## la01: Live Activity expanded by a long press, Safari tab
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, music playing. Expect: controls in a column on the right.
+2. Long-press the Live Activity in the Dynamic Island (it expands). Expect: controls in a column on the right.
+3. Tap the page (the Live Activity shrinks back). Expect: controls in a column on the right.
+
+## life01: Home, lock and the app switcher, Safari tab
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right; the address is /book?c=sauna.
+3. Press Home, then open Safari again. Expect: controls in a column on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+4. Lock the phone, wake it and unlock. Expect: controls in a column on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+5. Open the app switcher and pick Safari again. Expect: controls in a column on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+
+## life02: Reload while unfolded, then fold
+
+1. Open /book in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
+2. Tap Safari's Reload. Expect: controls inline on the right; the address is /book.
+3. Fold to the outer screen. Expect: controls in a column on the right; the address is /book.
+
+## life03: Home with the in-app preview open
+
+1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
+
+## set01: In-app preview, over full screen style, turned and unfolded
+
+1. Open /book in the in-app preview, over full screen style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Turn the phone on its side, landscape right (90). Expect: controls in a strip in the side inset on the left.
+3. Turn the phone upright. Expect: controls in a column on the right in the gap of the preview's own column.
+4. Unfold to the inner screen. Expect: controls inline on the right.
+5. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
+
+## set02: Dark appearance, call to action, Safari tab (dark True)
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right; Duet shows "Booked".
+
+## set03: Largest text size, call to action, Safari tab (content_size accessibility-extra-extra-extra-large)
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right; the address is /book?c=sauna; Duet shows "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right; Duet shows "Booked".
+
+## pg01: Page /: turned, unfolded and folded, Safari tab
+
+1. Open / in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+3. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right.
+4. Turn the phone upright. Expect: controls in a column on the right.
+5. Unfold to the inner screen. Expect: controls inline on the right.
+6. Fold to the outer screen. Expect: controls in a column on the right.
+
+## pg02: Page /book: turned, unfolded and folded, Safari tab
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+3. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right.
+4. Turn the phone upright. Expect: controls in a column on the right.
+5. Unfold to the inner screen. Expect: controls inline on the right.
+6. Fold to the outer screen. Expect: controls in a column on the right.
+
+## pg03: Page /scroll: turned, unfolded and folded, Safari tab
+
+1. Open /scroll in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+3. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right.
+4. Turn the phone upright. Expect: controls in a column on the right.
+5. Unfold to the inner screen. Expect: controls inline on the right.
+6. Fold to the outer screen. Expect: controls in a column on the right.
+
+## pg04: Page /sheet: turned, unfolded and folded, Safari tab
+
+1. Open /sheet in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+3. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right.
+4. Turn the phone upright. Expect: controls in a column on the right.
+5. Unfold to the inner screen. Expect: controls inline on the right.
+6. Fold to the outer screen. Expect: controls in a column on the right.
+
+## pg05: Page /probe: turned, unfolded and folded, Safari tab
+
+1. Open /probe in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+3. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right.
+4. Turn the phone upright. Expect: controls in a column on the right.
+5. Unfold to the inner screen. Expect: controls inline on the right.
+6. Fold to the outer screen. Expect: controls in a column on the right.
+
+# Journeys
+
 ## j01: a Safari tab, opened folded, on the outer screen, upright, no music
 
 1. Open the page in a Safari tab. Expect: controls in a column on the right.

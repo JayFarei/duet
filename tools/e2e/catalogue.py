@@ -119,7 +119,7 @@ def jid(i):
 
 # ---- plain English -------------------------------------------------------------------------------------------------
 SURFACE_EN = {"tab": "a Safari tab", "sheet": "the in-app preview, sheet style", "default": "the in-app preview, default style",
-              "full": "the in-app preview, full screen style"}
+              "full": "the in-app preview, full screen style", "over": "the in-app preview, over full screen style"}
 
 
 def angle_en(posture, angle):
@@ -182,6 +182,131 @@ def steps_en(start, acts):
     return out
 
 
+# ---- interaction suites (issue #107) --------------------------------------------------------------------------------
+# A suite opens one page in one starting state, then interacts with it: taps on the page and on Duet's controls, scrolls,
+# Safari's own buttons, the keyboard, a modal, the Home button, the lock button, the app switcher, the Dynamic Island.
+# Device steps (turn, unfold, fold, music, Open in Safari) change the state as in a journey; the others keep it, so
+# every step is judged against the placement of the state it ends in, plus its own outcome check:
+#   path        the address after the step, without the e2e and s parameters ("/book?c=sauna")
+#   label       a Duet control labelled this is shown;  no_label: none is
+#   keyboard    Duet's nav carries data-keyboard;  active: the focused element's tag ("input", or None for none)
+#   dialog      a page dialog is open (True) or not (False)
+#   scroll_gt   the page is scrolled down more than this (pt);  scroll_lt: less than this
+#   la          Live Activities running
+# env: dark (appearance), content_size (Dynamic Type), set for the suite and restored after it.
+TAB0, PV0 = ("tab", "closed", 0, False), ("sheet", "closed", 0, False)
+CTA = [  # /book: a class row, its call to action toggling Booked, and Duet's back to the list
+    (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
+    (("tap", "Book · 2 credits"), "Tap Duet's call to action \"Book · 2 credits\"", {"label": "Booked"}),
+    (("tap", "Booked"), "Tap \"Booked\" again", {"label": "Book · 2 credits"}),
+    (("tap", "Classes"), "Tap Duet's back button \"Classes\"", {"path": "/book", "no_label": "Book · 2 credits"}),
+]
+SUITES = [
+    {"id": "ctl01", "title": "Call to action and back, Safari tab, outer screen upright", "page": "/book", "start": TAB0, "steps": CTA},
+    {"id": "ctl02", "title": "Call to action and back, in-app preview (sheet)", "page": "/book", "start": PV0, "steps": CTA},
+    {"id": "ctl03", "title": "Call to action and back, Safari tab, unfolded", "page": "/book", "start": ("tab", "open", 0, False), "steps": CTA},
+    {"id": "ctl04", "title": "Call to action and back, Safari tab, outer screen on its side", "page": "/book", "start": ("tab", "closed", 90, False), "steps": CTA},
+    {"id": "scr01", "title": "Scroll kept across turn, unfold and fold, Safari tab", "page": "/scroll", "start": TAB0, "steps": [
+        (("scroll", 900), "Scroll the page down", {"scroll_gt": 500}),
+        (("turn", 90), None, {"scroll_gt": 300}),
+        (("turn", 0), None, {"scroll_gt": 300}),
+        (("unfold",), None, {"scroll_gt": 300}),
+        (("fold",), None, {"scroll_gt": 300}),
+        (("scroll", -2000), "Scroll back to the top", {"scroll_lt": 50}),
+    ]},
+    {"id": "scr02", "title": "Scroll in the in-app preview (its top bar compacts, #104)", "page": "/scroll", "start": PV0, "steps": [
+        (("scroll", 900), "Scroll the page down (the preview's top bar compacts)", {"scroll_gt": 500}),
+        (("scroll", -2000), "Scroll back to the top (the top bar grows back)", {"scroll_lt": 50}),
+    ]},
+    {"id": "nav01", "title": "Link, Safari Back and Forward, outer screen upright", "page": "/", "start": TAB0, "steps": [
+        (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
+        (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
+        (("forward",), "Swipe in from the right edge (Safari Forward)", {"path": "/book"}),
+    ]},
+    {"id": "nav02", "title": "Link and Safari Back, outer screen on its side", "page": "/", "start": ("tab", "closed", 90, False), "steps": [
+        (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
+        (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
+    ]},
+    {"id": "nav03", "title": "Link and Safari Back, unfolded", "page": "/", "start": ("tab", "open", 0, False), "steps": [
+        (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
+        (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
+    ]},
+    {"id": "nav04", "title": "Link and the preview's own Back, in-app preview (sheet)", "page": "/", "start": PV0, "steps": [
+        (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
+        (("native", "BackButton"), "Tap the preview's Back", {"path": "/"}),
+    ]},
+    {"id": "kb01", "title": "Keyboard up and down, Safari tab, outer screen", "page": "/probe", "start": TAB0, "steps": [
+        (("tap", "Tap to open the keyboard"), "Tap the text field (the keyboard comes up)", {"active": "input", "keyboard": True}),
+        (("blur",), "Tap the page outside the field (the keyboard goes down)", {"active": None, "keyboard": False}),
+    ]},
+    {"id": "kb02", "title": "Keyboard up and down, Safari tab, unfolded", "page": "/probe", "start": ("tab", "open", 0, False), "steps": [
+        (("tap", "Tap to open the keyboard"), "Tap the text field (the keyboard comes up)", {"active": "input", "keyboard": True}),
+        (("blur",), "Tap the page outside the field (the keyboard goes down)", {"active": None, "keyboard": False}),
+    ]},
+    {"id": "mod01", "title": "A full-screen page dialog opened and closed (#79), Safari tab", "page": "/sheet", "start": TAB0, "steps": [
+        (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True, "label": "Close"}),
+        (("turn", 90), None, {"dialog": True, "label": "Close"}),
+        (("turn", 0), None, {"dialog": True}),
+        (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False, "no_label": "Close"}),
+    ]},
+    {"id": "la01", "title": "Live Activity expanded by a long press, Safari tab", "page": "/book", "start": ("tab", "closed", 0, True), "steps": [
+        (("expand",), "Long-press the Live Activity in the Dynamic Island (it expands)", {}),
+        (("blur",), "Tap the page (the Live Activity shrinks back)", {}),
+    ]},
+    {"id": "life01", "title": "Home, lock and the app switcher, Safari tab", "page": "/book", "start": TAB0, "steps": [
+        (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna"}),
+        (("home",), "Press Home, then open Safari again", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
+        (("lock",), "Lock the phone, wake it and unlock", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
+        (("switcher",), "Open the app switcher and pick Safari again", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
+    ]},
+    {"id": "life02", "title": "Reload while unfolded, then fold", "page": "/book", "start": ("tab", "open", 0, False), "steps": [
+        (("native", "ReloadButton"), "Tap Safari's Reload", {"path": "/book"}),
+        (("fold",), None, {"path": "/book"}),
+    ]},
+    {"id": "life03", "title": "Home with the in-app preview open", "page": "/book", "start": PV0, "steps": [
+        (("home",), "Press Home, then open the app again", {}),
+    ]},
+    {"id": "set01", "title": "In-app preview, over full screen style, turned and unfolded", "page": "/book", "start": ("over", "closed", 0, False), "steps": [
+        (("turn", 90), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
+    ]},
+    {"id": "set02", "title": "Dark appearance, call to action, Safari tab", "page": "/book", "start": TAB0, "env": {"dark": True}, "steps": CTA[:2]},
+    {"id": "set03", "title": "Largest text size, call to action, Safari tab", "page": "/book", "start": TAB0, "env": {"content_size": "accessibility-extra-extra-extra-large"}, "steps": CTA[:2]},
+] + [
+    {"id": f"pg{n:02}", "title": f"Page {pg}: turned, unfolded and folded, Safari tab", "page": pg, "start": TAB0, "steps": [
+        (("turn", 90), None, {}), (("turn", 270), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
+    ]} for n, pg in enumerate(("/", "/book", "/scroll", "/sheet", "/probe"), 1)
+]
+DEVICE_OPS = {"turn", "unfold", "fold", "music", "safari"}
+SUITE_GAPS = [
+    "Safari's tab bar at the top vs the bottom: the setting is not reachable from the simulator yet.",
+    "A timer Live Activity, and two Live Activities at once: the host starts only its music activity yet.",
+]
+
+
+def check_en(c):
+    out = []
+    for k, v in c.items():
+        out.append({"path": lambda: f"the address is {v}", "label": lambda: f'Duet shows "{v}"', "no_label": lambda: f'Duet no longer shows "{v}"',
+                    "keyboard": lambda: "the keyboard is up (data-keyboard)" if v else "the keyboard is down",
+                    "active": lambda: "the text field has focus" if v else "nothing has focus",
+                    "dialog": lambda: "the dialog is open" if v else "the dialog is closed",
+                    "scroll_gt": lambda: f"the page stays scrolled down (more than {v}pt)", "scroll_lt": lambda: f"the page is at the top (under {v}pt)",
+                    "la": lambda: f"{v} Live Activities running"}[k]())
+    return out
+
+
+def suite_steps(suite):
+    """[(action, state after it, words, expected words, check)] for a suite, the open first."""
+    cur = suite["start"]
+    out = [(("open",), cur, f'Open {suite["page"]} in {SURFACE_EN[cur[0]]}, {state_en(cur)}', expect_en(cur), {})]
+    for a, words, check in suite["steps"]:
+        if a[0] in DEVICE_OPS:
+            words = words or action_en(a, cur)
+            cur = after(a, cur)
+        out.append((a, cur, words, "; ".join([expect_en(cur)] + check_en(check)), check))
+    return out
+
+
 def markdown():
     js = journeys()
     edges = sum(len(transitions(st)) for st in STATES)
@@ -199,6 +324,15 @@ def markdown():
         *[f"- {g}" for g in GAPS],
         "",
     ]
+    lines += ["# Interaction suites (#107)", "",
+              "Each suite opens one page, then interacts with it; every step is filmed and judged against the placement of the state it ends in, plus its own outcome. Play one: `tools/e2e/run.sh --catalogue --only ctl01`.", "",
+              "Not covered yet:", "", *[f"- {g}" for g in SUITE_GAPS], ""]
+    for su in SUITES:
+        lines += [f'## {su["id"]}: {su["title"]}' + (f' ({", ".join(f"{k} {v}" for k, v in su["env"].items())})' if su.get("env") else ""), ""]
+        for n, (a, st, words, exp, _) in enumerate(suite_steps(su), 1):
+            lines.append(f"{n}. {words}. Expect: {exp}.")
+        lines.append("")
+    lines += ["# Journeys", ""]
     for i, (start, acts) in enumerate(js):
         lines += [f"## {jid(i)}: {SURFACE_EN[start[0]]}, opened {state_en(start)}", ""]
         for n, (a, st, words, exp) in enumerate(steps_en(start, acts), 1):
