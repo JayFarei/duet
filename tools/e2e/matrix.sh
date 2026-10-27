@@ -3,8 +3,12 @@
 #   tools/e2e/matrix.sh [--only j01,j07] [--page /confirm]
 # Builds once (duet-ui, fold.bin, the host and its runner), starts the site on :3140 once, then runs one run.sh per
 # simulator, each with its own beacon and runner (BEACON_PORT 3151, 3152, ...) and every Nth journey (--shard i/N).
+# Confirm pass: the journeys with a red step re-run alone on the first simulator (confirm/). A red that repeats alone
+# is FAIL, one that passes alone is UNVERIFIED ("red under load, passed alone"). Four simulators is the calibrated N
+# (#110): more and timing contention makes false flash and settle reds.
 # Report: tools/e2e/reports/matrix-<ts>/index.html (each shard in shard-i/, its log in shard-i.log).
-# Env: DUO_SIMS, the simulators (default the four "Duo e2e" clones of "Duo Lab").
+# Env: DUO_SIMS, the simulators (default the four "Duo e2e" clones of "Duo Lab"); E2E_SITE_PORT (default 3140).
+# The simulators are shut down when the run ends.
 # Exit: 0 pass, 1 fail, 2 blocked.
 set -e
 E2E="$(cd "$(dirname "$0")" && pwd)"
@@ -13,9 +17,10 @@ SIMS="${DUO_SIMS:-D00CA882-99D4-4B4A-A21E-AE7F96DAADF6 9FCE1601-1100-4AB4-85FF-8
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-27.1.0.app/Contents/Developer}"
 OUT="$E2E/reports/matrix-$(date +%Y%m%d-%H%M%S)"; mkdir -p "$OUT"
 SITE=""
+export E2E_SITE_PORT="${E2E_SITE_PORT:-3140}"
 
 blocked() { echo "BLOCKED: $1"; exit 2; }
-cleanup() { [ -n "$SITE" ] && kill "$SITE" 2>/dev/null || true; }
+cleanup() { [ -n "$SITE" ] && kill "$SITE" 2>/dev/null; for u in $SIMS; do xcrun simctl shutdown "$u" 2>/dev/null; done; true; }
 trap cleanup EXIT INT TERM
 
 N=$(echo $SIMS | wc -w | tr -d ' ')
@@ -25,9 +30,9 @@ xcrun simctl bootstatus "$FIRST" -b >/dev/null || blocked "simulator $FIRST did 
 (cd "$ROOT/packages/duet-ui" && pnpm -s build) || blocked "duet-ui build failed"
 [ "$E2E/fold/fold.bin" -nt "$E2E/fold/fold.m" ] || "$E2E/fold/build.sh" || blocked "fold.bin build failed"
 "$E2E/host/build.sh" "$FIRST" || blocked "host build failed"
-if ! curl -s -o /dev/null -m 2 http://localhost:3140/; then
-  (cd "$ROOT/apps/site" && exec npx next dev -p 3140 -H 0.0.0.0 >"$OUT/site.log" 2>&1) & SITE=$!
-  i=0; until curl -s -o /dev/null -m 2 http://localhost:3140/; do i=$((i+1)); [ $i -gt 120 ] && blocked "site did not start, $OUT/site.log"; sleep 1; done
+if ! curl -s -o /dev/null -m 2 "http://localhost:$E2E_SITE_PORT/"; then
+  (cd "$ROOT/apps/site" && exec npx next dev -p "$E2E_SITE_PORT" -H 0.0.0.0 >"$OUT/site.log" 2>&1) & SITE=$!
+  i=0; until curl -s -o /dev/null -m 2 "http://localhost:$E2E_SITE_PORT/"; do i=$((i+1)); [ $i -gt 120 ] && blocked "site did not start, $OUT/site.log"; sleep 1; done
 fi
 
 # Phased start: boot one simulator, start its shard, and boot the next only once that shard plays its first step.
@@ -45,6 +50,17 @@ for u in $SIMS; do
 done
 echo "$N shards running, logs in $OUT/shard-*.log"
 for p in $PIDS; do wait "$p" || true; done
+
+REDS=$("$E2E/.venv/bin/python" -I -c '
+import glob, json, sys
+ids = {j["id"] for f in glob.glob(sys.argv[1] + "/shard-*/results.json") for j in json.load(open(f))["journeys"] if j["status"] == "FAIL"}
+print(",".join(sorted(ids)))' "$OUT")
+if [ -n "$REDS" ]; then
+  for u in $SIMS; do [ "$u" = "$FIRST" ] || xcrun simctl shutdown "$u" 2>/dev/null || true; done
+  echo "confirm pass, alone on $FIRST: $REDS"
+  BEACON_PORT=3151 DUO_UDID="$FIRST" E2E_SHARED=1 "$E2E/run.sh" --catalogue "$@" --only "$REDS" --out "$OUT/confirm" \
+    >"$OUT/confirm.log" 2>&1 || true
+fi
 
 set +e
 "$E2E/.venv/bin/python" -I "$E2E/e2e.py" --merge "$OUT"

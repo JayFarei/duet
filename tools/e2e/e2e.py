@@ -790,10 +790,18 @@ class Run:
 
     def open_in_safari(s, tok):
         def act(sid, t0):
-            r = cmd("tap", bundle=PREVIEW_SVC, label="Open in Safari")
-            if not r or not r.get("ok"):
-                s.why = f"tap Open in Safari failed: {r}"
+            # A query, not the snapshot behind native(): a turned preview's snapshot leaves out its top-right buttons.
+            # Its frame is in closed screen points, so the simulator helper taps it; the runner's own tap goes
+            # through SpringBoard's portrait points and misses on a turned screen.
+            end, el = time.time() + 5, None
+            while el is None and time.time() < end:
+                els = (cmd("find", bundle=PREVIEW_SVC, label="Open in Safari") or {}).get("elements") or []
+                el = next((e for e in els if e["type"] == 9), None)  # 9: button
+                el or time.sleep(0.3)
+            if el is None:
+                s.why = f"no Open in Safari button in the preview at {s.angle}"
                 return None
+            s.sim.tap(el["x"] + el["w"] / 2, el["y"] + el["h"] / 2, hold=0.12)
             gone = s.page  # the preview's document keeps reporting while it is dismissed: follow the new tab's
             return s.wait(sid, tok, lambda r: r.get("page") != gone and not r.get("preview"), t0)
         s.last = None  # a new document: no old placement to keep
@@ -1163,6 +1171,14 @@ class Run:
         """A journey's starting condition, before the page opens: posture and angle (fold.bin), then the music (the
         host in front starts the Live Activity, then Safari comes back in front). False, with s.why, when not reached."""
         _, posture, angle, music = state
+        try:  # a page this site does not serve proves nothing about placement: not run, not a FAIL
+            urllib.request.urlopen(SITE + s.page_path, timeout=120).close()
+        except urllib.error.HTTPError as e:
+            s.why = f"page {s.page_path} returns {e.code} on this site"
+            return False
+        except OSError as e:
+            s.why = f"site {SITE} unreachable: {e}"
+            return False
         if (posture, angle) != ("closed", 0):
             if not s.fold(posture, angle):
                 return False
@@ -1639,16 +1655,16 @@ class Run:
             jhtml.append(f'<section class=j><h2 id="{e(j["id"])}">{e(j["id"])}: {e(j["title"])} <span class="{j["status"]}">{j["status"]}</span></h2>'
                          f'<ol>{"".join(items)}</ol>{film}<p><small>Replay: <code>tools/e2e/run.sh --catalogue --only {e(j["id"])}{e(page)}</code></small></p></section>')
         if s.journeys:
-            c = {k: sum(j["status"] == k for j in s.journeys) for k in ("PASS", "FAIL", "BLOCKED")}
+            c = {k: sum(j["status"] == k for j in s.journeys) for k in ("PASS", "FAIL", "BLOCKED", "UNVERIFIED")}
             index = "".join(f'<a class="{j["status"]}" href="#{e(j["id"])}">{e(j["id"])}</a> ' for j in s.journeys)
-            jhtml.insert(0, f'<p><b>{len(s.journeys)} journeys: {c["PASS"]} pass, {c["FAIL"]} fail, {c["BLOCKED"]} blocked.</b> '
+            jhtml.insert(0, f'<p><b>{len(s.journeys)} journeys: {c["PASS"]} pass, {c["FAIL"]} fail, {c["BLOCKED"] + c["UNVERIFIED"]} unverified.</b> '
                             f'Scenarios in plain English: CATALOGUE.md.</p><p class=idx>{index}</p>')
         with open(os.path.join(s.out, "results.json"), "w") as fh:
             json.dump({"results": s.results, "films": s.films, "journeys": s.journeys}, fh)
         with open(os.path.join(s.out, "index.html"), "w") as fh:
             fh.write(f"""<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>Duo e2e report</title>
 <style>body{{font:14px system-ui;margin:16px;background:#fff;color:#111}}table{{border-collapse:collapse;width:100%}}td{{border-top:1px solid #ddd;padding:8px;vertical-align:top}}
-.PASS td:nth-child(2),span.PASS,a.PASS{{color:#080}}.FAIL td:nth-child(2),span.FAIL,a.FAIL{{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2),span.BLOCKED,a.BLOCKED{{color:#a60;font-weight:bold}}small{{color:#666}}
+.PASS td:nth-child(2),span.PASS,a.PASS{{color:#080}}.FAIL td:nth-child(2),span.FAIL,a.FAIL{{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2),span.BLOCKED,a.BLOCKED,.UNVERIFIED td:nth-child(2),span.UNVERIFIED,a.UNVERIFIED{{color:#a60;font-weight:bold}}small{{color:#666}}
 section.j{{border-top:2px solid #ddd;margin-top:24px}}ol li{{margin:4px 0}}.idx a{{display:inline-block;margin:2px 6px 2px 0}}code{{font-size:12px}}
 @media (prefers-color-scheme:dark){{body{{background:#111;color:#eee}}td{{border-color:#333}}}}</style>
 <h1>Duo e2e report</h1><p>{e(s.out)}. Overlay: red = Duet controls, blue = native buttons, green = preview column gap. Frames: 3.2s from 0.3s before the motion onset, one tile per 100ms.</p>
@@ -1708,11 +1724,35 @@ if __name__ == "__main__":
                 r.journeys.append(j)
             r.films += [(n, f"{d}/{x}") for n, x in got["films"]]
         r.journeys.sort(key=lambda j: j["id"])
+        # Confirm pass (matrix.sh): the red journeys re-run alone on one simulator. A red that repeats alone is FAIL; one
+        # that passes alone is UNVERIFIED (timing under load, not a verdict). A step the harness could not judge
+        # (BLOCKED) is UNVERIFIED too: the contract's three values are PASS, FAIL, UNVERIFIED.
+        cf = os.path.join(r.out, "confirm", "results.json")
+        alone = {x["id"]: x for x in json.load(open(cf))["results"]} if os.path.exists(cf) else {}
+        for res in r.results:
+            if res["status"] == "BLOCKED":
+                res["status"] = "UNVERIFIED"
+            if res["status"] != "FAIL":
+                continue
+            c = alone.get(res["id"])
+            if c and c["status"] == "PASS":
+                res["status"] = "UNVERIFIED"
+                res["reasons"] = ["red under load, passed alone"] + res["reasons"]
+            elif c and c["status"] == "FAIL":
+                res["notes"].append("confirmed: red again re-run alone (confirm/)")
+            else:
+                res["notes"].append("not confirmed alone: " + (f'confirm run {c["status"]}' if c else "no confirm run"))
+            if c and c.get("frames"):
+                res["notes"].append(f'alone: confirm/{c["frames"]}')
+        by = {x["id"]: x["status"] for x in r.results}
+        for j in r.journeys:
+            got = {by.get(i, "UNVERIFIED") for i in j["steps"]}
+            j["status"] = "FAIL" if "FAIL" in got else "UNVERIFIED" if got - {"PASS"} else "PASS"
         r.a.catalogue = True
         r.report()
         st = {x["status"] for x in r.results}
         print(f"{len(r.journeys)} journeys, {len(r.results)} steps, report {r.out}/index.html")
-        sys.exit(1 if "FAIL" in st else 2 if "BLOCKED" in st else 0)
+        sys.exit(1 if "FAIL" in st else 2 if st - {"PASS"} else 0)
     if not a.udid:
         ap.error("--udid is required")
     if a.rerender:
