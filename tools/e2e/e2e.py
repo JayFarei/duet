@@ -1316,7 +1316,7 @@ if __name__ == "__main__":
     if a.merge:
         # Shard reports keep their files; the merged report points into them (shard-i/shots/...).
         r = Run.__new__(Run); r.a, r.out, r.results, r.films, r.journeys = a, os.path.abspath(a.merge), [], [], []
-        for d in sorted(x for x in os.listdir(r.out) if x.startswith("shard-")):
+        for d in sorted(x for x in os.listdir(r.out) if x.startswith("shard-") and os.path.isdir(os.path.join(r.out, x))):
             f = os.path.join(r.out, d, "results.json")
             if not os.path.exists(f):
                 r.results.append({"id": d, "kind": "setup", "desc": d, "status": "BLOCKED", "reasons": [f"{d} wrote no results.json (see {d}.log)"], "notes": []})
