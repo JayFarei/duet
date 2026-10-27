@@ -36,6 +36,7 @@ MAX_S = 7.0     # but never longer than this
 SETTLE_S = 0.5  # controls must show in the final placement within this of the final signals
 GRACE_S = 0.15  # the old placement may linger this long after the signals first change (one render of the chrome)
 SLIDE_S = 0.15  # once shown in the final placement, slots must stop moving within this (no slow slide)
+SPRING_S = 0.6  # a page change in place (a tap opens a page, a call to action turns "Booked") springs its slots (#101)
 GAP_S = 0.15    # sampling gaps longer than this are reported (the page was throttled)
 ICON_SD = 6.0   # a visible slot icon whose screenshot crop has a luminance stddev under this is not painted
 STATE_TIMEOUT = 30
@@ -88,9 +89,26 @@ def address(path):
     return p + ("?" + "&".join(q) if q else "")
 
 
-def duet_buttons(r):
-    """[(label, rect)] of Duet's shown buttons in a sample."""
-    return [(b["label"], b["rect"]) for n in shown_navs(r) for sl in n["slots"] for b in sl.get("buttons") or []]
+def duet_buttons(r, back=False):
+    """[(label, rect)] of Duet's shown buttons in a sample, an open menu's items included. back: only Duet's back (its
+    slot, or a plain menu item), not a tab of the same name ("Classes" is /book's back and its first tab)."""
+    return [(b["label"], b["rect"]) for n in shown_navs(r) for g in n["slots"] + (n.get("menus") or []) for b in g.get("buttons") or []
+            if not back or g.get("slot") == "back" or b.get("role") == "menuitem"]
+
+
+def menu_items(r):
+    """Labels of an open Duet menu's items."""
+    return [b["label"] for n in shown_navs(r) for m in n.get("menus") or [] for b in m.get("buttons") or []]
+
+
+def opener(r):
+    """The rect of the button whose menu holds what Duet folded: "…", else the lone selected tab where the band holds
+    one button (its menu lists the tabs, then the rest: closed landscape, the preview under Live Activities)."""
+    more = next((rc for l, rc in duet_buttons(r) if l == "More"), None)
+    if more:
+        return more
+    tabs = [sl for n in shown_navs(r) for sl in n["slots"] if sl["slot"] == "tabs" and len(sl.get("buttons") or []) == 1]
+    return tabs[0]["buttons"][0]["rect"] if tabs else None
 
 
 def key(r):
@@ -243,7 +261,7 @@ class Run:
         s.assess(res, allr, native, expect, t0, kind, prev)
         s.check_icons(res, shot)
         if check:
-            s.verify(res, allr[-1] if allr else None, check)
+            s.verify(res, allr[-1] if allr else None, check, sid, tok, kind)
         sheet = s.stop_record(rec, t0 + (res.get("t") or {}).get("change", 0)) if rec else None
         if sheet:
             res["frames"] = os.path.relpath(sheet, s.out)
@@ -495,13 +513,18 @@ class Run:
                 bad.append(f"settled {(t_ok - t_final) / 1000:.2f}s after the final signals (> {SETTLE_S}s)")
             # 5. no slide: once in the final placement under the final signals, slot rects stop moving within SLIDE_S
             # (the same placement before the change, e.g. column/right at 270 then 0, has other rects by design).
+            # A page change in the same placement (other slots or labels) springs from where it happens, for up to SPRING_S.
             if want is not None:
-                t_ok = max(t_ok, t_final)
-                fin = [r for r in allr if r["rx"] >= t_ok]
+                t_ok, lim = max(t_ok, t_final), SLIDE_S
                 rects = lambda r: {x["slot"]: x["rect"] for x in all_slots(r)}
                 end = rects(last)
+                content = lambda r: (sorted(rects(r)), sorted(l for l, _ in duet_buttons(r)))
+                chg = [r for r in allr if r["rx"] >= t_ok and shown_place(r) is not None and content(r) != content(last)]
+                if chg:
+                    t_ok, lim = chg[-1]["rx"], SPRING_S
+                fin = [r for r in allr if r["rx"] >= t_ok]
                 moving = [r for r in fin if any(abs(r2[c] - end[sl][c]) > 2 for sl, r2 in rects(r).items() if sl in end for c in ("x", "y", "w", "h"))]
-                if moving and moving[-1]["rx"] - t_ok > SLIDE_S * 1000:
+                if moving and moving[-1]["rx"] - t_ok > lim * 1000:
                     m = moving[0]
                     bad.append(f"slots slide for {moving[-1]['rx'] - t_ok:.0f}ms after showing (e.g. {rects(m)} -> {end})"[:300])
         # 6. native overlap and the preview gap, on the final sample. Closed: screen points. Unfolded: window points
@@ -1138,13 +1161,21 @@ class Run:
         raise ValueError(action)
 
     # ---- interaction suites (catalogue.SUITES, issue #107) --------------------------------------------------------
-    def verify(s, res, r, check):
-        """A suite step's own outcome (catalogue.py, interaction suites), on the step's final sample."""
+    def verify(s, res, r, check, sid, tok, kind):
+        """A suite step's own outcome (catalogue.py, interaction suites), on the step's final sample. A label Duet
+        folded away is looked for in its menu, opened and closed again as a user would."""
         bad = []
         if r is None:
             bad.append("outcome not checked: no sample from the page")
         else:
             labels = [l for l, _ in duet_buttons(r)]
+            want = [v for k, v in check.items() if k in ("label", "no_label")]
+            if any(v not in labels for v in want) and opener(r):
+                folded = s.menu_labels(sid, tok, kind, r)
+                if folded is None:
+                    bad.append("could not open Duet's menu to look for " + ", ".join(map(repr, want)))
+                else:
+                    labels += folded
             for k, v in check.items():
                 if k == "path" and address(r["path"]) != v:
                     bad.append(f"address is {address(r['path'])}, expected {v}")
@@ -1169,10 +1200,10 @@ class Run:
             res["status"] = "FAIL" if res["status"] != "BLOCKED" else res["status"]
 
     @staticmethod
-    def find(r, name):
+    def find(r, name, back=False):
         """The rect of a control by name in a sample: Duet's buttons first, then the page's targets (aria-label,
-        placeholder or text); an exact name, else one that starts with it."""
-        cands = duet_buttons(r) + [(t["name"], t["rect"]) for t in r.get("targets") or []]
+        placeholder or text); an exact name, else one that starts with it. back: Duet's back only."""
+        cands = duet_buttons(r, back) + ([] if back else [(t["name"], t["rect"]) for t in r.get("targets") or []])
         for ok in (lambda l: l == name, lambda l: l.startswith(name)):
             for l, rc in cands:
                 if l and ok(l) and rc["w"] > 0 and rc["h"] > 0:
@@ -1204,10 +1235,34 @@ class Run:
             s.why = "the page stopped reporting after the step"
         return r
 
+    def menu_labels(s, sid, tok, kind, r):
+        """What Duet's folded menu lists: opens it, reads it, closes it (its "Close" item, else a tap on the page)."""
+        r2 = s.open_menu(sid, tok, kind, r)
+        if r2 is None:
+            return None
+        items = menu_items(r2)
+        close = next((rc for n in shown_navs(r2) for m in n.get("menus") or [] for b in m["buttons"] if b["label"] == "Close" for rc in [b["rect"]]), None)
+        x0, y0 = s.page_origin(r2, kind)
+        rc = close or s.neutral(r2)
+        s.sim.tap(x0 + rc["x"] + rc["w"] / 2, y0 + rc["y"] + rc["h"] / 2, hold=0.12)
+        time.sleep(0.8)
+        return items
+
+    def open_menu(s, sid, tok, kind, r):
+        """Taps the button whose menu holds what Duet folded (opener) and returns a sample with the menu open, or None."""
+        op = opener(r)
+        if op is None:
+            return None
+        x0, y0 = s.page_origin(r, kind)
+        s.sim.tap(x0 + op["x"] + op["w"] / 2, y0 + op["y"] + op["h"] / 2, hold=0.12)
+        time.sleep(0.8)
+        r2 = s.now_sample(sid, tok, time.time() * 1000)
+        return r2 if r2 and menu_items(r2) else None
+
     def neutral(s, r):
-        """A page point (client px) on no control: the page's own targets and Duet's slots avoided."""
+        """A page point (client px) on no control: the page's own targets, Duet's slots and an open menu avoided."""
         g = r["sig"]
-        busy = [t["rect"] for t in r.get("targets") or []] + [sl["rect"] for n in r.get("navs") or [] for sl in n.get("slots") or []]
+        busy = [t["rect"] for t in r.get("targets") or []] + [sl["rect"] for n in r.get("navs") or [] for sl in (n.get("slots") or []) + (n.get("menus") or [])]
         for fy in (0.12, 0.5, 0.3, 0.7, 0.85):
             for fx in (0.15, 0.5, 0.3):
                 x, y = g["innerWidth"] * fx, g["innerHeight"] * fy
@@ -1249,14 +1304,11 @@ class Run:
                 return None
             land = dict(check=check)
             if k == "tap":
-                rc = s.find(r, action[1])
-                more = s.find(r, "More") if rc is None else None
-                if more:  # in a column Duet's back and the overflow are in its "More" menu: open it, as a user would
-                    x0, y0 = s.page_origin(r, kind)
-                    s.sim.tap(x0 + more["x"] + more["w"] / 2, y0 + more["y"] + more["h"] / 2, hold=0.12)
-                    time.sleep(0.8)
-                    r = s.now_sample(sid, tok, time.time() * 1000)
-                    rc = r and s.find(r, action[1])
+                back = action[2:] == ("back",)
+                rc = s.find(r, action[1], back)
+                if rc is None and opener(r):  # folded into "…" or the lone tab's menu: open it, as a user would
+                    r = s.open_menu(sid, tok, kind, r)
+                    rc = r and s.find(r, action[1], back)
                 if rc is None:
                     s.why = f'no control named "{action[1]}" on the page'
                     return None

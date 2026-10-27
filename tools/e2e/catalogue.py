@@ -188,7 +188,7 @@ def steps_en(start, acts):
 # Device steps (turn, unfold, fold, music, Open in Safari) change the state as in a journey; the others keep it, so
 # every step is judged against the placement of the state it ends in, plus its own outcome check:
 #   path        the address after the step, without the e2e and s parameters ("/book?c=sauna")
-#   label       a Duet control labelled this is shown;  no_label: none is
+#   label       Duet offers a control labelled this (on screen, or in the menu it folded into);  no_label: it does not
 #   keyboard    Duet's nav carries data-keyboard;  active: the focused element's tag ("input", or None for none)
 #   dialog      a page dialog is open (True) or not (False)
 #   scroll_gt   the page is scrolled down more than this (pt);  scroll_lt: less than this
@@ -199,7 +199,7 @@ CTA = [  # /book: a class row, its call to action toggling Booked, and Duet's ba
     (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
     (("tap", "Book · 2 credits"), "Tap Duet's call to action \"Book · 2 credits\"", {"label": "Booked"}),
     (("tap", "Booked"), "Tap \"Booked\" again", {"label": "Book · 2 credits"}),
-    (("tap", "Classes"), "Tap Duet's back \"Classes\" (in a column, from its More menu)", {"path": "/book", "no_label": "Book · 2 credits"}),
+    (("tap", "Classes", "back"), "Tap Duet's back \"Classes\" (from \"…\" or the tab's menu where it folded)", {"path": "/book", "no_label": "Book · 2 credits"}),
 ]
 SUITES = [
     {"id": "ctl01", "title": "Call to action and back, Safari tab, outer screen upright", "page": "/book", "start": TAB0, "steps": CTA},
@@ -286,7 +286,7 @@ SUITE_GAPS = [
 def check_en(c):
     out = []
     for k, v in c.items():
-        out.append({"path": lambda: f"the address is {v}", "label": lambda: f'Duet shows "{v}"', "no_label": lambda: f'Duet no longer shows "{v}"',
+        out.append({"path": lambda: f"the address is {v}", "label": lambda: f'Duet offers "{v}"', "no_label": lambda: f'Duet no longer offers "{v}"',
                     "keyboard": lambda: "the keyboard is up (data-keyboard)" if v else "the keyboard is down",
                     "active": lambda: "the text field has focus" if v else "nothing has focus",
                     "dialog": lambda: "the dialog is open" if v else "the dialog is closed",

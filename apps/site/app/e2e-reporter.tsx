@@ -56,6 +56,7 @@ const labels = (el: Element) => [...el.querySelectorAll("button")].map((b) => b.
 // Each visible button of a slot with where it is: the driver taps one by its label (a tab of the pill, the back button).
 const buttons = (el: Element) => [...el.querySelectorAll("button")].filter(shown).map((b) => ({
   label: b.getAttribute("aria-label") ?? (b.textContent ?? "").trim(), rect: rect(b), pressed: b.getAttribute("aria-pressed") ?? b.getAttribute("aria-selected"),
+  role: b.getAttribute("role"),
 }));
 
 // The page's own controls and dialogs, outside Duet, with where they are: the driver taps them by rect (README).
@@ -79,6 +80,8 @@ function sample(s: string | null) {
     slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({
       slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), buttons: buttons(s), expanded: s.getAttribute("data-expanded"),
     })),
+    // An open "…" or tab menu is drawn outside the slots: the driver taps its items (a back folded into "…") by label.
+    menus: [...n.querySelectorAll("[role=menu]")].filter(shown).map((m) => ({ rect: rect(m), buttons: buttons(m) })),
   }));
   // Visible elements that stick out of the layout viewport (clipped content), Duet's own layer and content inside
   // a deliberate inner horizontal scroller narrower than the page (a code block) excluded. Full-bleed wrappers are reported too: the assertion
