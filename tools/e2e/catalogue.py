@@ -39,6 +39,10 @@ def preview_expect(style, angle):
     return {"preview": True, **(PREVIEW if style == "sheet" else PREVIEW_FULL)[angle]}
 UNFOLDED = {"mode": "inline", "side": "right"}
 UNFOLDED_PREVIEW = {"preview": True, **UNFOLDED}
+# The default, full and over styles fill the open screen. Wide (angle 0), every native button is in the top bar and
+# the status column (clock, island, Live Activities) heads the 84pt inset on the right: the controls take that strip,
+# below it. Tall, inline on the right, below the top bar and the island (matrix 2026-10-27, j26 to j36).
+UNFOLDED_PREVIEW_FULL = {0: {"preview": True, "mode": "strip", "side": "right"}}
 # Split view (wide inner display only, two 469x669 panes): the page cannot tell which pane it is in, so the column
 # is drawn on both edges and the native column of whichever pane hides the far copy (EXPECTED.md).
 SPLIT = {"mode": "column", "side": "both"}
@@ -56,7 +60,9 @@ def expect(state, sig=None):
     and the top bars one (opened or folded into landscape); which one Safari chose is read from the final sample."""
     surface, posture, angle, _ = state
     if posture == "open":
-        return dict(UNFOLDED_PREVIEW) if surface != "tab" else {"preview": False, **UNFOLDED}
+        if surface == "tab":
+            return {"preview": False, **UNFOLDED}
+        return dict(UNFOLDED_PREVIEW_FULL.get(angle, UNFOLDED_PREVIEW) if surface != "sheet" else UNFOLDED_PREVIEW)
     if surface != "tab":
         return preview_expect(surface, angle)
     if angle and sig and top_bars(sig):

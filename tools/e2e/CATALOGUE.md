@@ -169,7 +169,7 @@ Not covered yet:
 1. Open /book in the in-app preview, over full screen style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
 2. Turn the phone on its side, landscape right (90). Expect: controls in a strip in the side inset on the left.
 3. Turn the phone upright. Expect: controls in a column on the right in the gap of the preview's own column.
-4. Unfold to the inner screen. Expect: controls inline on the right.
+4. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
 5. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
 
 ## set02: Dark appearance, call to action, Safari tab (dark True)
@@ -441,7 +441,7 @@ Not covered yet:
 ## j26: the in-app preview, default style, opened folded, on the outer screen, upright, music playing
 
 1. Open the page in the in-app preview, default style. Expect: controls in a column on the right in the gap of the preview's own column.
-2. Unfold to the inner screen. Expect: controls inline on the right.
+2. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
 3. Turn the phone tall, turned right (90). Expect: controls inline on the right.
 4. Turn the phone tall, turned left (270). Expect: controls inline on the right.
 5. Fold to the outer screen. Expect: controls in a strip in the side inset on the right.
@@ -453,7 +453,7 @@ Not covered yet:
 
 1. Open the page in the in-app preview, default style. Expect: controls in a strip in the side inset on the left.
 2. Unfold to the inner screen. Expect: controls inline on the right.
-3. Turn the phone wide (951x669). Expect: controls inline on the right.
+3. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
 4. Turn the phone tall, turned left (270). Expect: controls inline on the right.
 5. Fold to the outer screen. Expect: controls in a strip in the side inset on the right.
 6. Turn the phone upright. Expect: controls in a column on the right in the gap of the preview's own column.
@@ -465,11 +465,11 @@ Not covered yet:
 1. Open the page in the in-app preview, default style. Expect: controls in a strip in the side inset on the left.
 2. Turn the phone on its side, landscape left (270). Expect: controls in a strip in the side inset on the right.
 3. Unfold to the inner screen. Expect: controls inline on the right.
-4. Turn the phone wide (951x669). Expect: controls inline on the right.
-5. Stop the music (the Live Activity ends). Expect: controls inline on the right.
+4. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
+5. Stop the music (the Live Activity ends). Expect: controls in a strip in the side inset on the right.
 6. Turn the phone tall, turned right (90). Expect: controls inline on the right.
 7. Turn the phone tall, turned left (270). Expect: controls inline on the right.
-8. Turn the phone wide (951x669). Expect: controls inline on the right.
+8. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
 
 ## j29: the in-app preview, default style, opened folded, on the outer screen, on its side, landscape left (270), no music
 
@@ -477,7 +477,7 @@ Not covered yet:
 2. Turn the phone on its side, landscape right (90). Expect: controls in a strip in the side inset on the left.
 3. Start music (a Live Activity in the Dynamic Island). Expect: controls in a strip in the side inset on the left.
 4. Unfold to the inner screen. Expect: controls inline on the right.
-5. Turn the phone wide (951x669). Expect: controls inline on the right.
+5. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
 6. Turn the phone tall, turned left (270). Expect: controls inline on the right.
 7. Turn the phone tall, turned right (90). Expect: controls inline on the right.
 8. Stop the music (the Live Activity ends). Expect: controls inline on the right.
@@ -490,18 +490,18 @@ Not covered yet:
 
 ## j31: the in-app preview, default style, opened unfolded, on the inner screen, wide (951x669), no music
 
-1. Open the page in the in-app preview, default style. Expect: controls inline on the right.
+1. Open the page in the in-app preview, default style. Expect: controls in a strip in the side inset on the right.
 2. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
 3. Start music (a Live Activity in the Dynamic Island). Expect: controls in a column on the right in the gap of the preview's own column.
 4. Stop the music (the Live Activity ends). Expect: controls in a column on the right in the gap of the preview's own column.
-5. Unfold to the inner screen. Expect: controls inline on the right.
-6. Start music (a Live Activity in the Dynamic Island). Expect: controls inline on the right.
+5. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
+6. Start music (a Live Activity in the Dynamic Island). Expect: controls in a strip in the side inset on the right.
 7. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
 8. Tap Open in Safari in the preview. Expect: controls in a column on the right.
 
 ## j32: the in-app preview, default style, opened unfolded, on the inner screen, wide (951x669), music playing
 
-1. Open the page in the in-app preview, default style. Expect: controls inline on the right.
+1. Open the page in the in-app preview, default style. Expect: controls in a strip in the side inset on the right.
 
 ## j33: the in-app preview, default style, opened unfolded, on the inner screen, tall, turned right (90), no music
 
@@ -541,7 +541,7 @@ Not covered yet:
 ## j38: the in-app preview, full screen style, opened folded, on the outer screen, upright, music playing
 
 1. Open the page in the in-app preview, full screen style. Expect: controls in a column on the right in the gap of the preview's own column.
-2. Unfold to the inner screen. Expect: controls inline on the right.
+2. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
 3. Turn the phone tall, turned right (90). Expect: controls inline on the right.
 4. Turn the phone tall, turned left (270). Expect: controls inline on the right.
 5. Fold to the outer screen. Expect: controls in a strip in the side inset on the right.
@@ -553,7 +553,7 @@ Not covered yet:
 
 1. Open the page in the in-app preview, full screen style. Expect: controls in a strip in the side inset on the left.
 2. Unfold to the inner screen. Expect: controls inline on the right.
-3. Turn the phone wide (951x669). Expect: controls inline on the right.
+3. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
 4. Turn the phone tall, turned left (270). Expect: controls inline on the right.
 5. Fold to the outer screen. Expect: controls in a strip in the side inset on the right.
 6. Turn the phone upright. Expect: controls in a column on the right in the gap of the preview's own column.
@@ -565,11 +565,11 @@ Not covered yet:
 1. Open the page in the in-app preview, full screen style. Expect: controls in a strip in the side inset on the left.
 2. Turn the phone on its side, landscape left (270). Expect: controls in a strip in the side inset on the right.
 3. Unfold to the inner screen. Expect: controls inline on the right.
-4. Turn the phone wide (951x669). Expect: controls inline on the right.
-5. Stop the music (the Live Activity ends). Expect: controls inline on the right.
+4. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
+5. Stop the music (the Live Activity ends). Expect: controls in a strip in the side inset on the right.
 6. Turn the phone tall, turned right (90). Expect: controls inline on the right.
 7. Turn the phone tall, turned left (270). Expect: controls inline on the right.
-8. Turn the phone wide (951x669). Expect: controls inline on the right.
+8. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
 
 ## j41: the in-app preview, full screen style, opened folded, on the outer screen, on its side, landscape left (270), no music
 
@@ -577,7 +577,7 @@ Not covered yet:
 2. Turn the phone on its side, landscape right (90). Expect: controls in a strip in the side inset on the left.
 3. Start music (a Live Activity in the Dynamic Island). Expect: controls in a strip in the side inset on the left.
 4. Unfold to the inner screen. Expect: controls inline on the right.
-5. Turn the phone wide (951x669). Expect: controls inline on the right.
+5. Turn the phone wide (951x669). Expect: controls in a strip in the side inset on the right.
 6. Turn the phone tall, turned left (270). Expect: controls inline on the right.
 7. Turn the phone tall, turned right (90). Expect: controls inline on the right.
 8. Stop the music (the Live Activity ends). Expect: controls inline on the right.
@@ -590,18 +590,18 @@ Not covered yet:
 
 ## j43: the in-app preview, full screen style, opened unfolded, on the inner screen, wide (951x669), no music
 
-1. Open the page in the in-app preview, full screen style. Expect: controls inline on the right.
+1. Open the page in the in-app preview, full screen style. Expect: controls in a strip in the side inset on the right.
 2. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
 3. Start music (a Live Activity in the Dynamic Island). Expect: controls in a column on the right in the gap of the preview's own column.
 4. Stop the music (the Live Activity ends). Expect: controls in a column on the right in the gap of the preview's own column.
-5. Unfold to the inner screen. Expect: controls inline on the right.
-6. Start music (a Live Activity in the Dynamic Island). Expect: controls inline on the right.
+5. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
+6. Start music (a Live Activity in the Dynamic Island). Expect: controls in a strip in the side inset on the right.
 7. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
 8. Tap Open in Safari in the preview. Expect: controls in a column on the right.
 
 ## j44: the in-app preview, full screen style, opened unfolded, on the inner screen, wide (951x669), music playing
 
-1. Open the page in the in-app preview, full screen style. Expect: controls inline on the right.
+1. Open the page in the in-app preview, full screen style. Expect: controls in a strip in the side inset on the right.
 
 ## j45: the in-app preview, full screen style, opened unfolded, on the inner screen, tall, turned right (90), no music
 

@@ -18,8 +18,9 @@ blocked() { echo "BLOCKED: $1"; exit 2; }
 cleanup() { [ -n "$SITE" ] && kill "$SITE" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
-N=0; for u in $SIMS; do N=$((N+1)); xcrun simctl boot "$u" 2>/dev/null || true; done
+N=$(echo $SIMS | wc -w | tr -d ' ')
 FIRST=$(echo $SIMS | cut -d' ' -f1)
+xcrun simctl boot "$FIRST" 2>/dev/null || true
 xcrun simctl bootstatus "$FIRST" -b >/dev/null || blocked "simulator $FIRST did not boot"
 (cd "$ROOT/packages/duet-ui" && pnpm -s build) || blocked "duet-ui build failed"
 [ "$E2E/fold/fold.bin" -nt "$E2E/fold/fold.m" ] || "$E2E/fold/build.sh" || blocked "fold.bin build failed"
@@ -29,13 +30,18 @@ if ! curl -s -o /dev/null -m 2 http://localhost:3140/; then
   i=0; until curl -s -o /dev/null -m 2 http://localhost:3140/; do i=$((i+1)); [ $i -gt 120 ] && blocked "site did not start, $OUT/site.log"; sleep 1; done
 fi
 
+# Phased start: boot one simulator, start its shard, and boot the next only once that shard plays its first step.
+# Booting them all at once starves the host: the iOS watchdog kills apps that miss their launch allowance.
+phased_in() { w=0; until grep -q '^\[' "$1" 2>/dev/null; do kill -0 "$2" 2>/dev/null || return 0; w=$((w+1)); [ $w -gt 180 ] && return 0; sleep 1; done; }
 i=0; PIDS=""
 for u in $SIMS; do
   i=$((i+1))
+  xcrun simctl boot "$u" 2>/dev/null || true
+  xcrun simctl bootstatus "$u" -b >/dev/null || { echo "simulator $u did not boot, shard $i not run"; continue; }
   BEACON_PORT=$((3150+i)) DUO_UDID="$u" E2E_SHARED=1 "$E2E/run.sh" --catalogue --shard "$i/$N" --out "$OUT/shard-$i" "$@" \
     >"$OUT/shard-$i.log" 2>&1 &
   PIDS="$PIDS $!"
-  sleep 20  # stagger: four runners and SpringBoard restarts at once starve the first samples
+  phased_in "$OUT/shard-$i.log" $!
 done
 echo "$N shards running, logs in $OUT/shard-*.log"
 for p in $PIDS; do wait "$p" || true; done

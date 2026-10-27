@@ -24,7 +24,7 @@ import workbench  # noqa: E402
 from catalogue import TAB, LANDSCAPE_TOP_BARS, PREVIEW, preview_expect, UNFOLDED, UNFOLDED_PREVIEW, SPLIT  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SITE = "http://localhost:3140"
+SITE = f"http://localhost:{os.environ.get('E2E_SITE_PORT', '3140')}"  # run.sh: E2E_SITE_PORT
 BEACON = "http://localhost:3141"
 HOST = "dev.duolab.e2e.host"
 SAFARI = "com.apple.mobilesafari"
@@ -72,6 +72,16 @@ def cmd(op, **kw):
 
 def sh(*a, check=True):
     return subprocess.run(a, capture_output=True, text=True, check=check)
+
+
+def openurl(udid, url):
+    """simctl openurl, retried once: on a busy host it can time out (exit 60) before Safari takes the URL."""
+    for _ in range(2):
+        r = sh("xcrun", "simctl", "openurl", udid, url, check=False)
+        if r.returncode == 0:
+            return
+        time.sleep(2)
+    r.check_returncode()
 
 
 def samples(step, since=0):
@@ -387,9 +397,12 @@ class Run:
             pane = "right" if back and back["x"] > g["outerWidth"] / 2 else "left"
             return (g["outerWidth"] - g["innerWidth"] if pane == "left" else 0, 0, pane)
         if kind == "preview":
+            # The page ends on the bottom bar holding Back (sheet, tall full screen); with Back in the top bar (wide full
+            # screen) it starts under the bars, as a tab's does.
             W = 669 if g["outerHeight"] > 700 else INNER_W  # the tall posture's screen is 669 wide
+            low = back and back["y"] > g["outerHeight"] / 2
             return ((W - g["outerWidth"]) / 2 if g["outerWidth"] < W else 0,
-                    (back["y"] - g["innerHeight"]) if back else 0, None)
+                    (back["y"] - g["innerHeight"]) if low else g["outerHeight"] - g["innerHeight"], None)
         return (g["outerWidth"] - g["innerWidth"] if back and back["x"] < 60 and g["outerWidth"] > g["innerWidth"] else 0,
                 g["outerHeight"] - g["innerHeight"] if g["outerWidth"] == g["innerWidth"] else 0, None)
 
@@ -723,7 +736,7 @@ class Run:
 
     def open_tab(s, tok):
         def act(sid, t0):
-            sh("xcrun", "simctl", "openurl", s.udid, s.url(tok))
+            openurl(s.udid, s.url(tok))
             return s.wait(sid, tok, lambda r: not r.get("preview"), t0)
         return act
 
