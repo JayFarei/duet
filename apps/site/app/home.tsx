@@ -47,7 +47,8 @@ function Site({ self }: { self: boolean }) {
   const theme = useTheme();
   const { tint } = useTint();
   const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
-  if (device === "iphone" && height > width && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
+  const portrait = device === "iphone" && height > width;
+  if (portrait && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
       tabs={{ items: SECTIONS, selected: tab, onSelect: go }}
@@ -60,7 +61,8 @@ function Site({ self }: { self: boolean }) {
       appearance={theme.appearance}
       tint={tint}
     >
-      <Page self={self} />
+      {/* On a portrait iPhone the side controls float over the page, which keeps the layout of the bars. */}
+      {portrait ? <div className="float"><Page self={self} /></div> : <Page self={self} />}
     </Duet>
   );
 }
