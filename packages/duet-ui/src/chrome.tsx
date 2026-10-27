@@ -184,8 +184,21 @@ function viewport(key: string, value: string) {
   for (const meta of metas) if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
-function useColumnLayer(on: boolean, split: boolean, left: boolean, column: number) {
+// Leaving the column, the sideways scroll the layer pinned stays behind: from a split left pane turned into the tall
+// window (inline), the document kept scrollX -84 with nothing to scroll, and Safari then painted the pill's glass but
+// not its unselected tab icons (e2e round 4, splitturn-left-to90). So when the mode leaves the column (not while the
+// column is only hidden mid-turn), the scroll goes back to 0, again as Safari restores the old offset on the resize.
+function useColumnLayer(on: boolean, split: boolean, left: boolean, column: number, inColumn: boolean) {
   const refs = [useRef<HTMLElement>(null), useRef<HTMLElement>(null)] as const;
+  const was = useRef(inColumn);
+  useEffect(() => {
+    const left = was.current && !inColumn;
+    was.current = inColumn;
+    if (!left || emulatedSignals()) return;
+    const reset = () => { if (Math.round(scrollX) !== 0) scrollTo({ left: 0, top: scrollY, behavior: "instant" }); };
+    const t = [0, 300, 1000].map((ms) => setTimeout(reset, ms));
+    return () => t.forEach(clearTimeout);
+  }, [inColumn]);
   useEffect(() => {
     const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
     if (!on || !els.length) return;
@@ -364,7 +377,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
     // inset, closed and unfolded; pages pad their top content by this much to stay sharp.
-    r.setProperty("--duet-inset-top", ctx.mode === "strip" ? `${DUO.edgeBlur}px` : "0px");
+    r.setProperty("--duet-inset-top", ctx.mode === "strip" && ctx.standalone ? `${DUO.edgeBlur}px` : "0px");
     // Safari's URL pill floats below the layout viewport (the column holds nothing above the page), so the scroller
     // runs on under it like a document that scrolls, and the last content scrolls clear of it.
     r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height)}px` : "0px");
@@ -380,7 +393,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
-  const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column);
+  const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column");
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
     if (!menu) return;

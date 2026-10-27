@@ -42,7 +42,8 @@ On every sample:
 
 On the final state:
 
-- preview flag, mode, side and `hidden` match the expectation (Safari tab: column right at 0 and 270, left at 90; preview portrait: column in the native gap; preview landscape: hidden, see EXPECTED.md; unfolded: strip or inline per the window).
+- preview flag, mode, side and `hidden` match the expectation (Safari tab: column right at 0 and 270, left at 90; preview portrait: column in the native gap; preview landscape: sheet hidden, default and full a strip in the turned-side safe-area inset below the native top bar; unfolded: inline right, preview flag set).
+- every icon a visible slot draws (its svg rects, reported per slot) is painted: its crop of the final screenshot has a luminance standard deviation of at least 6 (painted icons measure 45 to 120). Catches the round 3 pill that showed only the selected tab's icon.
 - settle: the last placement change is within 0.5s of the last signal change; slide: slot rects stop moving within 0.15s.
 - closed: no overlap with native buttons, and in the preview the slots sit in the gap between Page Menu (or Cancel/Done/Close) and Back.
 - unfolded: no overlap with Safari's or the preview's native buttons, in window points (Geometry); every slot inside the window is fully inside it; in split view at least two controls show in Safari's pane.
@@ -88,5 +89,9 @@ The second app is always `DuoE2EHost` (`dev.duolab.e2e.host`), never another Hom
 - Split view exists only in the wide unfolded posture: turning to the tall posture keeps the focused app full screen, and so does folding; split view does not come back on turning wide again.
 - Live Activities cannot be started on the simulator without an app that owns one, so the island-pushed variant of the preview gap is covered by unit fixtures (`DUO.island` reach). `dynamic-type` runs the preview and the tab at the largest accessibility text size instead: Safari's and the preview's buttons are fixed size, so the gap must not move. Safari's bottom bar does grow there (98 -> 106pt), which the library's column signature now admits.
 - Folding with the preview open (`pvu-fold`) intermittently leaves WebKit reporting a negative `visualViewport.height` (-78) until the next resize; the library treats a non-positive visual height as no keyboard (`keyboardUp`), else the controls hid as if the keyboard were up.
+- No split view in the tall posture, so there is nothing to place there; `split-turn` checks that Safari takes the screen.
+- `split-drag` (experimental, only with `--only split-drag`) tries a direct pane swap by dragging the pane's top handle. Round 4: blocked, the drag does not swap the panes and the simulator's accessibility tree exposes no pane handle to aim at (the dump is saved as `steps/<step>-ui.json`). `split` moves between panes through full width (quit the other app, open in split view on the other side), the path SpringBoard drives reliably.
+- Unfolded steps without native frames (the preview sheet unfolded) skip the overlap and icon checks: slot positions in the window come from the native frames.
+- One render after a viewport resize is not judged off screen: the page samples the new size before React has re-placed the controls (`pvu-tall`, round 3). A JS-positioned layout always has that frame.
 - Only the simulator: physical Duo devices are not driven. Real-device geometry is pinned in unit fixtures (`packages/duet-ui/test/`).
 - The simulator helper is a single client process per run; other agents' helpers on other simulators are unaffected, but never kill runners or helpers by name (`pkill`): an earlier round did and stopped another agent's runner.

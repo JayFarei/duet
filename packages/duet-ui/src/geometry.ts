@@ -173,6 +173,11 @@ export function previewReason(s: Signals): string | undefined {
   if (s.standalone || browserOf(s.userAgent) !== "safari") return;
   if (s.pixelRatio === PREVIEW.pixelRatio && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height) return "375x667 window at 3x";
   const chrome = s.outerHeight - s.innerHeight;
+  // The sheet on the open screen (e2e round 3/4: 653x661 wide, 653x869 tall, no column, inset 0 or 34): no Safari
+  // window has these sizes.
+  if (UNFOLDED_SHEETS.some(([a, b]) => Math.abs(s.outerWidth - a) <= 1 && Math.abs(s.outerHeight - b) <= 1)
+    && s.outerWidth - s.innerWidth <= 2 && within(chrome, LANDED.chrome))
+    return `${s.outerWidth}x${s.outerHeight} sheet on the open screen, inset ${s.insetBottom}`;
   // A tab measured inset 0 in every state (fresh, scrolled, keyboard, landscape); the preview 34.
   if (s.insetBottom < 20) return;
   // Turned full screen (iOS 27.1, every presentation but a sheet): the whole 678x466 window, no page column (the
@@ -285,9 +290,18 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
   if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }) };
+  // The turned full-screen preview (default and full styles, iOS 27.1): its buttons all sit in a top bar, and the 84pt
+  // safe-area inset on the side the Duo is turned to (left at 90, right at 270) is page area nothing native uses
+  // below that bar. The controls take it, like a Home Screen app's strip (e2e round 4: the sheet turned has only a
+  // ~26pt gap in its column, so it stays hidden).
+  const band: Side | undefined = s.insetLeft >= STRIP_INSET ? "left" : s.insetRight >= STRIP_INSET ? "right" : undefined;
+  if (preview && landscape && closed && band && browser === "safari" && !s.standalone && !s.framed)
+    return { ...base, mode: "strip", layout: layoutOf(s.innerWidth - INLINE_WIDTH), side: band, screenWidth: s.innerWidth, screenHeight: s.innerHeight, preview };
   // A preview inline: away from its own column (on the side the Duo is turned to, else the right).
-  const away: Side = preview ? (landscape && turned === "left" ? "right" : "left") : "right";
-  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(split && { split }) };
+  // On the open screen the sheet has no column of its own: inline right, like a full-width tab, and never hidden.
+  const onClosed = Math.min(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][0] + 1 && Math.max(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][1] + 1;
+  const away: Side = preview && onClosed ? (landscape && turned === "left" ? "right" : "left") : "right";
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && onClosed && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(split && { split }) };
 }
 
 /** Every window a Safari page on the Duo lands in, as measured (docs/research-notes.md): `page` is how much
@@ -339,8 +353,8 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   heights?: Record<string, number>;
   /** Sticky in-app preview verdict, and the window it was taken in. */
   preview?: boolean; previewKey?: string; previewAt?: number;
-  /** Last context returned, and the stable signals it was committed under. */
-  last?: Context; stableKey?: string;
+  /** Last context returned, the stable signals it was committed under, and its window (outer size). */
+  last?: Context; stableKey?: string; lastKey?: string;
   /** A fold or turn was caught halfway, and the landing (its stable signals, first seen at landAt) must hold until
    *  landUntil before the controls show (LAND_HOLD). */
   moving?: boolean; landKey?: string; landAt?: number; landUntil?: number }
@@ -372,11 +386,19 @@ export const LAND_HOLD = 150;
  *  first PREVIEW_RISE ms of a window (the sheet's late inset); a preview becomes a tab as soon as the rule stops
  *  matching (Open in Safari). */
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false, epoch = 0): Context {
-  if ((s.scale ?? 1) !== 1 && d.last) {
-    const keyboard = keyboardUp(s) || undefined;
-    return { ...d.last, keyboard, confidence: "held" };
-  }
   const key = `${s.outerWidth}x${s.outerHeight}`;
+  // Pinch zoom holds the context committed in this window. A scale off 1 in another window is WebKit's, not the
+  // user's: folding the open preview sheet (653 wide, its document briefly 935) onto the closed screen leaves
+  // visualViewport.scale at 1.0152 with the visual viewport as wide as the page (366), held until the next
+  // gesture (e2e round 4, pvu-open-unfolded-fold). Holding there kept the open screen's inline controls, drawn off
+  // the closed screen, so a window change reads the signals as unzoomed.
+  if ((s.scale ?? 1) !== 1 && d.last) {
+    if (d.lastKey === key) {
+      const keyboard = keyboardUp(s) || undefined;
+      return { ...d.last, keyboard, confidence: "held" };
+    }
+    s = { ...s, scale: 1 };
+  }
   const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`, raw = isPreview(s);
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
@@ -421,6 +443,7 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   c = { ...c, confidence: settling ? "settling" : "sure" };
   // A mobile browser's URL bar grows and shrinks the viewport as the page scrolls, while the window keeps its
   // width and orientation. A desktop window has no such bar: its height is the user's, so it stays current.
+  d.lastKey = key;
   if (c.device === "desktop") return d.last = c;
   const h = `${s.innerWidth}${s.outerWidth > s.outerHeight ? "L" : "P"}`, heights = d.heights ??= {};
   heights[h] = Math.min(heights[h] ?? Infinity, s.innerHeight);
@@ -544,8 +567,10 @@ export function plan(c: Context, s: Spec): Plan {
   // its back + reader rows at their worst-case (island-pushed) position, above its +/tabs pill. strip and
   // inline: viewport coordinates.
   const col = columnBand(c);
-  const top = col ? col.top : c.mode === "strip" ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap;
-  const bottom = col ? col.bottom : c.mode === "strip" ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
+  // The turned preview's strip is a page band below its native top bar, with the home indicator's inset below.
+  const strip = c.mode === "strip" && !c.preview;
+  const top = col ? col.top : strip ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap;
+  const bottom = col ? col.bottom : strip ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
   const centerX = c.side === "left" ? DUO.centerFromEdge : (c.mode === "column" ? c.screenWidth : c.width) - DUO.centerFromEdge;
   const step = DUO.control + DUO.gap;
 

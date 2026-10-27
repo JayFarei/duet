@@ -21,6 +21,24 @@ function shown(el: Element) {
   return cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.01;
 }
 
+// The icons a slot draws (its svg), clipped to the slot, with the opacity they are drawn at: e2e.py crops each one
+// from the screenshot and fails a step whose visible icon is not painted (splitturn-left-to90, round 3).
+function icons(slot: Element) {
+  const box = slot.getBoundingClientRect();
+  return [...slot.querySelectorAll("svg")].flatMap((el) => {
+    let o = 1;
+    for (let e: Element | null = el; e && e !== slot.parentElement; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.display === "none" || cs.visibility === "hidden") return [];
+      o *= Number(cs.opacity);
+    }
+    const r = el.getBoundingClientRect();
+    const x = Math.max(r.left, box.left), y = Math.max(r.top, box.top), x2 = Math.min(r.right, box.right), y2 = Math.min(r.bottom, box.bottom);
+    if (o < 0.3 || x2 - x < 6 || y2 - y < 6) return [];
+    return [{ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, w: Math.round((x2 - x) * 10) / 10, h: Math.round((y2 - y) * 10) / 10 }];
+  });
+}
+
 function label(el: Element) {
   const cls = typeof el.className === "string" ? el.className.trim().split(/\s+/).slice(0, 2).join(".") : "";
   const text = (el.textContent ?? "").trim().replace(/\s+/g, " ").slice(0, 40);
@@ -33,7 +51,7 @@ function sample() {
     mode: n.getAttribute("data-mode"), side: n.getAttribute("data-side"), settling: n.getAttribute("data-settling"),
     hidden: n.getAttribute("data-hidden"), confidence: n.getAttribute("data-confidence"),
     keyboard: n.getAttribute("data-keyboard"), rect: rect(n), shown: shown(n),
-    slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({ slot: s.getAttribute("data-duet-slot"), rect: rect(s) })),
+    slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({ slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s) })),
   }));
   // Visible elements that stick out of the layout viewport (clipped content), Duet's own layer and content inside
   // a deliberate inner horizontal scroller narrower than the page (a code block) excluded. Full-bleed wrappers are reported too: the assertion

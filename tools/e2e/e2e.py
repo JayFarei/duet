@@ -28,6 +28,7 @@ SETTLE_S = 0.5  # controls must show in the final placement within this of the f
 GRACE_S = 0.15  # the old placement may linger this long after the signals first change (one render of the chrome)
 SLIDE_S = 0.15  # once shown in the final placement, slots must stop moving within this (no slow slide)
 GAP_S = 0.15    # sampling gaps longer than this are reported (the page was throttled)
+ICON_SD = 6.0   # a visible slot icon whose screenshot crop has a luminance stddev under this is not painted
 STATE_TIMEOUT = 30
 
 # Rotator orientation per closed-screen angle (fold.bin -deviceOrientation). The page reports landscapeRight as 90.
@@ -38,11 +39,17 @@ TAB = {0: ("column", "right"), 90: ("column", "left"), 270: ("column", "right")}
 # Folding into closed landscape (like opening a tab there) gives Safari's 678x340 window with its bars at the top and
 # no column, so the page has no column to draw into: inline on the default side (EXPECTED.md).
 LANDSCAPE_TOP_BARS = {"preview": False, "mode": "inline", "side": "right"}
-# In-app preview: portrait, in the gap of the preview's own column. Turned, that gap is ~26pt and there is no
-# least-intrusive place left (an inline strip narrows the page, user: "the left inline strip is wrong"), so Duet
-# hides its controls; the page keeps its full width and the preview's own Done/back/share stay (README).
+# In-app preview: portrait, in the gap of the preview's own column. Turned, the sheet's column gap is ~26pt and there
+# is no least-intrusive place left (an inline strip narrows the page, user: "the left inline strip is wrong"), so Duet
+# hides its controls; the page keeps its full width and the preview's own Done/back/share stay (README). The default
+# and full styles turned put every native button in a top bar and leave the 84pt safe-area inset on the turned side
+# free below it: the controls go there, as a strip (round 4).
 PREVIEW = {0: {"mode": "column", "side": "right", "gap": True}, 90: {"hidden": True}, 270: {"hidden": True}}
+PREVIEW_FULL = {**PREVIEW, 90: {"mode": "strip", "side": "left"}, 270: {"mode": "strip", "side": "right"}}
+def preview_expect(style, angle):
+    return {"preview": True, **(PREVIEW if style == "sheet" else PREVIEW_FULL)[angle]}
 UNFOLDED = {"mode": "inline", "side": "right"}
+UNFOLDED_PREVIEW = {"preview": True, **UNFOLDED}
 # Split view (wide inner display only, two 469x669 panes): the page cannot tell which pane it is in, so the column
 # is drawn on both edges and the native column of whichever pane hides the far copy (EXPECTED.md).
 SPLIT = {"mode": "column", "side": "both"}
@@ -105,7 +112,7 @@ def shown_place(r):
 def all_slots(r):
     """[{slot, rect}] over every visible nav; a slot name is prefixed with its side when two navs are drawn."""
     ns = shown_navs(r)
-    return [{"slot": (f'{n.get("side")}:' if len(ns) > 1 else "") + x["slot"], "rect": x["rect"]} for n in ns for x in n["slots"]]
+    return [{"slot": (f'{n.get("side")}:' if len(ns) > 1 else "") + x["slot"], "rect": x["rect"], "icons": x.get("icons", [])} for n in ns for x in n["slots"]]
 
 
 def is_split(g):
@@ -189,7 +196,7 @@ class Run:
         onset = s.motion_onset(p)
         ss = max(0.0, (onset or 0) - 0.3)
         sh("ffmpeg", "-loglevel", "error", "-y", "-i", p, "-vf",
-           f"fps=10:start_time=0,trim=start={ss:.2f}:duration=3.2,setpts=PTS-STARTPTS,scale=160:-1,tile=8x4:padding=4:color=white",
+           f"fps=10:start_time=0,trim=start={ss:.2f}:duration=3.2,setpts=PTS-STARTPTS,scale=360:-1,tile=8x4:padding=4:color=white",
            "-frames:v", "1", sheet, check=False)
         return sheet if os.path.exists(sheet) and os.path.getsize(sheet) > 0 else None
 
@@ -217,6 +224,7 @@ class Run:
         native = s.native(kind)
         shot = s.screenshot(sid)
         s.assess(res, allr, native, expect, t0, kind, prev)
+        s.check_icons(res, shot)
         sheet = s.stop_record(rec, t0 + (res.get("t") or {}).get("change", 0)) if rec else None
         if sheet:
             res["frames"] = os.path.relpath(sheet, s.out)
@@ -405,14 +413,25 @@ class Run:
             bad.append(f'flash: {f["place"][0]}/{f["place"][1]} shown for {f["ms"]}ms at +{f["from"] - t0:.0f}ms (signals {f["key"]})')
         # 2. every visible sample: slots inside the viewport (old-placement samples inside the grace render excepted:
         # their DOM still has the old layout against the new viewport).
-        offs = []
+        # The first sample after the viewport size changes is excepted too: the reporter reads the new size before the
+        # chrome has re-rendered for it (pvu-tall, round 4: one sample of a 542pt-high page mid-turn, already hidden on
+        # the next). A layout that stays off screen fails on the next sample.
+        offs, lagged, size0 = [], 0, None
         for r in allr:
             p = shown_place(r)
+            sz = (r["sig"]["innerWidth"], r["sig"]["innerHeight"], r["sig"]["outerWidth"], r["sig"]["outerHeight"])
+            fresh = size0 is not None and sz != size0
+            size0 = sz
             if p is None or r["rx"] in stale or (prev and p == prev["place"] and key(r) != prev["key"] and r["rx"] < t_change + GRACE_S * 1000):
+                continue
+            if fresh:
+                lagged += bool(s.offscreen(r, kind))
                 continue
             o = s.offscreen(r, kind)
             if o:
                 offs.append((r["rx"] - t0, o[0]))
+        if lagged:
+            note.append(f"{lagged} samples off screen in the render right after a viewport resize, not judged")
         if offs:
             bad.append(f"off screen in {len(offs)} samples, first at +{offs[0][0]:.0f}ms: {offs[0][1]}")
         # 3. final state
@@ -452,12 +471,14 @@ class Run:
         slots = []
         if fp is not None and s.position == "closed":
             x0, y0 = s.origin(last, kind)
-            slots = [{"slot": x["slot"], "x": x["rect"]["x"] + x0, "y": x["rect"]["y"] + y0, "w": x["rect"]["w"], "h": x["rect"]["h"]} for x in all_slots(last)]
+            slots = [{"slot": x["slot"], "x": x["rect"]["x"] + x0, "y": x["rect"]["y"] + y0, "w": x["rect"]["w"], "h": x["rect"]["h"],
+                      "icons": [{**i, "x": i["x"] + x0, "y": i["y"] + y0} for i in x["icons"]]} for x in all_slots(last)]
         elif fp is not None and native:
             x0, y0, pane = s.origin_open(last, kind, native)
             res["pane"] = pane
             ww, wh = g["outerWidth"], g["outerHeight"]
-            slots = [{"slot": x["slot"], "x": x["rect"]["x"] + x0, "y": x["rect"]["y"] + y0, "w": x["rect"]["w"], "h": x["rect"]["h"]} for x in all_slots(last)]
+            slots = [{"slot": x["slot"], "x": x["rect"]["x"] + x0, "y": x["rect"]["y"] + y0, "w": x["rect"]["w"], "h": x["rect"]["h"],
+                      "icons": [{**i, "x": i["x"] + x0, "y": i["y"] + y0} for i in x["icons"]]} for x in all_slots(last)]
             slots = [sl for sl in slots if sl["x"] + sl["w"] > 0 and sl["x"] < ww and sl["y"] < wh]
             for sl in slots:
                 if sl["x"] < -1 or sl["x"] + sl["w"] > ww + 1 or sl["y"] < -1 or sl["y"] + sl["h"] > wh + 1:
@@ -492,6 +513,15 @@ class Run:
                         bad.append(f'{sl["slot"]} not in the preview column gap (x {cx:.0f}..{cx2:.0f}, y {top:.0f}..{bot:.0f}), at {sl["x"]:.0f},{sl["y"]:.0f}')
             else:
                 bad.append("preview column buttons not found, gap not measured")
+        # Turned default/full preview: the strip sits in the 84pt safe-area band, below the native top bar.
+        if expect.get("preview") and expect.get("mode") == "strip" and slots:
+            bar = [e for e in native if e["y"] + e["h"] <= 90 and e["h"] <= 60]
+            if not bar:
+                note.append("preview top bar buttons not found, band clearance checked by overlap only")
+            floor = max((e["y"] + e["h"] for e in bar), default=0)
+            for sl in slots:
+                if sl["y"] < floor - 1:
+                    bad.append(f'{sl["slot"]} above the preview top bar bottom ({floor:.0f}), at y {sl["y"]:.0f}')
         # 7. overflow / clipping / content under controls, on the final sample
         sx, W0 = last["scroll"]["x"], last["scroll"]["clientWidth"]
         lo, hi = min(0, -sx), max(W0, W0 - sx)
@@ -521,12 +551,9 @@ class Run:
         s.results.append(res)
         s.log(f"  {res['status']} " + "; ".join(res["reasons"]) + (f"  [{'; '.join(res['notes'])}]" if res["notes"] else ""))
 
-    def overlay(s, res, shot):
-        """Draws Duet's slots (red), native buttons (blue) and the preview gap (green) on the screenshot."""
-        try:
-            from PIL import Image, ImageDraw
-        except ImportError:
-            return None
+    def frame(s, res, shot):
+        """The screenshot turned upright, and the map from slot points (screen or window) to its pixels."""
+        from PIL import Image
         im = Image.open(shot).convert("RGB")
         a = (res.get("final") or {}).get("angle", 0)
         opened = res.get("position") == "open"
@@ -537,17 +564,53 @@ class Run:
             dx = INNER_W - 469 if res.get("pane") == "right" else 0
         else:
             k, dx = im.width / (678 if im.width > im.height else 466), 0
+        return im, (lambda r: [(r["x"] + dx) * k, r["y"] * k, (r["x"] + dx + r["w"]) * k, (r["y"] + r["h"]) * k])
+
+    def check_icons(s, res, shot):
+        """Every icon a visible slot draws must be painted: its crop in the final screenshot has contrast (an icon
+        stroke on glass), not one flat colour. Catches a pill whose unselected tab icons never painted (round 3)."""
+        if not shot or res.get("status") == "BLOCKED" or not res.get("slots"):
+            return
+        try:
+            from PIL import ImageStat
+            im, box = s.frame(res, shot)
+        except Exception as e:  # noqa: BLE001
+            res["notes"].append(f"icons not checked ({e})"); return
+        blank, n = [], 0
+        for sl in res["slots"]:
+            for i in sl.get("icons", []):
+                b = [round(v) for v in box(i)]
+                if b[0] < 0 or b[1] < 0 or b[2] > im.width or b[3] > im.height or b[2] - b[0] < 4 or b[3] - b[1] < 4:
+                    continue
+                n += 1
+                sd = ImageStat.Stat(im.crop(b).convert("L")).stddev[0]
+                i["sd"] = round(sd, 1)
+                if sd < ICON_SD:
+                    blank.append(f'{sl["slot"]} icon at {i["x"]:.0f},{i["y"]:.0f} (sd {sd:.1f})')
+        res["icons"] = n
+        if blank:
+            res["reasons"].append(f"{len(blank)} of {n} icons not painted: " + ", ".join(blank[:4]))
+            res["status"] = "FAIL"
+
+    def overlay(s, res, shot):
+        """Draws Duet's slots (red), native buttons (blue) and the preview gap (green) on the screenshot."""
+        try:
+            from PIL import ImageDraw
+        except ImportError:
+            return None
+        im, box = s.frame(res, shot)
         d = ImageDraw.Draw(im)
-        box = lambda r: [(r["x"] + dx) * k, r["y"] * k, (r["x"] + dx + r["w"]) * k, (r["y"] + r["h"]) * k]
         for e in res.get("native", []):
             d.rectangle(box(e), outline=(40, 120, 255), width=5)
         if res.get("gap"):
             gp = res["gap"]
-            d.rectangle([gp["x"] * k, gp["top"] * k, gp["x2"] * k, gp["bottom"] * k], outline=(0, 200, 80), width=5)
+            d.rectangle(box({"x": gp["x"], "y": gp["top"], "w": gp["x2"] - gp["x"], "h": gp["bottom"] - gp["top"]}), outline=(0, 200, 80), width=5)
         for sl in res.get("slots", []):
             d.rectangle(box(sl), outline=(255, 40, 40), width=6)
+            for i in sl.get("icons", []):
+                d.rectangle(box(i), outline=(255, 200, 0), width=2)
         p = shot.replace(".png", "-overlay.png")
-        im.thumbnail((700, 700))
+        im.thumbnail((1400, 1400))
         im.save(p)
         return os.path.relpath(p, s.out)
 
@@ -712,6 +775,31 @@ class Run:
         s.target_display = 3
         return act
 
+    def swap_drag(s, tok):
+        """Direct pane swap, no detour through full width: drag Safari's pane by its top edge handle over the other
+        pane. Dumps the lit display's accessibility tree first (split-handle.json) so a missed handle can be found."""
+        def act(sid, t0):
+            page, frm = s.page, s.split
+            try:
+                with open(os.path.join(s.out, "steps", f"{sid}-ui.json"), "w") as f:
+                    json.dump(s.sim.ui(), f)
+                x = 234 if frm == "left" else INNER_W - 234
+                s.sim.drag(x, 8, INNER_W - x, 330, hold_ms=600, ms=900, end_hold_ms=400)
+            except SimError as e:
+                s.why = str(e)
+                return None
+            want = "right" if frm == "left" else "left"
+            end = time.time() + 12
+            while time.time() < end:
+                r = s.wait(sid, tok, lambda r: is_split(r["sig"]), t0, page=page, timeout=2)
+                if r is not None and s.origin_open(r, "tab", s.native("tab"))[2] == want:
+                    s.split = want
+                    return r
+            s.why = f"dragging the {frm} pane's top handle did not move Safari to the {want} pane"
+            return None
+        s.target_display = 3
+        return act
+
     def split_to_full(s, tok):
         """Drags the divider to the far edge so Safari's pane takes the whole screen."""
         def act(sid, t0):
@@ -773,10 +861,10 @@ class Run:
 
     def scenario_preview(s, style):
         t = s.tok(f"pv{style}")
-        s.step(f"preview-{style}-0", "preview", t, s.open_preview(t, style), {"preview": True, **PREVIEW[0]}, f"in-app preview ({style}), portrait")
+        s.step(f"preview-{style}-0", "preview", t, s.open_preview(t, style), preview_expect(style, 0), f"in-app preview ({style}), portrait")
         for a in [90, 270, 0]:
             frm = s.angle
-            s.step(f"preview-{style}-{frm}to{a}", "preview", t, s.rotate(t, a), {"preview": True, **PREVIEW[a]}, f"in-app preview ({style}), turn {frm} -> {a}", video=True)
+            s.step(f"preview-{style}-{frm}to{a}", "preview", t, s.rotate(t, a), preview_expect(style, a), f"in-app preview ({style}), turn {frm} -> {a}", video=True)
 
     def scenario_open_safari(s, angle):
         t = s.tok(f"pvos{angle}")
@@ -813,6 +901,15 @@ class Run:
         s.step("split-right", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "full width -> split view, Safari in the right pane", video=True)
         s.step("split-right-to-full", "tab", t, s.split_to_full(t), {"preview": False, **UNFOLDED}, "right pane -> full width (divider to the left edge)", video=True)
 
+    def scenario_split_drag(s):
+        """Experimental: a direct pane swap by dragging the pane's top handle (scenario split moves through full width)."""
+        t = s.tok("splitdrag")
+        s.step("splitdrag-tab", "tab", t, s.open_tab(t), {"preview": False, "mode": "column", "side": "right"}, "Safari tab, closed, portrait")
+        s.step("splitdrag-unfold", "tab", t, s.unfold(t, 0), {"preview": False, **UNFOLDED}, "unfold into the wide window")
+        s.step("splitdrag-left", "tab", t, s.to_split(t, "left"), {"preview": False, **SPLIT}, "split view, Safari in the left pane")
+        s.step("splitdrag-to-right", "tab", t, s.swap_drag(t), {"preview": False, **SPLIT}, "drag Safari's pane onto the right pane", video=True)
+        s.step("splitdrag-to-left", "tab", t, s.swap_drag(t), {"preview": False, **SPLIT}, "drag Safari's pane back onto the left pane", video=True)
+
     def scenario_split_turn(s):
         """Turning and folding from split view: the tall posture and the closed screen have no split view."""
         t = s.tok("splitturn")
@@ -831,15 +928,15 @@ class Run:
         no column: Duet goes inline on the default side, like full width Safari (EXPECTED.md, unfolded)."""
         t = s.tok("pvu")
         s.step("pvu-closed", "preview", t, s.open_preview(t, "sheet"), {"preview": True, **PREVIEW[0]}, "in-app preview (sheet), closed portrait")
-        s.step("pvu-unfold", "preview", t, s.unfold(t, 0, preview=True), dict(UNFOLDED), "unfold with the preview open", video=True)
-        s.step("pvu-tall", "preview", t, s.unfold(t, 90, preview=True), dict(UNFOLDED), "preview unfolded, turn to the tall posture", video=True)
-        s.step("pvu-wide", "preview", t, s.unfold(t, 0, preview=True), dict(UNFOLDED), "preview unfolded, back to the wide posture", video=True)
+        s.step("pvu-unfold", "preview", t, s.unfold(t, 0, preview=True), dict(UNFOLDED_PREVIEW), "unfold with the preview open", video=True)
+        s.step("pvu-tall", "preview", t, s.unfold(t, 90, preview=True), dict(UNFOLDED_PREVIEW), "preview unfolded, turn to the tall posture", video=True)
+        s.step("pvu-wide", "preview", t, s.unfold(t, 0, preview=True), dict(UNFOLDED_PREVIEW), "preview unfolded, back to the wide posture", video=True)
         s.step("pvu-fold", "preview", t, s.fold_closed(t, 0), {"preview": True, **PREVIEW[0]}, "fold with the preview open", video=True)
         s.reset()
         s.fold("open", 0)
         time.sleep(1.5)
         t = s.tok("pvuo")
-        s.step("pvu-open-unfolded", "preview", t, s.open_preview(t, "sheet"), dict(UNFOLDED), "in-app preview opened while unfolded")
+        s.step("pvu-open-unfolded", "preview", t, s.open_preview(t, "sheet"), dict(UNFOLDED_PREVIEW), "in-app preview opened while unfolded")
         s.step("pvu-open-unfolded-fold", "preview", t, s.fold_closed(t, 0), {"preview": True, **PREVIEW[0]}, "fold the preview opened unfolded", video=True)
 
     def scenario_open_safari_unfold(s):
@@ -891,9 +988,11 @@ class Run:
         "open-in-safari-unfold": lambda s: s.scenario_open_safari_unfold(),
         "split": lambda s: s.scenario_split(),
         "split-turn": lambda s: s.scenario_split_turn(),
+        "split-drag": lambda s: s.scenario_split_drag(),
         "dynamic-type": lambda s: s.scenario_dynamic_type(),
     }
-    NEEDS_SIM = {"split", "split-turn", "open-in-safari-unfold"}
+    NEEDS_SIM = {"split", "split-turn", "split-drag", "open-in-safari-unfold"}
+    EXPERIMENTAL = {"split-drag"}  # run only when named with --only
 
     def main(s):
         only = set(s.a.only.split(",")) if s.a.only else None
@@ -902,7 +1001,7 @@ class Run:
         if not os.access(FOLD, os.X_OK):
             s.results.append({"id": "setup", "kind": "setup", "desc": "fold.bin", "status": "BLOCKED", "reasons": [f"{FOLD} missing (fold/build.sh)"], "notes": []})
         for name, fn in s.SCENARIOS.items():
-            if only and name not in only:
+            if (only and name not in only) or (not only and name in s.EXPERIMENTAL):
                 continue
             if name in s.NEEDS_SIM and not s.sim:
                 s.results.append({"id": name, "kind": "setup", "desc": name, "status": "BLOCKED", "reasons": ["simulator helper missing (sim.py, Claude desktop app)"], "notes": []})
@@ -966,6 +1065,7 @@ if __name__ == "__main__":
                 t0 = res["samples"][0]["rx"]
                 res.update(status="PASS", reasons=[], notes=[])
                 r.assess(res, res["samples"], res.get("native", []), res["expect"], t0, res["kind"], res.get("prev"))
+                r.check_icons(res, os.path.join(r.out, res["shot"]) if res.get("shot") else None)
             r.results.append(res)
             print(f'{res["id"]:28} {res["status"]:11} {"; ".join(res.get("reasons", []))[:240]}')
         r.report()

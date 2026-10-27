@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { detect, inTransit, isPreview, LAND_HOLD, stable } from "../src/geometry.ts";
+import { DUO, detect, inTransit, isPreview, LAND_HOLD, plan, stable } from "../src/geometry.ts";
 
 const F = JSON.parse(readFileSync(new URL("./fixtures/states.json", import.meta.url), "utf8"));
 const full = (s) => ({
@@ -56,9 +56,18 @@ LANDED.push(["unfolded preview sheet, wide, inset 34", full({ ...O, outerWidth: 
 LANDED.push(["unfolded preview sheet, tall", full({ ...O, outerWidth: 653, outerHeight: 869, innerWidth: 653, innerHeight: 710, angle: 180 })]);
 test("unfolded preview sheet, turn caught halfway (569x786 in 653x869): in transit", () =>
   assert.equal(inTransit(full({ ...O, outerWidth: 653, outerHeight: 869, innerWidth: 569, innerHeight: 786, angle: 270 })), true));
-test("unfolded preview sheet: inline, right", () => {
-  const c = detect(full({ ...O, outerWidth: 653, outerHeight: 661, innerWidth: 653, innerHeight: 515, angle: 270 }));
-  assert.deepEqual([c.mode, c.side], ["inline", "right"]);
+test("unfolded preview sheet: read as the preview, inline right, never hidden", () => {
+  for (const s of [
+    full({ ...O, outerWidth: 653, outerHeight: 661, innerWidth: 653, innerHeight: 515, angle: 270 }),
+    full({ ...O, outerWidth: 653, outerHeight: 661, innerWidth: 653, innerHeight: 591, insetBottom: 34, angle: 270 }),
+    full({ ...O, outerWidth: 653, outerHeight: 869, innerWidth: 653, innerHeight: 710, angle: 180 }),
+  ]) {
+    assert.equal(isPreview(s), true);
+    const c = stable({ flips: [] }, s, undefined, 0);
+    assert.deepEqual([c.mode, c.side, c.preview, c.hidden], ["inline", "right", true, undefined]);
+  }
+  // A full-width open tab is not the preview.
+  assert.equal(isPreview(full({ ...O, outerWidth: 951, outerHeight: 669, innerWidth: 951, innerHeight: 543 })), false);
 });
 test("a negative visual viewport (sheet folded from the open screen) is not a keyboard", () => {
   const c = detect({ ...at("in-app preview, page sheet (real"), visualHeight: -78 });
@@ -115,12 +124,21 @@ const PREVIEW_FULL_TURNED = [
   full({ ...L, innerWidth: 678, innerHeight: 391, insetBottom: 34, insetLeft: 84, angle: 90 }),
   full({ ...L, innerWidth: 678, innerHeight: 391, insetBottom: 34, insetRight: 84, angle: 270 }),
 ];
-test("full screen preview turned: read as the preview, controls hidden, never in transit", () => {
+// Its native buttons (Close, Back, Page Menu, Address, Share, Reload, Open in Safari) are all in a 44pt bar at window
+// y 24, x 84..661 at angle 90 (e2e round 4, XCUITest frames); the page starts at window y 75, below it.
+test("full screen preview turned: read as the preview, controls in the 84pt safe-area band, never in transit", () => {
   for (const s of PREVIEW_FULL_TURNED) {
     assert.equal(isPreview(s), true);
     assert.equal(inTransit(s), false);
     const c = stable({ flips: [] }, s, undefined, 0);
-    assert.deepEqual([c.mode, c.preview, c.hidden], ["inline", true, "preview"]);
+    const side = s.insetLeft ? "left" : "right";
+    assert.deepEqual([c.mode, c.side, c.preview, c.hidden], ["strip", side, true, undefined]);
+    const p = plan(c, { back: false, leading: 0, actions: 2, tabs: 3, searchButton: false, accessory: false, minimized: false });
+    const x0 = p.left, x1 = p.left + DUO.control, band = side === "left" ? [0, 84] : [678 - 84, 678];
+    assert.ok(x0 >= band[0] && x1 <= band[1], `inside the band: ${x0}..${x1}`);
+    const boxes = [p.actions, p.more, p.tabs].filter(Boolean);
+    for (const b of boxes) assert.ok(b.top >= DUO.gap && b.top + b.height <= 391 - 34, `below the bar, above the home indicator: ${b.top}+${b.height}`);
+    assert.equal(p.tabs?.min, false);
   }
   // A turned tab is never taken for it: fresh (126pt chrome, inset 34 after a fold) or with its column (98).
   assert.equal(isPreview(full({ ...L, innerWidth: 678, innerHeight: 340, insetBottom: 34, angle: 90 })), false);
@@ -140,4 +158,25 @@ test("in-app preview in landscape: the controls hide, the page keeps its full wi
   }
   assert.equal(detect(at("in-app preview, page sheet (real Duo"), undefined, true, true).hidden, undefined);
   assert.equal(detect(at("tab, landscape turned left")).hidden, undefined);
+});
+
+// Fold the open preview sheet (e2e round 4, pvu-open-unfolded-fold): the closed sheet's page comes back with a stale
+// visualViewport.scale (1.0152, the open page's 935 scroll width briefly). That is WebKit's, not a pinch: the hold must
+// not keep the open screen's inline placement in the closed window.
+test("fold the open preview sheet with a stale scale: not held, column right in the closed sheet", () => {
+  const d = { flips: [] };
+  const open = stable(d, full({ ...O, outerWidth: 653, outerHeight: 661, innerWidth: 653, innerHeight: 515, angle: 270 }), undefined, 0);
+  assert.equal(open.mode, "inline");
+  const sheet = { outerWidth: 450, outerHeight: 670, innerWidth: 366, innerHeight: 600, insetBottom: 34, scale: 1.0152 };
+  const mid = stable(d, full({ ...sheet, angle: 270 }), undefined, 100, true);
+  assert.notEqual(mid.confidence, "held");
+  const c = stable(d, full({ ...sheet, angle: 0 }), undefined, 3000, false);
+  assert.deepEqual([c.mode, c.side, c.hidden, c.preview], ["column", "right", undefined, true]);
+});
+test("a pinch in the same window still holds the committed context", () => {
+  const d = { flips: [] };
+  const s = at("tab, fresh load");
+  const a = stable(d, s, undefined, 0);
+  const z = stable(d, { ...s, scale: 1.6, innerWidth: 240 }, undefined, 1000);
+  assert.deepEqual([z.mode, z.side, z.confidence], [a.mode, a.side, "held"]);
 });
