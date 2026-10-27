@@ -593,6 +593,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.children !== undefined && <div ref={scroller} className="duet-scroller">{p.children}</div>}
       {sides.map(bar)}
+      {/* On the viewport edge that faces Safari's column, so a page's full-screen overlay cannot hide it (duet.css). */}
+      {ctx.mode === "column" && !emulatedSignals() && sides.map((side) => <span key={side} className="duet-guard" data-side={side} aria-hidden />)}
     </GlassProvider>
   );
 }
