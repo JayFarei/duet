@@ -159,7 +159,7 @@ class Run:
             os.makedirs(os.path.join(s.out, d), exist_ok=True)
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
         s.la_on = False  # a Live Activity is running (the host's music or timer activity, la())
-        s.want = {"on": False, "timer": False}  # the Live Activities wanted from the host: "on" music, "timer" the countdown
+        s.la_want = {"on": False, "timer": False}  # the Live Activities wanted from the host: "on" music, "timer" the countdown
         s.page_path = a.page
         s.films = []  # (scenario, stitched clips) for the report
         s.journeys = []  # catalogue journeys played (--catalogue): id, title, steps in words, status, film
@@ -769,11 +769,11 @@ class Run:
         return act
 
     def la_state(s, since, timeout=15):
-        """Waits for the host to report the wanted Live Activities (s.want) after `since` (ms)."""
+        """Waits for the host to report the wanted Live Activities (s.la_want) after `since` (ms)."""
         end = time.time() + timeout
         while time.time() < end:
             st = http("GET", "/la/state") or {}
-            if st.get("at", 0) >= since and all(bool(st.get(k)) == v for k, v in s.want.items()):
+            if st.get("at", 0) >= since and all(bool(st.get(k)) == v for k, v in s.la_want.items()):
                 return st
             time.sleep(0.2)
         return None
@@ -787,8 +787,8 @@ class Run:
         def act(sid, t0):
             page, since = s.page, time.time() * 1000
             on = any(want.values())
-            s.want.update(want)
-            http("POST", "/la", s.want)
+            s.la_want.update(want)
+            http("POST", "/la", s.la_want)
             fwd = on and kind == "tab"
             if fwd:
                 s.host()
@@ -798,7 +798,7 @@ class Run:
             if st is None:
                 s.why = f"Live Activity not {'started' if on else 'ended'} in 15s: {http('GET', '/la/state')}"
                 return None
-            s.la_on = any(s.want.values())
+            s.la_on = any(s.la_want.values())
             time.sleep(1.0)  # the island grows or shrinks, and Safari's buttons move with it
             done = time.time() * 1000
             r = s.wait(sid, tok, lambda r: r["rx"] >= done, t0, page=page)
@@ -953,8 +953,8 @@ class Run:
         """Every scenario starts closed, in portrait, with Safari in front, the host preview gone and no Live Activity
         (the host ends it first: an activity outlives its app)."""
         since = time.time() * 1000
-        s.want = {"on": False, "timer": False}
-        http("POST", "/la", s.want)
+        s.la_want = {"on": False, "timer": False}
+        http("POST", "/la", s.la_want)
         if (http("GET", "/la/state") or {}).get("count") and not s.la_state(since, timeout=3):
             s.host()
             s.la_state(since)
@@ -1138,8 +1138,8 @@ class Run:
             time.sleep(1.5)
         if music:
             since = time.time() * 1000
-            s.want = {"on": True, "timer": False}
-            http("POST", "/la", s.want)
+            s.la_want = {"on": True, "timer": False}
+            http("POST", "/la", s.la_want)
             s.host()
             st = s.la_state(since)
             sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
