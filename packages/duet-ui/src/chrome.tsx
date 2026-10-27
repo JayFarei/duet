@@ -44,8 +44,9 @@ export interface DuetProps<T extends string = string> {
   close?: false | { label?: string; onPress: () => void };
   /** `.tabViewBottomAccessory`, e.g. a mini player. */
   accessory?: ReactNode;
-  /** `.tabBarMinimizeBehavior(.onScrollDown)`. */
-  minimizeOnScroll?: boolean;
+  /** `.tabBarMinimizeBehavior(.onScrollDown)`. "always": the tabs stay minimized, the selected tab opening the
+   *  full list, e.g. where a pill of icons alone wouldn't say enough, like a desktop table of contents. */
+  minimizeOnScroll?: boolean | "always";
   /** Light or dark, like overrideUserInterfaceStyle. Default "auto": follow the system. Menus follow it too; in
    *  Safari's column the buttons keep following the system, so they match Safari's own. */
   appearance?: Appearance;
@@ -330,7 +331,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const p = props as unknown as DuetProps; // tab ids are only typed at the boundary
   const ctx = useDuet();
   const scroller = useRef<HTMLDivElement>(null);
-  const minimized = useMinimized(!!p.minimizeOnScroll, scroller);
+  const minimized = useMinimized(!!p.minimizeOnScroll, scroller) || p.minimizeOnScroll === "always";
   const [menu, setMenuNow] = useState<"more" | "tabs" | null>(null);
   // The menu that is rolling back into its button; it stays mounted until its animation ends.
   const [closing, setClosing] = useState<"more" | "tabs" | null>(null);
@@ -599,7 +600,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
               // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
               // are masked out under the lens (CSS), so only the enlarged copy shows through it.
               <span className="duet-lens" aria-hidden><span className="duet-lens-view"><span className="duet-lens-col">
-                {tabItems.map((t, i) => <span key={t.id} className="duet-tab" data-on={i === lensAt || undefined} style={tint(t)}>{t.icon}</span>)}
+                {tabItems.map((t, i) => <span key={t.id} className="duet-tab" data-label={t.label} data-on={i === lensAt || undefined} style={tint(t)}>{t.icon}</span>)}
               </span></span></span>
             )}
             {/* Full-pill badges ride above the lens, so it neither clips nor hides them. */}

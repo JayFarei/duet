@@ -160,6 +160,8 @@
   font: 600 9px/11px -apple-system, system-ui, sans-serif; letter-spacing: -0.1px; white-space: nowrap; opacity: 0; transition: opacity 0.25s ease-out;
 }
 .duet-pill[data-scrub] .duet-tab::after { opacity: 1; transition-delay: 0.06s; }
+/* The lens copy carries the labels too, or the tab under the finger would lose its label to the hole in the real tabs. */
+.duet-lens-col .duet-tab::after { content: attr(data-label); }
 .duet-pill[data-scrub] .duet-tab > svg { translate: 0 -6px; scale: 0.82; }
 /* Badges hang off the icon's corner towards the page, over the glass edge, as native tab bars draw them,
    so a surface with one stops clipping (its frost, rim and refraction layers clip themselves). */
