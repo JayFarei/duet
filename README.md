@@ -208,7 +208,7 @@ Pass `onChange={() => router.refresh()}` from a client component to re-render wi
 | `searchButton` | `() => void` | A round search button at the bottom, when there are no tabs |
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the strip holds only a close button, where back goes, until it is cleared |
 | `accessory` | `ReactNode` | A view docked by the tabs, like `.tabViewBottomAccessory` (a mini player) |
-| `minimizeOnScroll` | `boolean` | Scrolling down shrinks the tabs to the selected one, like `.tabBarMinimizeBehavior(.onScrollDown)`. Follows the inner scroller and any pane |
+| `minimizeOnScroll` | `boolean \| "always"` | Scrolling down shrinks the tabs to the selected one, like `.tabBarMinimizeBehavior(.onScrollDown)`. Follows the inner scroller and any pane. `"always"`: the tabs stay minimized and the selected tab opens the full list, with `menuStyle: "morph"` as icon plus label rows. Use it where icons alone don't say enough, like a desktop table of contents |
 | `menuStyle` | `"island" \| "morph"` | How "…" and the minimized tab open their menu. Default `"island"` |
 | `appearance` | `"auto" \| "light" \| "dark"` | Light or dark, like `overrideUserInterfaceStyle`. Default `"auto"`: follow the system. `dark` (boolean) still works but is deprecated |
 | `tint` | `string` | Accent for the selected tab, the active menu item and the primary button, like iOS's `tintColor`. Default: system blue |
@@ -440,6 +440,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** falls back to a transform set on every scroll event, which lags in momentum.
 - **You do:** exclude `.duet` from the reset, or pass the page as `children` (the steadier choice in any case).
 - **Status:** [PR #56](https://github.com/JayFarei/duet/pull/56). See [Column mode](#column-mode-how-it-works).
+
+### Tab labels while scrubbing
+
+- **You see:** without the handling, holding and dragging on the tab pill shows every label except the one under your finger.
+- **Cause:** the real tabs are cut away under the lens, so only its magnified copy shows there, and that copy had icons only.
+- **Duet does:** draws the labels in the lens copy too, magnified with the icon.
+- **You do:** keep labels short (about 10 characters); longer ones are clipped to the tab's width. Where they matter, `minimizeOnScroll="always"` with `menuStyle="morph"` lists them in full.
+- **Status:** [#93](https://github.com/JayFarei/duet/issues/93).
 
 ### Viewport meta and `viewport-fit=cover`
 

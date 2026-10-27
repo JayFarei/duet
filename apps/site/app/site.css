@@ -1,8 +1,8 @@
-:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); --wd-island-rim: transparent; --wd-col: rgb(240 239 236 / 0.55); --wd-edge: 0.3; --wd-rim: 0.15; --wd-shine: rgb(10 132 255 / 0.35); }
+:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); --wd-island-rim: transparent; --wd-col: rgb(240 239 236 / 0.55); --wd-edge: 0.3; --wd-rim: 0.15; --wd-shine: rgb(10 132 255 / 0.35); --cta: #007aff; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); }
+  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --cta: #0a84ff; }
 }
-:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); }
+:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --cta: #0a84ff; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); text-decoration: none; }
 code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
@@ -34,6 +34,25 @@ html { scroll-behavior: smooth; }
 section[id] { scroll-margin-top: 24px; }
 .pill { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 22px; border-radius: 99px; border: 0; background: var(--card); color: var(--accent); font: 500 17px/1 -apple-system, system-ui; box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .pill-solid { background: var(--ink); color: var(--bg); box-shadow: none; }
+/* "Copy prompt", after the OpenTraces button: a tilted deck of agent glyphs that fans out on hover, and a face that
+   flips to "Copied". Ours is a card pill with system blue ink in SF, and the deck springs open the way iOS menus do. */
+.pill-cta { position: relative; overflow: hidden; color: var(--cta); white-space: nowrap; font-weight: 600; padding: 0 22px 0 18px; transition: scale 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.pill-cta:active { scale: 0.96; transition-duration: 0.1s; }
+.cta-face { display: inline-flex; align-items: center; gap: 12px; transition: opacity 0.2s, translate 0.35s cubic-bezier(0.3, 1.3, 0.5, 1); }
+.cta-done { position: absolute; inset: 0; justify-content: center; gap: 7px; opacity: 0; translate: 0 60%; }
+.pill-cta[data-done] .cta-face:not(.cta-done) { opacity: 0; translate: 0 -60%; }
+.pill-cta[data-done] .cta-done { opacity: 1; translate: 0 0; }
+/* 4 glyphs of 18px: overlapping 15px apart at rest (63px, centred), 22px apart open (84px), so the deck fans out both ways. It reserves the open width,
+   so the label never moves. */
+.cta-deck { position: relative; width: 84px; height: 18px; flex: none; }
+.cta-deck > svg { position: absolute; top: 0; left: calc(10.5px + var(--i) * 15px); width: 18px; height: 18px; rotate: var(--r); transition: left 0.45s cubic-bezier(0.3, 1.4, 0.5, 1), rotate 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); filter: drop-shadow(1.5px 0 0 var(--card)) drop-shadow(-1.5px 0 0 var(--card)) drop-shadow(0 1.5px 0 var(--card)) drop-shadow(0 -1.5px 0 var(--card)); }
+.cta-deck > :nth-child(1) { --i: 0; --r: -13deg; z-index: 4; }
+.cta-deck > :nth-child(2) { --i: 1; --r: 8deg; z-index: 3; }
+.cta-deck > :nth-child(3) { --i: 2; --r: -6deg; z-index: 2; }
+.cta-deck > :nth-child(4) { --i: 3; --r: 10deg; z-index: 1; }
+.pill-cta:is(:hover, :focus-visible) .cta-deck > svg { left: calc(var(--i) * 22px); rotate: 0deg; }
+@media (prefers-reduced-motion: reduce) { .pill-cta, .cta-face, .cta-deck > svg { transition: none; } }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pill-sm { height: 30px; padding: 0 14px; font-size: 13px; }
 .npm code { font-size: 15px; }
 .npm-hint { font-size: 12px; opacity: 0.75; }
@@ -89,6 +108,13 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 .bar-tab[data-on] { color: #007aff; background: rgb(120 120 128 / 0.14); }
 .bars .hero, html .float .hero { padding-top: calc(max(12px, env(safe-area-inset-top)) + 72px); }
 .bars .foot, html .float .foot { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+/* Duet's controls beside the page on a desktop, flat as iOS draws them: no specular rim or bevel from GlassyUI, only a
+   hairline. The glimmer over the stage's buttons ([data-wd-shine]) is separate and stays. */
+.duet[data-mode="inline"] .duet-glass::after { display: none; }
+.duet[data-mode="inline"] .duet-glass::before { box-shadow: inset 0 0 0 0.5px var(--line); }
+/* The selection as a grey fill, like the phone bar's: Duet's dark default darkens, which vanishes on a flat black control. */
+html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
+
 /* Side controls tried on an iPhone (home.tsx): the page ignores Duet's insets, so the controls float over it. */
 .float { --duet-inset-left: 0px; --duet-inset-right: 0px; }
 
