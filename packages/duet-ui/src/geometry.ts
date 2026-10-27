@@ -245,19 +245,25 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
  *  window sizes (453x661 and 450x670 outer, 369x591 and 366x600 inner), then taken for windowed Safari; 450x670
  *  with inset 34 is the in-app preview's sheet (isPreview), which goes inline. A pane with the compact URL bar has
  *  75pt of chrome, so any portrait Safari window on the Duo with the column counts. */
-const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 102] } as const;
+// The largest Dynamic Type grows the bottom bar to 106pt (382x572 in 466x678, e2e round 3).
+const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 110] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
 const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome);
 
 /** Side inset of a Home Screen app on the Duo: 84 measured (closed portrait). iPhones have up to 59 in landscape. */
 const STRIP_INSET = 76;
 
+/** The keyboard (or anything else) covers the bottom of the page: the visual viewport is shorter than the layout one.
+ *  WebKit can report a negative visual height after the preview's sheet is folded from the open screen (-78 for a
+ *  600pt page, e2e round 3, held until the next resize); no viewport is that short, so it is not a keyboard. */
+export const keyboardUp = (s: Signals) => s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
+
 /** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
  *  caller holds a sticky one (stable()). */
 export function detect(s: Signals, preferred?: Side, allowColumn = true, preview = isPreview(s)): Context {
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
-  const keyboard = s.visualHeight < s.innerHeight - 1;
+  const keyboard = keyboardUp(s);
   const kb = keyboard ? { keyboard } : {};
   if (s.standalone && duo && (s.insetRight >= STRIP_INSET || s.insetLeft >= STRIP_INSET)) {
     return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
@@ -291,13 +297,19 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
  *  0, simulator 2026-10-26: 678x340, 466x498, 382x498, then 382x580 in 466x678). */
 /** How far inside the closed screen the preview's sheet may be: 16x8 measured. */
 const SHEET_SLACK = 40;
-const LANDED = { page: [[0, 2], [80, 88]], chrome: [0, 160] } as const;
+/** The in-app preview's sheet on the open screen, wide and tall posture (simulator, iOS 27.1). */
+const UNFOLDED_SHEETS = [[653, 661], [653, 869]] as const;
+const LANDED = { page: [[0, 2], [83, 85]], chrome: [0, 160], columnChrome: 110 } as const;
 /** True while a Safari page on the Duo is between postures: the page and its window disagree on orientation, the
  *  turn (screen.orientation.angle) disagrees with the page, or page and window are not a pair Safari settles in
  *  (LANDED, or the window is not a Duo window or the preview's sheet). Only asked while the window settles
  *  (signals.ts settling(), at most SETTLE.cap), so a state never measured cannot hide the controls for good. */
 export function inTransit(s: Signals): boolean {
   if (s.standalone || s.framed || browserOf(s.userAgent) !== "safari" || isIOS(s) === false || !isDuo(s)) return false;
+  // The preview's sheet on the open screen: a near-square window of its own, no column, its page wider than tall in
+  // the wide posture (e2e round 3: 653x661 wide, 653x869 tall).
+  if (s.outerWidth - s.innerWidth <= LANDED.page[0][1] && within(s.outerHeight - s.innerHeight, LANDED.chrome)
+    && UNFOLDED_SHEETS.some(([a, b]) => Math.abs(s.outerWidth - a) <= 1 && Math.abs(s.outerHeight - b) <= 1)) return false;
   const landscape = s.innerWidth > s.innerHeight;
   if (landscape !== s.outerWidth > s.outerHeight) return true;
   const [w, h] = DUO_SIZES[0], m = PREVIEW.sheetInset, short = Math.min(s.outerWidth, s.outerHeight), long = Math.max(s.outerWidth, s.outerHeight);
@@ -306,6 +318,11 @@ export function inTransit(s: Signals): boolean {
   if (closed && s.angle !== undefined && s.angle % 90 === 0 && (s.angle % 180 === 90) !== landscape) return true;
   const page = s.outerWidth - s.innerWidth, chrome = s.outerHeight - s.innerHeight;
   if (!LANDED.page.some((r) => within(page, r)) || !within(chrome, LANDED.chrome)) return true;
+  // Safari's column is 84pt in every window measured, and comes with its bottom URL bar (chrome 98, 106 at the largest
+  // Dynamic Type, preview 70 to 75), never with the 126pt bars of a full open window. Anything else is a stale layout
+  // handed a new window (e2e round 3: entering split view, 867x543 in 951x669 for ~200ms before the pane; going home
+  // from a split pane, the pane's 385x571 page in the closed screen's 466x678 window, an 81pt "column").
+  if (page >= LANDED.page[1][0] && chrome > LANDED.columnChrome) return true;
   // A Duo window, or the preview's sheet (a window a few points inside the closed screen; its inset lands ~100ms late,
   // so sizes alone decide).
   const sheet = short <= w - m && long <= h - m && short >= w - SHEET_SLACK && long >= h - SHEET_SLACK;
@@ -356,7 +373,7 @@ export const LAND_HOLD = 150;
  *  matching (Open in Safari). */
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false, epoch = 0): Context {
   if ((s.scale ?? 1) !== 1 && d.last) {
-    const keyboard = s.visualHeight < s.innerHeight - 1 || undefined;
+    const keyboard = keyboardUp(s) || undefined;
     return { ...d.last, keyboard, confidence: "held" };
   }
   const key = `${s.outerWidth}x${s.outerHeight}`;

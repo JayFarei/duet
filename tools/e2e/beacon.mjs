@@ -45,7 +45,8 @@ http.createServer(async (req, res) => {
   }
   if (u.pathname === "/cmd" && req.method === "POST") {
     const cmd = { ...JSON.parse((await body(req)) || "{}"), id: ++cmdId };
-    const timer = setTimeout(() => { waiting.delete(cmd.id); send(res, 504, { ok: false, error: "runner did not answer (is the UI-test runner up?)" }); }, Number(u.searchParams.get("timeout") ?? 60000));
+    // A command nobody took is dropped with its answer: left queued, a stale "stop" would end the next runner at start.
+    const timer = setTimeout(() => { waiting.delete(cmd.id); const i = queue.indexOf(cmd); if (i >= 0) queue.splice(i, 1); send(res, 504, { ok: false, error: "runner did not answer (is the UI-test runner up?)" }); }, Number(u.searchParams.get("timeout") ?? 60000));
     waiting.set(cmd.id, (r) => { clearTimeout(timer); send(res, 200, r); });
     queue.push(cmd); dispatch();
     return;

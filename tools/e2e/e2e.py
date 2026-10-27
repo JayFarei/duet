@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """Duo e2e matrix: drives the "Duo Lab" simulator through Safari tab, in-app preview and unfolded states, rotations
 and folds (tools/e2e/fold/fold.bin), collects the page's Duet state from the beacon every ~40ms, native button
-frames from the UI-test runner, a screenshot per step and a video contact sheet per transition, and asserts
+frames from the UI-test runner (closed screen) or the simulator helper (sim.py, unfolded and split view), a screenshot per step and a video contact sheet per transition, and asserts
 tools/e2e/EXPECTED.md on every sample, not only the last. Writes reports/<ts>/{index.html,steps/*.json,shots/*}.
 
-Needs (run.sh starts them): site on :3140 (served from this worktree), beacon on :3141, the UI-test runner.
+Needs (run.sh starts them): site on :3140 (served from this worktree), beacon on :3141, the UI-test runner; split view
+and the unfolded native checks need the Claude desktop app's simulator helper (sim.py), reported BLOCKED without it.
 Usage: e2e.py --udid <sim> [--only <scenario>[,<scenario>]] [--md round.md] [--video]
 Exit: 0 all PASS, 1 any FAIL, 2 any BLOCKED (a state the run could not reach, or a broken setup).
 """
 import argparse, datetime, html, json, os, signal, subprocess, sys, time, urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # run with python -I, which leaves the script dir out
+from sim import Sim, SimError  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SITE = "http://localhost:3140"
@@ -39,6 +43,14 @@ LANDSCAPE_TOP_BARS = {"preview": False, "mode": "inline", "side": "right"}
 # hides its controls; the page keeps its full width and the preview's own Done/back/share stay (README).
 PREVIEW = {0: {"mode": "column", "side": "right", "gap": True}, 90: {"hidden": True}, 270: {"hidden": True}}
 UNFOLDED = {"mode": "inline", "side": "right"}
+# Split view (wide inner display only, two 469x669 panes): the page cannot tell which pane it is in, so the column
+# is drawn on both edges and the native column of whichever pane hides the far copy (EXPECTED.md).
+SPLIT = {"mode": "column", "side": "both"}
+SB_SAFARI = "Safari"              # SpringBoard accessibility identifiers (dock icon, our host's icon, menu item)
+SB_HOST = "DuoE2EHost"
+SB_SPLIT = "com.apple.springboardhome.application-shortcut-item.open-in-split"
+INNER_W = 951                     # wide inner display, points
+DIVIDER = (476, 335)              # split view divider handle on the wide inner display
 # Rotation path: every turn between the three UI angles, both directions (0->90, 90->270, 270->0, 0->270, 270->90, 90->0).
 PATH = [90, 270, 0, 270, 90, 0]
 
@@ -75,12 +87,30 @@ def nav(r):
     return (r.get("navs") or [{}])[0]
 
 
+def shown_navs(r):
+    return [n for n in r.get("navs") or [] if n.get("slots") and not n.get("hidden")]
+
+
 def shown_place(r):
-    """(mode, side) when Duet's controls are visible, None when hidden (data-hidden, or no visible slot)."""
-    n = nav(r)
-    if n.get("hidden") or not n.get("slots"):
+    """(mode, side) when Duet's controls are visible, None when hidden (data-hidden, or no visible slot). Two column
+    copies on opposite edges (split view) are ("column", "both")."""
+    ns = shown_navs(r)
+    if not ns:
         return None
-    return (n.get("mode"), n.get("side"))
+    if len(ns) > 1 and all(n.get("mode") == "column" for n in ns) and len({n.get("side") for n in ns}) > 1:
+        return ("column", "both")
+    return (ns[0].get("mode"), ns[0].get("side"))
+
+
+def all_slots(r):
+    """[{slot, rect}] over every visible nav; a slot name is prefixed with its side when two navs are drawn."""
+    ns = shown_navs(r)
+    return [{"slot": (f'{n.get("side")}:' if len(ns) > 1 else "") + x["slot"], "rect": x["rect"]} for n in ns for x in n["slots"]]
+
+
+def is_split(g):
+    """A split view pane, 469x669 (the closed portrait window is 466x678)."""
+    return (g["outerWidth"], g["outerHeight"]) == (469, 669)
 
 
 class Run:
@@ -90,6 +120,8 @@ class Run:
         for d in ("steps", "shots"):
             os.makedirs(os.path.join(s.out, d), exist_ok=True)
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
+        s.split = None  # Safari's split view pane, "left" or "right", or None when Safari is full screen
+        s.sim = Sim(s.udid) if Sim.available() else None
 
     def log(s, *m):
         print(*m, flush=True)
@@ -126,7 +158,7 @@ class Run:
         return proc, p, time.time() * 1000
 
     def stop_record(s, rec, at=None):
-        """Stops the recording; tiles 2.4s of it starting 0.3s before `at` (ms, wall clock: the first signal change)."""
+        """Stops the recording and tiles it (contact_sheet: from the video's own motion onset, not `at`)."""
         proc, p, t_rec = rec
         proc.send_signal(signal.SIGINT)
         try:
@@ -135,11 +167,31 @@ class Run:
             proc.kill()
         if not os.path.exists(p):
             return None
+        return s.contact_sheet(p)
+
+    @staticmethod
+    def motion_onset(p):
+        """Video time (s) the screen starts moving. simctl recordVideo is variable frame rate: it writes a frame only
+        when the screen changes, and its timestamps are not wall-clock aligned (first frame at 0, the next one seconds
+        later), so the wall clock cannot pick the window. The transition is the first burst: 5 frames within 0.5s
+        (a lone clock or cursor tick is not one). None when the video never moves."""
+        r = sh("ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "frame=pts_time", "-of", "csv=p=0", p, check=False)
+        ts = sorted(float(x.strip(",")) for x in r.stdout.split() if x.strip(","))
+        for i in range(1, len(ts) - 4):
+            if ts[i + 4] - ts[i] <= 0.5:
+                return ts[i]
+        return None
+
+    def contact_sheet(s, p):
+        """3.2s from 0.3s before the motion onset at 10fps, one tile per 100ms, left to right, top to bottom. The fps
+        filter repeats the last frame through the VFR gaps, which is what the screen showed."""
         sheet = p.replace(".mp4", "-frames.png")
-        # 2.4s at 10fps from just before the change: one tile per 100ms, left to right, top to bottom.
-        ss = max(0.0, ((at or t_rec) - t_rec) / 1000 - 0.3)
-        sh("ffmpeg", "-loglevel", "error", "-y", "-ss", f"{ss:.2f}", "-i", p, "-t", "2.4", "-vf", "fps=10,scale=160:-1,tile=8x3:padding=4:color=white", "-frames:v", "1", sheet, check=False)
-        return sheet if os.path.exists(sheet) else None
+        onset = s.motion_onset(p)
+        ss = max(0.0, (onset or 0) - 0.3)
+        sh("ffmpeg", "-loglevel", "error", "-y", "-i", p, "-vf",
+           f"fps=10:start_time=0,trim=start={ss:.2f}:duration=3.2,setpts=PTS-STARTPTS,scale=160:-1,tile=8x4:padding=4:color=white",
+           "-frames:v", "1", sheet, check=False)
+        return sheet if os.path.exists(sheet) and os.path.getsize(sheet) > 0 else None
 
     # ---- one step ---------------------------------------------------------------------------------------------
     def step(s, sid, kind, tok, action, expect, desc, video=False):
@@ -161,6 +213,7 @@ class Run:
             return res
         s.page = first.get("page")
         allr = s.collect(sid, tok, t0)
+        res["position"] = s.position
         native = s.native(kind)
         shot = s.screenshot(sid)
         s.assess(res, allr, native, expect, t0, kind, prev)
@@ -194,11 +247,27 @@ class Run:
         return allr
 
     def native(s, kind):
-        if s.position == "open":
-            return []  # XCUITest frames on the unfolded inner display are not in screen points we can map (README)
+        """Native button frames. Closed: the UI-test runner, in closed screen points. Unfolded: XCUITest frames on the
+        inner display do not map (README), so the simulator helper describes the app by pid, in points of its window
+        (the pane in split view), which works for either split pane."""
         bundle = PREVIEW_SVC if kind == "preview" else SAFARI
-        r = cmd("elements", bundle=bundle)
-        return (r or {}).get("elements", [])
+        if s.position != "open":
+            r = cmd("elements", bundle=bundle)
+            return (r or {}).get("elements", [])
+        if not s.sim:
+            s.native_why = "simulator helper missing"
+            return []
+        pid = s.sim.pid(bundle)
+        if not pid:
+            s.native_why = f"no running {bundle}"
+            return []
+        try:
+            out = [e for e in s.sim.app_ui(pid) if e["type"] == "Button" or e["label"] == "Address"]
+        except SimError as e:
+            s.native_why = f"describe failed: {e}"
+            return []
+        s.native_why = None if out else f"{bundle} (pid {pid}) reported no buttons"
+        return out
 
     # ---- assertions -------------------------------------------------------------------------------------------
     @staticmethod
@@ -217,6 +286,24 @@ class Run:
         top = g["outerHeight"] - g["innerHeight"] if g["outerWidth"] == g["innerWidth"] else 0
         return (col + vx, top)
 
+    @staticmethod
+    def origin_open(r, kind, native):
+        """Page origin in window points on the unfolded screen (the frame native() reports in): a split pane's page
+        sits beside Safari's column on the pane's outer edge (native Back on the right means the right pane, column
+        right, page at 0); full screen Safari has its bars above the page; the preview sheet is centred with its bottom
+        bar under the page. Returns (x0, y0, pane) where pane is "left", "right" or None."""
+        g = r["sig"]
+        back = next((e for e in native if e["label"] == "Back"), None)
+        if is_split(g):
+            pane = "right" if back and back["x"] > g["outerWidth"] / 2 else "left"
+            return (g["outerWidth"] - g["innerWidth"] if pane == "left" else 0, 0, pane)
+        if kind == "preview":
+            W = 669 if g["outerHeight"] > 700 else INNER_W  # the tall posture's screen is 669 wide
+            return ((W - g["outerWidth"]) / 2 if g["outerWidth"] < W else 0,
+                    (back["y"] - g["innerHeight"]) if back else 0, None)
+        return (g["outerWidth"] - g["innerWidth"] if back and back["x"] < 60 and g["outerWidth"] > g["innerWidth"] else 0,
+                g["outerHeight"] - g["innerHeight"] if g["outerWidth"] == g["innerWidth"] else 0, None)
+
     def offscreen(s, r, kind):
         """Slots not fully on the screen. Closed: in screen points through origin() (the column Safari reserves is on
         screen, outside the page). Unfolded: inside the page's visible viewport [-vv.x, innerWidth - vv.x]."""
@@ -229,9 +316,12 @@ class Run:
             if (g["innerWidth"] > g["innerHeight"]) != (W > H):
                 W, H = H, W
             box = (-x0, -y0, W - x0, H - y0)
+        elif is_split(g):
+            col = g["outerWidth"] - g["innerWidth"]  # either copy may sit under the pane's column, beside the page
+            box = (-col, 0, g["innerWidth"] + col, g["innerHeight"])
         else:
             box = (-vx, 0, g["innerWidth"] - vx, g["innerHeight"])
-        for x in nav(r).get("slots", []):
+        for x in all_slots(r):
             q = x["rect"]
             if q["x"] < box[0] - 1 or q["y"] < box[1] - 1 or q["x"] + q["w"] > box[2] + 1 or q["y"] + q["h"] > box[3] + 1:
                 out.append(f'{x["slot"]} at {q["x"] + (x0 if closed else 0):.0f},{q["y"]:.0f} off the {box[2] - box[0]:.0f}x{box[3] - box[1]:.0f} screen')
@@ -247,6 +337,37 @@ class Run:
             prev = {"place": tuple(prev["place"]) if prev["place"] else None, "key": tuple(prev["key"])}
         if not allr:
             res["status"] = "BLOCKED"; bad.append("no samples after the action"); return
+        # 0. sampling
+        gaps = [(b["rx"] - a["rx"]) for a, b in zip(allr, allr[1:])]
+        big = [x for x in gaps if x > GAP_S * 1000]
+        res["sample_ms"] = round(sorted(gaps)[len(gaps) // 2]) if gaps else None
+        if big:
+            note.append(f"{len(big)} sampling gaps over {GAP_S * 1000:.0f}ms (max {max(big)}ms)")
+        # A backgrounded page (Safari behind the home screen or a split view menu, document.visibilityState hidden)
+        # keeps laying out for the app switcher, at whatever window size it is handed, but nobody sees it: those
+        # samples are not judged. Only the samples the user can see count.
+        # The first render after the page is shown again (visibilitychange runs a task after the first paint) still has
+        # the layout it was given while hidden: one render of it within GRACE_S is the return, not a flash.
+        timeline = allr
+        stale, last_hidden, back = set(), None, None
+        for r in timeline:
+            if r.get("visible") == "hidden":
+                last_hidden, back = shown_place(r), None
+                continue
+            if last_hidden is not None and back is None:
+                back = r["rx"]
+            if back is not None and r["rx"] < back + GRACE_S * 1000 and shown_place(r) == last_hidden:
+                stale.add(r["rx"])
+            elif back is not None:
+                last_hidden = None
+        hidden = [r for r in allr if r.get("visible") == "hidden"]
+        if hidden:
+            note.append(f"{len(hidden)} samples while the page was hidden (backgrounded), not judged")
+            allr = [r for r in allr if r.get("visible") != "hidden"]
+            if not allr:
+                res["status"] = "BLOCKED"; bad.append("the page stayed hidden after the action"); return
+        if stale:
+            note.append(f"{len(stale)} samples of the hidden layout in the first render after the page was shown again, not judged")
         last = allr[-1]
         g, n = last["sig"], nav(last)
         res["final"] = {"angle": g["angle"], "inner": f'{g["innerWidth"]}x{g["innerHeight"]}', "outer": f'{g["outerWidth"]}x{g["outerHeight"]}',
@@ -258,12 +379,6 @@ class Run:
         if same and prev:
             want = prev["place"]
         ok = lambda p: p == want or (want == "any" and p is not None)
-        # 0. sampling
-        gaps = [(b["rx"] - a["rx"]) for a, b in zip(allr, allr[1:])]
-        big = [x for x in gaps if x > GAP_S * 1000]
-        res["sample_ms"] = round(sorted(gaps)[len(gaps) // 2]) if gaps else None
-        if big:
-            note.append(f"{len(big)} sampling gaps over {GAP_S * 1000:.0f}ms (max {max(big)}ms)")
         # Phases: the old signals (prev key), transit, and the final signals (the trailing run of the last key).
         k_end = key(last)
         t_final = last["rx"]
@@ -276,8 +391,8 @@ class Run:
         # 1. every sample: visible only in the old placement (before the signals change, plus one render), or in the
         # expected one; anywhere else is a flash, however short.
         flashes, cur = [], None
-        for i, r in enumerate(allr):
-            p = shown_place(r)
+        for i, r in enumerate(timeline):  # hidden samples end a flash (nobody sees the page) but are not one
+            p = None if r.get("visible") == "hidden" or r["rx"] in stale else shown_place(r)
             old = prev is not None and p == prev["place"] and (key(r) == prev["key"] or r["rx"] < t_change + GRACE_S * 1000)
             wrong = p is not None and not ok(p) and not old
             if wrong and cur is None:
@@ -293,7 +408,7 @@ class Run:
         offs = []
         for r in allr:
             p = shown_place(r)
-            if p is None or (prev and p == prev["place"] and key(r) != prev["key"] and r["rx"] < t_change + GRACE_S * 1000):
+            if p is None or r["rx"] in stale or (prev and p == prev["place"] and key(r) != prev["key"] and r["rx"] < t_change + GRACE_S * 1000):
                 continue
             o = s.offscreen(r, kind)
             if o:
@@ -326,17 +441,35 @@ class Run:
             if want is not None:
                 t_ok = max(t_ok, t_final)
                 fin = [r for r in allr if r["rx"] >= t_ok]
-                rects = lambda r: {x["slot"]: x["rect"] for x in nav(r).get("slots", [])}
+                rects = lambda r: {x["slot"]: x["rect"] for x in all_slots(r)}
                 end = rects(last)
                 moving = [r for r in fin if any(abs(r2[c] - end[sl][c]) > 2 for sl, r2 in rects(r).items() if sl in end for c in ("x", "y", "w", "h"))]
                 if moving and moving[-1]["rx"] - t_ok > SLIDE_S * 1000:
                     m = moving[0]
                     bad.append(f"slots slide for {moving[-1]['rx'] - t_ok:.0f}ms after showing (e.g. {rects(m)} -> {end})"[:300])
-        # 6. native overlap and the preview gap, on the final sample (closed screen only)
+        # 6. native overlap and the preview gap, on the final sample. Closed: screen points. Unfolded: window points
+        # (the pane in split view), only the slots inside the window (the far split copy is clipped by design).
         slots = []
         if fp is not None and s.position == "closed":
             x0, y0 = s.origin(last, kind)
-            slots = [{"slot": x["slot"], "x": x["rect"]["x"] + x0, "y": x["rect"]["y"] + y0, "w": x["rect"]["w"], "h": x["rect"]["h"]} for x in n.get("slots", [])]
+            slots = [{"slot": x["slot"], "x": x["rect"]["x"] + x0, "y": x["rect"]["y"] + y0, "w": x["rect"]["w"], "h": x["rect"]["h"]} for x in all_slots(last)]
+        elif fp is not None and native:
+            x0, y0, pane = s.origin_open(last, kind, native)
+            res["pane"] = pane
+            ww, wh = g["outerWidth"], g["outerHeight"]
+            slots = [{"slot": x["slot"], "x": x["rect"]["x"] + x0, "y": x["rect"]["y"] + y0, "w": x["rect"]["w"], "h": x["rect"]["h"]} for x in all_slots(last)]
+            slots = [sl for sl in slots if sl["x"] + sl["w"] > 0 and sl["x"] < ww and sl["y"] < wh]
+            for sl in slots:
+                if sl["x"] < -1 or sl["x"] + sl["w"] > ww + 1 or sl["y"] < -1 or sl["y"] + sl["h"] > wh + 1:
+                    bad.append(f'{sl["slot"]} cut by the window edge at {sl["x"]:.0f},{sl["y"]:.0f} ({ww}x{wh} window)')
+            if is_split(g):
+                if len(slots) < 2:
+                    bad.append(f"split view, {pane} pane: fewer than two Duet controls visible in the pane")
+                if pane != s.split:
+                    note.append(f"native Back puts Safari in the {pane} pane, the driver expected {s.split}")
+        elif s.position == "open":
+            note.append(f"unfolded: no native frames ({getattr(s, 'native_why', None) or 'none found'}), overlap not checked")
+        if slots:
             for sl in slots:
                 for e in native:
                     if e["label"] == "Address" and e["w"] > 200:
@@ -345,8 +478,6 @@ class Run:
                     iy = min(sl["y"] + sl["h"], e["y"] + e["h"]) - max(sl["y"], e["y"])
                     if ix > 2 and iy > 2:
                         bad.append(f'{sl["slot"]} overlaps native "{e["label"]}" by {ix:.0f}x{iy:.0f}')
-        elif s.position == "open":
-            note.append("unfolded: native frames not mapped, overlap checked by screenshot only")
         res["slots"] = slots
         if expect.get("gap") and slots:
             col = [e for e in native if e["w"] <= 60]
@@ -398,11 +529,16 @@ class Run:
             return None
         im = Image.open(shot).convert("RGB")
         a = (res.get("final") or {}).get("angle", 0)
-        if res.get("slots") and a in (90, 270) and im.width < im.height:
+        opened = res.get("position") == "open"
+        if not opened and res.get("slots") and a in (90, 270) and im.width < im.height:
             im = im.rotate(-90 if a == 90 else 90, expand=True)
-        k = im.width / (678 if im.width > im.height else 466)
+        if opened:  # unfolded: window points; a right split pane starts after the left pane and the divider
+            k = im.width / (INNER_W if im.width > im.height else 669)
+            dx = INNER_W - 469 if res.get("pane") == "right" else 0
+        else:
+            k, dx = im.width / (678 if im.width > im.height else 466), 0
         d = ImageDraw.Draw(im)
-        box = lambda r: [r["x"] * k, r["y"] * k, (r["x"] + r["w"]) * k, (r["y"] + r["h"]) * k]
+        box = lambda r: [(r["x"] + dx) * k, r["y"] * k, (r["x"] + dx + r["w"]) * k, (r["y"] + r["h"]) * k]
         for e in res.get("native", []):
             d.rectangle(box(e), outline=(40, 120, 255), width=5)
         if res.get("gap"):
@@ -440,13 +576,15 @@ class Run:
             return s.wait(sid, tok, lambda r: True, t0)
         return act
 
-    def turn(s, tok, position, angle, cond, label):
-        """Folds/turns with fold.bin, then waits for a sample of the same page that satisfies cond."""
+    def turn(s, tok, position, angle, cond, label, after=False):
+        """Folds/turns with fold.bin, then waits for a sample of the same page that satisfies cond (after: taken once
+        fold.bin returned, which waits for the turn, for a state whose window the one before it may match too)."""
         def act(sid, t0):
             page = s.page
             if not s.fold(position, angle):
                 return None
-            r = s.wait(sid, tok, cond, t0, page=page)
+            done = time.time() * 1000
+            r = s.wait(sid, tok, (lambda r: r["rx"] >= done and cond(r)) if after else cond, t0, page=page)
             if r is None:
                 s.why = f"{label} not reported by the page in {STATE_TIMEOUT}s"
             return r
@@ -468,9 +606,12 @@ class Run:
         s.target_display = 1
         return act
 
-    def unfold(s, tok, angle=0):
+    def unfold(s, tok, angle=0, preview=False):
         # On the inner display "portrait" (0) is the wide 951x669 window, a quarter turn is the tall 669x951 one.
         wide = angle in (0, 180)
+        if preview:  # the preview's sheet unfolded: a window of its own (653x661 wide), larger than the closed screen
+            return s.turn(tok, "open", angle, lambda r: min(r["sig"]["outerWidth"], r["sig"]["outerHeight"]) > 500,
+                          f"unfolded preview sheet ({'wide' if wide else 'tall'})", after=True)
         return s.turn(tok, "open", angle, lambda r: (r["sig"]["outerWidth"] > 900) == wide and max(r["sig"]["outerWidth"], r["sig"]["outerHeight"]) > 900,
                       f"unfolded {'951x669' if wide else '669x951'}")
 
@@ -489,11 +630,132 @@ class Run:
         s.target_display = 1
         return act
 
+    # ---- split view (simulator helper; README, Split view) --------------------------------------------------------
+    def sb_tap(s, ident, hold=0.0, tries=6, page=False):
+        """Taps (or long-presses) a SpringBoard element found by accessibility identifier. page: an app icon, which may
+        be on another Home Screen page (HOME lands on whichever page was last shown, the widgets page included), so a
+        miss turns the page: forward twice, then back."""
+        for i in range(tries):
+            pt = s.sim.springboard_find(ident)
+            if pt:
+                s.sim.tap(*pt, hold=hold)
+                return True
+            if page:
+                lit = s.sim.lit()
+                w, h = lit["pointWidth"], lit["pointHeight"]
+                if lit.get("quarterTurns", 0) % 2:
+                    w, h = h, w
+                a, b = (w * 0.75, w * 0.25) if i % 4 < 2 else (w * 0.25, w * 0.75)
+                s.sim.drag(a, h * 0.45, b, h * 0.45, ms=300, steps=10, end_hold_ms=50)
+                time.sleep(0.8)
+            else:
+                time.sleep(0.5)
+        s.why = f"SpringBoard element {ident!r} not found"
+        return False
+
+    def open_in_split(s, icon):
+        """Home, long-press an app icon, "Open in Split View": that app takes the left pane, home shows on the right."""
+        s.sim.button("HOME")
+        time.sleep(1.5)
+        if not s.sb_tap(icon, hold=1.5, page=icon != SB_SAFARI):  # Safari is in the dock, on every page
+            return False
+        time.sleep(1.0)
+        if not s.sb_tap(SB_SPLIT):
+            s.sim.button("HOME")
+            return False
+        time.sleep(1.5)
+        return True
+
+    def to_split(s, tok, pane):
+        """Safari's tab into the left pane (long-press Safari, Open in Split View, then our host on the right) or the
+        right pane (long-press our host, Open in Split View, then Safari from the dock). Both keep Safari's window and
+        its document. From a pane, the host is quit first: "Open in Split View" on an app of a live pair brings the same pair back
+        (e2e round 3), so a move between panes is split -> Safari full width -> split on the other side. Waits for the 469x669 pane."""
+        def act(sid, t0):
+            page = s.page
+            if not s.sim:
+                s.why = "simulator helper missing (sim.py)"
+                return None
+            try:
+                if s.split:  # SpringBoard restores a live pair as it was: quit the host so Safari can take the other pane
+                    sh("xcrun", "simctl", "terminate", s.udid, HOST, check=False)
+                    time.sleep(1.5)
+                if pane == "left":
+                    if not s.open_in_split(SB_SAFARI):
+                        return None
+                    sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
+                else:
+                    if not s.open_in_split(SB_HOST):
+                        return None
+                    if not s.sb_tap(SB_SAFARI):
+                        return None
+            except SimError as e:
+                s.why = str(e)
+                return None
+            r = s.wait(sid, tok, lambda r: is_split(r["sig"]), t0, page=page, timeout=15)
+            if r is None:
+                s.why = f"Safari did not report a 469x669 split pane ({pane}) in 15s"
+                return None
+            time.sleep(0.5)
+            got = s.origin_open(r, "tab", s.native("tab"))[2]
+            s.split = got
+            if got != pane:
+                s.why = f"Safari landed in the {got} pane, not the {pane} pane"
+                return None
+            # Focus Safari's pane (a tap on the page's title, beside its column): the focused app is the one that keeps
+            # the screen when the tall posture or the fold drops split view; unfocused, the other app takes it.
+            try:
+                s.sim.tap(84 + 192 if pane == "left" else INNER_W - 469 + 192, 150)
+            except SimError:
+                pass
+            return r
+        s.target_display = 3
+        return act
+
+    def split_to_full(s, tok):
+        """Drags the divider to the far edge so Safari's pane takes the whole screen."""
+        def act(sid, t0):
+            page = s.page
+            x, y = DIVIDER
+            try:
+                s.sim.drag(x, y, INNER_W - 10 if s.split == "left" else 10, y, hold_ms=300, ms=700)
+            except SimError as e:
+                s.why = str(e)
+                return None
+            r = s.wait(sid, tok, lambda r: r["sig"]["outerWidth"] > 900, t0, page=page, timeout=15)
+            if r is None:
+                s.why = "Safari did not report the full 951pt window in 15s after the divider drag"
+            else:
+                s.split = None
+            return r
+        s.target_display = 3
+        return act
+
+    def split_turn(s, tok, angle):
+        """Turns the unfolded device to the tall posture from split view. Split view does not exist there: one app
+        takes the screen: the focused one (to_split leaves Safari focused). Passes when Safari reports the full 669x951 window."""
+        def act(sid, t0):
+            page = s.page
+            if not s.fold("open", angle):
+                return None
+            r = s.wait(sid, tok, lambda r: r["sig"]["outerWidth"] < 700 and r["sig"]["outerHeight"] > 900, t0, page=page, timeout=12)
+            if r is None:
+                s.why = f"split view dropped in the tall posture ({angle}) and the other app took the screen: Safari stopped reporting"
+            s.split = None
+            return r
+        s.target_display = 3
+        return act
+
     def reset(s):
         """Every scenario starts closed, in portrait, with Safari in front and the host preview gone."""
         sh("xcrun", "simctl", "terminate", s.udid, HOST, check=False)
+        if s.split and s.position == "open" and s.sim:  # leave split view: Safari full screen again
+            try:
+                s.sim.drag(*DIVIDER, INNER_W - 10 if s.split == "left" else 10, DIVIDER[1], hold_ms=300, ms=700)
+            except SimError:
+                pass
         s.fold("closed", 0)
-        s.position, s.angle, s.last = "closed", 0, None
+        s.position, s.angle, s.last, s.split = "closed", 0, None, None
         time.sleep(1)
 
     # ---- scenarios --------------------------------------------------------------------------------------------
@@ -539,6 +801,69 @@ class Run:
         s.step("fold-fold-to-270", "tab", t, s.fold_closed(t, 270), LANDSCAPE_TOP_BARS, "fold into closed 270 (Safari keeps its top bars, no column)", video=True)
         s.step("fold-270to0", "tab", t, s.rotate(t, 0), {"preview": False, "mode": "column", "side": "right"}, "closed 270 after the fold, turn to portrait", video=True)
 
+    def scenario_split(s):
+        """Split view in every way the user moves through it, wide inner display (the only posture with split view)."""
+        t = s.tok("split")
+        s.step("split-tab", "tab", t, s.open_tab(t), {"preview": False, "mode": "column", "side": "right"}, "Safari tab, closed, portrait")
+        s.step("split-unfold", "tab", t, s.unfold(t, 0), {"preview": False, **UNFOLDED}, "unfold into the wide window", video=True)
+        s.step("split-left", "tab", t, s.to_split(t, "left"), {"preview": False, **SPLIT}, "full width -> split view, Safari in the left pane", video=True)
+        s.step("split-swap-right", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "move Safari to the right pane", video=True)
+        s.step("split-swap-left", "tab", t, s.to_split(t, "left"), {"preview": False, **SPLIT}, "move Safari back to the left pane", video=True)
+        s.step("split-left-to-full", "tab", t, s.split_to_full(t), {"preview": False, **UNFOLDED}, "left pane -> full width (divider to the right edge)", video=True)
+        s.step("split-right", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "full width -> split view, Safari in the right pane", video=True)
+        s.step("split-right-to-full", "tab", t, s.split_to_full(t), {"preview": False, **UNFOLDED}, "right pane -> full width (divider to the left edge)", video=True)
+
+    def scenario_split_turn(s):
+        """Turning and folding from split view: the tall posture and the closed screen have no split view."""
+        t = s.tok("splitturn")
+        s.step("splitturn-tab", "tab", t, s.open_tab(t), {"preview": False, "mode": "column", "side": "right"}, "Safari tab, closed, portrait")
+        s.step("splitturn-unfold", "tab", t, s.unfold(t, 0), {"preview": False, **UNFOLDED}, "unfold into the wide window")
+        for pane, a in (("left", 90), ("right", 270)):
+            s.step(f"splitturn-{pane}", "tab", t, s.to_split(t, pane), {"preview": False, **SPLIT}, f"split view, Safari in the {pane} pane")
+            s.step(f"splitturn-{pane}-to{a}", "tab", t, s.split_turn(t, a), {"preview": False, **UNFOLDED}, f"{pane} pane, turn to the tall posture ({a}): one app full screen", video=True)
+            s.step(f"splitturn-{pane}-wide", "tab", t, s.unfold(t, 0), {"preview": False, **UNFOLDED}, "back to the wide window", video=True)
+        s.step("splitturn-split-fold", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "split view, Safari in the right pane, before folding")
+        s.step("splitturn-fold", "tab", t, s.fold_closed(t, 0), {"preview": False, "mode": "column", "side": "right"}, "fold from split view to the closed screen", video=True)
+
+    def scenario_preview_unfolded(s):
+        """The in-app preview across the unfold: opened closed then unfolded, turned, folded back, and opened unfolded.
+        Unfolded, the sheet is a 653x661 window centred on the wide screen with its bars above and below the page,
+        no column: Duet goes inline on the default side, like full width Safari (EXPECTED.md, unfolded)."""
+        t = s.tok("pvu")
+        s.step("pvu-closed", "preview", t, s.open_preview(t, "sheet"), {"preview": True, **PREVIEW[0]}, "in-app preview (sheet), closed portrait")
+        s.step("pvu-unfold", "preview", t, s.unfold(t, 0, preview=True), dict(UNFOLDED), "unfold with the preview open", video=True)
+        s.step("pvu-tall", "preview", t, s.unfold(t, 90, preview=True), dict(UNFOLDED), "preview unfolded, turn to the tall posture", video=True)
+        s.step("pvu-wide", "preview", t, s.unfold(t, 0, preview=True), dict(UNFOLDED), "preview unfolded, back to the wide posture", video=True)
+        s.step("pvu-fold", "preview", t, s.fold_closed(t, 0), {"preview": True, **PREVIEW[0]}, "fold with the preview open", video=True)
+        s.reset()
+        s.fold("open", 0)
+        time.sleep(1.5)
+        t = s.tok("pvuo")
+        s.step("pvu-open-unfolded", "preview", t, s.open_preview(t, "sheet"), dict(UNFOLDED), "in-app preview opened while unfolded")
+        s.step("pvu-open-unfolded-fold", "preview", t, s.fold_closed(t, 0), {"preview": True, **PREVIEW[0]}, "fold the preview opened unfolded", video=True)
+
+    def scenario_open_safari_unfold(s):
+        t = s.tok("pvosu")
+        s.step("openinsafari-unfold-preview", "preview", t, s.open_preview(t, "sheet"), {"preview": True, **PREVIEW[0]}, "in-app preview (sheet), closed portrait")
+        s.step("openinsafari-unfold-tab", "tab", t, s.open_in_safari(t), {"preview": False, "mode": "column", "side": "right"}, "Open in Safari from the outer screen", video=True)
+        s.step("openinsafari-unfold", "tab", t, s.unfold(t, 0), {"preview": False, **UNFOLDED}, "then unfold", video=True)
+        s.step("openinsafari-unfold-split", "tab", t, s.to_split(t, "left"), {"preview": False, **SPLIT}, "then split view, left pane", video=True)
+
+    def scenario_dynamic_type(s):
+        """PREVIEW.gap variant: the preview's column with the largest accessibility text size. Its buttons are fixed
+        size controls, so the gap should not move; the step proves Duet still fits it (a Live Activity in the island
+        cannot be started on the simulator without an app that owns one, README, Limits)."""
+        before = sh("xcrun", "simctl", "ui", s.udid, "content_size", check=False).stdout.strip() or "large"
+        sh("xcrun", "simctl", "ui", s.udid, "content_size", "accessibility-extra-extra-extra-large", check=False)
+        try:
+            t = s.tok("dyn")
+            s.step("dyntype-preview-0", "preview", t, s.open_preview(t, "sheet"), {"preview": True, **PREVIEW[0]}, "largest Dynamic Type: in-app preview (sheet), portrait")
+            t = s.tok("dyntab")
+            s.reset()
+            s.step("dyntype-tab-0", "tab", t, s.open_tab(t), {"preview": False, "mode": "column", "side": "right"}, "largest Dynamic Type: Safari tab, portrait")
+        finally:
+            sh("xcrun", "simctl", "ui", s.udid, "content_size", before, check=False)
+
     def scenario_dark(s):
         before = sh("xcrun", "simctl", "ui", s.udid, "appearance", check=False).stdout.strip() or "light"
         sh("xcrun", "simctl", "ui", s.udid, "appearance", "dark", check=False)
@@ -562,15 +887,13 @@ class Run:
         "open-in-safari-270": lambda s: s.scenario_open_safari(270),
         "fold": lambda s: s.scenario_fold(),
         "dark": lambda s: s.scenario_dark(),
+        "preview-unfolded": lambda s: s.scenario_preview_unfolded(),
+        "open-in-safari-unfold": lambda s: s.scenario_open_safari_unfold(),
+        "split": lambda s: s.scenario_split(),
+        "split-turn": lambda s: s.scenario_split_turn(),
+        "dynamic-type": lambda s: s.scenario_dynamic_type(),
     }
-    # Not automatable on the simulator today (README, Limits). Listed so the matrix stays complete; they do not
-    # change the exit status, unlike BLOCKED.
-    UNSUPPORTED = {
-        "split-left": "split view: tab drag to the screen edge, long press on a tab and the bottom bar swipe were driven with the simulator MCP on the unfolded inner display (XCUITest touches do not reach it) and none opened a split; no API enters it. Covered by unit fixtures (split pane 469x669, inner 385x571)",
-        "split-right": "split view: see split-left",
-        "split-swap": "split view: see split-left",
-        "split-to-full": "split view: see split-left",
-    }
+    NEEDS_SIM = {"split", "split-turn", "open-in-safari-unfold"}
 
     def main(s):
         only = set(s.a.only.split(",")) if s.a.only else None
@@ -581,12 +904,11 @@ class Run:
         for name, fn in s.SCENARIOS.items():
             if only and name not in only:
                 continue
+            if name in s.NEEDS_SIM and not s.sim:
+                s.results.append({"id": name, "kind": "setup", "desc": name, "status": "BLOCKED", "reasons": ["simulator helper missing (sim.py, Claude desktop app)"], "notes": []})
+                continue
             s.reset()
             fn(s)
-        for name, why in s.UNSUPPORTED.items():
-            if only and name not in only:
-                continue
-            s.results.append({"id": name, "kind": "unsupported", "desc": name, "status": "UNSUPPORTED", "reasons": [why], "notes": []})
         s.reset()
         s.report()
         fails = [r for r in s.results if r["status"] == "FAIL"]
@@ -611,9 +933,9 @@ class Run:
         with open(os.path.join(s.out, "index.html"), "w") as fh:
             fh.write(f"""<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>Duo e2e report</title>
 <style>body{{font:14px system-ui;margin:16px;background:#fff;color:#111}}table{{border-collapse:collapse;width:100%}}td{{border-top:1px solid #ddd;padding:8px;vertical-align:top}}
-.PASS td:nth-child(2){{color:#080}}.FAIL td:nth-child(2){{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2){{color:#a60;font-weight:bold}}.UNSUPPORTED td:nth-child(2){{color:#888}}small{{color:#666}}
+.PASS td:nth-child(2){{color:#080}}.FAIL td:nth-child(2){{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2){{color:#a60;font-weight:bold}}small{{color:#666}}
 @media (prefers-color-scheme:dark){{body{{background:#111;color:#eee}}td{{border-color:#333}}}}</style>
-<h1>Duo e2e report</h1><p>{e(s.out)}. Overlay: red = Duet controls, blue = native buttons, green = preview column gap. Frames: the transition's first 2.4s, one tile per 100ms.</p>
+<h1>Duo e2e report</h1><p>{e(s.out)}. Overlay: red = Duet controls, blue = native buttons, green = preview column gap. Frames: 3.2s from 0.3s before the motion onset, one tile per 100ms.</p>
 <table>{"".join(rows)}</table>""")
         if s.a.md:
             lines = ["| step | result | final (angle, inner, mode/side) | settle | reason | screenshot / frames |", "|---|---|---|---|---|---|"]

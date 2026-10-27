@@ -32,6 +32,39 @@ const LANDED = [
   ["unfolded, screen.* stale at the folded size", full({ outerWidth: 951, outerHeight: 669, innerWidth: 951, innerHeight: 543 })],
 ];
 
+// Split entry from full width (e2e round 3, split-left): Safari comes back from the home screen still laid out with its
+// 84pt column against the full open window, then gets the 469x669 pane ~200ms later.
+// Going home from a split pane (split-swap-left), the pane's page is handed the closed screen's window for ~50ms.
+const SPLIT_ENTRY = [
+  full({ outerWidth: 951, outerHeight: 669, innerWidth: 867, innerHeight: 543, screenWidth: 951, screenHeight: 669, angle: 270 }),
+  full({ outerWidth: 466, outerHeight: 678, innerWidth: 385, innerHeight: 571, angle: 0 }),
+  full({ outerWidth: 466, outerHeight: 678, innerWidth: 385, innerHeight: 571, angle: 270 }),
+];
+LANDED.push(["split pane, Safari column beside the page", full({ outerWidth: 469, outerHeight: 669, innerWidth: 385, innerHeight: 571, screenWidth: 951, screenHeight: 669, angle: 270 })]);
+// Largest Dynamic Type (accessibility-extra-extra-extra-large, e2e round 3): Safari's bottom bar grows 98 -> 106.
+const DYNAMIC_TYPE_TAB = full({ ...P, innerWidth: 382, innerHeight: 572 });
+LANDED.push(["tab at the largest Dynamic Type, bottom bar 106pt", DYNAMIC_TYPE_TAB]);
+test("tab at the largest Dynamic Type: column, right", () => {
+  const c = detect(DYNAMIC_TYPE_TAB);
+  assert.deepEqual([c.mode, c.side], ["column", "right"]);
+});
+// The preview's sheet on the open screen (e2e round 3, preview-unfolded): landed wide and tall, with and without the
+// 34pt bottom inset; a column-narrow page in that window is the turn caught halfway.
+const O = { screenWidth: 951, screenHeight: 669 };
+LANDED.push(["unfolded preview sheet, wide", full({ ...O, outerWidth: 653, outerHeight: 661, innerWidth: 653, innerHeight: 515, angle: 270 })]);
+LANDED.push(["unfolded preview sheet, wide, inset 34", full({ ...O, outerWidth: 653, outerHeight: 661, innerWidth: 653, innerHeight: 591, insetBottom: 34, angle: 270 })]);
+LANDED.push(["unfolded preview sheet, tall", full({ ...O, outerWidth: 653, outerHeight: 869, innerWidth: 653, innerHeight: 710, angle: 180 })]);
+test("unfolded preview sheet, turn caught halfway (569x786 in 653x869): in transit", () =>
+  assert.equal(inTransit(full({ ...O, outerWidth: 653, outerHeight: 869, innerWidth: 569, innerHeight: 786, angle: 270 })), true));
+test("unfolded preview sheet: inline, right", () => {
+  const c = detect(full({ ...O, outerWidth: 653, outerHeight: 661, innerWidth: 653, innerHeight: 515, angle: 270 }));
+  assert.deepEqual([c.mode, c.side], ["inline", "right"]);
+});
+test("a negative visual viewport (sheet folded from the open screen) is not a keyboard", () => {
+  const c = detect({ ...at("in-app preview, page sheet (real"), visualHeight: -78 });
+  assert.deepEqual([c.mode, c.keyboard], ["column", undefined]);
+});
+for (const [i, s] of SPLIT_ENTRY.entries()) test(`split entry, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [i, s] of TURN_90_TO_0.entries()) test(`turn 90 to 0, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [i, s] of UNFOLD.entries()) test(`unfold, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [name, s] of LANDED) test(`landed: ${name}`, () => assert.equal(inTransit(s), false));

@@ -71,6 +71,8 @@ function sample() {
   const h = document.documentElement;
   return {
     t: Date.now(), page: PAGE, path: location.pathname + location.search,
+    // A backgrounded page (home screen, a split view menu) still lays out for the app switcher; nobody sees it.
+    visible: document.visibilityState, focus: document.hasFocus(),
     sig, preview: isPreview(sig), reason: previewReason(sig) ?? null,
     html: { mode: h.getAttribute("data-duet-mode"), split: h.getAttribute("data-duet-split"), emulated: h.getAttribute("data-duet-emulated") },
     navs,
