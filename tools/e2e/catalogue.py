@@ -324,6 +324,17 @@ def suite_steps(suite):
     return out
 
 
+def suite_live(suite):
+    """Live Activities running after each of suite_steps' steps (the state only says whether any is)."""
+    lit = {"music": suite["start"][3], "timer": False}
+    out = [sum(lit.values())]
+    for a, _, _ in suite["steps"]:
+        if a[0] in lit:
+            lit[a[0]] = a[1]
+        out.append(sum(lit.values()))
+    return out
+
+
 def markdown():
     js = journeys()
     edges = sum(len(transitions(st)) for st in STATES)

@@ -15,7 +15,7 @@ Usage: e2e.py --udid <sim> [--only <scenario>[,<scenario>]] [--page /path] [--md
        e2e.py --merge <dir with shard-*/results.json>
 Exit: 0 all PASS, 1 any FAIL, 2 any BLOCKED (a state the run could not reach, or a broken setup).
 """
-import argparse, datetime, html, json, os, signal, subprocess, sys, time, urllib.parse, urllib.request
+import argparse, atexit, datetime, html, json, os, signal, subprocess, sys, time, urllib.parse, urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # run with python -I, which leaves the script dir out
 from sim import Sim, SimError  # noqa: E402
@@ -160,6 +160,9 @@ class Run:
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
         s.la_on = False  # a Live Activity is running (the host's music or timer activity, la())
         s.la_want = {"on": False, "timer": False}  # the Live Activities wanted from the host: "on" music, "timer" the countdown
+        s.film_why, s.recorder = "no display to film", None
+        # A run that dies mid-step (an exception, ^C) must not leave its recorder running: it holds the device.
+        atexit.register(lambda: s.recorder and s.recorder.poll() is None and s.recorder.send_signal(signal.SIGINT))
         s.page_path = a.page
         s.films = []  # (scenario, stitched clips) for the report
         s.journeys = []  # catalogue journeys played (--catalogue): id, title, steps in words, status, film
@@ -195,9 +198,15 @@ class Run:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         # recordVideo needs a moment before the first frame; wait for it to say so (or give up after 3s).
         end = time.time() + 3
-        while time.time() < end and not (os.path.exists(p) and os.path.getsize(p) > 0):
+        while time.time() < end and proc.poll() is None and not (os.path.exists(p) and os.path.getsize(p) > 0):
             time.sleep(0.1)
+        if proc.poll() is not None:
+            # It exits at once when it cannot record, e.g. "Host recording is already in progress": a recorder an
+            # earlier run left behind (or one killed hard) holds the device until it is rebooted.
+            s.film_why = (proc.stderr.read().decode(errors="replace").strip().splitlines() or ["recordVideo exited"])[-1]
+            return None
         time.sleep(0.3)
+        s.recorder = proc
         return proc, p, time.time() * 1000
 
     def stop_record(s, rec, at=None):
@@ -205,9 +214,14 @@ class Run:
         proc, p, t_rec = rec
         proc.send_signal(signal.SIGINT)
         try:
-            proc.wait(10)
+            proc.wait(15)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            # SIGKILL leaves the device's recorder held ("Host recording is already in progress"); SIGTERM first.
+            proc.terminate()
+            try:
+                proc.wait(5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
         if not os.path.exists(p):
             return None
         return s.contact_sheet(p)
@@ -246,8 +260,11 @@ class Run:
         res = {"id": sid, "kind": kind, "desc": desc, "status": "PASS", "reasons": [], "notes": [],
                "expect": None if callable(expect) else expect,
                "prev": {"place": prev["place"], "key": prev["key"]} if prev else None, **(extra or {})}
-        rec = s.record(sid, s.target_display) if (video or s.a.video) and getattr(s, "target_display", None) else None
+        filming = video or s.a.video
+        rec = s.record(sid, getattr(s, "target_display", None) or s.display()) if filming else None
         s.target_display = None
+        if filming and rec is None:
+            res["notes"].append(f"not filmed: {s.film_why}")
         t0 = time.time() * 1000
         s.why = "no sample from the page"
         first = action(sid, t0)
@@ -1384,7 +1401,7 @@ class Run:
         step, filmed and judged against the placement of the state it ends in plus its own check. A blocked step ends
         the suite."""
         sid0 = suite["id"]
-        steps = catalogue.suite_steps(suite)
+        steps, live = catalogue.suite_steps(suite), catalogue.suite_live(suite)
         title = suite["title"] + (f' ({", ".join(f"{k} {v}" for k, v in suite["env"].items())})' if suite.get("env") else "")
         rec = {"id": sid0, "title": title, "steps": [], "words": [w for _, _, w, _, _ in steps], "status": "PASS", "film": None, "not_run": 0}
         s.journeys.append(rec)
@@ -1413,7 +1430,7 @@ class Run:
                     act = s.journey_action(t, a, cur) if a[0] == "open" else s.suite_action(t, a, cur, check)
                     res = s.step(f"{sid0}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
                                  lambda sig, st=nxt: catalogue.expect(st, sig), words, video=True,
-                                 extra={"journey": sid0, "expect_en": exp_en, "check": check or None}, check=check)
+                                 extra={"journey": sid0, "expect_en": exp_en, "check": check or None, "state": list(nxt), "live": live[k - 1]}, check=check)
                     rec["steps"].append(res["id"])
                     cur = nxt
                     if res["status"] == "BLOCKED":
@@ -1451,7 +1468,7 @@ class Run:
                 act = s.journey_action(t, a, cur)
                 res = s.step(f"{jid}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
                              lambda sig, st=nxt: catalogue.expect(st, sig), words, video=True,
-                             extra={"journey": jid, "expect_en": exp_en})
+                             extra={"journey": jid, "expect_en": exp_en, "state": list(nxt), "live": int(nxt[3])})
                 rec["steps"].append(res["id"])
                 cur = nxt
                 if res["status"] == "BLOCKED":
