@@ -99,11 +99,33 @@ How a new reading is committed:
 
 Column mode infers from the window geometry that Safari's column is there; it never sees Safari's buttons. The 80 to 88px width difference is Safari's column (84px measured), the height difference is Safari's chrome below the page.
 
-- `position: fixed` content is clipped to the page viewport, but WebKit paints in-document content that overflows the layout viewport into Safari's column. Duet renders the controls in an absolute layer at the top of the document, widens the document by the column's width, keeps the document itself from scrolling (the page scrolls in the inner scroller) and sets `touch-action: pan-y` on `<html>` so the page does not pan sideways. This is observed WebKit behaviour, not a supported API.
+- `position: fixed` content stops at the page viewport (and a fixed box covering the middle of the viewport edge has its colour painted over the column, see [Modals and sheets in column mode](#modals-and-sheets-in-column-mode)), but WebKit paints in-document content that overflows the layout viewport into Safari's column. Duet renders the controls in an absolute layer at the top of the document, widens the document by the column's width, keeps the document itself from scrolling (the page scrolls in the inner scroller) and sets `touch-action: pan-y` on `<html>` so the page does not pan sideways. This is observed WebKit behaviour, not a supported API.
 - Without `children` the document itself scrolls, and the layer follows it on a CSS scroll timeline (`animation-timeline: scroll(root)`). Safari runs the timeline with the scroll, so the controls hold through momentum and through smooth programmatic scrolls (`scrollIntoView({ behavior: "smooth" })`, `scrollTo({ behavior: "smooth" })`): you need no scroll listener and no `behavior: "auto"` workaround. Measured on the simulator: within 1px through flings and at rest, and one frame of up to 7pt at the end of a smooth scroll (a transform set on scroll ran up to 300pt off there). The keyframe ends at `scrollHeight - innerHeight`, Safari's own timeline range, which follows its URL bar as it collapses. Without scroll-timeline support, or when a page reset like `* { animation: none !important }` removes it, Duet falls back to a transform set on scroll, which lags in momentum. Children mode stays the steadier choice.
 - The widened document can pan sideways when a swipe runs off the end of a horizontal scroller (a chip row), since `touch-action` stops at that scroller. Duet pins `scrollX` (0, or the column width when the document spans a left column) on every scroll and sets `overscroll-behavior-x: contain` on all elements at zero specificity (`:where()`), so your own value wins.
 - Touches in the column reach the page but are not hit-tested to Duet's buttons, and Safari usually keeps the touch end. Duet listens for `pointerdown`, finds the button under the touch's coordinates and clicks it, so a column button fires on touch down.
 - Placement comes from constants measured on the iPhone Duo simulator (iOS 27.1) and checked on a device: Safari's back and reader rows at the top of the column, its +/tabs pill at the bottom. A Safari update that moves its buttons or changes this painting behaviour needs new measurements.
+
+### Modals and sheets in column mode
+
+A modal or sheet on the web usually sits on a full-screen scrim: `position: fixed; inset: 0`. In Safari's column on the closed Duo that used to hide Duet's whole column layer, the close button included (#79).
+
+- **What you see:** nothing to handle. While the overlay is open, the controls stay in the column and keep working. Safari's own buttons there are unaffected either way.
+- **Cause:** Safari 26 hit-tests the middle of each viewport edge, 4px in, for a fixed or sticky box (WebKit's `LocalFrameView::fixedContainerEdges`). When one covers that point, Safari paints the box's colour, or plain chrome when the box has a `backdrop-filter`, over everything beyond that edge, Safari's column included. Duet's column layer is in-document content, so it disappears under that fill. Measured on the simulator: a scrim 3px short of the edge still hides the column, 6px short does not, and a scrim of 90% width or 40% height does not.
+- **What Duet does:** in column mode it renders a small fixed guard (`.duet-guard`, 16x64px, transparent, `pointer-events: none`, top `z-index`) straddling that point on each edge that faces a column. Safari's hit test lands on the guard, which is too small to count as a container, so it finds none and keeps painting the column normally. The guard takes no taps and paints nothing.
+- **What you must do:** nothing for visibility. For a native feel, pass `close` to `<Duet>` while the sheet is open, so the controls hold only its close button, and hide the sheet's own X in column mode:
+
+  ```tsx
+  <Duet tabs={tabs} close={open ? { label: "Close", onPress: () => setOpen(false) } : undefined}>
+  ```
+
+  ```css
+  html[data-duet-mode="column"] .sheet-x { display: none; }
+  ```
+
+  The old workaround, making the scrim `position: absolute` in column mode, still works and is no longer needed.
+- **Not covered:** `<dialog>.showModal()` puts its `::backdrop` in the browser's top layer, above any `z-index`, so it still hides the column (checked on the simulator), and the page outside a modal dialog is inert anyway, so Duet's buttons could not take taps. Use a fixed `<div>` scrim (or `dialog.show()` with your own scrim) when you want the column controls. A page box of your own with `z-index: 2147483647` over the middle of the column edge also beats the guard.
+
+Try it on the [site](https://getduet.dev/sheet).
 
 ### Split view
 
@@ -313,7 +335,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** Safari's column is on the pane's left edge (or on the left when the closed Duo is turned to 90). Duet keeps the document scrolled one column across so the left column can paint, but the page content still starts at x 0, under the column.
 - **Duet does:** places the page itself: `margin-left` of the column width and the matching negative `margin-right` on `<html>`, marked `<html data-duet-reserve>`, with both insets 0. Centred content stays centred, nothing is clipped.
 - **You do:** nothing. Don't set `margin` on `<html>` or reset `scrollX`, Duet owns both. `<Duet reserve={false}>` opts out: the page runs under the column and `--duet-inset-left` / `--duet-inset-right` hold its width for `column()`, `bleed()` or your own padding.
-- **Status:** [#77](https://github.com/JayFarei/duet/issues/77), [PR #78](https://github.com/JayFarei/duet/pull/78), open, not merged. Until it lands, pass the page as `children` and keep text clear with `column()` or `bleed()`. See [Split view](#split-view).
+- **Status:** [#77](https://github.com/JayFarei/duet/issues/77), [PR #78](https://github.com/JayFarei/duet/pull/78), 0.4.0-rc.2. See [Split view](#split-view).
 
 ### Rubber band at the top or bottom of the page
 
@@ -321,19 +343,15 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** the controls follow the document on a CSS scroll timeline, which is clamped to the scroll range. The iOS rubber band pushes `scrollY` past that range, and the in-document layer moves with the bounce.
 - **Duet does:** while the layer follows the document, `<html>` gets `overscroll-behavior-y: none`, so the document does not rubber-band, like a page with children. Only the Duo column is affected: other modes and other devices keep the bounce.
 - **You do:** nothing. The rule has zero specificity (`:where()`), so a page's own `overscroll-behavior` still wins, and with it the controls ride the bounce again.
-- **Status:** [#76](https://github.com/JayFarei/duet/issues/76), [PR #80](https://github.com/JayFarei/duet/pull/80), open, not merged. Until it lands, pages with `children` are unaffected (their document never scrolls).
+- **Status:** [#76](https://github.com/JayFarei/duet/issues/76), [PR #80](https://github.com/JayFarei/duet/pull/80), 0.4.0-rc.2.
 
 ### Full-screen `position: fixed` overlay or modal backdrop
 
-- **You see:** in column mode, while a modal or sheet scrim (`position: fixed; inset: 0`) is open, every Duet control in Safari's column disappears, the close button included, so the user has no way to close the sheet from the column.
-- **Cause:** WebKit stops showing in-document paint in the column while a fixed box covers the viewport. Not yet confirmed which WebKit behaviour triggers it.
-- **Duet does:** nothing yet. A library fix is in progress.
-- **You do:** in column mode, make the backdrop `position: absolute`, sized to the viewport at the current scroll position (`top` = `scrollY`, `height` = `innerHeight`, full width), instead of fixed. For the sheet itself, pass `close` to `<Duet>` while it is open (the strip then holds only a close button, where back goes) and hide the sheet's own X in column mode, so there is one X, in the column:
-  ```css
-  html[data-duet-mode="column"] .backdrop { position: absolute; inset: auto 0; } /* top and height set from scrollY and innerHeight while open */
-  html[data-duet-mode="column"] .sheet-close { display: none; }
-  ```
-- **Status:** [#79](https://github.com/JayFarei/duet/issues/79), open. The fix may change this entry.
+- **You see:** without the handling, in column mode, while a modal or sheet scrim (`position: fixed; inset: 0`) is open, every Duet control in Safari's column disappears, the close button included, so the user has no way to close the sheet from the column.
+- **Cause:** Safari 26 hit-tests a point 4px in from the middle of each viewport edge for a fixed or sticky box and, when one covers it, paints that box's colour over the inset beyond that edge, Safari's column included, instead of the page's in-document content.
+- **Duet does:** in column mode renders `.duet-guard`, a small invisible fixed box (16x64px, `pointer-events: none`, top `z-index`) on each column edge, so that hit test lands on it and the column keeps showing the controls. Your scrim stays `position: fixed`.
+- **You do:** nothing for a fixed `<div>` scrim. `<dialog>.showModal()` is not covered: its `::backdrop` sits in the top layer, above any `z-index`, so use a fixed `<div>` scrim instead. For one X, in the column, pass `close` to `<Duet>` while the sheet is open and hide the sheet's own X in column mode (`html[data-duet-mode="column"] .sheet-close { display: none; }`). See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
+- **Status:** [#79](https://github.com/JayFarei/duet/issues/79), [PR #83](https://github.com/JayFarei/duet/pull/83), 0.4.0-rc.2.
 
 ### Sideways swipe pans the page into the column
 

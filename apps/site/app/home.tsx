@@ -138,6 +138,7 @@ function Page({ self = false }: { self?: boolean }) {
         <div className="ctas" style={{ justifyContent: "flex-start" }}>
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
           <a href="/panes" className="pill">Panes example</a>
+          <a href="/sheet" className="pill">Sheets example</a>
         </div>
       </Section>
 

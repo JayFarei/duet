@@ -254,9 +254,10 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
 .duet-scroller { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; }
 /* The page spans the whole window and the controls float over it (blueprint rules 14/15): backgrounds run on
    under the controls, and only text and buttons keep clear, by the insets (--duet-inset-left/right), through
-   column() or bleed(). Safari's column only shows in-document content and clips fixed boxes at the viewport
-   edge, so there the scroller is an in-document box that runs on under the column. The document still never
-   scrolls, so the chrome layer never moves. */
+   column() or bleed(). Safari's column paints in-document content that overflows the layout viewport, but no
+   fixed box reaches it: a fixed box stops at the viewport edge, and one covering the middle of that edge has its
+   colour painted over the column instead (the guard below). So there the scroller is an in-document box that runs
+   on under the column. The document still never scrolls, so the chrome layer never moves. */
 html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left) + var(--duet-inset-right)); bottom: auto; height: calc(100% + var(--duet-inset-bottom)); }
 /* That overflow widens the document, and touch-action on <html> stops at this scroll container, so without its own
    a sideways swipe pans the whole page, chrome and all, into the column. Carousels inside are scrollers of their own
@@ -283,6 +284,22 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
    So from focus, before the zoom and the keyboard, the layer is clipped out of the document width. */
 html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibility: hidden; }
 .duet[data-mode="column"] { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 50; }
+/* A page's full-screen fixed overlay (a modal scrim, `position: fixed; inset: 0`) would hide the whole column,
+   controls included: Safari 26 hit-tests the middle of each viewport edge, 4px in, for a fixed or sticky box
+   (LocalFrameView::fixedContainerEdges) and, when one covers it, paints that box's colour, or plain chrome behind a
+   backdrop-filter, over the inset beyond that edge, Safari's column included, instead of the page's in-document
+   content. The guard is a small fixed box straddling that point on the column's edge, above every page layer, so
+   the hit test lands on it instead: too small to count as a container itself, it has none above it, and the column
+   keeps showing the controls. That hit test skips layers with nothing fixed or sticky in them, so the guard is fixed
+   and outside the layer; it keeps a (transparent) background, since a box with no background, no backdrop and no
+   children counts as transparent and the hit test then retries without it, honouring pointer-events. It takes no
+   taps (simulator, 2026-10-27, #79). */
+.duet-guard {
+  position: fixed; z-index: 2147483647; top: 50%; width: 16px; height: 64px; margin-top: -32px; pointer-events: none;
+  background-image: linear-gradient(transparent, transparent);
+}
+.duet-guard[data-side="right"] { right: -8px; }
+.duet-guard[data-side="left"] { left: -8px; }
 /* Mid-turn or mid-fold the layer still carries the last posture's positions (the old screen's column), which would
    widen the document past the new window, and Safari then zooms the page to fit it (scale 1.14 unfolding from
    closed landscape into the tall window, e2e round 2). Clipped, it adds no width until the window lands. */

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Column mode: a page's full-screen `position: fixed` overlay (a modal scrim, `inset: 0`) no longer hides the controls in Safari's column, close button included. A small invisible fixed guard on the column's edge keeps Safari from filling the column with the overlay's colour. `<dialog>.showModal()` is not covered (#79).
 - Column mode without children: the controls no longer ride the rubber band at the top or bottom of the page, where they slid over Safari's own column buttons or vanished until the bounce settled. The document no longer rubber-bands while the controls follow it, like a page with children. A page's own `overscroll-behavior` still wins.
 
 ## 0.4.0-rc.1
