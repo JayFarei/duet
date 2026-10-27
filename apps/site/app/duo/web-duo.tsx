@@ -79,98 +79,98 @@ const bezier = (x1: number, y1: number, x2: number, y2: number) => (x: number) =
 };
 // The turn, timed on Apple's film: two eased legs read as one, leaving rest gently and landing without overshoot.
 // The page stays lit and turns with the device, like a phone before iOS turns its interface; near the end iOS turns
-// the interface upright: the screen fades to the page's background, the new layout appears under it and fades in.
+// the interface upright: the page blurs, the new layout appears under the blur and sharpens.
 const TURN = 800; // rotation, ms
 const TURN_EASE = "cubic-bezier(0.45, 0, 0.2, 1)", turnEase = bezier(0.45, 0, 0.2, 1);
 const SWAP = 0.85, REFLOW = 100;
-const COVER = { in: 90, out: 200 }; // the screen fading to the page's background and back while iOS swaps layouts
+const SOFTEN = { px: 10, in: 90, out: 220 }; // the page blurring and back while iOS swaps layouts
 const MOVE = 520; // the page frame moving between apps
 // Asked for less motion, folds and turns cross-fade: the screen dims over DARK_MS and lights over LIGHT_MS.
 const DARK_MS = 160, LIGHT_MS = 360;
-// The fold, as Apple's film shows it. Unfolding, the closed device turns on its vertical axis until it is edge-on, a
-// rounded metal band, then opens into a V towards the viewer: two halves hinged at the far end, the hinge dipping
-// below the free edges, which are nearer. Folding runs back. Drawn orthographic, as one outline throughout: the body
-// is a shell of three nested shapes (rim, band, front) whose outline is a path with a fixed number of points, so it
-// morphs from the closed device to the band to the V to the open device without a second layer ever showing.
-// The swap from one posture to the other happens edge-on, where both draw the same band. The closed screen dims as it
-// turns away; the open screen is dark glass in the V that lights near flat. Folding, the open screen stays lit in the
-// V and dims as it closes, and the closed screen lights a moment after it lands.
+// The fold, as Apple's film shows it, drawn in real perspective. Unfolding, the closed device turns on its vertical
+// axis, its free edge towards the viewer, until it is edge-on: a thick rounded metal band. It then opens into a V
+// towards the viewer, two halves hinged at the far end, and lands flat. Folding runs back. Every surface is a flat
+// layer with its own 3D transform under one perspective (no preserve-3d, whose depth sorting and backface handling
+// differ between browsers): the closed body and its free side, or the open device's two halves (the body cut at the
+// hinge, the right half a copy of the open screen) and their outer edges. A surface turned away from the viewer is
+// hidden by pose, so no layer ever shows through another. The swap happens edge-on, where both postures draw the
+// same band at the same place. The closed screen dims as it turns away; the open screen is dark glass in the V that
+// lights near flat. Folding, the open screen stays lit in the V and dims as it closes, and the closed screen lights a
+// moment after it lands.
 const FOLDS = { open: { ms: 560, ease: bezier(0.4, 0, 0.2, 1) }, closed: { ms: 520, ease: bezier(0.45, 0, 0.3, 1) } } as const;
-const DEPTH = 40; // the closed device's thickness (each half is half of it), at the device's scale
-const EDGE_R = 16, EDGE_K = 1; // the band's rounded ends, seen edge-on
-const NOTCH = 30; // how far the hinge dips below the free edges, at its deepest (the V half open)
+const DEPTH = 32; // the closed device's thickness (each half is half of it), at the device's scale: Apple's band is 0.045 of the height
+const EDGE_R = DEPTH / 2; // the band's rounded ends, seen edge-on
+const PERSPECTIVE = 2400; // the viewer's distance, at the device's scale
 const LANDED = { hold: 40, light: 80 }; // folded, the closed screen stays off this long after landing, then lights
-// The shell: a box with room around either posture's body (the band edge-on is the closed body's height), centred on
-// the device.
-const SHELL = { w: BODY.open.w + 24, h: BODY.closed.h + 2 * NOTCH + 24 };
-// The device's side: a satin band, lit along the middle of each half's edge. Edge-on the closed device's side is both
-// halves' edges together, so the full band is the half band mirrored and the swap between them shows nothing.
-const HALF = "#3a3a3c, #9c9ca1 35%, #7c7c80";
-const SIDE = { half: `linear-gradient(90deg, ${HALF})`, halfR: `linear-gradient(270deg, ${HALF})`, both: "linear-gradient(90deg, #3a3a3c, #9c9ca1 17.5%, #7c7c80 50%, #9c9ca1 82.5%, #3a3a3c)" };
+// The body's front: black, inside a thin bright rim and a graphite band.
+const RIM = `inset 0 0 0 1.5px ${FINISH.rim}, inset 0 0 0 3.5px ${FINISH.band}`;
+// The device's side: polished chamfers along both faces, graphite between, and the dark line where the halves meet.
+// Edge-on the closed device's side is both halves' edges together, so the full band is the half band and its mirror.
+const HALF = "#2c2c2e, #c9c9ce 16%, #6a6a6f 34%, #3a3a3c 86%, #141416";
+const SIDE = { half: `linear-gradient(90deg, ${HALF})`, halfR: `linear-gradient(270deg, ${HALF})`,
+  both: "linear-gradient(90deg, #2c2c2e, #c9c9ce 8%, #6a6a6f 17%, #3a3a3c 43%, #141416 50%, #3a3a3c 57%, #6a6a6f 83%, #c9c9ce 92%, #2c2c2e)" };
+// The open device cut at the hinge: the left half a hair past the middle, over the right half, so no seam opens.
+const CUT = { whole: "inset(-40px)", left: "inset(-40px calc(50% - 1px) -40px -40px)", right: "inset(-40px -40px -40px 50%)" };
 const smooth = (a: number, b: number, t: number) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
-/** A corner of the outline: superellipse radii and CSS corner-shape exponent (|x|^n + |y|^n = 1, n = 2^k). */
-interface Arc { rx: number; ry: number; k: number }
-const ARC = 14; // segments per corner
-/** The body's outline, w x h centred in the shell, as a clip-path: corners top left, top right, bottom right, bottom
- *  left, the top and bottom edges dipping `notch` at the middle (a chevron: the hinge, further away, sits lower), everything `inset` in. Always the same commands, so
- *  any two outlines interpolate point by point. */
-function outline(w: number, h: number, a: Arc[], notch = 0, inset = 0) {
-  const l = (SHELL.w - w) / 2 + inset, r = (SHELL.w + w) / 2 - inset, t = (SHELL.h - h) / 2 + inset, b = (SHELL.h + h) / 2 - inset, cx = SHELL.w / 2;
-  const pts: number[][] = [];
-  const corner = (c: Arc, ox: number, oy: number, from: number) => {
-    const rx = Math.max(0, c.rx - inset), ry = Math.max(0, c.ry - inset), e = 2 / 2 ** c.k;
-    const x0 = ox + (ox === l ? rx : -rx), y0 = oy + (oy === t ? ry : -ry);
-    for (let i = 0; i <= ARC; i++) {
-      const th = (from + (90 * i) / ARC) * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th);
-      pts.push([x0 + rx * Math.sign(cs) * Math.abs(cs) ** e, y0 + ry * Math.sign(sn) * Math.abs(sn) ** e]);
-    }
-  };
-  corner(a[0], l, t, 180); pts.push([cx, t + notch]); corner(a[1], r, t, 270);
-  corner(a[2], r, b, 0); pts.push([cx, b + notch]); corner(a[3], l, b, 90);
-  return `path("M${pts.map(([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`).join("L")}Z")`;
-}
-type Part = "rim" | "band" | "front" | "side" | "edgeL" | "edgeR" | "face" | "buttons" | "power" | "dark" | "shadow";
-/** Fold progress t (0 closed, 1 open) as the parts of the device draw it.
- *  Up to edge-on (t 0.5) it is the closed device turned by ψ, its free edge towards the viewer: the front narrows by
- *  cos ψ and the side, D sin ψ wide, shows beyond it; the outline's corners foreshorten and round off to the band's.
- *  From there it is the open device as a V, each half turned φ about the hinge (90° edge-on, 0 flat): the faces narrow
- *  by cos φ towards the middle, each half's edge (D/2 sin φ) shows at the outside, and the hinge dips.
+type Part = "body" | "copy" | "back" | "back2" | "side" | "edgeL" | "edgeR" | "buttons" | "power" | "dark" | "tintL" | "tintR" | "crease" | "shadow";
+/** Fold progress t (0 closed, 1 open) as the parts of the device draw it, in the device's coordinates with the origin
+ *  at its centre, z towards the viewer (who is PERSPECTIVE away), the front face at z 0 at rest.
+ *  Up to edge-on (t 0.5) it is the closed body turned by ψ about its own centre (D/2 behind the face), free edge
+ *  towards the viewer, its side showing once it faces the viewer. From there it is the open device as a V, each half
+ *  turned φ about the hinge (90° edge-on, 0 flat), the hinge pushed back so the free edges stay where the closed
+ *  device's band was; each half's outer edge shows once it faces the viewer.
  *  `lit`: folding, the open screen stays lit in the V and dims as it closes, the closed one stays off; unfolding, the
  *  closed screen dims as it turns away and the open one is dark until near flat. */
 function pose(t: number, closed = t <= 0.5, lit = false): Record<Part, Keyframe> {
-  const f = (x: number) => x.toFixed(4), D = DEPTH, B = BODY[closed ? "closed" : "open"];
+  const f = (x: number) => x.toFixed(4), D = DEPTH, P = PERSPECTIVE;
   const turn = closed ? Math.min(t, 0.5) / 0.5 : (1 - Math.max(t, 0.5)) / 0.5; // 0 square on, 1 edge-on
-  const a = turn * Math.PI / 2, c = Math.cos(a), s = Math.sin(a), round = smooth(0, 0.3, c);
-  // A corner seen turned: its run across foreshortens and the band's rounding takes over; edge-on it is the band's end.
-  const arc = (x: Corner, across: number): Arc => ({ rx: across, ry: EDGE_R + (x.r - EDGE_R) * round, k: EDGE_K + (x.k - EDGE_K) * round });
-  const shell = (w: number, h: number, corners: Arc[], notch: number) => ({
-    rim: { clipPath: outline(w, h, corners, notch) }, band: { clipPath: outline(w, h, corners, notch, 1.5) }, front: { clipPath: outline(w, h, corners, notch, 3.5) },
-  });
-  const strip = (x: number, w: number) => ({ transform: `translateX(${f(x)}px) scaleX(${f(w / D)})` });
-  const none = strip(0, 0), x0 = (SHELL.w - B.w) / 2; // the body's left in the shell
+  const deg = turn * 90, a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  // A side seen turned runs between the body's rounded corners (their own sides are the back face showing past the
+  // front), growing to the full height edge-on, where its ends are the band's. `long`: its scale for a body h tall.
+  const long = (h: number) => 1 - (2 * (C.free.r - EDGE_R) * smooth(0, 0.3, c)) / h, ends = (h: number) => `${f(EDGE_R / long(h))}px`;
+  const shown = s > 0.001 ? 1 : 0;
+  const x = (px: number, z: number) => px * P / (P - z); // where a point lands on screen (x only)
+  const shadow = (l: number, r: number, w: number) => ({ transform: `translateX(${f((l + r) / 2)}px) scaleX(${f((r - l) / w)})` });
+  // Square on, the faces carry no transform at all: a 3D transform, even an identity one, makes Chrome resample the
+  // layer and soften the rim and screen at rest.
+  // Likewise the layers that only the turned device shows are hidden, not just transparent, whenever they do not draw:
+  // left composited beside the body they make Chrome composite it too, off the pixel grid, and blur it.
+  const flatOn = (k: Keyframe): Keyframe => (turn === 0 ? { ...k, transform: "none" } : k);
+  const only = (k: Keyframe, on = k.opacity !== 0): Keyframe => ({ ...k, visibility: on ? "visible" : "hidden" });
   if (closed) {
-    const w = B.w * c + D * s, left = (B.w - w) / 2;
-    const hinge = arc(C.hinge, Math.max(C.hinge.r * c, EDGE_R * s)), free = arc(C.free, C.free.r * c + EDGE_R * s);
-    const squash = { transform: `translateX(${f(left)}px) scaleX(${f(c)})` };
+    const B = BODY.closed, hw = B.w / 2;
+    const at = (px: number, pz: number) => x(px * c - pz * s, px * s + pz * c - D / 2); // a point of the body, turned
+    const xs = [at(-hw, D / 2), at(-hw, -D / 2), at(hw, D / 2), at(hw, -D / 2)];
+    const turned = `translateZ(${-D / 2}px) rotateY(${f(-deg)}deg)`;
     return {
-      ...shell(w, B.h, [hinge, free, free, hinge], 0),
-      side: strip(x0 + left + B.w * c, D * s), edgeL: none, edgeR: none,
-      face: squash, buttons: { transform: `matrix(${f(c)}, 0, 0, 1, ${f(left)}, 0)`, opacity: +f(c * c) }, power: { ...squash, opacity: +f(c * c) },
-      dark: { opacity: lit ? 1 : +f(0.75 * s * s) },
-      shadow: { transform: `scaleX(${f(w / B.w)})` },
+      body: flatOn({ transform: `${turned} translateZ(${D / 2}px)`, clipPath: CUT.whole }), copy: only({ opacity: 0 }),
+      back: only(flatOn({ transform: `${turned} translateZ(${-D / 2}px)`, clipPath: CUT.whole, opacity: shown })), back2: only({ opacity: 0 }),
+      // The free side faces the viewer once the angle to it opens past the line of sight.
+      side: only({ transform: `${turned} translateX(${hw}px) rotateY(90deg) scaleY(${f(long(B.h))})`, opacity: s * (P + D / 2) - hw > 0 ? 1 : 0, borderRadius: `${D / 2}px / ${ends(B.h)}` }),
+      edgeL: only({ opacity: 0 }), edgeR: only({ opacity: 0 }),
+      buttons: { opacity: +f(c * c) }, power: { opacity: +f(c * c) },
+      dark: { opacity: lit ? 1 : +f(0.75 * s * s) }, tintL: { opacity: 0 }, tintR: { opacity: 0 }, crease: { opacity: 0 },
+      shadow: shadow(Math.min(...xs), Math.max(...xs), B.w),
     };
   }
-  const L = B.w / 2, w = 2 * L * c + D * s, h = B.h + (BODY.closed.h - B.h) * s * s, left = (B.w - w) / 2, e = (D / 2) * s;
-  const free = arc(C.free, C.free.r * c + EDGE_R * s), squash = { transform: `translateX(${f(L - L * c)}px) scaleX(${f(c)})` };
-  // The top buttons ride the top edge: it drops (B.h - h) / 2 and slopes from the hinge, `notch` lower, up to the corner.
-  const notch = NOTCH * Math.sin(2 * a) ** 2, m = -notch / Math.max(1, w / 2 - free.rx), top = (B.h - h) / 2 + notch;
+  const B = BODY.open, L = B.w / 2, hs = 1 + (BODY.closed.h / B.h - 1) * s * s;
+  const zh = (BODY.closed.w / 2 - D / 2 - L) * s; // the hinge, pushed back: edge-on the free edges are the band
+  const half = (k: 1 | -1) => `translateZ(${f(zh)}px) rotateY(${f(k * deg)}deg) scaleY(${f(hs)})`;
+  // A half's outer edge: centred D/4 behind its face, facing outwards.
+  const ex = -L * c - (D / 4) * s, ez = zh + L * s - (D / 4) * c, edgeOn = c * ex + s * (P - ez) > 0 ? 1 : 0;
+  const out = x(-L * c - (D / 2) * s, zh + L * s - (D / 2) * c), front = x(-L * c, zh + L * s), l = Math.min(out, front);
+  const e = ends(B.h), k = f(long(B.h)), flat = turn === 0;
   return {
-    ...shell(w, h, [free, free, free, free], notch),
-    side: none, edgeL: strip(x0 + left, e), edgeR: strip(x0 + left + w - e, e),
-    face: squash, buttons: { transform: `matrix(${f(c)}, ${f(m * c)}, 0, 1, ${f(L - L * c)}, ${f(top - m * c * L)})`, opacity: +f(c * c) },
-    power: { ...squash, opacity: +f(c * c) },
+    body: flatOn({ transform: half(1), clipPath: flat ? CUT.whole : CUT.left }), copy: only(flatOn({ transform: half(-1), opacity: 1 }), !flat), // open, the copy stays drawn under the body, so its frame is painted when the V shows it
+    back: only(flatOn({ transform: `${half(1)} translateZ(${-D / 2}px)`, clipPath: CUT.left, opacity: shown })), back2: only(flatOn({ transform: `${half(-1)} translateZ(${-D / 2}px)`, opacity: shown })),
+    side: only({ opacity: 0 }),
+    edgeL: only({ transform: `${half(1)} translate3d(${-L}px, 0, ${-D / 4}px) rotateY(-90deg) scaleY(${k})`, opacity: edgeOn, borderRadius: `${D / 2}px 0 0 ${D / 2}px / ${e} 0 0 ${e}` }),
+    edgeR: only({ transform: `${half(-1)} translate3d(${L}px, 0, ${-D / 4}px) rotateY(90deg) scaleY(${k})`, opacity: edgeOn, borderRadius: `0 ${D / 2}px ${D / 2}px 0 / 0 ${e} ${e} 0` }),
+    buttons: { opacity: +f(c * c) }, power: { opacity: +f(c * c) },
     dark: { opacity: +f(lit ? 0.85 * smooth(0.3, 1, turn) : 0.92 * smooth(0, 0.35, turn)) },
-    shadow: { transform: `scaleX(${f(w / B.w)})` },
+    // Lit from the right: the left half, turned away from the light, is darker, and the crease shades both sides.
+    tintL: { opacity: +f(0.3 * s) }, tintR: { opacity: +f(0.08 * s) }, crease: { opacity: +f(Math.min(1, 2 * s) ** 2) },
+    shadow: shadow(l, -l, B.w),
   };
 }
 
@@ -366,10 +366,13 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const k = useRef(1), held = useRef<{ closed: boolean; as: Animation[]; ms: number } | null>(null);
   k.current = slow ? 4 : 1;
   const turn = measured ? TURN * k.current : 0;
-  const frame = useRef<HTMLIFrameElement>(null), screen = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLIFrameElement>(null), frame2 = useRef<HTMLIFrameElement>(null);
   const page = useRef<HTMLDivElement>(null), device = useRef<HTMLDivElement>(null), cast = useRef<HTMLDivElement>(null), shadow = useRef<HTMLDivElement>(null);
-  const rim = useRef<HTMLDivElement>(null), band = useRef<HTMLDivElement>(null), front = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null), buttons = useRef<HTMLDivElement>(null), power = useRef<HTMLDivElement>(null), dark = useRef<HTMLDivElement>(null);
-  const flank = useRef<HTMLDivElement>(null), edgeL = useRef<HTMLDivElement>(null), edgeR = useRef<HTMLDivElement>(null), cover = useRef<HTMLDivElement>(null);
+  // The device's surfaces (see pose): the body and the open device's right half (a copy), each with its buttons,
+  // screen light and shading, and the sides.
+  const body = useRef<HTMLDivElement>(null), copy = useRef<HTMLDivElement>(null), back = useRef<HTMLDivElement>(null), back2 = useRef<HTMLDivElement>(null), side = useRef<HTMLDivElement>(null), edgeL = useRef<HTMLDivElement>(null), edgeR = useRef<HTMLDivElement>(null);
+  const buttons = useRef<HTMLDivElement>(null), power = useRef<HTMLDivElement>(null), dark = useRef<HTMLDivElement>(null), tintL = useRef<HTMLDivElement>(null), crease = useRef<HTMLDivElement>(null);
+  const buttons2 = useRef<HTMLDivElement>(null), power2 = useRef<HTMLDivElement>(null), dark2 = useRef<HTMLDivElement>(null), tintR = useRef<HTMLDivElement>(null), crease2 = useRef<HTMLDivElement>(null);
   const cur = useRef(s), busy = useRef(false), spin = useRef(0);
   cur.current = s;
   const host = useSyncExternalStore(() => () => {}, () => location.host, () => "");
@@ -378,9 +381,10 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   // `closed`: the posture on screen, the closed device up to edge-on or the open one from there.
   const draw = (ts: number[], ms: number, closed: boolean, lit = false) => {
     const poses = ts.map((t) => pose(t, closed, lit)), o = { duration: ms * k.current, fill: "both" as const };
-    const els: Record<Part, HTMLElement | null> = { rim: rim.current, band: band.current, front: front.current, side: flank.current, edgeL: edgeL.current, edgeR: edgeR.current,
-      face: face.current, buttons: buttons.current, power: power.current, dark: dark.current, shadow: shadow.current };
-    return (Object.keys(els) as Part[]).flatMap((part) => els[part] ? [els[part]!.animate(poses.map((x) => x[part]), o)] : []);
+    const els: Record<Part, (HTMLElement | null)[]> = { body: [body.current], copy: [copy.current], back: [back.current], back2: [back2.current], side: [side.current], edgeL: [edgeL.current], edgeR: [edgeR.current],
+      buttons: [buttons.current, buttons2.current], power: [power.current, power2.current], dark: [dark.current, dark2.current],
+      tintL: [tintL.current], tintR: [tintR.current], crease: [crease.current, crease2.current], shadow: [shadow.current] };
+    return (Object.keys(els) as Part[]).flatMap((part) => { const ks = poses.map((x) => x[part]); return els[part].flatMap((el) => el ? [el.animate(ks, o)] : []); });
   };
   // One half of a fold: the posture it leaves up to edge-on, or the one it reaches from there. The fold's easing runs
   // across both halves, split where it is half done.
@@ -397,16 +401,17 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   };
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms * k.current));
   const finished = (as: Animation[]) => Promise.all(as.map((a) => a.finished)).catch(() => {});
-  // A layer fading from wherever it is now: `dark` (the screen turning off and on) or `cover` (iOS swapping layouts).
-  const fade = (el: HTMLElement | null, to: number, ms: number, easing: string) => {
+  // A style moving from wherever it is now: the screen's light (`dark` turning off and on) or the page's blur while
+  // iOS swaps layouts.
+  const fade = (el: HTMLElement | null, prop: "opacity" | "filter", to: string, ms: number, easing: string) => {
     if (!el) return sleep(ms);
-    const from = +getComputedStyle(el).opacity;
+    const from = getComputedStyle(el)[prop];
     el.getAnimations().forEach((a) => a.cancel());
-    el.animate([{ opacity: from }, { opacity: to }], { duration: ms * k.current, easing, fill: "forwards" });
+    el.animate([{ [prop]: from === "none" ? "blur(0px)" : from }, { [prop]: to }], { duration: ms * k.current, easing, fill: "forwards" });
     return sleep(ms);
   };
-  const darken = (on: boolean, ms: number) => fade(dark.current, on ? 1 : 0, ms, on ? "ease-in" : "ease-out");
-  const relit = () => { for (const el of [dark.current, cover.current]) el?.getAnimations().forEach((a) => a.cancel()); setInstant(false); };
+  const darken = (on: boolean, ms: number) => fade(dark.current, "opacity", on ? "1" : "0", ms, on ? "ease-in" : "ease-out");
+  const relit = () => { for (const el of [dark.current, page.current]) el?.getAnimations().forEach((a) => a.cancel()); setInstant(false); };
   const go = async (next: Partial<State>, fromTour = false) => {
     if (!fromTour) setTour(false);
     if (busy.current) return;
@@ -446,14 +451,14 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       setRetract(false);
     } else {
       // The device turns with the page lit on it (the layout effect below draws the turn). Near the end iOS swaps in
-      // the upright layout: the screen fades to the page's background, the page lays out again under it, and the new
-      // layout fades in.
+      // the upright layout: the page blurs, lays out again turned upright under the blur, and comes back sharp. It
+      // never leaves the screen.
       setS(n);
-      await sleep(TURN * SWAP - COVER.in);
-      await fade(cover.current, 1, COVER.in, "ease-in");
+      await sleep(TURN * SWAP - SOFTEN.in);
+      await fade(page.current, "filter", `blur(${SOFTEN.px}px)`, SOFTEN.in, "ease-in");
       flushSync(() => setUpright(n.turn));
       await sleep(REFLOW);
-      await fade(cover.current, 0, COVER.out, "ease-out");
+      await fade(page.current, "filter", "blur(0px)", SOFTEN.out, "ease-out");
       setRetract(false);
     }
     busy.current = false;
@@ -545,16 +550,24 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   const [W, H] = upright ? [n.h, n.w] : [n.w, n.h];
   const modeOf = (x: Signals) => { const j = JSON.stringify(x); return seen?.signals === j ? seen.mode : detect(x).mode; };
   const sc = scene({ ...s, turn: upright }, W, H, host, modeOf);
+  // The open device's right half in the V: the same page laid out open.
+  const [W2, H2] = upright ? [SCREEN.open.h, SCREEN.open.w] : [SCREEN.open.w, SCREEN.open.h];
+  const sc2 = s.posture === "open" ? sc : scene({ ...fit({ ...s, posture: "open" }), turn: upright }, W2, H2, host, modeOf);
 
   // Tell the page what the device would tell it: now, and whenever it (re)loads and says it is listening.
-  const signals = JSON.stringify(sc.signals);
+  const signals = JSON.stringify(sc.signals), signals2 = JSON.stringify(sc2.signals);
   useEffect(() => {
-    const post = () => { sent.current = signals; frame.current?.contentWindow?.postMessage({ type: "duet:signals", signals: JSON.parse(signals) }, location.origin); };
-    const ready = (e: MessageEvent) => { if (e.source === frame.current?.contentWindow && e.origin === location.origin && e.data?.type === "duet:ready") post(); };
+    const send = (f: HTMLIFrameElement | null, x: string) => f?.contentWindow?.postMessage({ type: "duet:signals", signals: JSON.parse(x) }, location.origin);
+    const post = () => { sent.current = signals; send(frame.current, signals); send(frame2.current, signals2); };
+    const ready = (e: MessageEvent) => {
+      if (e.origin !== location.origin || e.data?.type !== "duet:ready") return;
+      if (e.source === frame.current?.contentWindow) { sent.current = signals; send(frame.current, signals); }
+      if (e.source === frame2.current?.contentWindow) send(frame2.current, signals2);
+    };
     post();
     addEventListener("message", ready);
     return () => removeEventListener("message", ready);
-  }, [signals]);
+  }, [signals, signals2]);
 
   // Watch the mode the page lays out in.
   useEffect(() => {
@@ -576,16 +589,18 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
   // The call-out: colours each slot Duet placed in the page, and outlines iOS's own chrome around it.
   useEffect(() => {
-    const el = frame.current;
-    const apply = () => {
-      const d = el?.contentDocument;
-      if (!d?.head) return;
-      if (!d.getElementById("wd-callout")) d.head.append(Object.assign(d.createElement("style"), { id: "wd-callout", textContent: CALLOUT }));
-      d.documentElement.toggleAttribute("data-wd-slots", slots);
-    };
-    apply();
-    el?.addEventListener("load", apply);
-    return () => el?.removeEventListener("load", apply);
+    const els = [frame.current, frame2.current], off = els.map((el) => {
+      const apply = () => {
+        const d = el?.contentDocument;
+        if (!d?.head) return;
+        if (!d.getElementById("wd-callout")) d.head.append(Object.assign(d.createElement("style"), { id: "wd-callout", textContent: CALLOUT }));
+        d.documentElement.toggleAttribute("data-wd-slots", slots);
+      };
+      apply();
+      el?.addEventListener("load", apply);
+      return () => el?.removeEventListener("load", apply);
+    });
+    return () => off.forEach((f) => f());
   }, [slots]);
 
   // The glimmer: once each new screen settles, a sheen runs over the buttons Duet put in the page, so the web's own
@@ -660,13 +675,14 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   spin.current += ((((hw - spin.current) % 360) + 540) % 360) - 180;
   // One scale per orientation, the smaller of the two postures', so a fold never resizes the device; the stage box is
   // the larger of the two, so nothing beside it moves on a fold.
-  const side = hw % 180 !== 0, orient = (x: Size) => side ? [x.h, x.w] : [x.w, x.h];
+  const sideways = hw % 180 !== 0, orient = (x: Size) => sideways ? [x.h, x.w] : [x.w, x.h];
   const scaleFor = (w: number, h: number) => embed ? Math.min(view.w / w, view.h / h, 1) : Math.min((view.w - 64) / w, (view.h - 320) / h, 1);
   const scale = Math.min(...[BODY.closed, BODY.open].map((x) => scaleFor(orient(x)[0], orient(x)[1])));
   const bw = Math.max(...[BODY.closed, BODY.open].map((x) => orient(x)[0])), bh = Math.max(...[BODY.closed, BODY.open].map((x) => orient(x)[1]));
   const settle = (prop: string) => calm || !measured ? "none" : `${prop} ${turn}ms ${TURN_EASE}`;
-  // The turn: the angle on the film's curve, the scale moving with it from one orientation's to the other's, steady
-  // in between (a real device does not shrink as it turns). Web Animations at even times, ending on the styles React set.
+  // The turn: the angle on the film's curve, the scale moving with it from one orientation's to the other's and never
+  // dipping between (the device does not shrink as it turns; the stage clips it at the window's edges). Web Animations
+  // at even times, ending on the styles React set.
   const spun = spin.current, drawn = useRef<{ spin: number; scale: number } | null>(null);
   useLayoutEffect(() => {
     const was = drawn.current;
@@ -675,13 +691,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const N = 40, o = { duration: TURN * k.current };
     const keys = Array.from({ length: N + 1 }, (_, i) => {
       const e = turnEase(i / N);
-      const th = was.spin + (spun - was.spin) * e, r = th * Math.PI / 180, cs = Math.abs(Math.cos(r)), sn = Math.abs(Math.sin(r));
-      const w = b.w * cs + b.h * sn, h = b.w * sn + b.h * cs, pad = 24 * Math.abs(Math.sin(2 * r));
-      const fits = embed ? Math.min((view.w - pad) / w, (view.h - pad) / h, 1) : scaleFor(w, h);
-      // Mid-turn the device's box is wider than either end's: it shrinks just enough to stay in the window, through a
-      // soft minimum (never above either) so the scale has no corner where the fit takes over from the steady scale.
-      const lerp = was.scale + (scale - was.scale) * e, x = fits / lerp, soft = 0.12 * Math.sin(Math.PI * e);
-      return { th, sc: lerp * (1 + x - Math.sqrt((1 - x) ** 2 + soft ** 2)) / 2 };
+      return { th: was.spin + (spun - was.spin) * e, sc: was.scale + (scale - was.scale) * e };
     });
     device.current?.animate(keys.map(({ th, sc }) => ({ transform: `translate(-50%, -50%) scale(${sc}) rotate(${th}deg)` })), o);
     cast.current?.animate(keys.map(({ th }) => ({ transform: `rotate(${-th}deg) translateY(${DEPTH}px) rotate(${th}deg)` })), o);
@@ -694,6 +704,51 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   if (lastChrome.current !== chromeKey) { fadeChrome.current = !instant; lastChrome.current = chromeKey; }
   const rest = pose(s.posture === "open" ? 1 : 0);
   const motion = (props: string[]) => instant || !measured ? "none" : props.map((x) => `${x} ${MOVE}ms ${ease}`).join(", ");
+  // A body with its screen: the device's own (`primary`, the frame the stage talks to and watches), or the open
+  // device's copy, whose frame shows the same page laid out open, for the right half in the V.
+  const shell = (bd: typeof b, sn: Size, x: Scene, w: number, h: number, primary: boolean, st: Record<Part, Keyframe>) => (
+    <div ref={primary ? body : copy} data-wd-shape aria-hidden={primary ? undefined : true} style={{ ...corners(bd.r), position: "absolute", left: -bd.w / 2, top: -bd.h / 2, width: bd.w, height: bd.h,
+      background: FINISH.front, boxShadow: RIM, ...(primary ? st.body : { ...st.copy, clipPath: CUT.right, pointerEvents: "none" }) as CSSProperties }}>
+      {/* The buttons, on the body's top and free side. A top button is the part above the body, shaded as the top of a
+          taller one, and one pixel of rim colour over the rim, so no dark seam shows between them. */}
+      {([[primary ? buttons : buttons2, BUTTONS.filter((x) => x.top < 0), st.buttons, "3px 3px 0 0"], [primary ? power : power2, BUTTONS.filter((x) => x.top >= 0), st.power, "0 3px 3px 0"]] as const).map(([ref, xs, o, r], j) => (
+        <div key={j} ref={ref} style={{ position: "absolute", inset: 0, ...o as CSSProperties }}>
+          {xs.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.top < 0 ? 1 - x.top : x.h, borderRadius: r,
+            background: x.top < 0 ? `linear-gradient(#6e6e73, #424245) top / 100% ${-x.top}px no-repeat ${FINISH.rim}` : FINISH.button }} />)}
+        </div>
+      ))}
+      {/* clip-path as well as the rounded overflow: in a 3D-turned body Chrome clips a backdrop-filtered layer (the
+          Safari glass) to the screen's box only, and its corner would show past the screen's rounded corner. */}
+      <div data-wd-shape data-wd-screen={primary || undefined} style={{ ...corners(bd.screenR), clipPath: `inset(0 round ${bd.screenR.map((x) => `${x.round}px`).join(" ")})`, position: "absolute", left: bd.x, top: bd.y, width: sn.w, height: sn.h, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
+        {/* The page, upright for the user: counter-turned when the device is turned. */}
+        <div ref={primary ? page : undefined} style={{
+          position: "absolute", left: 0, top: 0, width: w, height: h, transformOrigin: "0 0",
+          transform: upright > 0 ? `translateY(${sn.h}px) rotate(-90deg)` : upright < 0 ? `translateX(${sn.w}px) rotate(90deg)` : undefined,
+        }}>
+          {x.under}
+          {/* The window the page shows through, and the page in it. */}
+          <div style={{
+            position: "absolute", left: x.clip.x, top: x.clip.y, width: x.clip.w, height: x.clip.h, overflow: "hidden",
+            borderRadius: x.clipR, transition: motion(["left", "top", "width", "height", "border-radius"]),
+          }}>
+            <iframe ref={primary ? frame : frame2} src={src} title={primary ? "Duet on the iPhone Duo" : ""} tabIndex={embed || !primary ? -1 : undefined} aria-hidden={primary ? undefined : true} style={{
+              position: "absolute", left: x.frame.x, top: x.frame.y, width: x.frame.w, height: x.frame.h,
+              border: 0, display: "block", background: "var(--bg)", pointerEvents: embed || !primary ? "none" : undefined, transition: motion(["left", "top", "width", "height"]),
+            }} />
+            {primary && shine.map((g, i) => <div key={`${shown}-${i}`} data-wd-shine style={{ left: x.frame.x + g.x, top: x.frame.y + g.y, width: g.w, height: g.h, "--wd-at": `${i * 90}ms` } as CSSProperties} />)}
+          </div>
+          <div key={chromeKey} data-wd-callout={slots || undefined} style={{ position: "absolute", inset: 0, pointerEvents: "none", animation: fadeChrome.current ? `wd-in ${MOVE}ms ${ease} both` : undefined }}>{x.chrome}</div>
+        </div>
+        {/* The V's shading: each half's tone, and the crease darkening towards the hinge. */}
+        <div ref={primary ? tintL : tintR} style={{ position: "absolute", inset: 0, background: "#000", pointerEvents: "none", ...(primary ? st.tintL : st.tintR) as CSSProperties }} />
+        <div ref={primary ? crease : crease2} style={{ position: "absolute", inset: 0, background: "linear-gradient(90deg, transparent calc(50% - 90px), rgb(0 0 0 / 0.5) 50%, transparent calc(50% + 90px))", pointerEvents: "none", ...st.crease as CSSProperties }} />
+        {primary && s.posture === "closed" && <Island live={island(s) && !retract} />}
+      </div>
+      {/* The screen switched off: over the screen and a pixel past its edge, so its antialiased rim never shows the
+          page's light tone between the bezel and the black. */}
+      <div ref={primary ? dark : dark2} data-wd-shape data-wd-dark={primary || undefined} style={{ ...corners(bd.screenR), position: "absolute", left: bd.x - 1, top: bd.y - 1, width: sn.w + 2, height: sn.h + 2, background: "#000", pointerEvents: "none", ...st.dark as CSSProperties, ...(primary && { opacity: 0 }) }} />
+    </div>
+  );
 
   return (
     <div ref={stage} style={embed ? { display: "flex", flexDirection: "column", alignItems: "center", gap: 18, width: "100%" } : { minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 22, padding: "28px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
@@ -719,51 +774,18 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
         <div ref={cast} style={{ position: "absolute", inset: 0, transform: `rotate(${-spin.current}deg) translateY(${DEPTH}px) rotate(${spin.current}deg)` }}>
           <div ref={shadow} data-wd-shape data-wd-shadow style={{ ...corners(b.r), position: "absolute", inset: 0, background: "rgb(0 0 0 / 0.28)", filter: "blur(40px)" }} />
         </div>
-        {/* The body: one shell of three nested clip-paths (rim, band, front) whose outline pose morphs through the fold,
-            the face (screen and page) inside it, and the device's sides as strips over it, all clipped to the outline. */}
-        {/* The buttons: the top ones follow the top edge through the fold, the side one the side. */}
-        {([[buttons, BUTTONS.filter((x) => x.top < 0), rest.buttons], [power, BUTTONS.filter((x) => x.top >= 0), rest.power]] as const).map(([ref, xs, st], j) => (
-          <div key={j} ref={ref} style={{ position: "absolute", inset: 0, transformOrigin: "0 0", ...st as CSSProperties }}>
-            {xs.map((x, i) => <div key={i} style={{ position: "absolute", right: x.right, top: x.top, width: x.w, height: x.h, borderRadius: 3, background: FINISH.button }} />)}
-          </div>
-        ))}
-        <div ref={rim} style={{ position: "absolute", left: (b.w - SHELL.w) / 2, top: (b.h - SHELL.h) / 2, width: SHELL.w, height: SHELL.h, background: FINISH.rim, ...rest.rim as CSSProperties }}>
-          <div ref={band} style={{ position: "absolute", inset: 0, background: FINISH.band, ...rest.band as CSSProperties }}>
-            <div ref={front} style={{ position: "absolute", inset: 0, background: FINISH.front, ...rest.front as CSSProperties }}>
-              <div ref={face} style={{ position: "absolute", left: (SHELL.w - b.w) / 2, top: (SHELL.h - b.h) / 2, width: b.w, height: b.h, transformOrigin: "0 0" }}>
-                <div ref={screen} data-wd-shape data-wd-screen style={{ ...corners(b.screenR), position: "absolute", left: b.x, top: b.y, width: n.w, height: n.h, overflow: "hidden", background: "var(--bg)", isolation: "isolate" }}>
-                  {/* The page, upright for the user: counter-turned when the device is turned. */}
-                  <div style={{
-                    position: "absolute", left: 0, top: 0, width: W, height: H, transformOrigin: "0 0",
-                    transform: upright > 0 ? `translateY(${n.h}px) rotate(-90deg)` : upright < 0 ? `translateX(${n.w}px) rotate(90deg)` : undefined,
-                  }} ref={page}>
-                    {sc.under}
-                    {/* The window the page shows through, and the page in it. */}
-                    <div style={{
-                      position: "absolute", left: sc.clip.x, top: sc.clip.y, width: sc.clip.w, height: sc.clip.h, overflow: "hidden",
-                      borderRadius: sc.clipR, transition: motion(["left", "top", "width", "height", "border-radius"]),
-                    }}>
-                      <iframe ref={frame} src={src} title="Duet on the iPhone Duo" tabIndex={embed ? -1 : undefined} style={{
-                        position: "absolute", left: sc.frame.x, top: sc.frame.y, width: sc.frame.w, height: sc.frame.h,
-                        border: 0, display: "block", background: "var(--bg)", pointerEvents: embed ? "none" : undefined, transition: motion(["left", "top", "width", "height"]),
-                      }} />
-                      {shine.map((g, i) => <div key={`${shown}-${i}`} data-wd-shine style={{ left: sc.frame.x + g.x, top: sc.frame.y + g.y, width: g.w, height: g.h, "--wd-at": `${i * 90}ms` } as CSSProperties} />)}
-                    </div>
-                    <div key={chromeKey} data-wd-callout={slots || undefined} style={{ position: "absolute", inset: 0, pointerEvents: "none", animation: fadeChrome.current ? `wd-in ${MOVE}ms ${ease} both` : undefined }}>{sc.chrome}</div>
-                  </div>
-                  {/* iOS swapping layouts as the device turns: the page's background over the page, under the camera. */}
-                  <div ref={cover} style={{ position: "absolute", inset: 0, background: "var(--bg)", opacity: 0, pointerEvents: "none" }} />
-                  {s.posture === "closed" && <Island live={island(s) && !retract} />}
-                </div>
-                {/* The screen switched off: over the screen and a pixel past its edge, so its antialiased rim never shows
-                    the page's light tone between the bezel and the black. */}
-                <div ref={dark} data-wd-shape data-wd-dark style={{ ...corners(b.screenR), position: "absolute", left: b.x - 1, top: b.y - 1, width: n.w + 2, height: n.h + 2, background: "#000", opacity: 0, pointerEvents: "none" }} />
-              </div>
-            </div>
-          </div>
-          {/* The sides, turned towards the viewer: the closed device's (both halves' edges) or each open half's. */}
-          {([[flank, SIDE.both], [edgeL, SIDE.half], [edgeR, SIDE.halfR]] as const).map(([ref, bg], i) => (
-            <div key={i} ref={ref} style={{ position: "absolute", left: 0, top: 0, width: DEPTH, height: SHELL.h, transformOrigin: "0 0", background: bg, transform: "scaleX(0)" }} />
+        {/* The device under one perspective centred on it: the body (closed, or the open device's left half in the V),
+            the open device's right half (a copy with its own frame of the page), and the sides (see pose). */}
+        <div style={{ position: "absolute", left: b.w / 2, top: b.h / 2, width: 0, height: 0, perspective: PERSPECTIVE }}>
+          {/* The back faces, behind everything: past the front they are the sides of the rounded corners. */}
+          {([[back, b, rest.back], [back2, BODY.open, { ...rest.back2, clipPath: CUT.right }]] as const).map(([ref, bd, st], i) => (
+            <div key={i} ref={ref} data-wd-shape style={{ ...corners(bd.r), position: "absolute", left: -bd.w / 2, top: -bd.h / 2, width: bd.w, height: bd.h, background: FINISH.band, pointerEvents: "none", ...st as CSSProperties }} />
+          ))}
+          {shell(BODY.open, SCREEN.open, sc2, W2, H2, false, rest)}
+          {shell(b, n, sc, W, H, true, rest)}
+          <div ref={side} data-wd-band style={{ position: "absolute", left: -DEPTH / 2, top: -BODY.closed.h / 2, width: DEPTH, height: BODY.closed.h, background: SIDE.both, ...rest.side as CSSProperties }} />
+          {([[edgeL, SIDE.half, rest.edgeL], [edgeR, SIDE.halfR, rest.edgeR]] as const).map(([ref, bg, st], i) => (
+            <div key={i} ref={ref} style={{ position: "absolute", left: -DEPTH / 4, top: -BODY.open.h / 2, width: DEPTH / 2, height: BODY.open.h, background: bg, ...st as CSSProperties }} />
           ))}
         </div>
         </div>

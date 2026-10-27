@@ -47,7 +47,8 @@ section[id] { scroll-margin-top: 24px; }
 .ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
 
 .hero { text-align: center; padding: clamp(40px, 9vw, 110px) 0 28px; }
-.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: clamp(48px, 8vw, 100px); }
+/* overflow-x: the device keeps its size as it turns, so on a phone its corners pass the window's edges mid-turn; they are cut there instead of widening the page. */
+.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: clamp(48px, 8vw, 100px); overflow-x: clip; }
 /* The stage centres where the hero's column(980, 20) does (duet-ui layout.ts), so device and title share one axis: --c2 is twice that column's centre. Each side keeps 16px clear of Duet's controls, and the side away from them gives up room to stay on the axis. */
 .stage {
   --l: var(--duet-inset-left, 0px); --r: var(--duet-inset-right, 0px);
