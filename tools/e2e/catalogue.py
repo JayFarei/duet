@@ -45,8 +45,10 @@ SPLIT = {"mode": "column", "side": "both"}
 
 
 def top_bars(sig):
-    """Safari's closed landscape window with its bars at the top and no column (678x340)."""
-    return sig["outerWidth"] > sig["outerHeight"] and sig["outerHeight"] < 400 and sig["outerWidth"] > 600
+    """Safari's closed landscape window with its bars at the top and no column: the page spans the full 678pt width
+    (inner 678x340 or 678x386 under the bars), where the column window leaves it 594 (the outer size, the screen's
+    678x466, is the same in both)."""
+    return sig["outerWidth"] > sig["outerHeight"] and sig["outerWidth"] > 600 and sig["innerWidth"] == sig["outerWidth"]
 
 
 def expect(state, sig=None):

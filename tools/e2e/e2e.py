@@ -1135,6 +1135,7 @@ class Run:
             s.results.append(res)
             rec["steps"].append(res["id"])
             rec["not_run"] = len(steps)
+            s.log(f"[{res['id']}] {res['desc']}\n  BLOCKED {res['reasons'][0]}")
         else:
             t, cur = s.tok(jid), start
             for k, (a, nxt, words, exp_en) in enumerate(steps, 1):
