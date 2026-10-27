@@ -96,13 +96,15 @@ function switchSide(el: HTMLElement, side: Side) {
 
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
-let pinTimer: ReturnType<typeof setTimeout> | undefined;
+let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined;
 // The damper keeps history, so it is fed once per signal change (refresh, from the watcher), never from React's
 // getSnapshot (read), which React may call several times per render.
 function refresh() {
   const s = readSignals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now(), settling(), epoch());
   // A pin lifts on its own time, with no resize to re-read on.
   if (damper.pinned && !pinTimer) pinTimer = setTimeout(() => { pinTimer = undefined; listeners.forEach((f) => f()); }, damper.until! - performance.now() + 20);
+  // So is a landing after a fold or turn (LAND_HOLD), which no resize may follow.
+  if (damper.landUntil !== undefined && !landTimer) landTimer = setTimeout(() => { landTimer = undefined; listeners.forEach((f) => f()); }, damper.landUntil - performance.now() + 10);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
 }
@@ -352,7 +354,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // and nothing runs under a right column (simulator, 2026-10-26: 84px of padding left a 100px gap), while a
     // left column has the document scrolled one column across, so the page runs under it.
     const r = document.documentElement.style;
-    const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
+    // Controls hidden for good in this window (the turned preview) take no room; hidden while moving keeps the
+    // last insets, so the page does not reflow twice in one turn.
+    const inset = ctx.hidden === "preview" ? "0px" : ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
     const other = (side: Side) => ctx.mode === "column" ? "0px" : envInset(side);
     const under = ctx.mode !== "column" || inner || !!emulatedSignals();
     const right = (ctx.side === "right" || split) && under ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
@@ -373,8 +377,10 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
-  const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, ctx.side === "left", column);
+  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
+  // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
+  // takes it up again, scrolled one column across for a left column.
+  const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column);
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
     if (!menu) return;
@@ -530,7 +536,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
       ...destructive,
     ];
     return (
-      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || undefined} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
+      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
         {p.close && pl.back && (
           <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
             <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>

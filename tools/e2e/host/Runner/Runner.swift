@@ -8,6 +8,9 @@ import XCTest
 //   {op:"elements", bundle}          native (outside any web view) buttons / controls of an app, screen points
 //   {op:"tap", bundle, label}        tap the first native button whose label contains `label`
 //   {op:"tapAt", x, y}               tap a screen point
+//   {op:"press", x, y, duration}     long-press a screen point
+//   {op:"drag", x, y, x2, y2, hold}  press at a point for `hold` s, then drag to another (split view, window tiling)
+//   {op:"tree", bundle}              every element of an app with a frame (exploration, split-view controls)
 //   {op:"stop"}
 final class Runner: XCTestCase {
   let beacon = ProcessInfo.processInfo.environment["E2E_BEACON"] ?? "http://localhost:3141"
@@ -62,6 +65,11 @@ final class Runner: XCTestCase {
     return out
   }
 
+  /** A screen point, through SpringBoard, which idles at once (see "tap"). */
+  func point(_ x: Double, _ y: Double, _ bundle: String? = nil) -> XCUICoordinate {
+    XCUIApplication(bundleIdentifier: bundle ?? "com.apple.springboard").coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y))
+  }
+
   func run(_ c: [String: Any]) throws -> [String: Any] {
     let op = c["op"] as? String ?? "noop"
     switch op {
@@ -93,6 +101,27 @@ final class Runner: XCTestCase {
       XCUIApplication(bundleIdentifier: "com.apple.springboard").coordinate(withNormalizedOffset: .zero)
         .withOffset(CGVector(dx: f.midX, dy: f.midY)).tap()
       return ["x": f.midX, "y": f.midY]
+    case "press":
+      point(c["x"] as! Double, c["y"] as! Double, c["bundle"] as? String).press(forDuration: c["duration"] as? Double ?? 1.0)
+      return [:]
+    case "drag":
+      point(c["x"] as! Double, c["y"] as! Double, c["bundle"] as? String).press(forDuration: c["hold"] as? Double ?? 0.6,
+        thenDragTo: point(c["x2"] as! Double, c["y2"] as! Double, c["bundle"] as? String),
+        withVelocity: XCUIGestureVelocity(rawValue: c["velocity"] as? Double ?? 600), thenHoldForDuration: 0.3)
+      return [:]
+    case "tree":
+      let app = XCUIApplication(bundleIdentifier: c["bundle"] as! String)
+      guard let snap = try? app.snapshot() else { return ["elements": []] }
+      var out: [[String: Any]] = []
+      func walk(_ e: XCUIElementSnapshot, _ depth: Int) {
+        let f = e.frame
+        if f.width > 0 && (!e.label.isEmpty || !e.identifier.isEmpty) {
+          out.append(["type": e.elementType.rawValue, "label": e.label, "id": e.identifier, "depth": depth, "x": f.minX, "y": f.minY, "w": f.width, "h": f.height])
+        }
+        for ch in e.children { walk(ch, depth + 1) }
+      }
+      walk(snap, 0)
+      return ["elements": out]
     case "tapAt":
       let sb = XCUIApplication(bundleIdentifier: "com.apple.springboard")
       sb.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: c["x"] as! Double, dy: c["y"] as! Double)).tap()

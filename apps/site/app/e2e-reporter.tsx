@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { isPreview, previewReason, readSignals } from "duet-ui";
 
 // e2e only (tools/e2e): with ?e2e in the URL (or once seen in this tab), posts Duet's full state to the local
-// beacon every 100ms. ?e2e=<origin> picks the beacon, default http://localhost:3141. Renders nothing.
+// beacon every 40ms (a flash of one frame pair is ~33ms; 100ms sampling missed 103ms ones). ?e2e=<origin> picks the beacon, default http://localhost:3141. Renders nothing.
 const KEY = "duet-e2e";
 // One id per page load, so the driver can tell two documents with the same URL apart (a dismissing preview and
 // the Safari tab it opened, a stale tab).
@@ -31,6 +31,7 @@ function sample() {
   const sig = readSignals();
   const navs = [...document.querySelectorAll("nav.duet")].map((n) => ({
     mode: n.getAttribute("data-mode"), side: n.getAttribute("data-side"), settling: n.getAttribute("data-settling"),
+    hidden: n.getAttribute("data-hidden"), confidence: n.getAttribute("data-confidence"),
     keyboard: n.getAttribute("data-keyboard"), rect: rect(n), shown: shown(n),
     slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({ slot: s.getAttribute("data-duet-slot"), rect: rect(s) })),
   }));
@@ -92,7 +93,7 @@ export function E2EReporter() {
     const url = origin + "/beacon";
     const id = setInterval(() => {
       try { fetch(url, { method: "POST", body: JSON.stringify(sample()), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
-    }, 100);
+    }, 40);
     return () => clearInterval(id);
   }, []);
   return null;

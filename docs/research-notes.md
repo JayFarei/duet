@@ -287,3 +287,22 @@ Native frames from the e2e runner (XCUITest on `com.apple.SafariViewService`, Du
 - Turned: no usable gap, so `inline` on the side away from the preview's column; the preview rule now accepts the sheet in either orientation.
 - Unknown: the preview's buttons with Live Activities (the old note's ~31pt worst case assumed the island pushes them like Safari's rows; not measured).
 
+
+## Turns and folds caught halfway (2026-10-26, e2e round 2)
+
+Traced with the e2e reporter at 40ms while `fold.bin` (SpringBoard's display tool service, see tools/e2e/README.md) turned and folded the Duo simulator.
+
+- A closed turn 0 -> 90 reports for about 100ms a window whose inner and outer orientations disagree (inner already landscape, outer still 466x678), then a page width without Safari's column. Committing either drew the controls inline or at the wrong edge for 100 to 400ms (the round-2 flashes: inline/right at 0 -> 90, `more` off screen at x=584 at 270 -> 0, the preview strip jumping from x 24 to 108 at 90 -> 270).
+- At 270 -> 0 and 90 -> 270 the angle flips before the window: `screen.orientation.angle` says portrait while the window is still landscape, or the reverse.
+- Unfolding passes through windows whose outer size is no Duo size (and is not the preview sheet); folding back passes through 466x498 inside 466x678 before 382x580.
+- Unfolded: `-deviceOrientation=portrait` gives a 951x543 page in a 951x669 window at angle 270; landscapeRight 669x825 in 669x951 at 180; landscapeLeft 669x825 in 669x951 at 0. `screen.width/height` stay at the closed values after unfolding.
+
+`inTransit()` in geometry.ts flags those windows: orientation mismatch, a closed-screen angle that disagrees with the window, page-to-window differences outside Safari's landed ranges (0 to 2 or 80 to 88 across, 0 to 160 down), or an outer size that is neither a Duo size nor the preview sheet. While settling, `stable()` keeps the last placement and sets `hidden: "moving"`; nothing is committed, so the landed window is taken as a stable change and placed at once. Every landed fixture state is asserted not in transit (packages/duet-ui/test/transit.test.mjs).
+
+Unfolding from closed landscape (the 678x340 window, inset 34, Safari keeps after a fold) passes through the closed portrait window (382x580 in 466x678, angle 0) for about 90ms before the open one. It reads as landed, so it flashed the column for one 40ms sample. `stable()` now holds a landing after a transit for `LAND_HOLD` (150ms) before committing it, and chrome.tsx re-reads at `landUntil` since no resize may follow.
+
+While hidden mid-turn the column layer still carried the last posture's positions (the closed screen's 678 width), widening the document past the open window's 585 page; held for those 150ms, Safari zoomed the page to fit it (visual scale 1.1436, 669/585) and the inline controls landed over the text (fold-unfold-from-90, tall window). The layer is now clipped out of the document width while `hidden` is `"moving"` (duet.css) and lets go of the sideways scroll until the landing.
+
+The full screen preview turned (every presentation but a sheet, iOS 27.1 simulator) is the whole 678x466 window: page 678x391 (no column, chrome 75), inset bottom 34, its buttons in a safe-area inset of 84 on the side the Duo is turned to. The old rule needed a page column, so this read as a tab and showed the inline strip over the page. `previewReason()` now takes it by the chrome band (73 to 77) and inset; a turned tab has 98 with its column or 126 fresh.
+
+The landscape preview's column gap is about 26pt; with no room for a button and an inline strip covering the page, Duet hides its controls there (`hidden: "preview"`).

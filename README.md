@@ -93,7 +93,7 @@ How a new reading is committed:
 - **Zoom.** While the page is zoomed (`visualViewport.scale` not 1, for example Safari zooming out when an input takes focus) the window signature is unreadable, so Duet keeps the last context.
 - **Drift.** While the window is still settling, a mode change at the same window size, page width and turn is held until the sizes stop moving; a change of window size, page width or turn commits at once.
 - **Loops.** A mode that flips twice in 2s at a stable window is pinned for 3s, doubling on each repeat up to 60s.
-- `useDuet().confidence` says how the context was reached: `"sure"` (settled signals), `"settling"` (the window is still moving) or `"held"` (the last context, kept through zoom or drift).
+- `useDuet().confidence` says how the context was reached: `"sure"` (settled signals), `"settling"` (the window is still moving) `"held"` (the last context, kept through zoom or drift) or `"moving"` (a turn or fold caught halfway, controls hidden).
 
 ### Column mode: how it works
 
@@ -115,7 +115,7 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 
 ### In-app preview
 
-Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. The gap holds two buttons: "…" and the selected tab (the tab pill minimized); everything else folds into "…". Turned sideways the preview's column sits on the side the Duo is turned to and its gap is about 26pt, too small for a button, so Duet falls back to `inline` on the other side (right at angle 90, left at 270), unless the user picked a side. Duet sets `useDuet().preview` in both. The gap was measured with a bare Dynamic Island; how Live Activities move the preview's buttons is not yet known. Duet takes a Safari window that is not standalone to be the preview when it is either:
+Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. The gap holds two buttons: "…" and the selected tab (the tab pill minimized); everything else folds into "…". Turned sideways the preview's column sits on the side the Duo is turned to and its gap is about 26pt, too small for a button. There Duet hides its controls (`useDuet().hidden` is `"preview"`, the controls get `visibility: hidden` and no inset) instead of drawing an inline strip across the page: the page keeps its full width and the preview's own close, back, share and "Open in Safari" stay usable. Turning back to portrait, or opening the page in Safari, brings the controls back. This is the least intrusive option measured; a strip on either side covered page content and was flagged in review. Duet sets `useDuet().preview` in both. The gap was measured with a bare Dynamic Island; how Live Activities move the preview's buttons is not yet known. Duet takes a Safari window that is not standalone to be the preview when it is either:
 
 - the closed screen's 466x678 window with the column signature, at most 77px of chrome below the page (the preview has 75, a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
 - a page sheet: a window inside the closed 466x678 screen, in either orientation (450x670 on a real Duo, 662x458 turned) with the column signature and a bottom safe-area inset, or
@@ -125,7 +125,9 @@ No Safari tab on the Duo is smaller than the screen (a split pane is 469 wide, t
 
 The verdict is sticky: a page that loaded as a tab stays a tab while its page height and insets move (scrolling collapses the URL bar to 80px of chrome), and is only re-decided when the window size, page width, turn, standalone or framing changes, or on `pageshow` or when the page becomes visible again. In a window's first second the verdict may still rise to preview, since the sheet's inset reads 0 on the first sample and 34 about 100ms later. A preview that stops matching becomes a tab at once.
 
-Limits: the open posture and landscape sheet were not measured. When "Open in Safari" hands the page to a tab, the `pageshow`/`visibilitychange` re-read switches to `column`. The [/probe page](https://getduet.dev/probe) logs every signal the rule reads, every 100ms. Measurements are in [docs/research-notes.md](docs/research-notes.md).
+While the Duo turns or folds, the window passes through sizes no landed window has (inner and outer orientations disagree, or the chrome around the page is not Safari's). Duet keeps the last placement and hides the controls (`hidden` is `"moving"`) until the window lands and holds there for 150ms, so nothing flashes at the wrong edge mid-turn, not even the closed portrait window an unfold from landscape passes through for a frame or two.
+
+Limits: the open posture was not measured for the preview. When "Open in Safari" hands the page to a tab, the `pageshow`/`visibilitychange` re-read switches to `column`. The [/probe page](https://getduet.dev/probe) logs every signal the rule reads, every 100ms. Measurements are in [docs/research-notes.md](docs/research-notes.md).
 
 ### Oscillation guard
 
@@ -234,7 +236,7 @@ Both are live on the [site](https://getduet.dev): scroll until the tabs shrink, 
 
 ### `useDuet()`
 
-Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split`, `preview` and `keyboard` (when true), `confidence`, `width` and `height` (the page viewport), `stableHeight` (the smallest page height seen at this window width and orientation, like CSS `svh`: it does not grow when Safari's URL bar collapses), plus the screen size and insets the placement uses. It works outside `<Duet>`.
+Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split`, `preview` and `keyboard` (when true), `hidden` (`"moving"` or `"preview"` when the controls are not drawn), `confidence`, `width` and `height` (the page viewport), `stableHeight` (the smallest page height seen at this window width and orientation, like CSS `svh`: it does not grow when Safari's URL bar collapses), plus the screen size and insets the placement uses. It works outside `<Duet>`.
 
 ### Lower-level exports
 

@@ -112,7 +112,13 @@ export interface Context {
   /** From stable() only. "sure": nothing is moving. "settling": the window is still settling after an event, so
    *  the mode may still change. "held": the last committed context, kept while the page is pinch-zoomed or while a
    *  drifting signal (viewport height) alone asks for another mode before the window settles. */
-  confidence?: "sure" | "settling" | "held";
+  confidence?: "sure" | "settling" | "held" | "moving";
+  /** The controls are not drawn (the page keeps its full width, no inset). "moving": a fold, unfold or turn is
+   *  caught halfway (stable() only, see inTransit), so the controls hide for those frames instead of showing in a
+   *  place that is right for neither posture. "preview": the in-app preview turned to landscape, whose column has no
+   *  room for a button and where an inline strip would cover the page (docs/research-notes.md, "Preview placement in
+   *  the gap"); the preview's own back and close buttons remain, and Duet's return in portrait or in a tab. */
+  hidden?: "moving" | "preview";
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
@@ -148,6 +154,8 @@ const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "na
  *    ~100ms after the first sample (0, then 34), so stable() lets the verdict rise to preview at first (PREVIEW_RISE).
  *    Turned, the sheet is 662x458 in the 678x466 screen, page 578x388, inset 34, its column on the side the Duo
  *    is turned to (simulator, iOS 27.1, 2026-10-26).
+ *  - Full screen turned (simulator, iOS 27.1, e2e round 2): the 678x466 window, page 678x391 (no column, chrome 75),
+ *    inset bottom 34, the buttons in a safe-area inset of 84 on the side the Duo is turned to.
  *    No tab is smaller than the screen: closed 466x678, open 951x669, a split pane 469x669 (wider than the 466
  *    screen Safari keeps reporting), all inset 0 in every state measured.
  *  - Older builds (device screenshot 2026-10-25): a fixed 375x667 window at 3x, a size no iPhone has natively. */
@@ -166,7 +174,14 @@ export function previewReason(s: Signals): string | undefined {
   if (s.pixelRatio === PREVIEW.pixelRatio && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height) return "375x667 window at 3x";
   const chrome = s.outerHeight - s.innerHeight;
   // A tab measured inset 0 in every state (fresh, scrolled, keyboard, landscape); the preview 34.
-  if (s.insetBottom < 20 || !hasColumn(s)) return;
+  if (s.insetBottom < 20) return;
+  // Turned full screen (iOS 27.1, every presentation but a sheet): the whole 678x466 window, no page column (the
+  // preview's buttons sit in a safe-area inset instead, left at 90, right at 270), 75pt chrome. A turned tab has
+  // 98 with its column, or 126 fresh (inset 34 after a fold), so the chrome band alone tells them apart.
+  if (within(chrome, PREVIEW.chrome) && Math.abs(s.outerWidth - DUO_SIZES[0][1]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][0]) <= 1
+    && Math.abs(s.innerWidth - s.outerWidth) <= 1)
+    return `678x466 window, ${chrome}pt chrome, inset ${s.insetBottom}, turned`;
+  if (!hasColumn(s)) return;
   if (within(chrome, PREVIEW.chrome) && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1)
     return `466x678 window, ${chrome}pt chrome, inset ${s.insetBottom}`;
   // The sheet: a window inside the closed screen on both sides, in either orientation.
@@ -266,7 +281,35 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }) };
   // A preview inline: away from its own column (on the side the Duo is turned to, else the right).
   const away: Side = preview ? (landscape && turned === "left" ? "right" : "left") : "right";
-  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(split && { split }) };
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(split && { split }) };
+}
+
+/** Every window a Safari page on the Duo lands in, as measured (docs/research-notes.md): `page` is how much
+ *  narrower the page is than the window (0, or Safari's 84pt column), `chrome` how much shorter (the address bar:
+ *  closed 98 or 80 compact, open and fresh landscape 126, split pane 98, preview 70 to 75). A sample outside these
+ *  is a fold, unfold or turn caught halfway: the viewport lands first and the window up to ~2s later (rotation 90 to
+ *  0, simulator 2026-10-26: 678x340, 466x498, 382x498, then 382x580 in 466x678). */
+/** How far inside the closed screen the preview's sheet may be: 16x8 measured. */
+const SHEET_SLACK = 40;
+const LANDED = { page: [[0, 2], [80, 88]], chrome: [0, 160] } as const;
+/** True while a Safari page on the Duo is between postures: the page and its window disagree on orientation, the
+ *  turn (screen.orientation.angle) disagrees with the page, or page and window are not a pair Safari settles in
+ *  (LANDED, or the window is not a Duo window or the preview's sheet). Only asked while the window settles
+ *  (signals.ts settling(), at most SETTLE.cap), so a state never measured cannot hide the controls for good. */
+export function inTransit(s: Signals): boolean {
+  if (s.standalone || s.framed || browserOf(s.userAgent) !== "safari" || isIOS(s) === false || !isDuo(s)) return false;
+  const landscape = s.innerWidth > s.innerHeight;
+  if (landscape !== s.outerWidth > s.outerHeight) return true;
+  const [w, h] = DUO_SIZES[0], m = PREVIEW.sheetInset, short = Math.min(s.outerWidth, s.outerHeight), long = Math.max(s.outerWidth, s.outerHeight);
+  // The turn speaks for the closed screen only: the open screen is landscape at angle 0.
+  const closed = short <= w + 1 && long <= h + 1;
+  if (closed && s.angle !== undefined && s.angle % 90 === 0 && (s.angle % 180 === 90) !== landscape) return true;
+  const page = s.outerWidth - s.innerWidth, chrome = s.outerHeight - s.innerHeight;
+  if (!LANDED.page.some((r) => within(page, r)) || !within(chrome, LANDED.chrome)) return true;
+  // A Duo window, or the preview's sheet (a window a few points inside the closed screen; its inset lands ~100ms late,
+  // so sizes alone decide).
+  const sheet = short <= w - m && long <= h - m && short >= w - SHEET_SLACK && long >= h - SHEET_SLACK;
+  return !duoSize(s.outerWidth, s.outerHeight) && !sheet;
 }
 
 /** Mode flips are a feedback loop when the layout of one mode changes the signals into the other (the
@@ -280,7 +323,10 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   /** Sticky in-app preview verdict, and the window it was taken in. */
   preview?: boolean; previewKey?: string; previewAt?: number;
   /** Last context returned, and the stable signals it was committed under. */
-  last?: Context; stableKey?: string }
+  last?: Context; stableKey?: string;
+  /** A fold or turn was caught halfway, and the landing (its stable signals, first seen at landAt) must hold until
+   *  landUntil before the controls show (LAND_HOLD). */
+  moving?: boolean; landKey?: string; landAt?: number; landUntil?: number }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 /** Longest pin: a loop that keeps resuming doubles the wait up to this. */
@@ -288,6 +334,10 @@ export const PIN_MAX = 60000;
 /** How long after a window first shows (stable signals or epoch changed) its verdict may still rise to preview:
  *  the real sheet's bottom inset reads 0 on the first sample and 34 ~100ms later (device, 2026-10-26). */
 export const PREVIEW_RISE = 1000;
+/** How long a landing after a fold or turn caught halfway must hold before the controls show there: unfolding from
+ *  closed landscape passes through the closed portrait window (382x580 in 466x678, angle 0) for ~90ms before the
+ *  open one (simulator, e2e round 2), a state that reads as landed and would flash the column for a frame. */
+export const LAND_HOLD = 150;
 
 /** settling: the window is still moving after a geometry event (signals.ts settling()). A fold lands the viewport
  *  first and outerWidth up to ~2s later, flipping the mode on the way at an unchanged window size, so flips then are
@@ -320,6 +370,21 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   if (d.key !== key) Object.assign(d, { key, pinned: undefined, ttl: undefined, flips: [] });
   if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
   let c = detect(s, preferred, !d.pinned, preview);
+  // Halfway through a fold or turn: hidden, and nothing committed, so the landing is taken as a stable change.
+  const moving = () => {
+    const { width, height, insetTop, insetBottom, keyboard } = c;
+    return { ...(d.last ?? c), width, height, insetTop, insetBottom, keyboard, hidden: "moving" as const, confidence: "moving" as const };
+  };
+  if (settling && inTransit(s)) {
+    Object.assign(d, { moving: true, landKey: undefined, landUntil: undefined });
+    return moving();
+  }
+  // Landed after a transit: hidden until the landing holds LAND_HOLD (the caller re-reads at landUntil).
+  if (settling && d.moving) {
+    if (d.landKey !== stableKey) Object.assign(d, { landKey: stableKey, landAt: now, landUntil: now + LAND_HOLD });
+    if (now < d.landUntil!) return moving();
+  }
+  Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
   // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once.
   if (d.last && c.mode !== d.last.mode && settling && stableKey === d.stableKey && !!d.last.preview === preview) {
     const { width, height, insetTop, insetBottom, keyboard } = c;

@@ -213,7 +213,9 @@
 .duet[data-drag="held"], .duet[data-drag="switch"] { transition: none; }
 /* Switching sides moves every control in the same frame: nothing glides across the page on its own. */
 .duet[data-drag="switch"] * { transition: none !important; }
-/* Loading: the controls appear where they settle, without transitions or entrance animations. */
+/* Mid fold or turn (Context.hidden "moving") and in the turned in-app preview ("preview"): not drawn. */
+.duet[data-hidden] { visibility: hidden; pointer-events: none; }
+/* Loading, and while the window settles after a fold, turn or resize: the controls appear where they settle, without transitions or entrance animations. */
 /* The root itself keeps its animation: in Safari's column it is the scroll follow (duet-follow), not an entrance. */
 .duet[data-settling], .duet[data-settling] * { transition: none !important; }
 .duet[data-settling] * { animation: none !important; }
@@ -281,6 +283,10 @@ html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; 
    So from focus, before the zoom and the keyboard, the layer is clipped out of the document width. */
 html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibility: hidden; }
 .duet[data-mode="column"] { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 50; }
+/* Mid-turn or mid-fold the layer still carries the last posture's positions (the old screen's column), which would
+   widen the document past the new window, and Safari then zooms the page to fit it (scale 1.14 unfolding from
+   closed landscape into the tall window, e2e round 2). Clipped, it adds no width until the window lands. */
+.duet[data-mode="column"][data-hidden="moving"] { overflow: clip; }
 /* No children (no .duet-scroller): the document scrolls, and the layer rides it on a scroll timeline that Safari
    runs with the scroll itself, so it holds through momentum and smooth scrollTo/scrollIntoView (chrome.tsx sets
    data-follow and --duet-scroll-max, the document's scroll range, or a transform where this is unsupported). */

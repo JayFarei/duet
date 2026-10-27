@@ -1,48 +1,54 @@
 # Duo e2e
 
-Automated placement checks for Duet on the iPhone Duo simulator: Safari tab, in-app preview (SFSafariViewController) in all three sheet styles, rotations, and preview -> "Open in Safari". Each step records the page's own Duet state, the native button frames, and a screenshot, then asserts it against [EXPECTED.md](EXPECTED.md).
+Automated placement checks for Duet on the iPhone Duo simulator: Safari tab in every rotation path, in-app preview (SFSafariViewController) in all three sheet styles and rotations, preview -> "Open in Safari" from portrait and both landscapes, fold and unfold in every posture, and dark mode. Each step records every sample of the page's own Duet state during the transition, the native button frames, a screenshot and, for transitions, a video and contact sheet, then asserts it against [EXPECTED.md](EXPECTED.md).
 
 ## Run
 
 ```sh
 tools/e2e/run.sh                                   # whole matrix on "Duo Lab"
-tools/e2e/run.sh --only tab,preview-sheet          # scenarios: tab, preview-sheet, preview-default, preview-full, open-in-safari
+tools/e2e/run.sh --only tab,fold                   # scenarios: tab, preview-sheet, preview-default, preview-full, open-in-safari, open-in-safari-90, open-in-safari-270, fold, dark
 tools/e2e/run.sh --md /path/round.md               # also write a markdown table
 DUO_UDID=<udid> tools/e2e/run.sh                   # another Duo simulator
 tools/e2e/.venv/bin/python -I tools/e2e/e2e.py --udid <udid> --rerender tools/e2e/reports/<ts>   # re-assess a saved run with current rules
 ```
 
-`run.sh` starts whatever is not already up and stops only what it started: the site from this checkout (`next dev -p 3140`), the beacon (`:3141`), the host app plus UI-test runner (built with Xcode 27.1, see SDK), and a `.venv` with pillow. Output goes to `tools/e2e/reports/<ts>/`: `index.html` (table plus overlays), `steps/<id>.json` (every sample, native frames, expectation, verdict), `shots/`.
+`run.sh` rebuilds the `duet-ui` dist (`pnpm -s build`) and `fold/fold.bin` when stale, starts whatever is not already up and stops only what it started: the site from this checkout (`next dev -p 3140`, required to answer `/?e2e=1` with 200), the beacon (`:3141`), the host app plus UI-test runner (built with Xcode 27.1, see SDK), and a `.venv` with pillow. Output goes to `tools/e2e/reports/<ts>/`: `index.html` (table, overlays, contact sheets), `steps/<id>.json` (every sample, native frames, expectation, verdict), `shots/`.
 
-Exit status is non-zero when any step FAILs. BLOCKED steps are states no automation can reach today (see Limits), listed so the gap stays visible.
+Exit status: 1 when any step FAILs, 2 when any step is BLOCKED or the environment cannot start (broken dist build, site not answering, fold tool missing), else 0. UNSUPPORTED steps (split view) are listed with the reason and do not change the exit status.
 
-## Rotation
+## Rotation and fold
 
-The only thing that rotates the Duo outer display is the Claude Code iOS Simulator MCP `rotate` action. `simctl`, XCUIDevice.orientation, the Simulator menu via osascript, GraphicsServices purple events and `devicectl device orientation` all leave the outer display unrotated (tried, removed). So rotation steps are a handshake:
+`fold/fold.bin` is a simulator command line tool that calls SpringBoard's display tool service (`SBSDisplayToolService.swapDisplayWithSettings`, the call behind Apple's internal `suiatool`). e2e.py runs it with `xcrun simctl spawn <udid> fold.bin -position=closed|open -deviceOrientation=portrait|landscapeRight|landscapeLeft|portraitUpsideDown -wait`, then `-unlock`. It drives every turn and fold with no human in the loop. Private API, simulator only. The turn lands about 4s after the call, so a step samples from the call until the signals are quiet.
 
-1. e2e.py writes `reports/<ts>/WAITING` and prints `ROTATE <left|left2> to angle <n>`.
-2. Whoever drives (an agent with the MCP, or a person in Simulator) turns the device; `left2` means two left turns.
-3. e2e.py polls the beacon until the page reports that angle (`--rot-timeout`, default 120s), otherwise the step is BLOCKED.
-
-`--rotate-cmd 'cmd {udid} {dir} {angle}'` runs a command per turn instead, for when a scriptable rotator exists. The cycle is 0 -> 90 -> 270 -> 0. Angle 180 is not reachable: Safari and the preview keep their previous orientation upside down (two left turns from 90 stay at 90).
+`landscapeRight` is angle 90, `landscapeLeft` 270. Unfolded, `portrait` gives the wide 951x669 window at angle 270, `landscapeRight` and `landscapeLeft` the tall 669x951 window at 180 and 0. Angle 180 on the closed screen keeps Safari in its previous orientation, so the expectation there is "same as before".
 
 ## Architecture
 
-- `apps/site/app/e2e-reporter.tsx`: loaded only with `?e2e`. Every 100ms posts the Duet state to the beacon: page id (random per load), preview flag and reason, mode/side, slot rects, scroll, visualViewport, overflowing or clipped elements, content under controls.
+- `apps/site/app/e2e-reporter.tsx`: loaded only with `?e2e`. Every 40ms posts the Duet state to the beacon: page id (random per load), preview flag and reason, mode/side, `hidden`, `confidence`, slot rects, scroll, visualViewport, overflowing or clipped elements, content under controls.
 - `beacon.mjs`: tags each sample with the driver's current step; relays device commands (`/cmd`) to the UI-test runner; `/runner` reports liveness.
-- `host/`: `DuoE2EHost` presents the URL in SFSafariViewController (`-url`, `-style sheet|default|full`). `DuoE2ERunner` (XCUITest) long-polls the beacon for commands: tap a button by label, read element frames for a bundle (`com.apple.SafariViewService` for the preview's own buttons).
-- `e2e.py`: scenarios, drivers (simctl openurl / launch, runner taps), assertions, overlays, report.
+- `host/`: `DuoE2EHost` presents the URL in SFSafariViewController (`-url`, `-style sheet|default|full`). `DuoE2ERunner` (XCUITest) long-polls the beacon for commands: tap or drag by label, read element frames for a bundle (`com.apple.SafariViewService` for the preview's own buttons).
+- `fold/`: `fold.bin` source and build script.
+- `e2e.py`: scenarios, drivers (simctl openurl / launch, runner taps, fold.bin), assertions, overlays, contact sheets, report.
 
 ## Assertions
 
-Per step, over 2.5s of samples filtered to the step's page id:
+Every sample from the start of the action until the signals have been quiet for 1.5s (at least 2.5s, at most 7s), filtered to the step's page id. Gaps between samples over 150ms are noted.
 
-- preview flag, mode and side match the expected state (Safari tab: column right at 0 and 270, column left at 90; preview: column in the native gap in portrait; turned, inline on the side away from the preview's column, right at 90 and left at 270, since its gap is ~26pt).
-- every slot is on screen and does not overlap a native button. In the preview, slots must sit in the gap of the native column between Page Menu (or Cancel/Done/Close) and Back, if that gap is at least 49pt tall; otherwise any non-overlapping fallback passes, noted.
-- no clipped text or overflowing block within the visible band; content not under controls.
-- settle: the last placement change is within 0.5s of the step's first sample and nothing moves after (drift).
+On every sample:
 
-Overlay colors: red = Duet slots, blue = native buttons, green = the required gap.
+- flash: no visible placement other than the expected one, or the previous one before the window signals change (the previous one gets 0.15s of grace after the change). Hidden controls (`data-hidden`) never count as a flash.
+- on screen: every visible slot is inside the screen (closed: screen points via `origin()`, so Safari's column counts; open: the visual viewport).
+
+On the final state:
+
+- preview flag, mode, side and `hidden` match the expectation (Safari tab: column right at 0 and 270, left at 90; preview portrait: column in the native gap; preview landscape: hidden, see EXPECTED.md; unfolded: strip or inline per the window).
+- settle: the last placement change is within 0.5s of the last signal change; slide: slot rects stop moving within 0.15s.
+- closed: no overlap with native buttons, and in the preview the slots sit in the gap between Page Menu (or Cancel/Done/Close) and Back.
+- no clipped text or overflowing block within the visible band.
+
+Overlay colors: red = Duet slots, blue = native buttons, green = the required gap. Contact sheets start 0.3s before the first signal change.
+
+The harness is checked against a reverted library: with `packages/duet-ui/src` at the previous commit, tab and fold turns FAIL (flashes at the wrong edge), so a pass is meaningful.
 
 ## Geometry
 
@@ -52,14 +58,13 @@ Page rects are mapped to screen points with `origin()` in e2e.py, checked agains
 - preview: `x0 = (W - outerW)/2 + col + vv.x`, `y0 = H - innerH`. Safari tab: `x0 = col + vv.x`, `y0 = 0`.
 - landscape preview has `vv.x` / `scrollX` of +84 at 90 and -84 at 270 while `scrollWidth == clientWidth`; the overflow band is `[min(0, -scrollX), max(W, W - scrollX)]` so that inset is not reported as overflow.
 - the dismissing preview briefly reports width 935, inline; ignored via page ids.
+- unfolded, `screen.*` goes stale; the inner display is screenshot with `--display=3`, the outer with `--display=1`. Native frames are not mapped there (XCUITest frames are unusable on the inner display), so overlap checks run on the closed screen only.
 
 ## SDK
 
 The host must be built with the iOS 27 SDK (Xcode 27.1). With an older SDK it runs letterboxed at 375x667 and its preview does not match a Duo-native app. Duo-native preview sheet: inner 366x600, outer 450x670, 34pt inset; `default` and `full` styles: 382x603. These match the real device.
 
-## Limits (BLOCKED steps)
+## Limits
 
-- Fold/unfold: the hinge state is only reachable through a private dtuhidd XPC endpoint; no public simctl, devicectl or XCTest API. Unfolded full, split and fold transitions stay manual.
-- Split view: no API enters, moves or swaps Safari between split panes on the simulator.
-- Angle 180: not a UI state on the Duo (see Rotation).
-- Only the simulator: physical Duo devices are not driven.
+- Split view (UNSUPPORTED): no API enters, moves or swaps Safari between split panes; tab drags, long presses and bottom bar swipes on the inner display did not open one. Split geometry (pane 469x669, page 385x571) is covered by unit fixtures.
+- Only the simulator: physical Duo devices are not driven. Real-device geometry is pinned in unit fixtures (`packages/duet-ui/test/`).

@@ -3,3 +3,4 @@ host/*.xcodeproj/
 host/Host/Info.plist
 reports/
 .venv/
+fold/fold.bin

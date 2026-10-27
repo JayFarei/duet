@@ -90,8 +90,17 @@ test("a mode only drifting signals ask for waits for the window to settle", () =
 test("a stable signal change commits at once, even while settling", () => {
   const d = { flips: [] };
   stable(d, TAB, undefined, 0);
-  const c = stable(d, { ...TAB, innerWidth: 951, innerHeight: 543, visualHeight: 543 }, undefined, 100, true);
+  // Unfolded and landed: the window says 951x669 too, so this is a real state, not a fold caught halfway.
+  const c = stable(d, { ...TAB, outerWidth: 951, outerHeight: 669, innerWidth: 951, innerHeight: 543, visualHeight: 543 }, undefined, 100, true);
   assert.deepEqual([c.mode, c.confidence], ["inline", "settling"]);
+});
+test("a fold caught halfway (page wider than its window) hides the controls and commits nothing", () => {
+  const d = { flips: [] };
+  const before = stable(d, TAB, undefined, 0);
+  const c = stable(d, { ...TAB, innerWidth: 951, innerHeight: 543, visualHeight: 543 }, undefined, 100, true);
+  assert.deepEqual([c.mode, c.side, c.hidden, c.confidence, c.width], [before.mode, before.side, "moving", "moving", 951]);
+  // Once the settle window closes the same signals are read as they are.
+  assert.equal(stable(d, { ...TAB, innerWidth: 951, innerHeight: 543, visualHeight: 543 }, undefined, 2500, false).hidden, undefined);
 });
 test("pins double up to PIN_MAX, no further", () => {
   const short = { ...TAB, innerHeight: 640, visualHeight: 640 };
