@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.4.0-rc.2
 
+- Column mode without children in a split view pane, or on the closed Duo turned left: Duet now places the page beside Safari's column (`margin-left` of the column width on `<html>`, marked `data-duet-reserve`), so the page is no longer clipped by 84px with the controls drawn over it. Don't set `margin` on `<html>` or reset `scrollX`. `<Duet reserve={false}>` opts out (#77).
+- README: an Edge cases section lists every iOS and Safari quirk Duet handles, what it does and what is left to you (#81).
 - Column mode: a page's full-screen `position: fixed` overlay (a modal scrim, `inset: 0`) no longer hides the controls in Safari's column, close button included. A small invisible fixed guard on the column's edge keeps Safari from filling the column with the overlay's colour. `<dialog>.showModal()` is not covered (#79).
 - Column mode without children: the controls no longer ride the rubber band at the top or bottom of the page, where they slid over Safari's own column buttons or vanished until the bounce settled. The document no longer rubber-bands while the controls follow it, like a page with children. A page's own `overscroll-behavior` still wins.
 
