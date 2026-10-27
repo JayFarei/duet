@@ -3,7 +3,8 @@ import AVFoundation
 import Foundation
 import UIKit
 
-// Live Activity control for the e2e driver. The driver sets the wanted state on the beacon (POST /la {"on": bool});
+// Live Activity control for the e2e driver. The driver sets the wanted state on the beacon (POST /la {"on": bool,
+// "timer": bool}: "on" the music activity, "timer" the countdown, so two can run at once);
 // the host polls GET /la and reconciles, then reports back (POST /la/state). Polling, not a URL scheme, so the driver
 // can end the activity while Safari or the preview is in front without bringing the host forward.
 // ActivityKit only starts an activity from the foreground (from the background: ActivityAuthorizationError.visibility).
@@ -29,28 +30,39 @@ import UIKit
     Task { while true { await tick(); try? await Task.sleep(for: .milliseconds(400)) } }
   }
 
-  var running: [Activity<MusicAttributes>] { Activity<MusicAttributes>.activities.filter { $0.activityState == .active } }
+  var music: [Activity<MusicAttributes>] { Activity<MusicAttributes>.activities.filter { $0.activityState == .active } }
+  var timer: [Activity<TimerAttributes>] { Activity<TimerAttributes>.activities.filter { $0.activityState == .active } }
 
-  func set(_ on: Bool) async {
-    if on, running.isEmpty, UIApplication.shared.applicationState == .active {
-      do {
-        _ = try Activity.request(attributes: MusicAttributes(app: "Duo e2e"),
-          content: .init(state: .init(title: "Midnight City", artist: "M83", playing: true), staleDate: nil))
-        lastError = nil
-      } catch { lastError = "\(String(reflecting: error)) enabled=\(ActivityAuthorizationInfo().areActivitiesEnabled)" }
+  /** Starts or ends one kind. ActivityKit starts only from the foreground; ending works from the background. */
+  func set(_ on: Bool, running: Bool, start: () throws -> Void, end: () async -> Void) async {
+    if on, !running, UIApplication.shared.applicationState == .active {
+      do { try start(); lastError = nil }
+      catch { lastError = "\(String(reflecting: error)) enabled=\(ActivityAuthorizationInfo().areActivitiesEnabled)" }
     } else if !on {
-      for a in Activity<MusicAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
-      lastError = nil
+      await end()
     }
   }
 
   func tick() async {
     guard let url = URL(string: beacon + "/la"), let (d, _) = try? await URLSession.shared.data(from: url),
           let want = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let on = want["on"] as? Bool else { return }
-    if on != !running.isEmpty { await set(on) }
+    let wantTimer = want["timer"] as? Bool ?? false
+    if on != !music.isEmpty {
+      await set(on, running: !music.isEmpty, start: {
+        _ = try Activity.request(attributes: MusicAttributes(app: "Duo e2e"),
+          content: .init(state: .init(title: "Midnight City", artist: "M83", playing: true), staleDate: nil))
+      }, end: { for a in Activity<MusicAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) } })
+    }
+    if wantTimer != !timer.isEmpty {
+      await set(wantTimer, running: !timer.isEmpty, start: {
+        _ = try Activity.request(attributes: TimerAttributes(name: "Tea"),
+          content: .init(state: .init(end: Date().addingTimeInterval(600)), staleDate: nil))
+      }, end: { for a in Activity<TimerAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) } })
+    }
     var req = URLRequest(url: URL(string: beacon + "/la/state")!)
     req.httpMethod = "POST"
-    req.httpBody = try? JSONSerialization.data(withJSONObject: ["on": !running.isEmpty, "count": running.count, "error": (lastError as Any?) ?? NSNull()])
+    req.httpBody = try? JSONSerialization.data(withJSONObject: ["on": !music.isEmpty, "timer": !timer.isEmpty, "count": music.count + timer.count,
+                                                               "error": (lastError as Any?) ?? NSNull()])
     _ = try? await URLSession.shared.data(for: req)
   }
 

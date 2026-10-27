@@ -148,6 +148,8 @@ def action_en(action, state):
         return "Fold to the outer screen"
     if k == "music":
         return "Start music (a Live Activity in the Dynamic Island)" if action[1] else "Stop the music (the Live Activity ends)"
+    if k == "timer":
+        return "Start a timer (a second kind of Live Activity)" if action[1] else "Stop the timer (its Live Activity ends)"
     if k == "safari":
         return "Tap Open in Safari in the preview"
     raise ValueError(action)
@@ -185,7 +187,8 @@ def steps_en(start, acts):
 # ---- interaction suites (issue #107) --------------------------------------------------------------------------------
 # A suite opens one page in one starting state, then interacts with it: taps on the page and on Duet's controls, scrolls,
 # Safari's own buttons, the keyboard, a modal, the Home button, the lock button, the app switcher, the Dynamic Island.
-# Device steps (turn, unfold, fold, music, Open in Safari) change the state as in a journey; the others keep it, so
+# Device steps (turn, unfold, fold, music, timer, Open in Safari) change the state as in a journey (a timer counts as a
+# Live Activity in the island, like the music); the others keep it, so
 # every step is judged against the placement of the state it ends in, plus its own outcome check:
 #   path        the address after the step, without the e2e and s parameters ("/book?c=sauna")
 #   label       Duet offers a control labelled this (on screen, or in the menu it folded into);  no_label: it does not
@@ -253,6 +256,16 @@ SUITES = [
         (("expand",), "Long-press the Live Activity in the Dynamic Island (it expands)", {}),
         (("blur",), "Tap the page (the Live Activity shrinks back)", {}),
     ]},
+    {"id": "la02", "title": "A timer Live Activity alone, turned, Safari tab", "page": "/book", "start": TAB0, "steps": [
+        (("timer", True), None, {"la": 1}), (("turn", 90), None, {}), (("turn", 0), None, {}), (("timer", False), None, {"la": 0}),
+    ]},
+    {"id": "la03", "title": "Two Live Activities at once (music and a timer), turned, unfolded, Safari tab", "page": "/book", "start": ("tab", "closed", 0, True), "steps": [
+        (("timer", True), None, {"la": 2}), (("turn", 90), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
+        (("timer", False), None, {"la": 1}),
+    ]},
+    {"id": "la04", "title": "Two Live Activities at once, in-app preview (sheet)", "page": "/book", "start": ("sheet", "closed", 0, True), "steps": [
+        (("timer", True), None, {"la": 2}), (("turn", 90), None, {}), (("turn", 0), None, {}), (("timer", False), None, {"la": 1}),
+    ]},
     {"id": "life01", "title": "Home, lock and the app switcher, Safari tab", "page": "/book", "start": TAB0, "steps": [
         (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna"}),
         (("home",), "Press Home, then open Safari again", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
@@ -276,10 +289,9 @@ SUITES = [
         (("turn", 90), None, {}), (("turn", 270), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
     ]} for n, pg in enumerate(("/", "/book", "/scroll", "/sheet", "/probe"), 1)
 ]
-DEVICE_OPS = {"turn", "unfold", "fold", "music", "safari"}
+DEVICE_OPS = {"turn", "unfold", "fold", "music", "timer", "safari"}
 SUITE_GAPS = [
     "Safari's tab bar at the top vs the bottom: the setting is not reachable from the simulator yet.",
-    "A timer Live Activity, and two Live Activities at once: the host starts only its music activity yet.",
 ]
 
 
@@ -291,7 +303,7 @@ def check_en(c):
                     "active": lambda: "the text field has focus" if v else "nothing has focus",
                     "dialog": lambda: "the dialog is open" if v else "the dialog is closed",
                     "scroll_gt": lambda: f"the page stays scrolled down (more than {v}pt)", "scroll_lt": lambda: f"the page is at the top (under {v}pt)",
-                    "la": lambda: f"{v} Live Activities running"}[k]())
+                    "la": lambda: f"{v} Live Activit{'y' if v == 1 else 'ies'} running"}[k]())
     return out
 
 
@@ -299,10 +311,15 @@ def suite_steps(suite):
     """[(action, state after it, words, expected words, check)] for a suite, the open first."""
     cur = suite["start"]
     out = [(("open",), cur, f'Open {suite["page"]} in {SURFACE_EN[cur[0]]}, {state_en(cur)}', expect_en(cur), {})]
+    lit = {"music": cur[3], "timer": False}  # the Live Activities running; the state's last item is any of them
     for a, words, check in suite["steps"]:
         if a[0] in DEVICE_OPS:
             words = words or action_en(a, cur)
-            cur = after(a, cur)
+            if a[0] in lit:
+                lit[a[0]] = a[1]
+                cur = cur[:3] + (any(lit.values()),)
+            else:
+                cur = after(a, cur)
         out.append((a, cur, words, "; ".join([expect_en(cur)] + check_en(check)), check))
     return out
 

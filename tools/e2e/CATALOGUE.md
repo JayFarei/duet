@@ -19,7 +19,6 @@ Each suite opens one page, then interacts with it; every step is filmed and judg
 Not covered yet:
 
 - Safari's tab bar at the top vs the bottom: the setting is not reachable from the simulator yet.
-- A timer Live Activity, and two Live Activities at once: the host starts only its music activity yet.
 
 ## ctl01: Call to action and back, Safari tab, outer screen upright
 
@@ -119,6 +118,32 @@ Not covered yet:
 1. Open /book in a Safari tab, folded, on the outer screen, upright, music playing. Expect: controls in a column on the right.
 2. Long-press the Live Activity in the Dynamic Island (it expands). Expect: controls in a column on the right.
 3. Tap the page (the Live Activity shrinks back). Expect: controls in a column on the right.
+
+## la02: A timer Live Activity alone, turned, Safari tab
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Start a timer (a second kind of Live Activity). Expect: controls in a column on the right; 1 Live Activity running.
+3. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+4. Turn the phone upright. Expect: controls in a column on the right.
+5. Stop the timer (its Live Activity ends). Expect: controls in a column on the right; 0 Live Activities running.
+
+## la03: Two Live Activities at once (music and a timer), turned, unfolded, Safari tab
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, music playing. Expect: controls in a column on the right.
+2. Start a timer (a second kind of Live Activity). Expect: controls in a column on the right; 2 Live Activities running.
+3. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
+4. Turn the phone upright. Expect: controls in a column on the right.
+5. Unfold to the inner screen. Expect: controls inline on the right.
+6. Fold to the outer screen. Expect: controls in a column on the right.
+7. Stop the timer (its Live Activity ends). Expect: controls in a column on the right; 1 Live Activity running.
+
+## la04: Two Live Activities at once, in-app preview (sheet)
+
+1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, music playing. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Start a timer (a second kind of Live Activity). Expect: controls in a column on the right in the gap of the preview's own column; 2 Live Activities running.
+3. Turn the phone on its side, landscape right (90). Expect: controls hidden, the page keeps its full width, the preview's own buttons untouched.
+4. Turn the phone upright. Expect: controls in a column on the right in the gap of the preview's own column.
+5. Stop the timer (its Live Activity ends). Expect: controls in a column on the right in the gap of the preview's own column; 1 Live Activity running.
 
 ## life01: Home, lock and the app switcher, Safari tab
 

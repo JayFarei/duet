@@ -92,13 +92,13 @@ def address(path):
 def duet_buttons(r, back=False):
     """[(label, rect)] of Duet's shown buttons in a sample, an open menu's items included. back: only Duet's back (its
     slot, or a plain menu item), not a tab of the same name ("Classes" is /book's back and its first tab)."""
-    return [(b["label"], b["rect"]) for n in shown_navs(r) for g in n["slots"] + (n.get("menus") or []) for b in g.get("buttons") or []
+    return [(b["label"], b["rect"]) for n in live_navs(r) for g in (n.get("slots") or []) + (n.get("menus") or []) for b in g.get("buttons") or []
             if not back or g.get("slot") == "back" or b.get("role") == "menuitem"]
 
 
 def menu_items(r):
     """Labels of an open Duet menu's items."""
-    return [b["label"] for n in shown_navs(r) for m in n.get("menus") or [] for b in m.get("buttons") or []]
+    return [b["label"] for n in live_navs(r) for m in n.get("menus") or [] for b in m.get("buttons") or []]
 
 
 def opener(r):
@@ -122,6 +122,11 @@ def nav(r):
 
 def shown_navs(r):
     return [n for n in r.get("navs") or [] if n.get("slots") and not n.get("hidden")]
+
+
+def live_navs(r):
+    """Navs with a visible slot or an open menu (a lone tab morphs into its menu, leaving no slot while it is open)."""
+    return [n for n in r.get("navs") or [] if (n.get("slots") or n.get("menus")) and not n.get("hidden")]
 
 
 def shown_place(r):
@@ -153,7 +158,8 @@ class Run:
         for d in ("steps", "shots"):
             os.makedirs(os.path.join(s.out, d), exist_ok=True)
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
-        s.la_on = False  # a Live Activity is running (the host's music activity, la())
+        s.la_on = False  # a Live Activity is running (the host's music or timer activity, la())
+        s.want = {"on": False, "timer": False}  # the Live Activities wanted from the host: "on" music, "timer" the countdown
         s.page_path = a.page
         s.films = []  # (scenario, stitched clips) for the report
         s.journeys = []  # catalogue journeys played (--catalogue): id, title, steps in words, status, film
@@ -762,35 +768,37 @@ class Run:
         s.target_display = 1
         return act
 
-    def la_state(s, on, since, timeout=15):
-        """Waits for the host to report the wanted Live Activity state after `since` (ms)."""
+    def la_state(s, since, timeout=15):
+        """Waits for the host to report the wanted Live Activities (s.want) after `since` (ms)."""
         end = time.time() + timeout
         while time.time() < end:
             st = http("GET", "/la/state") or {}
-            if st.get("at", 0) >= since and bool(st.get("count")) == on:
+            if st.get("at", 0) >= since and all(bool(st.get(k)) == v for k, v in s.want.items()):
                 return st
             time.sleep(0.2)
         return None
 
-    def la(s, tok, on, kind):
-        """Starts or ends the host's music Live Activity (host/Host/Live.swift) with the page in front. In the preview
+    def la(s, tok, kind, **want):
+        """Starts or ends the host's music (on=) or timer (timer=) Live Activity (host/Host/Live.swift) with the page in front. In the preview
         the host is the app in front, so its poll starts the activity under the open sheet. In a Safari tab ActivityKit
         will not start one from the background: the host comes forward (no URL scheme, which would prompt) and Safari
         goes back in front, as a user does after starting music elsewhere; the tab is not reloaded. Ending works from
         the background. Waits for a sample taken after the island settled."""
         def act(sid, t0):
             page, since = s.page, time.time() * 1000
-            http("POST", "/la", {"on": on})
+            on = any(want.values())
+            s.want.update(want)
+            http("POST", "/la", s.want)
             fwd = on and kind == "tab"
             if fwd:
                 s.host()
-            st = s.la_state(on, since)
+            st = s.la_state(since)
             if fwd:
                 sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
             if st is None:
                 s.why = f"Live Activity not {'started' if on else 'ended'} in 15s: {http('GET', '/la/state')}"
                 return None
-            s.la_on = on
+            s.la_on = any(s.want.values())
             time.sleep(1.0)  # the island grows or shrinks, and Safari's buttons move with it
             done = time.time() * 1000
             r = s.wait(sid, tok, lambda r: r["rx"] >= done, t0, page=page)
@@ -945,10 +953,11 @@ class Run:
         """Every scenario starts closed, in portrait, with Safari in front, the host preview gone and no Live Activity
         (the host ends it first: an activity outlives its app)."""
         since = time.time() * 1000
-        http("POST", "/la", {"on": False})
-        if (http("GET", "/la/state") or {}).get("count") and not s.la_state(False, since, timeout=3):
+        s.want = {"on": False, "timer": False}
+        http("POST", "/la", s.want)
+        if (http("GET", "/la/state") or {}).get("count") and not s.la_state(since, timeout=3):
             s.host()
-            s.la_state(False, since)
+            s.la_state(since)
         s.la_on = False
         sh("xcrun", "simctl", "terminate", s.udid, HOST, check=False)
         if s.split and s.position == "open" and s.sim:  # leave split view: Safari full screen again
@@ -1049,21 +1058,21 @@ class Run:
         name = "Safari tab" if tab else f"preview ({style})"
         p = f"live-{style}"
         s.step(f"{p}-open", kind, t, s.open_tab(t) if tab else s.open_preview(t, style), exp(0), f"{name}: open, no Live Activity", video=True)
-        s.step(f"{p}-on-0", kind, t, s.la(t, True, kind), exp(0), f"{name}: Live Activity starts at 0", video=True)
+        s.step(f"{p}-on-0", kind, t, s.la(t, kind, on=True), exp(0), f"{name}: Live Activity starts at 0", video=True)
         for a in (90, 270, 0):
             frm = s.angle
             s.step(f"{p}-on-{frm}to{a}", kind, t, s.rotate(t, a), exp(a), f"{name} with Live Activity: turn {frm} -> {a}", video=True)
-        s.step(f"{p}-off-0", kind, t, s.la(t, False, kind), exp(0), f"{name}: Live Activity ends at 0", video=True)
+        s.step(f"{p}-off-0", kind, t, s.la(t, kind, on=False), exp(0), f"{name}: Live Activity ends at 0", video=True)
         for a in (90, 270):
             s.step(f"{p}-to{a}", kind, t, s.rotate(t, a), exp(a), f"{name}: turn to {a}", video=True)
-            s.step(f"{p}-on-{a}", kind, t, s.la(t, True, kind), exp(a), f"{name}: Live Activity starts at {a}", video=True)
-            s.step(f"{p}-off-{a}", kind, t, s.la(t, False, kind), exp(a), f"{name}: Live Activity ends at {a}", video=True)
+            s.step(f"{p}-on-{a}", kind, t, s.la(t, kind, on=True), exp(a), f"{name}: Live Activity starts at {a}", video=True)
+            s.step(f"{p}-off-{a}", kind, t, s.la(t, kind, on=False), exp(a), f"{name}: Live Activity ends at {a}", video=True)
         s.step(f"{p}-to0", kind, t, s.rotate(t, 0), exp(0), f"{name}: back to 0", video=True)
-        s.step(f"{p}-on-0b", kind, t, s.la(t, True, kind), exp(0), f"{name}: Live Activity starts again", video=True)
+        s.step(f"{p}-on-0b", kind, t, s.la(t, kind, on=True), exp(0), f"{name}: Live Activity starts again", video=True)
         s.step(f"{p}-on-unfold", kind, t, s.unfold(t, 0, preview=not tab), UNFOLDED_PREVIEW if not tab else {"preview": False, **UNFOLDED},
                f"{name} with Live Activity: unfold", video=True)
         s.step(f"{p}-on-fold", kind, t, s.fold_closed(t, 0), exp(0), f"{name} with Live Activity: fold", video=True)
-        s.step(f"{p}-off-end", kind, t, s.la(t, False, kind), exp(0), f"{name}: Live Activity ends", video=True)
+        s.step(f"{p}-off-end", kind, t, s.la(t, kind, on=False), exp(0), f"{name}: Live Activity ends", video=True)
 
     def scenario_preview_unfolded(s):
         """The in-app preview across the unfold: opened closed then unfolded, turned, folded back, and opened unfolded.
@@ -1129,9 +1138,10 @@ class Run:
             time.sleep(1.5)
         if music:
             since = time.time() * 1000
-            http("POST", "/la", {"on": True})
+            s.want = {"on": True, "timer": False}
+            http("POST", "/la", s.want)
             s.host()
-            st = s.la_state(True, since)
+            st = s.la_state(since)
             sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
             if st is None:
                 s.why = f"Live Activity not started in 15s: {http('GET', '/la/state')}"
@@ -1154,8 +1164,8 @@ class Run:
             return s.unfold(tok, angle, preview)
         if k == "fold":
             return s.fold_closed(tok, angle)
-        if k == "music":
-            return s.la(tok, action[1], "preview" if preview else "tab")
+        if k in ("music", "timer"):
+            return s.la(tok, "preview" if preview else "tab", **{"on" if k == "music" else "timer": action[1]})
         if k == "safari":
             return s.open_in_safari(tok)
         raise ValueError(action)

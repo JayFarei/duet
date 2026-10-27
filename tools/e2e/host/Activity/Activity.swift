@@ -3,7 +3,7 @@ import SwiftUI
 import WidgetKit
 
 @main struct Activities: WidgetBundle {
-  var body: some Widget { MusicActivity() }
+  var body: some Widget { MusicActivity(); TimerActivity() }
 }
 
 struct Art: View {
@@ -53,6 +53,38 @@ struct MusicActivity: Widget {
         Meter()
       } minimal: {
         Art(size: 20)
+      }
+    }
+  }
+}
+
+struct Countdown: View {
+  var end: Date
+  var body: some View {
+    Text(timerInterval: Date.now...max(end, .now), countsDown: true).monospacedDigit().foregroundStyle(.orange)
+  }
+}
+
+struct TimerActivity: Widget {
+  var body: some WidgetConfiguration {
+    ActivityConfiguration(for: TimerAttributes.self) { ctx in
+      HStack(spacing: 12) {
+        Image(systemName: "timer").font(.title).foregroundStyle(.orange)
+        Text(ctx.attributes.name).font(.headline)
+        Spacer()
+        Countdown(end: ctx.state.end).font(.title2)
+      }.padding()
+    } dynamicIsland: { ctx in
+      DynamicIsland {
+        DynamicIslandExpandedRegion(.leading) { Image(systemName: "timer").font(.title).foregroundStyle(.orange) }
+        DynamicIslandExpandedRegion(.trailing) { Countdown(end: ctx.state.end).font(.title2).frame(width: 80) }
+        DynamicIslandExpandedRegion(.bottom) { Text(ctx.attributes.name).font(.headline) }
+      } compactLeading: {
+        Image(systemName: "timer").foregroundStyle(.orange)
+      } compactTrailing: {
+        Countdown(end: ctx.state.end).frame(width: 44)
+      } minimal: {
+        Image(systemName: "timer").foregroundStyle(.orange)
       }
     }
   }
