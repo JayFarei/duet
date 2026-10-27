@@ -96,13 +96,15 @@ function switchSide(el: HTMLElement, side: Side) {
 
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
-let pinTimer: ReturnType<typeof setTimeout> | undefined;
+let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined;
 // The damper keeps history, so it is fed once per signal change (refresh, from the watcher), never from React's
 // getSnapshot (read), which React may call several times per render.
 function refresh() {
   const s = readSignals(), c = stable(damper, s, preferredSide(isSplit(s)), performance.now(), settling(), epoch());
   // A pin lifts on its own time, with no resize to re-read on.
   if (damper.pinned && !pinTimer) pinTimer = setTimeout(() => { pinTimer = undefined; listeners.forEach((f) => f()); }, damper.until! - performance.now() + 20);
+  // So is a landing after a fold or turn (LAND_HOLD), which no resize may follow.
+  if (damper.landUntil !== undefined && !landTimer) landTimer = setTimeout(() => { landTimer = undefined; listeners.forEach((f) => f()); }, damper.landUntil - performance.now() + 10);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
 }
@@ -182,8 +184,21 @@ function viewport(key: string, value: string) {
   for (const meta of metas) if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
-function useColumnLayer(on: boolean, split: boolean, left: boolean, column: number) {
+// Leaving the column, the sideways scroll the layer pinned stays behind: from a split left pane turned into the tall
+// window (inline), the document kept scrollX -84 with nothing to scroll, and Safari then painted the pill's glass but
+// not its unselected tab icons (e2e round 4, splitturn-left-to90). So when the mode leaves the column (not while the
+// column is only hidden mid-turn), the scroll goes back to 0, again as Safari restores the old offset on the resize.
+function useColumnLayer(on: boolean, split: boolean, left: boolean, column: number, inColumn: boolean) {
   const refs = [useRef<HTMLElement>(null), useRef<HTMLElement>(null)] as const;
+  const was = useRef(inColumn);
+  useEffect(() => {
+    const left = was.current && !inColumn;
+    was.current = inColumn;
+    if (!left || emulatedSignals()) return;
+    const reset = () => { if (Math.round(scrollX) !== 0) scrollTo({ left: 0, top: scrollY, behavior: "instant" }); };
+    const t = [0, 300, 1000].map((ms) => setTimeout(reset, ms));
+    return () => t.forEach(clearTimeout);
+  }, [inColumn]);
   useEffect(() => {
     const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
     if (!on || !els.length) return;
@@ -352,7 +367,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // and nothing runs under a right column (simulator, 2026-10-26: 84px of padding left a 100px gap), while a
     // left column has the document scrolled one column across, so the page runs under it.
     const r = document.documentElement.style;
-    const inset = ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
+    // Controls hidden for good in this window (the turned preview) take no room; hidden while moving keeps the
+    // last insets, so the page does not reflow twice in one turn.
+    const inset = ctx.hidden === "preview" ? "0px" : ctx.mode === "strip" ? envInset(ctx.side) : ctx.mode === "inline" ? `${INLINE_WIDTH}px` : `${ctx.screenWidth - ctx.width}px`;
     const other = (side: Side) => ctx.mode === "column" ? "0px" : envInset(side);
     const under = ctx.mode !== "column" || inner || !!emulatedSignals();
     const right = (ctx.side === "right" || split) && under ? inset : other("right"), left = ctx.side === "left" || split ? inset : other("left");
@@ -360,7 +377,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
     // inset, closed and unfolded; pages pad their top content by this much to stay sharp.
-    r.setProperty("--duet-inset-top", ctx.mode === "strip" ? `${DUO.edgeBlur}px` : "0px");
+    r.setProperty("--duet-inset-top", ctx.mode === "strip" && ctx.standalone ? `${DUO.edgeBlur}px` : "0px");
     // Safari's URL pill floats below the layout viewport (the column holds nothing above the page), so the scroller
     // runs on under it like a document that scrolls, and the last content scrolls clear of it.
     r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height)}px` : "0px");
@@ -373,8 +390,10 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
-  const [nav, nav2] = useColumnLayer(ctx.mode === "column", split, ctx.side === "left", column);
+  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner]);
+  // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
+  // takes it up again, scrolled one column across for a left column.
+  const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column");
   useEffect(() => {
     // Any touch outside the chrome closes an open menu, like a native context menu.
     if (!menu) return;
@@ -530,7 +549,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
       ...destructive,
     ];
     return (
-      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || undefined} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
+      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
         {p.close && pl.back && (
           <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
             <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>

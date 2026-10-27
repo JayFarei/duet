@@ -1,0 +1,26 @@
+name: DuoE2EHost
+options: {bundleIdPrefix: dev.duolab, deploymentTarget: {iOS: "27.0"}}
+targets:
+  DuoE2EHost:
+    type: application
+    platform: iOS
+    sources: [Host]
+    info:
+      path: Host/Info.plist
+      properties:
+        CFBundleURLTypes: [{CFBundleURLName: dev.duolab.e2e, CFBundleURLSchemes: [duoe2e]}]
+        UILaunchScreen: {}
+        UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight, UIInterfaceOrientationPortraitUpsideDown]
+        NSAppTransportSecurity: {NSAllowsArbitraryLoads: true}
+    settings: {base: {GENERATE_INFOPLIST_FILE: YES, MARKETING_VERSION: "1.0", CURRENT_PROJECT_VERSION: "1", SWIFT_VERSION: "6.0", CODE_SIGNING_ALLOWED: NO, PRODUCT_BUNDLE_IDENTIFIER: dev.duolab.e2e.host}}
+  DuoE2ERunner:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Runner]
+    dependencies: [{target: DuoE2EHost}]
+    settings: {base: {GENERATE_INFOPLIST_FILE: YES, SWIFT_VERSION: "5.0", CODE_SIGNING_ALLOWED: NO, PRODUCT_BUNDLE_IDENTIFIER: dev.duolab.e2e.runner, TEST_TARGET_NAME: DuoE2EHost}}
+schemes:
+  DuoE2ERunner:
+    build: {targets: {DuoE2EHost: all, DuoE2ERunner: [test]}}
+    test: {targets: [DuoE2ERunner], environmentVariables: {E2E_BEACON: "http://localhost:3141"}}

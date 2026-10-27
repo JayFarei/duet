@@ -199,11 +199,15 @@ test("without settling the same fold pins inline: the reported bug", () => {
 // In-app Safari preview, iOS 27.1 (Duo Lab Preview simulator, SFSafariViewController in a test host app,
 // 2026-10-26): full screen, default and over-full-screen presentations all read 382x603 of 466x678, inset bottom 34.
 const PREVIEW_27 = sig(382, 603, 466, 678, { insetBottom: 34, pixelRatio: 3 });
-test("iOS 27 in-app preview: inline on the left, never Safari's column (its column is full of its own buttons)", () => {
+test("iOS 27 in-app preview: in the gap of its own column in portrait, inline away from that column turned", () => {
   const c = detect(PREVIEW_27);
-  assert.deepEqual([c.mode, c.side, c.preview], ["inline", "left", true]);
-  assert.equal(detect(PREVIEW_27, "right").side, "right", "the user's side still wins");
-  // Turned, its bar is above the page: no column width, inline either way.
+  assert.deepEqual([c.mode, c.side, c.preview], ["column", "right", true]);
+  // Turned, the sheet's column is on the side the Duo is turned to, with a ~26pt gap: inline on the other side.
+  const turned = (angle) => detect({ ...sig(578, 388, 662, 458, { insetBottom: 34, angle }), screenWidth: 678, screenHeight: 466 });
+  assert.deepEqual([turned(90).mode, turned(90).side, turned(90).preview], ["inline", "right", true]);
+  assert.deepEqual([turned(270).mode, turned(270).side, turned(270).preview], ["inline", "left", true]);
+  assert.equal(detect({ ...sig(578, 388, 662, 458, { insetBottom: 34, angle: 90 }), screenWidth: 678, screenHeight: 466 }, "left").side, "left", "the user's side still wins");
+  // No column width (an older build's bar above the page): inline either way.
   assert.equal(detect(sig(678, 391, 678, 466, { insetBottom: 34, angle: 90 })).mode, "inline");
 });
 test("a closed Safari tab is never taken for the preview, URL bar expanded or compact", () => {
@@ -214,21 +218,22 @@ test("a closed Safari tab is never taken for the preview, URL bar expanded or co
 });
 test("Open in Safari: the preview's window becomes a tab's and the re-read takes the column", () => {
   const d = { flips: [] };
-  assert.equal(stable(d, PREVIEW_27, undefined, 0).mode, "inline");
-  assert.equal(stable(d, CLOSED, undefined, 5000).mode, "column");
+  assert.deepEqual([stable(d, PREVIEW_27, undefined, 0).mode, d.preview], ["column", true]);
+  const c = stable(d, CLOSED, undefined, 5000);
+  assert.deepEqual([c.mode, c.preview], ["column", undefined]);
 });
 
 // Device trace 2026-10-25 19:30: windowed Safari (floating, or beside the Home Screen) and a split pane with the
 // compact URL bar stayed inline: the column check wanted the closed tab's window height and at least 76pt of chrome.
 // iOS on the Duo has no windowed Safari or Stage Manager: a portrait window inside the screen with inset 34 is the
-// in-app preview's sheet (real Duo, 2026-10-26: 450x670, page 366x600), so it goes inline (#66). Without the inset
-// (the sheet's first sample) it still takes the column.
-test("a window inside the screen takes the column without an inset, the sheet's inline with one; a compact split pane takes the column", () => {
+// in-app preview's sheet (real Duo, 2026-10-26: 450x670, page 366x600), so it takes the gap in the preview's column
+// (#66). Without the inset (the sheet's first sample) it is a tab's column.
+test("a window inside the screen takes the column, the sheet's with the preview flag; a compact split pane takes the column", () => {
   for (const s of [sig(369, 591, 450, 670), sig(366, 600, 450, 670), sig(369, 591, 453, 661)])
     assert.equal(detect({ ...s, screenWidth: 466, screenHeight: 678 }).mode, "column", JSON.stringify(s));
   for (const s of [sig(369, 591, 453, 661, { insetBottom: 34 }), sig(366, 600, 450, 670, { insetBottom: 34 })]) {
     const c = detect({ ...s, screenWidth: 466, screenHeight: 678 });
-    assert.deepEqual([c.mode, c.preview], ["inline", true], JSON.stringify(s));
+    assert.deepEqual([c.mode, c.preview], ["column", true], JSON.stringify(s));
   }
   const pane = detect({ ...sig(385, 594, 469, 669, { insetBottom: 34 }), screenWidth: 466, screenHeight: 678 });
   assert.equal(pane.mode, "column");

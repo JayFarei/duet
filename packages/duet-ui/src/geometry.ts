@@ -112,7 +112,13 @@ export interface Context {
   /** From stable() only. "sure": nothing is moving. "settling": the window is still settling after an event, so
    *  the mode may still change. "held": the last committed context, kept while the page is pinch-zoomed or while a
    *  drifting signal (viewport height) alone asks for another mode before the window settles. */
-  confidence?: "sure" | "settling" | "held";
+  confidence?: "sure" | "settling" | "held" | "moving";
+  /** The controls are not drawn (the page keeps its full width, no inset). "moving": a fold, unfold or turn is
+   *  caught halfway (stable() only, see inTransit), so the controls hide for those frames instead of showing in a
+   *  place that is right for neither posture. "preview": the in-app preview turned to landscape, whose column has no
+   *  room for a button and where an inline strip would cover the page (docs/research-notes.md, "Preview placement in
+   *  the gap"); the preview's own back and close buttons remain, and Duet's return in portrait or in a tab. */
+  hidden?: "moving" | "preview";
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
@@ -136,16 +142,20 @@ export const WIDE = 600;
 const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "narrow";
 
 /** In-app Safari preview (SFSafariViewController) on the closed Duo. Its own buttons (close, reader, back, and a
- *  share/reload/Safari pill) fill the column beside the page, leaving ~122pt free between them with a bare island
- *  and ~31pt with Live Activities, so controls go inline, on the left by default, away from that column. Two
+ *  share/reload/Safari pill) fill a column beside the page like a tab's. In portrait Duet's controls go into the free
+ *  gap of that column, between its reader/menu button and its back button (PREVIEW.gap, columnBand); turned, that
+ *  gap is ~26pt, too small for a button, so they go inline on the side away from the preview's column. Two
  *  windows say preview (docs/research-notes.md, "In-app Safari preview"):
  *  - iOS 27.1 (simulator, 2026-10-26, every presentation but a sheet): the closed screen's 466x678 window with an
  *    84pt column like a tab's, but only 75pt below the page (382x603) and the page reaching the screen bottom
  *    (safe-area-inset-bottom 34). A closed tab has 98pt (80 with the compact URL bar) and inset 0.
- *    In landscape the preview's bar is above the page, no column width, so it is inline anyway.
- *  - The page sheet, the common presentation (real Duo, iOS 18.7, Messages, 2026-10-26; simulator, iOS 27.1): a
+ * *  - The page sheet, the common presentation (real Duo, iOS 18.7, Messages, 2026-10-26; simulator, iOS 27.1): a
  *    450x670 window inside the 466x678 screen, page 366x600 (column 84, chrome 70), inset 34. The inset lands
  *    ~100ms after the first sample (0, then 34), so stable() lets the verdict rise to preview at first (PREVIEW_RISE).
+ *    Turned, the sheet is 662x458 in the 678x466 screen, page 578x388, inset 34, its column on the side the Duo
+ *    is turned to (simulator, iOS 27.1, 2026-10-26).
+ *  - Full screen turned (simulator, iOS 27.1, e2e round 2): the 678x466 window, page 678x391 (no column, chrome 75),
+ *    inset bottom 34, the buttons in a safe-area inset of 84 on the side the Duo is turned to.
  *    No tab is smaller than the screen: closed 466x678, open 951x669, a split pane 469x669 (wider than the 466
  *    screen Safari keeps reporting), all inset 0 in every state measured.
  *  - Older builds (device screenshot 2026-10-25): a fixed 375x667 window at 3x, a size no iPhone has natively. */
@@ -153,20 +163,38 @@ const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "na
  *  split pane (75) has another window size. stable() also keeps a tab's verdict while it scrolls, so a tab whose
  *  chrome drifts into the band mid-scroll is not taken for the preview. sheetInset: how far inside the screen, on
  *  each side, a window must be to count as a sheet (16x8 measured; a split pane is 3pt wider than the screen). */
-const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [73, 77], sheetInset: 4 } as const;
+/** gap: the free band of the preview's portrait column, in screen points (the same in the sheet and full screen,
+ *  simulator iOS 27.1 and real Duo iOS 18.7, 2026-10-26): its reader/menu button's bottom and its back button's top.
+ *  146pt, room for two buttons ("…" and the selected tab) with DUO.gap around them. Measured with a bare island:
+ *  how Live Activities move the preview's buttons is not yet known. */
+const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [73, 77], sheetInset: 4, gap: { top: 282, bottom: 428 } } as const;
 /** Why the signals read as the in-app preview, for probes and logs; undefined when they do not. */
 export function previewReason(s: Signals): string | undefined {
   if (s.standalone || browserOf(s.userAgent) !== "safari") return;
   if (s.pixelRatio === PREVIEW.pixelRatio && s.outerWidth === PREVIEW.width && s.outerHeight === PREVIEW.height) return "375x667 window at 3x";
   const chrome = s.outerHeight - s.innerHeight;
+  // The sheet on the open screen (e2e round 3/4: 653x661 wide, 653x869 tall, no column, inset 0 or 34): no Safari
+  // window has these sizes.
+  if (UNFOLDED_SHEETS.some(([a, b]) => Math.abs(s.outerWidth - a) <= 1 && Math.abs(s.outerHeight - b) <= 1)
+    && s.outerWidth - s.innerWidth <= 2 && within(chrome, LANDED.chrome))
+    return `${s.outerWidth}x${s.outerHeight} sheet on the open screen, inset ${s.insetBottom}`;
   // A tab measured inset 0 in every state (fresh, scrolled, keyboard, landscape); the preview 34.
-  if (s.insetBottom < 20 || !hasColumn(s)) return;
+  if (s.insetBottom < 20) return;
+  // Turned full screen (iOS 27.1, every presentation but a sheet): the whole 678x466 window, no page column (the
+  // preview's buttons sit in a safe-area inset instead, left at 90, right at 270), 75pt chrome. A turned tab has
+  // 98 with its column, or 126 fresh (inset 34 after a fold), so the chrome band alone tells them apart.
+  if (within(chrome, PREVIEW.chrome) && Math.abs(s.outerWidth - DUO_SIZES[0][1]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][0]) <= 1
+    && Math.abs(s.innerWidth - s.outerWidth) <= 1)
+    return `678x466 window, ${chrome}pt chrome, inset ${s.insetBottom}, turned`;
+  if (!hasColumn(s)) return;
   if (within(chrome, PREVIEW.chrome) && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1)
     return `466x678 window, ${chrome}pt chrome, inset ${s.insetBottom}`;
-  // The sheet: a portrait window inside the closed screen on both sides.
+  // The sheet: a window inside the closed screen on both sides, in either orientation.
   const [w, h] = DUO_SIZES[0], m = PREVIEW.sheetInset;
-  if (s.screenWidth === w && s.screenHeight === h && s.outerWidth <= w - m && s.outerHeight <= h - m && s.outerWidth < s.outerHeight)
-    return `${s.outerWidth}x${s.outerHeight} sheet in the ${w}x${h} screen, inset ${s.insetBottom}`;
+  const short = (a: number, b: number) => Math.min(a, b), long = (a: number, b: number) => Math.max(a, b);
+  if (short(s.screenWidth, s.screenHeight) === w && long(s.screenWidth, s.screenHeight) === h
+    && short(s.outerWidth, s.outerHeight) <= w - m && long(s.outerWidth, s.outerHeight) <= h - m)
+    return `${s.outerWidth}x${s.outerHeight} sheet in the ${s.screenWidth}x${s.screenHeight} screen, inset ${s.insetBottom}`;
 }
 export const isPreview = (s: Signals) => previewReason(s) !== undefined;
 
@@ -222,19 +250,25 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
  *  window sizes (453x661 and 450x670 outer, 369x591 and 366x600 inner), then taken for windowed Safari; 450x670
  *  with inset 34 is the in-app preview's sheet (isPreview), which goes inline. A pane with the compact URL bar has
  *  75pt of chrome, so any portrait Safari window on the Duo with the column counts. */
-const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 102] } as const;
+// The largest Dynamic Type grows the bottom bar to 106pt (382x572 in 466x678, e2e round 3).
+const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 110] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
 const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome);
 
 /** Side inset of a Home Screen app on the Duo: 84 measured (closed portrait). iPhones have up to 59 in landscape. */
 const STRIP_INSET = 76;
 
+/** The keyboard (or anything else) covers the bottom of the page: the visual viewport is shorter than the layout one.
+ *  WebKit can report a negative visual height after the preview's sheet is folded from the open screen (-78 for a
+ *  600pt page, e2e round 3, held until the next resize); no viewport is that short, so it is not a keyboard. */
+export const keyboardUp = (s: Signals) => s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
+
 /** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
  *  caller holds a sticky one (stable()). */
 export function detect(s: Signals, preferred?: Side, allowColumn = true, preview = isPreview(s)): Context {
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
-  const keyboard = s.visualHeight < s.innerHeight - 1;
+  const keyboard = keyboardUp(s);
   const kb = keyboard ? { keyboard } : {};
   if (s.standalone && duo && (s.insetRight >= STRIP_INSET || s.insetLeft >= STRIP_INSET)) {
     return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
@@ -246,16 +280,67 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   const closed = Math.abs(s.outerWidth - DUO_SIZES[0][1]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][0]) <= 1;
   const columnSide: Side | undefined = !landscape ? "right" : closed ? turned : undefined;
   // Other iOS browsers draw their own chrome where Safari has its column: inline for them.
-  // An in-app preview has the column signature too, but its column is full of its own buttons.
+  // An in-app preview has the column signature too: in portrait its column has a gap Duet's controls fit in
+  // (columnBand); turned, it has none, so the preview goes inline there.
   // Pinch zoom puts innerWidth in zoomed px, so the column signature means nothing then (stable() holds instead).
   // The keyboard leaves Safari's column in place (only the visual viewport shrinks), so it does not change the mode.
   const split = isSplit(s);
-  const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari" && !preview
+  const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari" && (!preview || !landscape)
     && hasColumn(s) && (s.scale ?? 1) === 1;
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
-  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight };
-  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? (preview ? "left" : "right"), screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(split && { split }) };
+  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }) };
+  // The turned full-screen preview (default and full styles, iOS 27.1): its buttons all sit in a top bar, and the 84pt
+  // safe-area inset on the side the Duo is turned to (left at 90, right at 270) is page area nothing native uses
+  // below that bar. The controls take it, like a Home Screen app's strip (e2e round 4: the sheet turned has only a
+  // ~26pt gap in its column, so it stays hidden).
+  const band: Side | undefined = s.insetLeft >= STRIP_INSET ? "left" : s.insetRight >= STRIP_INSET ? "right" : undefined;
+  if (preview && landscape && closed && band && browser === "safari" && !s.standalone && !s.framed)
+    return { ...base, mode: "strip", layout: layoutOf(s.innerWidth - INLINE_WIDTH), side: band, screenWidth: s.innerWidth, screenHeight: s.innerHeight, preview };
+  // A preview inline: away from its own column (on the side the Duo is turned to, else the right).
+  // On the open screen the sheet has no column of its own: inline right, like a full-width tab, and never hidden.
+  const onClosed = Math.min(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][0] + 1 && Math.max(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][1] + 1;
+  const away: Side = preview && onClosed ? (landscape && turned === "left" ? "right" : "left") : "right";
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && onClosed && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(split && { split }) };
+}
+
+/** Every window a Safari page on the Duo lands in, as measured (docs/research-notes.md): `page` is how much
+ *  narrower the page is than the window (0, or Safari's 84pt column), `chrome` how much shorter (the address bar:
+ *  closed 98 or 80 compact, open and fresh landscape 126, split pane 98, preview 70 to 75). A sample outside these
+ *  is a fold, unfold or turn caught halfway: the viewport lands first and the window up to ~2s later (rotation 90 to
+ *  0, simulator 2026-10-26: 678x340, 466x498, 382x498, then 382x580 in 466x678). */
+/** How far inside the closed screen the preview's sheet may be: 16x8 measured. */
+const SHEET_SLACK = 40;
+/** The in-app preview's sheet on the open screen, wide and tall posture (simulator, iOS 27.1). */
+const UNFOLDED_SHEETS = [[653, 661], [653, 869]] as const;
+const LANDED = { page: [[0, 2], [83, 85]], chrome: [0, 160], columnChrome: 110 } as const;
+/** True while a Safari page on the Duo is between postures: the page and its window disagree on orientation, the
+ *  turn (screen.orientation.angle) disagrees with the page, or page and window are not a pair Safari settles in
+ *  (LANDED, or the window is not a Duo window or the preview's sheet). Only asked while the window settles
+ *  (signals.ts settling(), at most SETTLE.cap), so a state never measured cannot hide the controls for good. */
+export function inTransit(s: Signals): boolean {
+  if (s.standalone || s.framed || browserOf(s.userAgent) !== "safari" || isIOS(s) === false || !isDuo(s)) return false;
+  // The preview's sheet on the open screen: a near-square window of its own, no column, its page wider than tall in
+  // the wide posture (e2e round 3: 653x661 wide, 653x869 tall).
+  if (s.outerWidth - s.innerWidth <= LANDED.page[0][1] && within(s.outerHeight - s.innerHeight, LANDED.chrome)
+    && UNFOLDED_SHEETS.some(([a, b]) => Math.abs(s.outerWidth - a) <= 1 && Math.abs(s.outerHeight - b) <= 1)) return false;
+  const landscape = s.innerWidth > s.innerHeight;
+  if (landscape !== s.outerWidth > s.outerHeight) return true;
+  const [w, h] = DUO_SIZES[0], m = PREVIEW.sheetInset, short = Math.min(s.outerWidth, s.outerHeight), long = Math.max(s.outerWidth, s.outerHeight);
+  // The turn speaks for the closed screen only: the open screen is landscape at angle 0.
+  const closed = short <= w + 1 && long <= h + 1;
+  if (closed && s.angle !== undefined && s.angle % 90 === 0 && (s.angle % 180 === 90) !== landscape) return true;
+  const page = s.outerWidth - s.innerWidth, chrome = s.outerHeight - s.innerHeight;
+  if (!LANDED.page.some((r) => within(page, r)) || !within(chrome, LANDED.chrome)) return true;
+  // Safari's column is 84pt in every window measured, and comes with its bottom URL bar (chrome 98, 106 at the largest
+  // Dynamic Type, preview 70 to 75), never with the 126pt bars of a full open window. Anything else is a stale layout
+  // handed a new window (e2e round 3: entering split view, 867x543 in 951x669 for ~200ms before the pane; going home
+  // from a split pane, the pane's 385x571 page in the closed screen's 466x678 window, an 81pt "column").
+  if (page >= LANDED.page[1][0] && chrome > LANDED.columnChrome) return true;
+  // A Duo window, or the preview's sheet (a window a few points inside the closed screen; its inset lands ~100ms late,
+  // so sizes alone decide).
+  const sheet = short <= w - m && long <= h - m && short >= w - SHEET_SLACK && long >= h - SHEET_SLACK;
+  return !duoSize(s.outerWidth, s.outerHeight) && !sheet;
 }
 
 /** Mode flips are a feedback loop when the layout of one mode changes the signals into the other (the
@@ -268,8 +353,11 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   heights?: Record<string, number>;
   /** Sticky in-app preview verdict, and the window it was taken in. */
   preview?: boolean; previewKey?: string; previewAt?: number;
-  /** Last context returned, and the stable signals it was committed under. */
-  last?: Context; stableKey?: string }
+  /** Last context returned, the stable signals it was committed under, and its window (outer size). */
+  last?: Context; stableKey?: string; lastKey?: string;
+  /** A fold or turn was caught halfway, and the landing (its stable signals, first seen at landAt) must hold until
+   *  landUntil before the controls show (LAND_HOLD). */
+  moving?: boolean; landKey?: string; landAt?: number; landUntil?: number }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 /** Longest pin: a loop that keeps resuming doubles the wait up to this. */
@@ -277,6 +365,10 @@ export const PIN_MAX = 60000;
 /** How long after a window first shows (stable signals or epoch changed) its verdict may still rise to preview:
  *  the real sheet's bottom inset reads 0 on the first sample and 34 ~100ms later (device, 2026-10-26). */
 export const PREVIEW_RISE = 1000;
+/** How long a landing after a fold or turn caught halfway must hold before the controls show there: unfolding from
+ *  closed landscape passes through the closed portrait window (382x580 in 466x678, angle 0) for ~90ms before the
+ *  open one (simulator, e2e round 2), a state that reads as landed and would flash the column for a frame. */
+export const LAND_HOLD = 150;
 
 /** settling: the window is still moving after a geometry event (signals.ts settling()). A fold lands the viewport
  *  first and outerWidth up to ~2s later, flipping the mode on the way at an unchanged window size, so flips then are
@@ -294,11 +386,19 @@ export const PREVIEW_RISE = 1000;
  *  first PREVIEW_RISE ms of a window (the sheet's late inset); a preview becomes a tab as soon as the rule stops
  *  matching (Open in Safari). */
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false, epoch = 0): Context {
-  if ((s.scale ?? 1) !== 1 && d.last) {
-    const keyboard = s.visualHeight < s.innerHeight - 1 || undefined;
-    return { ...d.last, keyboard, confidence: "held" };
-  }
   const key = `${s.outerWidth}x${s.outerHeight}`;
+  // Pinch zoom holds the context committed in this window. A scale off 1 in another window is WebKit's, not the
+  // user's: folding the open preview sheet (653 wide, its document briefly 935) onto the closed screen leaves
+  // visualViewport.scale at 1.0152 with the visual viewport as wide as the page (366), held until the next
+  // gesture (e2e round 4, pvu-open-unfolded-fold). Holding there kept the open screen's inline controls, drawn off
+  // the closed screen, so a window change reads the signals as unzoomed.
+  if ((s.scale ?? 1) !== 1 && d.last) {
+    if (d.lastKey === key) {
+      const keyboard = keyboardUp(s) || undefined;
+      return { ...d.last, keyboard, confidence: "held" };
+    }
+    s = { ...s, scale: 1 };
+  }
   const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`, raw = isPreview(s);
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
@@ -309,6 +409,20 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   if (d.key !== key) Object.assign(d, { key, pinned: undefined, ttl: undefined, flips: [] });
   if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
   let c = detect(s, preferred, !d.pinned, preview);
+  // Halfway through a fold or turn: hidden, and nothing committed, so the landing is taken as a stable change. The
+  // last context's geometry stays whole: mixing its screenWidth with the half-turned width made the page's insets
+  // jump mid-turn (84, 0, 212, 296px on a left column turn, -485px on an unfold; final review, 2026-10-27).
+  const moving = () => ({ ...(d.last ?? c), keyboard: c.keyboard, hidden: "moving" as const, confidence: "moving" as const });
+  if (settling && inTransit(s)) {
+    Object.assign(d, { moving: true, landKey: undefined, landUntil: undefined });
+    return moving();
+  }
+  // Landed after a transit: hidden until the landing holds LAND_HOLD (the caller re-reads at landUntil).
+  if (settling && d.moving) {
+    if (d.landKey !== stableKey) Object.assign(d, { landKey: stableKey, landAt: now, landUntil: now + LAND_HOLD });
+    if (now < d.landUntil!) return moving();
+  }
+  Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
   // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once.
   if (d.last && c.mode !== d.last.mode && settling && stableKey === d.stableKey && !!d.last.preview === preview) {
     const { width, height, insetTop, insetBottom, keyboard } = c;
@@ -328,6 +442,7 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   c = { ...c, confidence: settling ? "settling" : "sure" };
   // A mobile browser's URL bar grows and shrinks the viewport as the page scrolls, while the window keeps its
   // width and orientation. A desktop window has no such bar: its height is the user's, so it stays current.
+  d.lastKey = key;
   if (c.device === "desktop") return d.last = c;
   const h = `${s.innerWidth}${s.outerWidth > s.outerHeight ? "L" : "P"}`, heights = d.heights ??= {};
   heights[h] = Math.min(heights[h] ?? Infinity, s.innerHeight);
@@ -396,7 +511,7 @@ export interface Plan {
 }
 
 /** Closed landscape Safari tab: its column's buttons sit apart from portrait's (SAFARI.landscape). */
-const landscapeColumn = (c: Context) => !c.split && c.screenWidth > c.screenHeight;
+const landscapeColumn = (c: Context) => !c.split && !c.preview && c.screenWidth > c.screenHeight;
 const groupHeight = (n: number) => DUO.control + (n - 1) * DUO.groupItem;
 
 /** Safari's column buttons are an exclusion zone like the insets: native chrome always paints over the page, so
@@ -407,6 +522,11 @@ const groupHeight = (n: number) => DUO.control + (n - 1) * DUO.groupItem;
 export function columnBand(c: Context): { top: number; bottom: number; reach: number } | undefined {
   if (c.mode !== "column") return undefined;
   const rows = SAFARI.rows * (DUO.control + DUO.gap), pill = c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap;
+  // In-app preview: the gap in its column, from screen points to the page's (the page reaches the screen bottom).
+  if (c.preview) {
+    const y0 = DUO_SIZES[0][1] - c.height;
+    return { top: PREVIEW.gap.top + DUO.gap - y0, bottom: PREVIEW.gap.bottom - DUO.gap - y0, reach: 0 };
+  }
   if (c.split) return { top: SAFARI.splitTop[c.side] + rows, bottom: pill, reach: c.side === "right" ? DUO.island : 0 };
   if (landscapeColumn(c)) return { top: SAFARI.landscape[c.side].top + rows, bottom: SAFARI.landscape[c.side].pill - DUO.gap, reach: 0 };
   return { top: DUO.top + DUO.island + rows, bottom: pill, reach: DUO.island };
@@ -446,8 +566,10 @@ export function plan(c: Context, s: Spec): Plan {
   // its back + reader rows at their worst-case (island-pushed) position, above its +/tabs pill. strip and
   // inline: viewport coordinates.
   const col = columnBand(c);
-  const top = col ? col.top : c.mode === "strip" ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap;
-  const bottom = col ? col.bottom : c.mode === "strip" ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
+  // The turned preview's strip is a page band below its native top bar, with the home indicator's inset below.
+  const strip = c.mode === "strip" && !c.preview;
+  const top = col ? col.top : strip ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap;
+  const bottom = col ? col.bottom : strip ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
   const centerX = c.side === "left" ? DUO.centerFromEdge : (c.mode === "column" ? c.screenWidth : c.width) - DUO.centerFromEdge;
   const step = DUO.control + DUO.gap;
 

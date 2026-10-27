@@ -120,7 +120,7 @@ function Page({ self = false }: { self?: boolean }) {
 
       <section className="stage">
         {self ? (
-          <div style={{ ...column(980, 20), width: "100%" }}>
+          <div style={{ boxSizing: "border-box", width: "100%", maxWidth: 980 }}>
             <div className="card self">
               <h3 className="tile-h">This page uses Duet.</h3>
               <p className="tile-p">The controls on the side are Duet. Unfold, turn or split Safari to see them move.</p>
