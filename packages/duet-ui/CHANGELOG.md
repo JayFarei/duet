@@ -1,14 +1,13 @@
 # Changelog
 
-## 0.4.0-rc.2
+## 0.4.0
+
+Everything from 0.4.0-rc.1 and 0.4.0-rc.2.
 
 - Column mode without children in a split view pane, or on the closed Duo turned left: Duet now places the page beside Safari's column (`margin-left` of the column width on `<html>`, marked `data-duet-reserve`), so the page is no longer clipped by 84px with the controls drawn over it. Don't set `margin` on `<html>` or reset `scrollX`. `<Duet reserve={false}>` opts out (#77).
 - README: an Edge cases section lists every iOS and Safari quirk Duet handles, what it does and what is left to you (#81).
 - Column mode: a page's full-screen `position: fixed` overlay (a modal scrim, `inset: 0`) no longer hides the controls in Safari's column, close button included. A small invisible fixed guard on the column's edge keeps Safari from filling the column with the overlay's colour. `<dialog>.showModal()` is not covered (#79).
 - Column mode without children: the controls no longer ride the rubber band at the top or bottom of the page, where they slid over Safari's own column buttons or vanished until the bounce settled. The document no longer rubber-bands while the controls follow it, like a page with children. A page's own `overscroll-behavior` still wins.
-
-## 0.4.0-rc.1
-
 - Turning or folding no longer flashes the controls at the wrong edge: while the window is caught halfway they hide (`hidden: "moving"`, `confidence: "moving"`) and reappear where the landed window wants them once it has held for 150ms (`LAND_HOLD`). The full screen in-app preview turned sideways (no page column, 75pt chrome, inset 34) is now recognised as the preview.
 - In-app Safari preview: the controls now sit in the free gap of the preview's own column, between its reader and back buttons ("…" and the selected tab), so the page keeps its full width. Turned sideways, where that gap is too small, they hide (`useDuet().hidden` is `"preview"`) and the page keeps its full width. The preview sheet is now recognised turned too.
 - Theming: `tint` (accent, like iOS's tintColor), `appearance` (`"auto"`, `"light"` or `"dark"`, replacing `dark`, which still works) and `icons` (`size`, `tabSize`, `weight`, `color`). Each writes a documented `--duet-*` token that plain CSS can set too.
