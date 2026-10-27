@@ -10,6 +10,7 @@ import XCTest
 //   {op:"tapAt", x, y}               tap a screen point
 //   {op:"press", x, y, duration}     long-press a screen point
 //   {op:"drag", x, y, x2, y2, hold}  press at a point for `hold` s, then drag to another (split view, window tiling)
+//   {op:"find", bundle, label}       frames of every element whose label contains label (a query: reaches what a snapshot misses)
 //   {op:"tree", bundle}              every element of an app with a frame (exploration, split-view controls)
 //   {op:"stop"}
 final class Runner: XCTestCase {
@@ -101,6 +102,12 @@ final class Runner: XCTestCase {
       XCUIApplication(bundleIdentifier: "com.apple.springboard").coordinate(withNormalizedOffset: .zero)
         .withOffset(CGVector(dx: f.midX, dy: f.midY)).tap()
       return ["x": f.midX, "y": f.midY]
+    case "find":  // frames of the elements whose label contains `label`, any type, no wait (a query reaches buttons a snapshot misses)
+      let app = XCUIApplication(bundleIdentifier: c["bundle"] as! String)
+      let q = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", c["label"] as! String))
+      return ["elements": q.allElementsBoundByIndex.filter { $0.exists && $0.frame.width > 0 }.map { e in
+        ["type": e.elementType.rawValue, "label": e.label, "id": e.identifier, "x": e.frame.minX, "y": e.frame.minY, "w": e.frame.width, "h": e.frame.height]
+      }]
     case "press":
       point(c["x"] as! Double, c["y"] as! Double, c["bundle"] as? String).press(forDuration: c["duration"] as? Double ?? 1.0)
       return [:]

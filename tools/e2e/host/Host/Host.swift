@@ -4,6 +4,7 @@ import UIKit
 
 // e2e test host: presents a page in SFSafariViewController the way an app's link preview does.
 //   launch args:  -url <page> -style default|full|over|sheet   (presents 1s after launch)
+//                 -beacon <origin>                              (Live.swift, saved for later launches)
 //   URL scheme:   duoe2e://present?style=sheet&url=<encoded>   (dismisses any open preview first)
 //                 duoe2e://safari?url=<encoded>                (dismisses the preview, opens the page in Safari,
 //                                                               same end state as the preview's "Open in Safari")
@@ -11,7 +12,7 @@ import UIKit
 @main struct HostApp: App {
   var body: some Scene {
     WindowGroup {
-      Links().onOpenURL { handle($0) }
+      Links().onOpenURL { handle($0) }.task { Live.shared.start() }
     }
   }
 }

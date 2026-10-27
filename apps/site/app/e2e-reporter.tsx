@@ -5,6 +5,9 @@ import { isPreview, previewReason, readSignals } from "duet-ui";
 // e2e only (tools/e2e): with ?e2e in the URL (or once seen in this tab), posts Duet's full state to the local
 // beacon every 40ms (a flash of one frame pair is ~33ms; 100ms sampling missed 103ms ones). ?e2e=<loopback origin> picks the beacon, default http://localhost:3141. Renders nothing.
 const KEY = "duet-e2e";
+// The driver's run token (?s=), kept for the tab like the beacon: a page navigated to without it (a back button's
+// location.href, a link) still reports as the same run.
+const S_KEY = "duet-e2e-s";
 const loopback = (q: string) => {
   try { const u = new URL(q); return /^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname) ? u.origin : undefined; } catch { return undefined; }
 };
@@ -48,13 +51,37 @@ function label(el: Element) {
   return `${el.tagName.toLowerCase()}${el.id ? "#" + el.id : ""}${cls ? "." + cls : ""}${text ? ` "${text}"` : ""}`;
 }
 
-function sample() {
+// What a slot's buttons say (aria-label), so a step can check a call to action turned into "Booked".
+const labels = (el: Element) => [...el.querySelectorAll("button")].map((b) => b.getAttribute("aria-label") ?? (b.textContent ?? "").trim());
+// Each visible button of a slot with where it is: the driver taps one by its label (a tab of the pill, the back button).
+const buttons = (el: Element) => [...el.querySelectorAll("button")].filter(shown).map((b) => ({
+  label: b.getAttribute("aria-label") ?? (b.textContent ?? "").trim(), rect: rect(b), pressed: b.getAttribute("aria-pressed") ?? b.getAttribute("aria-selected"),
+  role: b.getAttribute("role"),
+}));
+
+// The page's own controls and dialogs, outside Duet, with where they are: the driver taps them by rect (README).
+function targets() {
+  const out: { el: string; name: string; id: string | null; rect: ReturnType<typeof rect> }[] = [];
+  for (const el of document.querySelectorAll("[data-e2e], a[href], button, input, textarea, select")) {
+    if (out.length >= 40) break;
+    if (el.closest("nav.duet") || !shown(el)) continue;
+    const name = (el.getAttribute("aria-label") ?? el.getAttribute("placeholder") ?? (el.textContent ?? "").trim().replace(/\s+/g, " ")).slice(0, 60);
+    out.push({ el: el.tagName.toLowerCase(), name, id: el.getAttribute("data-e2e"), rect: rect(el) });
+  }
+  return out;
+}
+
+function sample(s: string | null) {
   const sig = readSignals();
   const navs = [...document.querySelectorAll("nav.duet")].map((n) => ({
     mode: n.getAttribute("data-mode"), side: n.getAttribute("data-side"), settling: n.getAttribute("data-settling"),
     hidden: n.getAttribute("data-hidden"), confidence: n.getAttribute("data-confidence"),
     keyboard: n.getAttribute("data-keyboard"), rect: rect(n), shown: shown(n),
-    slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({ slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s) })),
+    slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({
+      slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), buttons: buttons(s), expanded: s.getAttribute("data-expanded"),
+    })),
+    // An open "…" or tab menu is drawn outside the slots: the driver taps its items (a back folded into "…") by label.
+    menus: [...n.querySelectorAll("[role=menu]")].filter(shown).map((m) => ({ rect: rect(m), buttons: buttons(m) })),
   }));
   // Visible elements that stick out of the layout viewport (clipped content), Duet's own layer and content inside
   // a deliberate inner horizontal scroller narrower than the page (a code block) excluded. Full-bleed wrappers are reported too: the assertion
@@ -91,32 +118,42 @@ function sample() {
   const main = document.querySelector("main");
   const h = document.documentElement;
   return {
-    t: Date.now(), page: PAGE, path: location.pathname + location.search,
+    t: Date.now(), page: PAGE, path: location.pathname + location.search, s,
     // A backgrounded page (home screen, a split view menu) still lays out for the app switcher; nobody sees it.
     visible: document.visibilityState, focus: document.hasFocus(),
+    active: document.activeElement && document.activeElement !== document.body ? document.activeElement.tagName.toLowerCase() : null,
     sig, preview: isPreview(sig), reason: previewReason(sig) ?? null,
     html: { mode: h.getAttribute("data-duet-mode"), split: h.getAttribute("data-duet-split"), emulated: h.getAttribute("data-duet-emulated") },
     navs,
     scroll: { scrollWidth: h.scrollWidth, clientWidth: W, bodyScrollWidth: document.body.scrollWidth, x: scrollX, y: scrollY },
     vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop, w: visualViewport.width, h: visualViewport.height, scale: visualViewport.scale } : null,
     overflow: out.slice(0, 20), overflowCount: out.length, underControls: under.slice(0, 10),
+    targets: targets(),
+    dialogs: [...document.querySelectorAll("[role=dialog], dialog[open]")].filter(shown).map(rect),
     content: main ? { main: rect(main), children: [...main.children].slice(0, 16).filter(shown).map((c) => ({ el: label(c), rect: rect(c) })) } : null,
   };
 }
 
 export function E2EReporter() {
   useEffect(() => {
-    let origin: string | null = null;
+    // The top page only: a same-origin iframe (/'s WebDuo demo of /skeleton) shares the tab's sessionStorage, so it
+    // would report under the run's token and the driver could follow it instead of the page (nav01-04, "the page is
+    // not reporting").
+    if (window.top !== window) return;
+    let origin: string | null = null, s: string | null = null;
     try {
       const q = new URLSearchParams(location.search).get("e2e");
       // Loopback beacons only: a link must not make a visitor's page post its state to another origin.
       if (q !== null) sessionStorage.setItem(KEY, loopback(q) ?? "http://localhost:3141");
       origin = sessionStorage.getItem(KEY);
+      const sq = new URLSearchParams(location.search).get("s");
+      if (sq) sessionStorage.setItem(S_KEY, sq);
+      s = sessionStorage.getItem(S_KEY);
     } catch { /* storage blocked: no reporting */ }
     if (!origin) return;
     const url = origin + "/beacon";
     const id = setInterval(() => {
-      try { fetch(url, { method: "POST", body: JSON.stringify(sample()), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
+      try { fetch(url, { method: "POST", body: JSON.stringify(sample(s)), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
     }, 40);
     return () => clearInterval(id);
   }, []);
