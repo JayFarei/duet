@@ -110,6 +110,9 @@ export interface Context {
   screenHeight: number;
   insetTop: number;
   insetBottom: number;
+  /** Page y that native chrome over the page reaches down the controls' edge: the unfolded preview's status column
+   *  (with Live Activities at their worst) or its floating top bar (UNFOLDED_PREVIEW). Slots and menus stay below. */
+  clearTop?: number;
   /** In-app Safari preview (SFSafariViewController, opened from a social or mail app). */
   preview?: boolean;
   /** The on-screen keyboard is up (visual viewport shorter than the page). The mode stays as it was; in column
@@ -184,6 +187,8 @@ export function previewReason(s: Signals): string | undefined {
   if (UNFOLDED_SHEETS.some(([a, b]) => Math.abs(s.outerWidth - a) <= 1 && Math.abs(s.outerHeight - b) <= 1)
     && s.outerWidth - s.innerWidth <= 2 && within(chrome, LANDED.chrome))
     return `${s.outerWidth}x${s.outerHeight} sheet on the open screen, inset ${s.insetBottom}`;
+  const open = unfoldedPreview(s);
+  if (open) return `${s.outerWidth}x${s.outerHeight} window, ${chrome}pt chrome, inset ${s.insetBottom}, unfolded ${open}`;
   // A tab measured inset 0 in every state (fresh, scrolled, keyboard, landscape); the preview 34.
   if (s.insetBottom < 20) return;
   // Turned full screen (iOS 27.1, every presentation but a sheet): the whole 678x466 window, no page column (the
@@ -203,6 +208,26 @@ export function previewReason(s: Signals): string | undefined {
     return `${s.outerWidth}x${s.outerHeight} sheet in the ${s.screenWidth}x${s.screenHeight} screen, inset ${s.insetBottom}`;
 }
 export const isPreview = (s: Signals) => previewReason(s) !== undefined;
+
+/** The in-app preview on the open screen, default, full screen and over full screen styles (iOS 27.1, e2e matrix
+ *  2026-10-27; the sheet is UNFOLDED_SHEETS). No column, and no Safari tab has these chrome and inset pairs (a tab
+ *  unfolded: chrome 126, inset 34, in both postures).
+ *  - Wide: the 951x669 window, page 951x594 under a 75pt top bar holding every button, inset bottom 34, and the status
+ *    column (clock at screen y 33 to 48, a bare island to 102) in an 84pt safe-area inset on the right, the band a
+ *    Home Screen app's strip has. Before, the controls went inline there, over the clock and island.
+ *  - Tall: the 669x951 window, page 669x800 at screen y 75 (chrome 151: a 76pt bottom bar), inset 0. Turned right
+ *    (page angle 180) the status row heads the screen and the top bar floats over the page (its buttons at screen
+ *    y 85 to 129); turned left (angle 0) the bar sits above the page. The island sits top right (bare bottom 68), above the controls' edge, in both.
+ *  `clear`: where the controls start (Context.clearTop), assuming Live Activities grow the island by DUO.island as in
+ *  the closed strip (not yet measured on the open screen). */
+const UNFOLDED_PREVIEW = { chrome: { wide: [73, 77], tall: [149, 153] },
+  clear: { wide: DUO.top + DUO.island - 75, tall: Math.max(129, 68 + DUO.island) - 75 + DUO.gap } } as const;
+function unfoldedPreview(s: Signals): "wide" | "tall" | undefined {
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1, [w, h] = DUO_SIZES[1], chrome = s.outerHeight - s.innerHeight;
+  if (!near(s.innerWidth, s.outerWidth)) return;
+  if (near(s.outerWidth, h) && near(s.outerHeight, w) && within(chrome, UNFOLDED_PREVIEW.chrome.wide) && s.insetBottom >= 20) return "wide";
+  if (near(s.outerWidth, w) && near(s.outerHeight, h) && within(chrome, UNFOLDED_PREVIEW.chrome.tall) && s.insetBottom < 20) return "tall";
+}
 
 /** Window and screen sizes only the Duo has, as [short, long] sides: the closed screen (Safari's `screen.*` keeps
  *  466x678 after unfolding, so it holds in every Safari state), the open screen, and a split-view pane's window.
@@ -300,14 +325,16 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   // safe-area inset on the side the Duo is turned to (left at 90, right at 270) is page area nothing native uses
   // below that bar. The controls take it, like a Home Screen app's strip (e2e round 4: the sheet turned has only a
   // ~26pt gap in its column, so it stays hidden).
+  // The unfolded wide preview has the same band on the right, headed by the status column (UNFOLDED_PREVIEW).
   const band: Side | undefined = s.insetLeft >= STRIP_INSET ? "left" : s.insetRight >= STRIP_INSET ? "right" : undefined;
-  if (preview && landscape && closed && band && browser === "safari" && !s.standalone && !s.framed)
-    return { ...base, mode: "strip", layout: layoutOf(s.innerWidth - INLINE_WIDTH), side: band, screenWidth: s.innerWidth, screenHeight: s.innerHeight, preview };
+  const open = preview ? unfoldedPreview(s) : undefined;
+  if (preview && landscape && (closed || open === "wide") && band && browser === "safari" && !s.standalone && !s.framed)
+    return { ...base, mode: "strip", layout: layoutOf(s.innerWidth - INLINE_WIDTH), side: band, screenWidth: s.innerWidth, screenHeight: s.innerHeight, preview, ...(open && { clearTop: UNFOLDED_PREVIEW.clear.wide }) };
   // A preview inline: away from its own column (on the side the Duo is turned to, else the right).
   // On the open screen the sheet has no column of its own: inline right, like a full-width tab, and never hidden.
   const onClosed = Math.min(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][0] + 1 && Math.max(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][1] + 1;
   const away: Side = preview && onClosed ? (landscape && turned === "left" ? "right" : "left") : "right";
-  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && onClosed && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(split && { split }) };
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && onClosed && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(open === "tall" && { clearTop: UNFOLDED_PREVIEW.clear.tall }), ...(split && { split }) };
 }
 
 /** Every window a Safari page on the Duo lands in, as measured (docs/research-notes.md): `page` is how much
@@ -582,7 +609,7 @@ export function morphBox(c: Context, p: Plan, b: Box, n: number) {
     return { top: Math.min(Math.max(down ? y0 : y0 + DUO.control - height, lo), hi - height), height };
   };
   const flush = c.side === "left" ? p.left : p.left + DUO.control - w;
-  const viewport = [c.insetTop + MORPH.pad, c.height - MORPH.pad] as const;
+  const viewport = [Math.max(c.insetTop + MORPH.pad, c.clearTop ?? 0), c.height - MORPH.pad] as const;
   if (p.columnTop !== undefined && p.columnBottom !== undefined && full > p.columnBottom - p.columnTop) {
     // Beside the column: its page-side edge a pad in from the column's inner edge.
     const column = c.screenWidth - c.width, left = c.side === "left" ? column + MORPH.pad : c.width - MORPH.pad - w;
@@ -613,7 +640,7 @@ export function plan(c: Context, s: Spec): Plan {
   const col = columnBand(c);
   // The turned preview's strip is a page band below its native top bar, with the home indicator's inset below.
   const strip = c.mode === "strip" && !c.preview;
-  const top = col ? col.top : strip ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap;
+  const top = Math.max(col ? col.top : strip ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap, c.clearTop ?? -Infinity);
   const bottom = col ? col.bottom : strip ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
   const centerX = c.side === "left" ? DUO.centerFromEdge : (c.mode === "column" ? c.screenWidth : c.width) - DUO.centerFromEdge;
   const step = DUO.control + DUO.gap;
