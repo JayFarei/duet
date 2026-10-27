@@ -544,6 +544,8 @@ class Run:
         # 7. overflow / clipping / content under controls, on the final sample
         sx, W0 = last["scroll"]["x"], last["scroll"]["clientWidth"]
         lo, hi = min(0, -sx), max(W0, W0 - sx)
+        # span.duet-guard straddles the column edge 8pt past the window by design (duet.css, #79): transparent, no
+        # taps, adds no scroll width, so it is not an overflowing block.
         overs = []
         for o in last.get("overflow", []):
             ov = round(max(o["rect"]["x"] + o["rect"]["w"] - hi, lo - o["rect"]["x"]))
@@ -551,7 +553,7 @@ class Run:
                 overs.append({**o, "over": ov})
         for o in [o for o in overs if o["text"]][:4]:
             bad.append(f'clipped text {o["el"][:60]} by {o["over"]}pt')
-        for o in [o for o in overs if not o["text"] and not o["el"].startswith(("div.duet-scroller", "main", "section.stage"))][:3]:
+        for o in [o for o in overs if not o["text"] and not o["el"].startswith(("div.duet-scroller", "main", "section.stage", "span.duet-guard"))][:3]:
             bad.append(f'overflowing block {o["el"][:60]} by {o["over"]}pt')
         if last["scroll"]["scrollWidth"] > W0:
             note.append(f"scrollWidth {last['scroll']['scrollWidth']} > {W0} (column bleed, documented)")
