@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0-rc.1
 
 - Turning or folding no longer flashes the controls at the wrong edge: while the window is caught halfway they hide (`hidden: "moving"`, `confidence: "moving"`) and reappear where the landed window wants them once it has held for 150ms (`LAND_HOLD`). The full screen in-app preview turned sideways (no page column, 75pt chrome, inset 34) is now recognised as the preview.
 - In-app Safari preview: the controls now sit in the free gap of the preview's own column, between its reader and back buttons ("…" and the selected tab), so the page keeps its full width. Turned sideways, where that gap is too small, they hide (`useDuet().hidden` is `"preview"`) and the page keeps its full width. The preview sheet is now recognised turned too.
@@ -8,6 +8,8 @@
 - Your icons are now sized by context (22px in buttons and menus, 24px in tabs) and stroked at weight 2, like SF Symbols in a native bar. Set `icons` or the vars to change it. The chrome's own glyphs keep their sizes.
 - `badgeTone: "neutral"` on an item: a grey badge for plain counts like a balance.
 - Column mode: menus follow the page's appearance; the buttons keep following the system, like Safari's own.
+- While hidden mid-turn or mid-unfold, the page keeps its last insets, so `--duet-inset-*` no longer jump (they reached 296px on a turn and -485px on an unfold).
+- The preview is also recognised as a page sheet inside the closed screen (450x670 on a real Duo, 662x458 turned). The default and full styles turned sideways use the 84px strip inset; unfolded, the preview goes inline.
 
 ## 0.3.0
 
