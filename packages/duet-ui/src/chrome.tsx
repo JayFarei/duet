@@ -177,8 +177,9 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
  *  layer rides it on a CSS scroll timeline (duet.css, duet-follow): Safari runs that with the scroll itself, so
  *  it holds through momentum and smooth programmatic scrolls, where a transform set from scroll events lags and
  *  drifts (#55; simulator, 2026-10-26: up to 300pt during scrollIntoView, under 2pt on the timeline).
- *  The keyframe ends at the timeline's scroll range (--duet-scroll-max); a fixed 100000px range drifted ~12pt in
- *  momentum. Browsers without scroll timelines get the transform. Touches there reach the page
+ *  The keyframe ends at the timeline's scroll range (--duet-scroll-max). A constant px range (animation-range
+ *  0px 1000000px) computes exactly but Safari's compositor paints it up to 18pt off in momentum (2026-10-27).
+ *  Browsers without scroll timelines get the transform. Touches there reach the page
  *  but are not hit-tested to our elements, and Safari keeps the touch end (no pointerup, no click), so we route
  *  them by coordinates on pointerdown. Nothing in the column scrolls, so a touch there is always a tap.
  *  Split pane: the column is on the pane's outer edge, which the page cannot see, so the document spans a column
@@ -223,11 +224,13 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     if (!timeline) for (const el of els) delete el.dataset.follow;
     // The keyframe ends at the timeline's own scroll range, which in Safari is scrollHeight - innerHeight: when the
     // URL bar collapses innerHeight grows 18px but clientHeight does not, and scrollHeight - clientHeight drifted
-    // 6pt 1000pt down (simulator, 2026-10-26). Content can outgrow the body (absolute, overflowing), so every
-    // scroll re-measures as well as resizes.
+    // 6pt 1000pt down (simulator, 2026-10-26). The innerHeight half is left to CSS as 100dvh, which follows it
+    // frame by frame: at the page end Safari's toolbar grows back seconds after the last scroll, with no scroll or
+    // window resize until it settles, and a measured range held the controls 17pt up meanwhile (2026-10-27).
+    // Content can outgrow the body (absolute, overflowing), so every scroll re-measures as well as resizes.
     let max = "";
     const range = () => {
-      const m = `${Math.max(0, root.scrollHeight - innerHeight)}px`;
+      const m = `max(0px, ${root.scrollHeight}px - 100dvh)`;
       if (m !== max) { max = m; for (const el of els) el.style.setProperty("--duet-scroll-max", m); }
     };
     const sizes = timeline ? new ResizeObserver(range) : undefined;

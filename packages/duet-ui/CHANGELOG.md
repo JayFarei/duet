@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Column mode without children: the controls no longer sit up to 18pt too high after a flick to the end of the page while Safari's toolbar grows back. The scroll timeline's range is now `scrollHeight - 100dvh`, which CSS keeps live through the toolbar change, instead of a value measured in JavaScript that went stale with no event to refresh it (#100).
+
 ## 0.4.1
 
 - New `duet-ui/boot` export: `bootScript`, an inline script for the top of `<body>` that marks Safari's column on the closed Duo before the first paint (`data-duet-mode="column"`, `--duet-column`, `--duet-vh`, `--duet-inset-bottom` on `<html>`), so column styling no longer flashes the plain layout on load. Nothing is set on any other browser or device, and `useDuet()` takes it back if the mounted reading is not column. New `--duet-column` variable: the column's width, 0px outside column mode (#94).
