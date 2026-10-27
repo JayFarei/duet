@@ -458,6 +458,9 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
   flex: none; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font: 600 15px/20px -apple-system, system-ui, sans-serif; animation: duet-tab-in 0.3s ease-out backwards;
 }
+/* Closed, the pill is the round button: the label stays laid out (so opening knows its width) but fades out. */
+.duet-glass.duet-cta:not([data-expanded]) .duet-cta-label { opacity: 0; }
+.duet-cta-label { transition: opacity 0.2s; }
 .duet-glass.duet-cta:has(:active) { scale: 1.08; }
 .duet-glass.duet-cta:has(:active)::before { background-color: var(--duet-tint); filter: brightness(1.15); }
 /* In the rail the call to action keeps its slot by the thumb as a tinted bubble under "…". */

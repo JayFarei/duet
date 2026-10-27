@@ -53,7 +53,7 @@ function Book() {
   const isBooked = !!c && booked.has(c.id);
   // The call to action is plain props: label, icon and tint change with the page's state.
   const primary: DuetPrimary | undefined = c && (isBooked
-    ? { id: "booked", label: "Booked", icon: <Check size={22} />, tint: "#34c759", prominent: true, onPress: () => setBooked(toggle(booked, c.id)) }
+    ? { id: "booked", label: "Booked", icon: <Check size={22} />, tint: "#34c759", prominent: true, expanded: true, onPress: () => setBooked(toggle(booked, c.id)) }
     : { id: "book", label: `Book · ${c.credits} credit${c.credits > 1 ? "s" : ""}`, icon: <CalendarCheck size={22} />, prominent: true, onPress: () => setBooked(toggle(booked, c.id)) });
 
   const page = c ? (

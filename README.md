@@ -233,7 +233,7 @@ import { bootScript } from "duet-ui/boot";
 | `icons` | `{ size?, tabSize?, weight?, color? }` | How your icons are drawn. See [Theming](#theming) |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
-`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey, for plain counts like a balance. `tint` overrides the strip's tint for that tab or primary button. `folded: true` puts a `leading` or action item in "…" even where there is room for it. `DuetTab<T>` is a `DuetItem` whose `id` is `T`. `DuetPrimary` is a `DuetItem` plus `prominent?`.
+`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey, for plain counts like a balance. `tint` overrides the strip's tint for that tab or primary button. `folded: true` puts a `leading` or action item in "…" even where there is room for it. `DuetTab<T>` is a `DuetItem` whose `id` is `T`. `DuetPrimary` is a `DuetItem` plus `prominent?` and `expanded?`.
 
 ### Theming
 
@@ -286,13 +286,13 @@ A page with one thing to do (book, buy, join) passes it as a prominent primary, 
     { id: "fav", label: "Favourite", icon: <Heart />, onPress: fav, folded: true },
   ]}
   primary={booked
-    ? { id: "cta", label: "Booked", icon: <Check />, tint: "#34c759", prominent: true, onPress: cancel }
+    ? { id: "cta", label: "Booked", icon: <Check />, tint: "#34c759", prominent: true, expanded: true, onPress: cancel }
     : { id: "cta", label: `Book · ${credits} credits`, icon: <CalendarCheck />, prominent: true, onPress: book }}
   tabs={tabs}
 />
 ```
 
-- Where there is room, it is a tinted pill with icon and label by the thumb, growing toward the page. In a tight band (a closed Safari tab) it is the round button, and it keeps its slot: the tabs fold into "…" instead.
+- It starts closed: a tinted round button by the thumb, its label read only by assistive tech. `expanded: true` opens it into a pill with icon and label, growing toward the page, and turning it off closes it on the same spring. Open it when the label carries news (Booked, Booking) or the page is the action. In a tight band (a closed Safari tab) it is always the round button, and it keeps its slot: the tabs fold into "…" instead.
 - Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop. The pill's width springs to the new label, the new label fades in and the tint crossfades.
 - Labels longer than 160px are cut with an ellipsis; keep them to a few words.
 
@@ -545,6 +545,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** in a closed tab Safari's own buttons leave the band room for two controls, and "…" always takes one.
 - **Duet does:** with `primary.prominent`, gives the thumb slot to the call to action and folds the tabs (or search) into "…" as a radio group at the top of the menu. With forward history and Live Activities, "…" and the call to action share the two-item rail, the call to action as a tinted bubble.
 - **You do:** mark only the page's one main action `prominent`, and keep tabs reachable another way on that page if they matter (back, or the "…" menu).
+- **Status:** [#101](https://github.com/JayFarei/duet/issues/101). See [Call to action](#call-to-action).
+
+### Call to action opens over the page
+
+- **You see:** a call to action that loads as a wide labelled pill reads as an open card over the content, before the user has done anything.
+- **Cause:** the pill grows toward the page to fit its label, so on load it covers part of the page.
+- **Duet does:** starts a prominent primary closed, as the tinted round button, and opens it into the pill only with `expanded: true`, on the same spring as label changes.
+- **You do:** leave it closed by default; set `expanded` for a state worth reading (Booking, Booked), or from the start on a page whose whole point is the action.
 - **Status:** [#101](https://github.com/JayFarei/duet/issues/101). See [Call to action](#call-to-action).
 
 ## Limitations

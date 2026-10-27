@@ -2,7 +2,7 @@
 
 ## 0.5.0 (Unreleased)
 
-- Call to action: `primary` takes `prominent: true` (new `DuetPrimary` type) to make it the page's call to action. Where there is room it is a tinted pill with icon and label by the thumb; in a closed Safari tab it keeps the thumb slot and the tabs (or search) fold into "…" as a radio group instead. Its label, icon and tint can change at runtime: the pill's width springs to the new label and the tint crossfades (#101).
+- Call to action: `primary` takes `prominent: true` (new `DuetPrimary` type) to make it the page's call to action. Where there is room it is a tinted pill with icon and label by the thumb; in a closed Safari tab it keeps the thumb slot and the tabs (or search) fold into "…" as a radio group instead. Its label, icon and tint can change at runtime: the pill's width springs to the new label and the tint crossfades (#101). It starts closed, as the round tinted button; `expanded: true` opens it into the labelled pill on the same spring.
 - `folded: true` on a `leading` or action item keeps it in "…" even where the strip has room, so a page can fold its secondary actions and change that at runtime (#101).
 - Page transitions: controls that appear scale up out of a blur, controls that go away shrink into one (kept 450ms so they can), and the rest slide to their new places on the same spring. Reduced motion crossfades instead (#101).
 - Site: a call to action example at `/book`, a class list and a class page with "Book · 2 credits" (#101).

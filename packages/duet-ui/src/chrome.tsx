@@ -26,10 +26,14 @@ export interface DuetItem {
 }
 /** The primary action. */
 export interface DuetPrimary extends DuetItem {
-  /** The page's call to action (Book · 2 credits): a tinted pill with the label beside the icon, growing towards the
-   *  page. Where the band has no room for it and the tabs (or search button) both, it keeps the slot by the thumb and
-   *  they lead "…". Change label, icon or tint as the page changes and the pill reshapes on a spring. No badge. */
+  /** The page's call to action (Book · 2 credits): a tinted button by the thumb. Where the band has no room for it
+   *  and the tabs (or search button) both, it keeps the slot by the thumb and they lead "…". Change label, icon or
+   *  tint as the page changes and it reshapes on a spring. No badge. */
   prominent?: boolean;
+  /** A prominent primary starts closed, a round tinted button with the label only for assistive tech. Set expanded
+   *  to open it into a pill with the label beside the icon, growing towards the page (e.g. while it books, or for
+   *  a page whose whole point is the action); it opens and closes on the same spring. */
+  expanded?: boolean;
 }
 /** A tab: an item whose id is one of the app's tab ids. */
 export type DuetTab<T extends string = string> = DuetItem & { id: T };
@@ -615,6 +619,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const pl = planFor(side), left = side === "left", anchor = anchors(pl);
     // The rail's low slot holds the tabs, the search button or, where it took their place, the call to action.
     const railCta = !!pl.rail && !pl.tabs && !pl.searchButton && !!pl.primary;
+    const ctaOpen = p.primary?.expanded ? ctaWidth : DUO.control;
     const at = (b: Box) => ({ top: b.top, left: pl.left, width: DUO.control, height: b.height });
     // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
     // as tall as the button, outer edge on the button's, widening towards the page centre only.
@@ -657,8 +662,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
           !p.close && p.back && pl.back && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="back" style={at(pl.back)}>{backButton}</GlassSurface>,
           !p.close && p.primary && pl.primary && !railCta && (p.primary.prominent ? (
             // The pill keeps its icon where the round button would be and grows towards the page.
-            <GlassSurface preset="control" className="duet-glass duet-round duet-primary duet-cta" data-duet-slot="primary"
-              style={{ ...at(pl.primary), width: ctaWidth, left: left ? pl.left : pl.left + DUO.control - ctaWidth, ...tint(p.primary) }}>
+            <GlassSurface preset="control" className="duet-glass duet-round duet-primary duet-cta" data-duet-slot="primary" data-expanded={p.primary.expanded || undefined}
+              style={{ ...at(pl.primary), width: ctaOpen, left: left ? pl.left : pl.left + DUO.control - ctaOpen, ...tint(p.primary) }}>
               <button className="duet-item" aria-label={p.primary.label} onClick={p.primary.onPress}>
                 <span className="duet-cta-row" ref={ctaRow}>{p.primary.icon}<span key={p.primary.label} className="duet-cta-label">{p.primary.label}</span></span>
               </button>
