@@ -36,7 +36,7 @@ for (const [name, s] of [["strip", STRIP], ["column", COLUMN], ["inline", INLINE
     assertNoOverlap(p);
     const folded = p.menu.leading + p.menu.actions + (p.menu.back ? 1 : 0);
     assert.equal((p.actions?.visible ?? 0) + (p.leading?.visible ?? 0) + (p.back ? 1 : 0) + folded, 8);
-    if (folded) assert.ok(p.more, "overflow needs a … button");
+    if (folded) assert.ok(p.more || p.tabs?.merged, "overflow needs a … button, or the merged tab's menu");
   });
 }
 
@@ -65,11 +65,10 @@ test("primary: by the thumb above the tabs where one pane shows, under back wher
   const p = plan(detect(STRIP), spec({ back: true, actions: 3, tabs: 4, primary: true }));
   assertNoOverlap(p);
   assert.ok(p.primary.top + p.primary.height <= p.tabs.top && p.tabs.top - p.primary.top - p.primary.height <= DUO.gap + 0.01, "sits right above the tabs");
-  // A closed Safari tab's band holds two buttons: with back and actions folded, "…" takes the slot and the
-  // primary action leads its menu; on its own it keeps the slot.
+  // A closed Safari tab's band holds one button at worst: "…" and the selected tab share a rail, "…" led by the primary.
   const closed = plan(detect(COLUMN), spec({ back: true, actions: 3, tabs: 4, primary: true }));
-  assert.ok(closed.more && !closed.primary && closed.menu.primary);
-  const alone = plan(detect(COLUMN), spec({ tabs: 4, primary: true }));
+  assert.ok(closed.rail && closed.more && !closed.tabs.merged && !closed.primary && closed.menu.primary);
+  const alone = plan(detect(COLUMN), spec({ primary: true }));
   assert.ok(alone.primary && !alone.more);
   const wide = plan(detect(INLINE), spec({ back: true, actions: 2, tabs: 4, primary: true }));
   assertNoOverlap(wide);
@@ -99,10 +98,11 @@ test("split pane: column mode, both columns planned in the band beside Safari's 
   const l = plan({ ...c, side: "left" }, full), r = plan({ ...c, side: "right" }, full);
   assert.equal(l.centerX, DUO.centerFromEdge);
   assert.equal(r.centerX, 469 - DUO.centerFromEdge);
-  // Simulator: Safari's bookmarks button ends at 132.5 in the left pane, its +/tabs pill starts at 533. The right
-  // pane sits under the status column, so two Live Activities push its bookmarks down to 374, as in a closed tab;
-  // the right band holds only "…" and the minimized tabs, back and actions fold.
-  assert.ok(l.back.top >= 132.5 + DUO.gap - 0.5 && r.more.top >= 374 + DUO.gap - 0.5);
-  assert.ok(!r.back && r.menu.back && r.menu.actions === 3 && r.tabs.min);
+  // Simulator: Safari's bookmarks button ends at 132.5 in the left pane (184.2 under a back + forward pill), its
+  // +/tabs pill starts at 533. The right pane sits under the status column, so two Live Activities and forward
+  // history push its bookmarks down to 425.7, as in a closed tab; the right band holds only the selected tab,
+  // whose menu takes back and the actions.
+  assert.ok(l.back.top >= 184.2 + DUO.gap - 0.5 && r.tabs.top >= 425.7 + DUO.gap - 0.5);
+  assert.ok(!r.back && !r.more && r.menu.back && r.menu.actions === 3 && r.tabs.min && r.tabs.merged);
   for (const p of [l, r]) { assert.ok(p.tabs.top + p.tabs.height <= 533 - DUO.gap + 0.5); assertNoOverlap(p); }
 });

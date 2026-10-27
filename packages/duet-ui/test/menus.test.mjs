@@ -3,7 +3,7 @@
 // free middle of the column before folding into "…" (RegTail #4).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { columnBand, detect, plan, islandBox, morphBox, DUO, MORPH } from "../src/geometry.ts";
+import { columnBand, detect, plan, islandBox, morphBox, DUO, MORPH, RAIL, SAFARI } from "../src/geometry.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -19,10 +19,13 @@ const COLUMNS = {
 // RegTail's page: back, a credits button (leading), three actions, four tabs minimized on scroll.
 const REGTAIL = { back: true, leading: 1, actions: 3, tabs: 4, searchButton: false, accessory: false, minimized: true, primary: false };
 
-test("columnTop is the reader row's bottom plus a gap, in every column state", () => {
-  const c = COLUMNS["closed tab"], p = plan(c, REGTAIL);
-  assert.equal(p.columnTop, DUO.top + DUO.island + 2 * DUO.control + 2 * DUO.gap);
-  for (const [name, c] of Object.entries(COLUMNS)) assert.equal(plan(c, REGTAIL).columnTop, columnBand(c).top, name);
+test("columnTop is the reader row's bottom plus a gap, or the rail's top where one is used, in every column state", () => {
+  const c = COLUMNS["closed tab"], p = plan(c, { ...REGTAIL, minimized: false, tabs: 0 });
+  assert.equal(p.columnTop, DUO.top + DUO.island + 2 * DUO.control + 2 * DUO.gap + SAFARI.forward);
+  for (const [name, c] of Object.entries(COLUMNS)) {
+    const p = plan(c, REGTAIL);
+    assert.equal(p.columnTop, p.rail ? p.rail.top : columnBand(c).top, name);
+  }
   assert.equal(plan(detect(sig(951, 543, 951, 669)), REGTAIL).columnTop, undefined);
 });
 
@@ -46,33 +49,45 @@ for (const [name, c] of Object.entries(COLUMNS)) {
   });
 }
 
-test("closed tab: a short tab menu opens upward flush with the column, top under the reader row (native)", () => {
-  const c = COLUMNS["closed tab"], p = plan(c, REGTAIL), m = morphBox(c, p, p.tabs, 3);
+test("closed tab: a one-row menu opens upward flush with the column, top under the reader row (native)", () => {
+  const c = COLUMNS["closed tab"], p = plan(c, REGTAIL), m = morphBox(c, p, p.tabs, 1);
   assert.equal(m.left + m.width, p.left + DUO.control); // outer edge on the button's
-  assert.ok(Math.abs(m.top + m.height - (p.tabs.top + DUO.control)) < 0.01); // grows up from the button's bottom
+  const y0 = p.tabs.top + p.tabs.height / 2 - DUO.control / 2;
+  assert.ok(Math.abs(m.top + m.height - (y0 + DUO.control)) < 0.01); // grows up from the button's bottom
   assert.ok(m.top >= p.columnTop);
 });
 
 test("closed tab: a list too tall for the column band opens beside the column, over the page, and may rise", () => {
-  const c = COLUMNS["closed tab"], p = plan(c, REGTAIL), m = morphBox(c, p, p.more, 5);
+  const c = COLUMNS["closed tab"], p = plan(c, REGTAIL), m = morphBox(c, p, p.tabs, 5);
   assert.ok(m.left + m.width <= c.width);
   assert.ok(m.top < p.columnTop);
   assert.equal(m.scroll, false);
-  const long = morphBox(c, p, p.more, 20);
+  const long = morphBox(c, p, p.tabs, 20);
   assert.equal(long.scroll, true);
   assert.equal(long.height, c.height - 2 * MORPH.pad);
 });
 
-test("closed tab: RegTail's credits button uses the free middle instead of folding into …", () => {
+test(`closed tab, worst case (#97): one slot, so "…" and RegTail's selected tab share a rail between Safari's buttons`, () => {
+  // Two Live Activities push Safari's back to 265 and forward history grows it into a 102.7pt pill: the reader
+  // ends at 427.7, the +/tabs pill starts at 541.6, so the band holds one button. A two-item rail (100.7) fits
+  // between the reader and the pill, RAIL.gap clear of each.
   const c = COLUMNS["closed tab"], p = plan(c, REGTAIL), band = columnBand(c);
-  assert.equal(p.leading?.visible, 1);
-  assert.equal(p.menu.leading, 0);
-  assert.equal(p.menu.back, true); // back still folds: it never rises over Safari's own
-  assert.ok(p.leading.top >= band.top - band.reach);
-  assert.ok(p.more.top >= band.top, "… stays under the reader row");
-  // Packed down onto the tabs: leading, …, tabs one step apart.
-  assert.ok(Math.abs(p.more.top - (p.leading.top + DUO.control + DUO.gap)) < 0.01);
-  assert.ok(Math.abs(p.tabs.top - (p.more.top + DUO.control + DUO.gap)) < 0.01);
+  assert.ok(Math.abs(band.bottom - band.top - 91.9) < 0.1);
+  assert.ok(p.rail && p.more && p.tabs.min && !p.tabs.merged);
+  assert.equal(p.more.top, p.rail.top);
+  assert.ok(Math.abs(p.tabs.top + p.tabs.height - (p.rail.top + p.rail.height)) < 0.01);
+  assert.ok(p.rail.top >= band.top - DUO.gap + RAIL.gap - 0.01 && p.rail.top + p.rail.height <= band.bottom + DUO.gap - RAIL.gap + 0.01);
+  assert.ok(!p.back && !p.leading && !p.actions && !p.primary);
+  assert.deepEqual(p.menu, { primary: false, back: true, leading: 1, actions: 3 });
+  // Without tabs, the rail holds "…" and search.
+  const search = plan(c, { ...REGTAIL, tabs: 0, searchButton: true });
+  assert.ok(search.rail && search.more && search.searchButton && !search.menu.search);
+  // Where even the rail has no room (closed landscape), the selected tab alone holds the merged menu.
+  const land = plan(COLUMNS["landscape left"], REGTAIL);
+  if (!land.more) assert.ok(land.tabs.merged && !land.rail);
+  // With room for "…" beside the tab (the left split pane), nothing merges.
+  const left = plan(COLUMNS["split left"], REGTAIL);
+  assert.ok(left.more && !left.tabs.merged);
 });
 
 test("no reach where the island cannot push Safari's rows: landscape and the left split pane fold as before", () => {

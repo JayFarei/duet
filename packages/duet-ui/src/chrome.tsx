@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, isSplit, pageInsets, islandBox, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { DUO, columnBand, isSplit, pageInsets, islandBox, islandFits, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import { GlassSurface } from "./glassyui/glass-surface.tsx";
@@ -531,20 +531,22 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   useEffect(() => { if (closingGone) setClosing(null); }, [closingGone]);
 
   // Island: icons only; the "…" island ends in a close slot where the "…" was, so the button reads as unrolled.
-  // Morph: icon and label rows; a touch outside closes it, so it needs no close row.
-  const morph = p.menuStyle === "morph";
-  const menuEl = (kind: "more" | "tabs", anchor: Box | undefined | false, items: DuetItem[], radio: boolean, menuAt: (b: Box, n: number) => CSSProperties, morphAt: (b: Box, n: number) => CSSProperties) => {
+  // Morph: icon and label rows; a touch outside closes it, so it needs no close row. An island too wide for the
+  // screen morphs (menuAt gives null).
+  // radio: how many leading items are tabs (a radio group); a merged tab menu lists what folded after them.
+  const menuEl = (kind: "more" | "tabs", anchor: Box | undefined | false, items: DuetItem[], radio: number, menuAt: (b: Box, n: number) => CSSProperties | null, morphAt: (b: Box, n: number) => CSSProperties) => {
     if ((menu !== kind && closing !== kind) || !anchor) return null;
-    const close = kind === "more" && !morph, rolling = menu !== kind;
+    const island = p.menuStyle !== "morph" && menuAt(anchor, items.length + (kind === "more" ? 1 : 0));
+    const morph = !island, close = kind === "more" && !morph, rolling = menu !== kind;
     return (
       <GlassSurface preset="control" className="duet-glass duet-menu" role="menu" data-style={morph ? "morph" : undefined}
-        style={morph ? morphAt(anchor, items.length) : menuAt(anchor, items.length + (close ? 1 : 0))}
+        style={island || morphAt(anchor, items.length)}
         data-closing={rolling || undefined} onAnimationEnd={(e) => { if (rolling && (e.animationName === "duet-roll" || e.animationName === "duet-unmorph")) setClosing(null); }}>
         {items.map((a, i) => (
-          <button key={a.id} role={radio ? "menuitemradio" : "menuitem"} aria-checked={radio ? a.id === selected : undefined} aria-label={a.label}
-            className="duet-menu-item" data-on={(radio && a.id === selected) || undefined} data-destructive={a.destructive || undefined}
-            data-sep={(a.destructive && i > 0 && !items[i - 1].destructive) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.06 + 0.025 * i : 0.05 + 0.035 * (items.length - i)}s` }) }}
-            onClick={() => { setMenu(null); if (radio) select(a.id); else a.onPress?.(); }}>{a.icon}{morph && <span className="duet-menu-label">{a.label}</span>}{badge(a)}</button>
+          <button key={a.id} role={i < radio ? "menuitemradio" : "menuitem"} aria-checked={i < radio ? a.id === selected : undefined} aria-label={a.label}
+            className="duet-menu-item" data-on={(i < radio && a.id === selected) || undefined} data-destructive={a.destructive || undefined}
+            data-sep={(i > 0 && (i === radio || (a.destructive && !items[i - 1].destructive))) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.06 + 0.025 * i : 0.05 + 0.035 * (items.length - i)}s` }) }}
+            onClick={() => { setMenu(null); if (i < radio) select(a.id); else a.onPress?.(); }}>{a.icon}{morph && <span className="duet-menu-label">{a.label}</span>}{badge(a)}</button>
         ))}
         {close && <button className="duet-menu-item" aria-label="Close" onClick={() => setMenu(null)}><X size={20} /></button>}
       </GlassSurface>
@@ -557,6 +559,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
     // as tall as the button, outer edge on the button's, widening towards the page centre only.
     const menuAt = (b: Box, n: number) => {
+      if (!islandFits(side === ctx.side ? ctx : { ...ctx, side }, pl, n, side)) return null;
       const { x0, ...box } = islandBox(pl, b, n, side);
       return { ...box, "--x0": `${x0}px` } as CSSProperties;
     };
@@ -568,6 +571,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const shownLeading = leading.slice(0, leading.length - pl.menu.leading);
     const shownActions = actions.slice(0, actions.length - pl.menu.actions);
     const more: DuetItem[] = [
+      ...(pl.menu.search && p.searchButton ? [{ id: "duet-search", label: "Search", icon: <Search size={20} />, onPress: p.searchButton }] : []),
       ...(pl.menu.primary && p.primary ? [p.primary] : []),
       ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
       ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length),
@@ -592,8 +596,15 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
         )}
         {pl.leading && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="leading" style={at(pl.leading)}>{shownLeading.map(item)}</GlassSurface>}
         {pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>}
-        {!p.close && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
-        {p.tabs && pl.tabs && (
+        {pl.rail && (
+          // One group for "…" and the bottom item; each still unrolls its own menu from its slot.
+          <GlassSurface preset="control" className="duet-glass duet-group duet-rail" data-duet-slot="rail" style={at(pl.rail)}>
+            {!p.close && more.length > 0 && moreButton}
+            {p.tabs && pl.tabs ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : pl.searchButton && searchButton}
+          </GlassSurface>
+        )}
+        {!p.close && !pl.rail && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
+        {p.tabs && pl.tabs && !pl.rail && (
           <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
             data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
             {!pl.tabs.min && (
@@ -608,9 +619,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
             {pl.tabs.min ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : tabItems.map((t, i) => tabButton(t, false, i))}
           </GlassSurface>
         )}
-        {pl.searchButton && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="search" style={at(pl.searchButton)}>{searchButton}</GlassSurface>}
-        {(!split || side === menuSide) && menuEl("more", anchor.more, more, false, menuAt, morphAt)}
-        {p.tabs && (!split || side === menuSide) && menuEl("tabs", anchor.tabs, tabItems, true, menuAt, morphAt)}
+        {pl.searchButton && !pl.rail && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="search" style={at(pl.searchButton)}>{searchButton}</GlassSurface>}
+        {(!split || side === menuSide) && menuEl("more", anchor.more, more, 0, menuAt, morphAt)}
+        {p.tabs && (!split || side === menuSide) && menuEl("tabs", anchor.tabs, pl.tabs?.merged ? [...tabItems, ...more] : tabItems, tabItems.length, menuAt, morphAt)}
         {/* The tab island unrolls across the accessory's row; the accessory steps aside while it is open. */}
         {p.accessory && pl.accessory && !i && (
           <GlassSurface preset="control" className="duet-glass duet-accessory" data-duet-slot="accessory" style={pl.accessory}

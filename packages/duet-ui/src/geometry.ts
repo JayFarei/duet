@@ -38,8 +38,11 @@ export const DUO = {
 } as const;
 
 /** Safari's own column in a tab: back + reader rows at the top, a 2-item +/tabs pill at the bottom.
- *  In a closed tab DUO.island pushes the back + reader rows down; the pill never moves. */
-export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem,
+ *  In a closed tab DUO.island pushes the back + reader rows down; the pill never moves. `forward`: with forward
+ *  history the back button grows into a back + forward pill (100.7pt, Duo Lab and device, 2026-10-27), pushing
+ *  the reader row down by one group item, and the reader sits 13pt under it, not 11; nothing tells the page, so
+ *  the band always assumes it. */
+export const SAFARI = { rows: 2, forward: DUO.groupItem + 2, pill: DUO.pillPad + 2 * DUO.pillItem,
   /** Split-view pane: the back slot's top. The left pane has no status bar above it. The right pane sits
    *  under the same status column as a closed tab and grows the same way (bare: 124, recording: 178, a
    *  2-slot music activity: ~224), so it takes the closed tab's worst case. The pill sits DUO.bottom above
@@ -55,6 +58,9 @@ export const SAFARI = { rows: 2, pill: DUO.pillPad + 2 * DUO.pillItem,
 /** Menu island slots: a button unrolls into a pill of these (Safari's own pill items are 50; 46.5 keeps
  *  every slot above the 44pt touch target). */
 export const ISLAND = { pad: 3, item: 46.5 } as const;
+/** Rail: where the band holds one button, "…" and the bottom item share a two-item group (as tall as Safari's
+ *  back + forward pill), centred between Safari's buttons, at least `gap` clear of each. */
+export const RAIL = { gap: 5 } as const;
 /** Morph menu: a labelled list the size of an iOS context menu (rows above the 44pt touch target). */
 export const MORPH = { width: 240, row: 44, pad: 6 } as const;
 
@@ -527,10 +533,14 @@ export interface Plan {
   more?: Box;
   primary?: Box;
   /** What did not fit, in order, behind the "…" slot: primary first, then back, leading, actions (indexes). */
-  menu: { primary: boolean; back: boolean; leading: number; actions: number };
-  /** min: only the selected tab shows (minimized, or the full pill does not fit). */
-  tabs?: Box & { min: boolean };
+  menu: { primary: boolean; back: boolean; leading: number; actions: number; search?: boolean };
+  /** min: only the selected tab shows (minimized, or the full pill does not fit). merged: the band holds one
+   *  button, so the selected tab is the only one and its menu lists the tabs, then everything in `menu`. */
+  tabs?: Box & { min: boolean; merged?: boolean };
   searchButton?: Box;
+  /** One shared group holding "…" (top) and the minimized tab or search button (bottom), whose boxes are its
+   *  two slots: the band holds one button, but the room between Safari's buttons holds a two-item group (RAIL). */
+  rail?: Box;
   accessory?: { left: number; width: number; top: number; height: number };
   /** Column mode: the band clear of Safari's column buttons (columnBand). Menus crossing the column stay inside
    *  it; only leading items and the primary action may rise above columnTop, into the island's reach. */
@@ -544,12 +554,12 @@ const groupHeight = (n: number) => DUO.control + (n - 1) * DUO.groupItem;
 
 /** Safari's column buttons are an exclusion zone like the insets: native chrome always paints over the page, so
  *  nothing of ours shows over its back + reader rows or its +/tabs pill. `top`: the reader row's bottom plus
- *  DUO.gap, at its worst-case (island-pushed) position. `bottom`: DUO.gap above the pill. `reach`: how far the
- *  island can push the rows, so with a bare island the free band starts that much higher; Live Activities, which
- *  nothing tells the page, take it back. Column mode only; landscape rows are measured with a bare island. */
+ *  DUO.gap, at its worst-case position (island-pushed, under a back + forward pill). `bottom`: DUO.gap above
+ *  the pill. `reach`: how far the island can push the rows, so with a bare island the free band starts that much
+ *  higher; Live Activities, which nothing tells the page, take it back. Column mode only; landscape rows are measured with a bare island. */
 export function columnBand(c: Context): { top: number; bottom: number; reach: number } | undefined {
   if (c.mode !== "column") return undefined;
-  const rows = SAFARI.rows * (DUO.control + DUO.gap), pill = c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap;
+  const rows = SAFARI.rows * (DUO.control + DUO.gap) + SAFARI.forward, pill = c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap;
   // In-app preview: the gap in its column, from screen points to the page's (the page reaches the screen bottom).
   if (c.preview) {
     const y0 = DUO_SIZES[0][1] - c.height;
@@ -589,6 +599,13 @@ export function islandBox(p: Plan, b: Box, n: number, side: Side) {
   return { top, left: side === "left" ? p.left : p.left + DUO.control - w, width: w, height: DUO.control, x0: p.left };
 }
 
+/** An island wider than the room between its button and the far screen edge (a merged tab menu on a busy page)
+ *  would run off screen; that menu morphs instead. */
+export function islandFits(c: Context, p: Plan, n: number, side: Side) {
+  const w = 2 * ISLAND.pad + n * ISLAND.item, width = c.mode === "column" ? c.screenWidth : c.width;
+  return side === "left" ? p.left + w <= width - MORPH.pad : p.left + DUO.control - w >= MORPH.pad;
+}
+
 export function plan(c: Context, s: Spec): Plan {
   // column: screen coordinates (the layer is in-document), in the band Safari's column never uses: below
   // its back + reader rows at their worst-case (island-pushed) position, above its +/tabs pill. strip and
@@ -601,8 +618,10 @@ export function plan(c: Context, s: Spec): Plan {
   const centerX = c.side === "left" ? DUO.centerFromEdge : (c.mode === "column" ? c.screenWidth : c.width) - DUO.centerFromEdge;
   const step = DUO.control + DUO.gap;
 
-  // Safari's column band (146pt) holds two separate round buttons: the selected tab and "…" (or the one
-  // item that fits). Only separate buttons unroll, so nothing is merged into a shared pill to save room.
+  // Safari's column band holds one button at worst (92pt, under a back + forward pill and Live Activities):
+  // where "…" has no room beside the selected tab, the two share a rail, closer to Safari's buttons than the
+  // usual gap (Plan.rail). Where even that has no room (closed landscape), the tab alone stays and its menu takes
+  // everything else (Plan.tabs.merged).
   // Bottom item: the tab pill (minimized to the selected tab when it would crowd out the "…" slot), or
   // the search button.
   const fullPill = DUO.pillPad + DUO.pillItem * s.tabs;
@@ -653,6 +672,18 @@ export function plan(c: Context, s: Spec): Plan {
     if (leading) { const h = groupHeight(leading); p.leading = { top: y, height: h, visible: leading }; y += h + DUO.gap; }
     if (actions) { const h = groupHeight(actions); p.actions = { top: y, height: h, visible: actions }; y += h + DUO.gap; }
     if (menuCount()) p.more = { top: y, height: DUO.control };
+  } else if ((p.tabs || p.searchButton) && (bottom - top + 2 * DUO.gap - groupHeight(2)) / 2 >= RAIL.gap) {
+    const h = groupHeight(2), railTop = (top + bottom - h) / 2, low = { top: railTop + h / 2, height: h / 2 };
+    p.rail = { top: railTop, height: h };
+    if (col) Object.assign(p, { columnTop: railTop, columnBottom: railTop + h }); // menus may use the rail's reach too
+    p.more = { top: railTop, height: h / 2 };
+    if (p.tabs) p.tabs = { ...low, min: true }; else p.searchButton = low;
+  } else if (p.tabs) {
+    // One slot: the selected tab is the only button, and its menu lists the tabs, then what folded.
+    p.tabs = { top: bottom - DUO.control, height: DUO.control, min: true, merged: true };
+  } else if (p.searchButton) {
+    // One slot without tabs: "…" takes the search button's place, search first in its menu.
+    p.more = p.searchButton; delete p.searchButton; p.menu.search = true;
   }
   return { ...p, ...accessory(c, s, centerX, bottom) };
 }
