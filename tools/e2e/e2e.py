@@ -131,9 +131,10 @@ def live_navs(r):
 
 
 def shown_place(r):
-    """(mode, side) when Duet's controls are visible, None when hidden (data-hidden, or no visible slot). Two column
+    """(mode, side) when Duet's controls are visible, None when hidden (data-hidden, or no visible slot and no open
+    menu: a lone tab morphs into its menu, so reaching a folded call to action leaves no slot for ~1.5s). Two column
     copies on opposite edges (split view) are ("column", "both")."""
-    ns = shown_navs(r)
+    ns = live_navs(r)
     if not ns:
         return None
     if len(ns) > 1 and all(n.get("mode") == "column" for n in ns) and len({n.get("side") for n in ns}) > 1:
@@ -1238,6 +1239,26 @@ class Run:
                     return rc
         return None
 
+    def reveal(s, sid, tok, kind, r, rc, refind, tries=3):
+        """(sample, rect) with a page target scrolled clear of Safari's bars, as a user would before tapping it: a
+        target below the fold (kb01: /probe's text field at y 697 in a 580pt viewport) gets slow drags of at most 300pt,
+        then is found again. Unchanged when it is already in view."""
+        for _ in range(tries):
+            g, vh = r["sig"], (r.get("vv") or {}).get("h") or r["sig"]["innerHeight"]
+            if rc["y"] >= 60 and rc["y"] + rc["h"] <= vh - 100:
+                break
+            x0, y0 = s.page_origin(r, kind)
+            d = max(-300, min(300, rc["y"] + rc["h"] / 2 - vh * 0.4))
+            y1 = y0 + g["innerHeight"] * (0.75 if d > 0 else 0.25)
+            s.sim.drag(x0 + g["innerWidth"] * 0.3, y1, x0 + g["innerWidth"] * 0.3, y1 - d, ms=500, steps=12, end_hold_ms=200)
+            time.sleep(1.0)  # momentum and the bars compacting
+            r2 = s.now_sample(sid, tok, time.time() * 1000)
+            rc2 = r2 and refind(r2)
+            if rc2 is None:
+                break
+            r, rc = r2, rc2
+        return r, rc
+
     def page_origin(s, r, kind):
         """Page origin in points of the lit display (sim.py taps in those)."""
         return s.origin_open(r, kind, s.native(kind))[:2] if s.position == "open" else s.origin(r, kind)
@@ -1337,6 +1358,8 @@ class Run:
                 if rc is None and opener(r):  # folded into "…" or the lone tab's menu: open it, as a user would
                     r = s.open_menu(sid, tok, kind, r)
                     rc = r and s.find(r, action[1], back)
+                if rc is not None:
+                    r, rc = s.reveal(sid, tok, kind, r, rc, lambda r2: s.find(r2, action[1], back))
                 if rc is None:
                     s.why = f'no control named "{action[1]}" on the page'
                     return None

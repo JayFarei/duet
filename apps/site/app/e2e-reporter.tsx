@@ -136,6 +136,10 @@ function sample(s: string | null) {
 
 export function E2EReporter() {
   useEffect(() => {
+    // The top page only: a same-origin iframe (/'s WebDuo demo of /skeleton) shares the tab's sessionStorage, so it
+    // would report under the run's token and the driver could follow it instead of the page (nav01-04, "the page is
+    // not reporting").
+    if (window.top !== window) return;
     let origin: string | null = null, s: string | null = null;
     try {
       const q = new URLSearchParams(location.search).get("e2e");
