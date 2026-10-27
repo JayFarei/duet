@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0 (Unreleased)
+
+- Call to action: `primary` takes `prominent: true` (new `DuetPrimary` type) to make it the page's call to action. Where there is room it is a tinted pill with icon and label by the thumb; in a closed Safari tab it keeps the thumb slot and the tabs (or search) fold into "…" as a radio group instead. Its label, icon and tint can change at runtime: the pill's width springs to the new label and the tint crossfades (#101).
+- `folded: true` on a `leading` or action item keeps it in "…" even where the strip has room, so a page can fold its secondary actions and change that at runtime (#101).
+- Page transitions: controls that appear scale up out of a blur, controls that go away shrink into one (kept 450ms so they can), and the rest slide to their new places on the same spring. Reduced motion crossfades instead (#101).
+- Site: a call to action example at `/book`, a class list and a class page with "Book · 2 credits" (#101).
+
 ## 0.4.1
 
 - New `duet-ui/boot` export: `bootScript`, an inline script for the top of `<body>` that marks Safari's column on the closed Duo before the first paint (`data-duet-mode="column"`, `--duet-column`, `--duet-vh`, `--duet-inset-bottom` on `<html>`), so column styling no longer flashes the plain layout on load. Nothing is set on any other browser or device, and `useDuet()` takes it back if the mounted reading is not column. New `--duet-column` variable: the column's width, 0px outside column mode (#94).

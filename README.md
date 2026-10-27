@@ -166,7 +166,7 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 - **Above:** the status bar and Dynamic Island, and in Safari its own back and reader buttons at the top of the column. Live Activities grow the island down the strip and push Safari's buttons with it, and a page can't tell, so the band always assumes the worst case measured on device (two activities). That space stays empty even when none are running. A split-view pane on the right sits under the same status column, so it gets the same band as a closed tab, while the left pane uses the full column.
 - **Below:** Safari's +/tabs pill, or the bottom edge.
 - **Closed landscape:** Safari moves its back and reader rows and its pill on each side (left column: back slot top 81.5pt, pill top 327pt; right column: 23.5pt and 279pt), and Duet takes the gap between. Measured with a bare island; how Live Activities grow it sideways is not yet known.
-- **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item.
+- **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item, unless it is `prominent`: then the tabs (or search) fold instead, as a radio group leading the menu, and the call to action keeps the slot by the thumb. Items marked `folded` always sit in "…", after the ones that did not fit.
 - **The free middle of Safari's column:** before `leading` or `primary` fold, they may rise into the space the island only takes with Live Activities (up to 91.7pt above the band, in a closed portrait tab and the right split pane), and the stack packs down onto the tabs so it rises as little as it can. Back, actions and "…" never do. With no activity running the item sits clear of Safari's reader button; with two activities the reader can cover part of it.
 - **Safari's column buttons are an exclusion zone for menus too.** Native chrome always paints over the page, so z-index can't help. A menu that reaches into the column keeps its top at or below `columnTop` (the reader button's worst-case bottom plus 11pt) and its bottom above Safari's pill, opening flush with the column like Safari's own menus. A morph list too tall for that band opens wholly over the page, beside the column, where it may rise to the top of the page. One too tall even there caps its height and scrolls inside. `plan()` returns `columnTop` and `columnBottom` in `column` mode, and Duet sets `--duet-safe-top-column` on `<html>` for your own popovers (0 outside `column` mode).
 
@@ -221,7 +221,7 @@ import { bootScript } from "duet-ui/boot";
 | `back` | `false \| { label?, onPress }` | Back button at the top of the strip |
 | `leading` | `DuetItem[]` | Its own group under back, like SwiftUI `.topBarLeading` |
 | `actions` | `DuetItem[]` | Like `.primaryAction`; folds into "…" when it would reach the tabs. Items with `destructive: true` only show in "…", last, in red |
-| `primary` | `DuetItem` | The screen's main action (compose, new), a tinted round button. Narrow: just above the tabs. Wide: under back. Folds into "…" last |
+| `primary` | `DuetPrimary` | The screen's main action (compose, new), a tinted round button. Narrow: just above the tabs. Wide: under back. Folds into "…" last. `prominent: true` makes it the page's call to action, see [Call to action](#call-to-action) |
 | `tabs` | `{ items, selected, onSelect, search? }` | Tab pill at the bottom. `search` is a `DuetTab` added as the last tab. Each tab keeps its scroll position |
 | `searchButton` | `() => void` | A round search button at the bottom, when there are no tabs |
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the strip holds only a close button, where back goes, until it is cleared |
@@ -233,7 +233,7 @@ import { bootScript } from "duet-ui/boot";
 | `icons` | `{ size?, tabSize?, weight?, color? }` | How your icons are drawn. See [Theming](#theming) |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
-`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey, for plain counts like a balance. `tint` overrides the strip's tint for that tab or primary button. `DuetTab<T>` is a `DuetItem` whose `id` is `T`.
+`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey, for plain counts like a balance. `tint` overrides the strip's tint for that tab or primary button. `folded: true` puts a `leading` or action item in "…" even where there is room for it. `DuetTab<T>` is a `DuetItem` whose `id` is `T`. `DuetPrimary` is a `DuetItem` plus `prominent?`.
 
 ### Theming
 
@@ -273,6 +273,30 @@ Every prop writes a CSS custom property on `.duet`, so plain CSS can set the sam
 - `"morph"`: the button grows into a labelled list, like a context menu. Best when items need their names.
 
 Both are live on the [site](https://getduet.dev): scroll until the tabs shrink, tap the button, and switch styles in the Menus card.
+
+### Call to action
+
+A page with one thing to do (book, buy, join) passes it as a prominent primary, and folds what else it offers:
+
+```tsx
+<Duet
+  back={{ onPress: () => history.back() }}
+  actions={[
+    { id: "share", label: "Share", icon: <Share />, onPress: share, folded: true },
+    { id: "fav", label: "Favourite", icon: <Heart />, onPress: fav, folded: true },
+  ]}
+  primary={booked
+    ? { id: "cta", label: "Booked", icon: <Check />, tint: "#34c759", prominent: true, onPress: cancel }
+    : { id: "cta", label: `Book · ${credits} credits`, icon: <CalendarCheck />, prominent: true, onPress: book }}
+  tabs={tabs}
+/>
+```
+
+- Where there is room, it is a tinted pill with icon and label by the thumb, growing toward the page. In a tight band (a closed Safari tab) it is the round button, and it keeps its slot: the tabs fold into "…" instead.
+- Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop. The pill's width springs to the new label, the new label fades in and the tint crossfades.
+- Labels longer than 160px are cut with an ellipsis; keep them to a few words.
+
+Between pages the controls move like a native bar: a control that appears scales up out of a blur, one that goes away shrinks into one and is kept for 450ms so it can, and the rest slide to their new places on the same spring. With reduced motion, controls crossfade in place. The site's [call to action example](https://getduet.dev/book) shows all of it.
 
 ### `useDuet()`
 
@@ -514,6 +538,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** uses the column only in Safari (not Chrome, Firefox, Edge or other apps' browsers), never in an iframe, and gives in-app web views (a user agent without `Safari/`) `inline`. A Duo whose reported sizes differ (display zoom, a future iOS release) gets `inline`, and an iPad or another device with matching sizes may read as a Duo.
 - **You do:** use `useDuet().duo` to switch to a Duo layout, not as proof of the device. Check `useDuet().browser` to tell why a page is `inline`. For server-rendered layouts, see [Server rendering](#server-rendering-and-hydration).
 - **Status:** 0.2.2. See [Is this an iPhone Duo?](#is-this-an-iphone-duo) and [Which mode](#which-mode).
+
+### Call to action in a closed Safari tab
+
+- **You see:** without the handling, a page's main action (Book, Buy) folds into "…" on the closed Duo, while the tabs keep the slot by the thumb.
+- **Cause:** in a closed tab Safari's own buttons leave the band room for two controls, and "…" always takes one.
+- **Duet does:** with `primary.prominent`, gives the thumb slot to the call to action and folds the tabs (or search) into "…" as a radio group at the top of the menu. With forward history and Live Activities, "…" and the call to action share the two-item rail, the call to action as a tinted bubble.
+- **You do:** mark only the page's one main action `prominent`, and keep tabs reachable another way on that page if they matter (back, or the "…" menu).
+- **Status:** [#101](https://github.com/JayFarei/duet/issues/101). See [Call to action](#call-to-action).
 
 ## Limitations
 
