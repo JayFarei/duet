@@ -16,6 +16,17 @@ tools/e2e/.venv/bin/python -I tools/e2e/e2e.py --udid <udid> --rerender tools/e2
 
 Exit status: 1 when any step FAILs, 2 when any step is BLOCKED or the environment cannot start (broken dist build, site not answering, fold tool missing), else 0. split, split-turn and open-in-safari-unfold need the simulator helper (Split view below) and are BLOCKED without it.
 
+## Catalogue and parallel runs
+
+[CATALOGUE.md](CATALOGUE.md) lists, in plain English, every state a page can be shown in (Safari tab or in-app preview sheet, default, full; folded or unfolded; each angle; music Live Activity on or off), every transition between them (turn, fold, unfold, start or stop music, Open in Safari) and the journeys that walk all of them: each journey sets up its starting condition (posture, angle, music) before opening the page, so "open unfolded" and "open folded, then unfold" are separate journeys. `catalogue.py` holds the states, transitions and expectations as data and generates the journeys (a greedy edge cover, stable ids `j01`...); regenerate CATALOGUE.md with `python3 tools/e2e/catalogue.py > tools/e2e/CATALOGUE.md` after changing it.
+
+```sh
+tools/e2e/run.sh --catalogue --only j07 --page /confirm   # replay one journey on "Duo Lab" (the report shows this line per journey)
+tools/e2e/matrix.sh --page /confirm                       # every journey, sharded over the four "Duo e2e N" simulators
+```
+
+Every step of a journey is filmed; the report has one section per journey with its steps in words, each step's verdict and first reason, the stitched film and its replay command. `matrix.sh` builds once, starts the site once, then runs one `run.sh` per simulator, each with its own beacon and UI-test runner (`BEACON_PORT` 3151 to 3154: the host gets `-beacon`, the runner a copy of the xctestrun with `E2E_BEACON`) and every Nth journey (`--shard i/N`), and joins the shard reports with `e2e.py --merge` into `reports/matrix-<ts>/index.html`. The four simulators are clones of "Duo Lab" (iPhone Duo, iOS 27.1); `DUO_SIMS` overrides them.
+
 ## Rotation and fold
 
 `fold/fold.bin` is a simulator command line tool that calls SpringBoard's display tool service (`SBSDisplayToolService.swapDisplayWithSettings`, the call behind Apple's internal `suiatool`). e2e.py runs it with `xcrun simctl spawn <udid> fold.bin -position=closed|open -deviceOrientation=portrait|landscapeRight|landscapeLeft|portraitUpsideDown -wait`, then `-unlock`. It drives every turn and fold with no human in the loop. Private API, simulator only. The turn lands about 4s after the call, so a step samples from the call until the signals are quiet.
