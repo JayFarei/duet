@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import { BookOpen, Layers, Moon, PanelBottom, PanelRight, Sparkles, Sun } from "lucide-react";
+import { BookOpen, Check, Layers, Moon, PanelBottom, PanelRight, Sparkles, Sun } from "lucide-react";
 import { Duet, DuoCookie, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
+import { AGENT_PROMPT } from "./agent-prompt";
 import { WebDuo } from "./duo/web-duo";
 import { TINTS, useTheme, useTint } from "./theme";
 
@@ -116,6 +117,7 @@ function Page({ self = false }: { self?: boolean }) {
         </h1>
         <p className="lede">A React library that approximates the Duo&apos;s native side controls.</p>
         <div className="ctas">
+          <AgentPrompt />
           <Npm />
         </div>
       </section>
@@ -197,6 +199,18 @@ function Integrate() {
 
 function Snippet({ code }: { code: string }) {
   return <pre className="card code"><code dangerouslySetInnerHTML={{ __html: highlight(code) }} /></pre>;
+}
+
+/** The hero's main call to action: copies a prompt that has a coding agent make the reader's app Duo-ready. */
+function AgentPrompt() {
+  const [copied, setCopied] = useState(false);
+  const copy = () => navigator.clipboard?.writeText(AGENT_PROMPT).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
+  return (
+    <button className="pill pill-cta" onClick={copy} aria-label="Copy a prompt that makes your app Duo-ready with a coding agent">
+      {copied ? <Check size={18} strokeWidth={2.4} /> : <Sparkles size={18} strokeWidth={2.2} />}
+      {copied ? "Prompt copied" : "Copy agent prompt"}
+    </button>
+  );
 }
 
 function Npm() {

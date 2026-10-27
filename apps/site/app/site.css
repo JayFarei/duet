@@ -1,8 +1,8 @@
-:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); --wd-island-rim: transparent; --wd-col: rgb(240 239 236 / 0.55); --wd-edge: 0.3; --wd-rim: 0.15; --wd-shine: rgb(10 132 255 / 0.35); }
+:root { --bg: rgb(242 242 247); --card: #fff; --ink: #000; --dim: rgb(60 60 67 / 0.6); --line: rgb(60 60 67 / 0.18); --accent: var(--ink); --code: rgb(242 242 247); --wd-glass: rgb(255 255 255 / 0.9); --wd-island-rim: transparent; --wd-col: rgb(240 239 236 / 0.55); --wd-edge: 0.3; --wd-rim: 0.15; --wd-shine: rgb(10 132 255 / 0.35); --cta: #007aff; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); }
+  :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --cta: #0a84ff; }
 }
-:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); }
+:root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --cta: #0a84ff; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); text-decoration: none; }
 code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
@@ -34,6 +34,7 @@ html { scroll-behavior: smooth; }
 section[id] { scroll-margin-top: 24px; }
 .pill { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 22px; border-radius: 99px; border: 0; background: var(--card); color: var(--accent); font: 500 17px/1 -apple-system, system-ui; box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .pill-solid { background: var(--ink); color: var(--bg); box-shadow: none; }
+.pill-cta { background: var(--cta); color: #fff; box-shadow: none; white-space: nowrap; }
 .pill-sm { height: 30px; padding: 0 14px; font-size: 13px; }
 .npm code { font-size: 15px; }
 .npm-hint { font-size: 12px; opacity: 0.75; }
@@ -89,6 +90,10 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 .bar-tab[data-on] { color: #007aff; background: rgb(120 120 128 / 0.14); }
 .bars .hero, html .float .hero { padding-top: calc(max(12px, env(safe-area-inset-top)) + 72px); }
 .bars .foot, html .float .foot { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+/* Duet's controls beside the page on a desktop, flat as iOS draws them: no specular rim or bevel from GlassyUI, only a
+   hairline. The glimmer over the stage's buttons ([data-wd-shine]) is separate and stays. */
+.duet[data-mode="inline"] .duet-glass::after { display: none; }
+.duet[data-mode="inline"] .duet-glass::before { box-shadow: inset 0 0 0 0.5px var(--line); }
 /* Side controls tried on an iPhone (home.tsx): the page ignores Duet's insets, so the controls float over it. */
 .float { --duet-inset-left: 0px; --duet-inset-right: 0px; }
 
