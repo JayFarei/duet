@@ -19,5 +19,6 @@ jobs:
       - name: Tag matches package version
         run: test "v$(node -p 'require("./packages/duet-ui/package.json").version')" = "$GITHUB_REF_NAME"
       - run: pnpm build && pnpm typecheck && pnpm test
-      - run: npm publish --access public
+      # A prerelease (a version with a hyphen, like 0.4.0-rc.1) goes to `next`, so `latest` stays on the last release.
+      - run: npm publish --access public --tag "$(case $GITHUB_REF_NAME in *-*) echo next ;; *) echo latest ;; esac)"
         working-directory: packages/duet-ui
