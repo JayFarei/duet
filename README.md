@@ -107,7 +107,7 @@ Column mode infers from the window geometry that Safari's column is there; it ne
 
 ### Split view
 
-A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on the pane's outer edge, but no web signal says whether the pane is on the left or the right. In column mode Duet widens the document by a column on each side and draws the controls in both; each pane only shows its own column, and a tap there tells Duet which side it was. When a split pane falls back to `inline`, its side is remembered separately from the full-window side, so the user can move the controls next to Safari's column once. `useDuet().split` is true in a split pane.
+A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on the pane's outer edge, but no web signal says whether the pane is on the left or the right. In column mode Duet widens the document by a column on each side and draws the controls in both; each pane only shows its own column, and a tap there tells Duet which side it was. The document is kept scrolled across the left column, so a pane shows document x 84 to 469. When a split pane falls back to `inline`, its side is remembered separately from the full-window side, so the user can move the controls next to Safari's column once. `useDuet().split` is true in a split pane.
 
 ### Side
 
@@ -256,7 +256,17 @@ The page spans the whole window and the controls float over it, so backgrounds r
 - `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
 - `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image). The `duet-bleed` class does the same in CSS.
 
-Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right` (the controls' width on their edge; in `column` mode without children the page does not run under a right-hand column, so that inset is 0), `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear) and `--duet-safe-top-column` (in `column` mode, the top of the part of Safari's column clear of its back and reader buttons: keep popovers that cross the column below it). `--duet-vh` is `stableHeight` in px: size full-screen sections with `min-height: var(--duet-vh, 100svh)` so they keep their height while the URL bar collapses and expands. Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
+Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right` (the controls' width on their edge; 0 in `column` mode without children, see below), `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear) and `--duet-safe-top-column` (in `column` mode, the top of the part of Safari's column clear of its back and reader buttons: keep popovers that cross the column below it). `--duet-vh` is `stableHeight` in px: size full-screen sections with `min-height: var(--duet-vh, 100svh)` so they keep their height while the URL bar collapses and expands. Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
+
+### Column mode without children: Duet places the page
+
+In `column` mode the controls sit in Safari's column, outside the layout viewport, so a page has nothing to keep clear of. Without `children` Duet places the page itself, so any page, including one that never calls `column()` or `bleed()`, starts just clear of the controls, keeps centred content centred in the space left and is never clipped:
+
+- The insets are 0 and the page's layout viewport is exactly the part of the window beside Safari's column.
+- Where the document spans a left column (split view, the closed Duo turned to 90), Duet keeps it scrolled across and gives `<html>` `margin-left` of the column width and the matching negative `margin-right`, so the page lands in the visible part of the window instead of under the column. `<html data-duet-reserve>` marks this. Do not set `margin` on `<html>` yourself, and do not reset `scrollX`: Duet owns it.
+- `<Duet reserve={false}>` opts out: the page runs under the column as before, and `--duet-inset-left` / `--duet-inset-right` hold the column's width for `column()`, `bleed()` or your own padding.
+
+With `children`, in `inline` and `strip` mode and in the emulated column, the page still runs under the controls and keeps clear through the insets above.
 
 ## Panes
 
