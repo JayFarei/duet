@@ -18,7 +18,7 @@ The gap map records that room, as rectangles in CSS pixels, for every layout:
 | Rotation | 0, 90, 270 |
 | Split View | only when open |
 | Window | Safari tab; in-app preview: sheet, default, full screen, over full screen |
-| Safari chrome | tab bar bottom or top; Back and Forward arrows shown or not |
+| Safari chrome | tab bar bottom or top; Back and Forward arrows shown or not; Shared with You banner ("From <name>" with X, on pages opened from a Messages link, stays on later visits) shown or not |
 | Live Activities | 0, 1, 2 |
 | Appearance | dark mode, larger text |
 
