@@ -521,7 +521,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** with forward history the preview adds a Forward button where Back was and moves Back up a row (its top from 428 to 374pt), so the free gap ends higher.
 - **Duet does:** reads `navigation.canGoForward` (re-read on `currententrychange` and `popstate`) and, in the preview, ends the gap above the raised Back. That gap holds one button with no room left for Live Activities, so with forward history an activity may push the preview's reader/menu button onto Duet's button, never onto Back.
 - **You do:** nothing. The Navigation API only sees same-origin entries: coming back from another site, the preview shows Forward but Duet can't know, and its button may cover Back until the next same-origin navigation.
-- **Status:** [#117](https://github.com/JayFarei/duet/issues/117).
+- **Status:** [#117](https://github.com/JayFarei/duet/issues/117), [PR #118](https://github.com/JayFarei/duet/pull/118).
 
 ### Menus and popovers under Safari's buttons
 
