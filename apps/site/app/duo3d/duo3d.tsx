@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { AppWindow, ArrowRight, Compass, Globe, House, Keyboard, Maximize2, MessageSquareShare, MessageSquareText, PanelBottom, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
+import { AppWindow, ArrowRight, Compass, Globe, House, Keyboard, MessageSquareShare, MessageSquareText, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
 import { ONLY_OPEN, Phases, Rule, Segmented, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
 import { CHANNEL, DUO_PORT, type Sync } from "./shared";
 
@@ -173,8 +173,8 @@ export function Duo3D() {
         )}
         {messages && (
           <div role="toolbar" aria-label="Link preview" style={{ ...group, alignItems: "center" }}>
-            <Tool label="Link preview, sheet" on={s.app === "sheet"} onClick={() => go({ app: "sheet" })}><PanelBottom size={18} /></Tool>
-            <Tool label="Link preview, full screen" on={s.app === "preview"} onClick={() => go({ app: "preview" })}><Maximize2 size={18} /></Tool>
+            {/* The in-app preview's two presentations: a page sheet over Messages, or full screen. */}
+            <Segmented value={s.app} onChange={(v) => go({ app: v as "sheet" | "preview" })} options={[["sheet", "Sheet"], ["preview", "Full screen"]]} />
             <Rule />
             <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
           </div>

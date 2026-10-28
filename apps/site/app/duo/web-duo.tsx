@@ -127,9 +127,11 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
   // The address bar centres on the page, or where given (sideways, on the screen); its bottom is the pill's.
   const barW = Math.min(BAR.w, page.w - 36), barX = o.barX ?? pageX + page.w / 2;
   // `drop`: the Shared with You bar above the page, across the page only (the column keeps its height).
-  const frame: Box = !column ? { x: pageX, y: drop, ...page }
-    : o.split ? { x: col === "right" ? -colW : 0, y: drop, w: page.w + 2 * colW, h: win.h - drop }
-    : { x: 0, y: drop, w: win.w, h: win.h - drop };
+  // The in-app preview's title bar sits above the page instead (`top`), and it has no bar below.
+  const top = o.preview ? bar : drop;
+  const frame: Box = !column ? { x: pageX, y: top, ...page }
+    : o.split ? { x: col === "right" ? -colW : 0, y: top, w: page.w + 2 * colW, h: win.h - top }
+    : { x: 0, y: top, w: win.w, h: win.h - top };
   const colX = col === "left" ? 0 : page.w, pill = o.pill ?? { top: win.h - low - BAR.pill, h: BAR.pill };
   return {
     clip: win, clipR: o.rounded ? 30 : undefined, frame,
@@ -137,11 +139,11 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
     chrome: (
       <div style={{ position: "absolute", left: win.x, top: win.y, width: win.w, height: win.h, borderRadius: o.rounded ? 30 : undefined, overflow: "hidden", pointerEvents: "none" }}>
         {/* In column mode the page runs on under the pill (Duet extends it by outer minus inner height). */}
-        {!column && <div style={{ position: "absolute", left: pageX, top: drop + page.h, width: page.w, height: bar, background: "var(--card)" }} />}
+        {!column && !o.preview && <div style={{ position: "absolute", left: pageX, top: drop + page.h, width: page.w, height: bar, background: "var(--card)" }} />}
         {drop > 0 && <SharedBar left={pageX} width={page.w} h={drop} />}
         {o.preview
-          ? <><PreviewBar left={pageX} top={drop + page.h} width={page.w} h={bar} host={o.host} />
-              <PreviewColumn x={colX} h={win.h} col={col} close={o.preview.close} back={o.preview.back} pill={pill} over={column} /></>
+          ? <><PreviewBar width={win.w} h={bar} host={o.host} />
+              <PreviewColumn x={colX} top={bar} h={win.h} col={col} clock={o.clock} close={o.preview.close} back={o.preview.back} pill={pill} over={column} /></>
           : <><UrlBar left={barX - barW / 2} top={win.h - BAR.bottom - BAR.h} width={barW} host={o.host} />
               <SafariColumn x={colX} h={win.h} col={col} back={o.back} clock={o.clock} pill={pill} over={column} forward={o.forward} /></>}
       </div>
@@ -258,22 +260,20 @@ function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signa
     const win = portrait ? { w: 653, h: 869 } : { w: 653, h: 661 }, box = { x: (W - win.w) / 2, y: (H - win.h) / 2, ...win };
     const page = { w: win.w, h: win.h - 70 }, signals = vis(sig(page, win, { insetBottom: 34, screen: safariScreen(page) }), box.y), mode = modeOf(signals);
     return {
-      clip: box, clipR: 30, frame: { x: 0, y: 0, ...page }, signals, mode,
+      clip: box, clipR: 30, frame: { x: 0, y: 70, ...page }, signals, mode,
       under: messages,
-      chrome: <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: 30, overflow: "hidden", pointerEvents: "none" }}><PreviewBar left={0} top={page.h} width={page.w} h={70} host={host} buttons /></div>,
+      chrome: <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: 30, overflow: "hidden", pointerEvents: "none" }}><PreviewBar width={box.w} h={70} host={host} buttons /></div>,
       note: `Unfolded, a link from Messages opens as a sheet with no column of its own. ${say(mode)}`,
     };
   }
   const col: Side = portrait || s.turn > 0 ? "right" : "left";
   if (!sheet && !portrait) {
-    // Full screen turned: the page spans the screen, the preview's buttons float in an 84pt inset on the turned side.
+    // Full screen turned: the preview's buttons move into its title bar, the page spans the screen below it, and
+    // iOS keeps an 84pt inset on the turned side, which Duet takes for its strip.
     const page = { w: W, h: H - 75 }, signals = vis(sig(page, { w: W, h: H }, { ...ins, [col === "right" ? "insetRight" : "insetLeft"]: STRIP, angle: s.turn > 0 ? 270 : 90 }), 0), mode = modeOf(signals);
     return {
-      clip: { x: 0, y: 0, w: W, h: H }, frame: { x: 0, y: 0, ...page }, signals, mode,
-      chrome: <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-        <PreviewBar left={0} top={page.h} width={W} h={75} host={host} />
-        <PreviewColumn x={col === "right" ? W - STRIP : 0} h={H} col={col} close={23.5} back={H - 75 - BAR.pill - 2 * DUO.gap - DUO.control} pill={{ top: H - BAR.bottom - BAR.pill, h: BAR.pill }} over />
-      </div>,
+      clip: { x: 0, y: 0, w: W, h: H }, frame: { x: 0, y: 75, ...page }, signals, mode,
+      chrome: <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}><PreviewBar width={W} h={75} host={host} buttons inset={col} /></div>,
       note: `Turned, the full-screen preview gives the page the whole width. ${say(mode)}`,
     };
   }
@@ -281,7 +281,8 @@ function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signa
   const page = portrait ? (sheet ? { w: 366, h: 600 } : { w: 382, h: 603 }) : { w: 578, h: 388 };
   const signals = vis(sig(page, win, { ...ins, angle: portrait ? 0 : s.turn > 0 ? 270 : 90 }), win.y), mode = modeOf(signals);
   const close = portrait ? DUO.top + push - win.y : SAFARI.landscape[col].top, back = portrait ? 428 - win.y : win.h - BAR.bottom - BAR.pill - DUO.gap - DUO.control;
-  const w = safariWindow({ win, page, col, back, host, mode, rounded: sheet, preview: { close, back } });
+  // Closed portrait the clock and battery top the column, as in a Safari tab; a turned sheet has none.
+  const w = safariWindow({ win, page, col, back, host, mode, rounded: sheet, clock: portrait ? 84 + push - win.y : undefined, preview: { close, back } });
   return {
     ...w, signals, mode, under: <>{messages}{w.under}</>,
     note: `${sheet ? "A link from Messages opens in a page sheet" : "A link opened full screen in the in-app preview"}: its own column, like a tab's, with different buttons. ${say(mode)}`,
@@ -1137,12 +1138,14 @@ function SafariColumn({ x, h, col, back, clock, pill, over, forward }: { x: numb
   );
 }
 
-/** The in-app preview's column: close and reader at the top, its back button below the free gap, and the
- *  share/reload/Safari pill at the bottom. */
-function PreviewColumn({ x, h, col, close, back, pill, over }: { x: number; h: number; col: Side; close: number; back: number; pill: { top: number; h: number }; over?: boolean }) {
+/** The in-app preview's column, under its title bar (`top`): the clock, close and reader, its back button below the
+ *  free gap, and the share/reload/Safari pill at the bottom. */
+function PreviewColumn({ x, top, h, col, clock, close, back, pill, over }: { x: number; top: number; h: number; col: Side; clock?: number; close: number; back: number; pill: { top: number; h: number }; over?: boolean }) {
   const cx = col === "right" ? STRIP - DUO.centerFromEdge : DUO.centerFromEdge, at = (top: number): CSSProperties => ({ ...column, position: "absolute", left: cx - DUO.control / 2, top, transition: `top ${MOVE}ms ${ease}` });
   return (
-    <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
+    <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none" }}>
+      {!over && <div style={{ position: "absolute", inset: 0, top, background: "var(--card)" }} />}
+      {clock !== undefined && <Status x={cx} top={clock} />}
       <div data-wd-system data-wd-col style={at(close)}><Glyph d="M18 6 6 18M6 6l12 12" /></div>
       <div data-wd-system data-wd-col style={at(close + DUO.control + DUO.gap)}><Glyph d="M4 6h16M4 12h16M4 18h10" /></div>
       <div data-wd-system data-wd-col style={at(back)}><Glyph d="m15 18-6-6 6-6" /></div>
@@ -1153,13 +1156,24 @@ function PreviewColumn({ x, h, col, close, back, pill, over }: { x: number; h: n
   );
 }
 
-/** The preview's band under the page: the site's host, small, and on the open screen's sheet its buttons too. */
-function PreviewBar({ left, top, width, h, host, buttons }: { left: number; top: number; width: number; h: number; host: string; buttons?: boolean }) {
+/** The preview's title bar across the top: the site's host, centred. Turned full screen and on the open screen its
+ *  buttons join it, close, back and reader on the left and the share/reload/Safari pill on the right (`inset`: the
+ *  turned side's 84pt safe area, kept clear). */
+function PreviewBar({ width, h, host, buttons, inset }: { width: number; h: number; host: string; buttons?: boolean; inset?: Side }) {
+  const btn: CSSProperties = { ...circle, width: DUO.control, height: DUO.control, color: "var(--ink)" };
   return (
-    <div data-wd-system style={{ position: "absolute", left, top, width, height: h, background: "var(--card)", borderTop: "0.5px solid var(--line)", display: "flex", alignItems: "center", justifyContent: buttons ? "space-between" : "center", padding: "0 20px 14px", boxSizing: "border-box", font: "500 13px -apple-system, system-ui", color: "var(--dim)", pointerEvents: "none" }}>
-      {buttons && <div style={{ ...circle, width: 40, height: 40, color: "var(--ink)" }}><Glyph d="M18 6 6 18M6 6l12 12" size={20} /></div>}
-      <span>{host}</span>
-      {buttons && <div style={{ ...circle, width: 40, height: 40, color: "var(--ink)" }}><Glyph d="M12 3v12M8 7l4-4 4 4M5 12v8h14v-8" size={20} /></div>}
+    <div data-wd-system style={{ position: "absolute", left: 0, top: 0, width, height: h, background: "var(--card)", borderBottom: "0.5px solid var(--line)", display: "flex", alignItems: "center", justifyContent: "space-between", padding: `0 ${inset === "right" ? STRIP : 14}px 0 ${inset === "left" ? STRIP : 14}px`, boxSizing: "border-box", pointerEvents: "none" }}>
+      <span style={{ position: "absolute", left: 0, right: 0, textAlign: "center", font: "600 15px -apple-system, system-ui", color: "var(--ink)" }}>{host.replace(/:\d+$/, "")}</span>
+      {buttons && <>
+        <div style={{ display: "flex", gap: 6 }}>
+          <div style={btn}><Glyph d="M18 6 6 18M6 6l12 12" /></div>
+          <div style={{ ...btn, color: "var(--dim)" }}><Glyph d="m15 18-6-6 6-6" /></div>
+          <div style={btn}><Glyph d="M4 6h16M4 12h16M4 18h10" /></div>
+        </div>
+        <div style={{ ...btn, width: 130, display: "flex", alignItems: "center", justifyContent: "space-around" }}>
+          <Glyph d="M12 3v12M8 7l4-4 4 4M5 12v8h14v-8" /><Glyph d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /><Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm3.5 5.5-2 5-5 2 2-5z" />
+        </div>
+      </>}
     </div>
   );
 }
