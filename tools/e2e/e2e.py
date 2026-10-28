@@ -278,8 +278,11 @@ class Run:
         if filming and rec is None:
             res["notes"].append(f"not filmed: {s.film_why}")
         t0 = time.time() * 1000
-        s.why = "no sample from the page"
+        s.why, s.rebase = "no sample from the page", None
         first = action(sid, t0)
+        if first is not None and s.rebase:  # the target was scrolled into view first: judge from the tap, on the scrolled page (kb01-02)
+            t0, prev = s.t_tap, {"place": shown_place(s.rebase), "key": key(s.rebase)}
+            res["prev"] = {"place": prev["place"], "key": prev["key"]}
         if first is None:
             if rec:
                 s.stop_record(rec)
@@ -1284,7 +1287,7 @@ class Run:
             d = max(-300, min(300, rc["y"] + rc["h"] / 2 - vh * 0.4))
             y1 = y0 + g["innerHeight"] * (0.75 if d > 0 else 0.25)
             s.sim.drag(x0 + g["innerWidth"] * 0.3, y1, x0 + g["innerWidth"] * 0.3, y1 - d, ms=500, steps=12, end_hold_ms=200)
-            r2 = s.still(sid, tok)
+            r2 = s.rebase = s.still(sid, tok)
             rc2 = r2 and refind(r2)
             if rc2 is None:
                 break
@@ -1292,15 +1295,18 @@ class Run:
         return (r, rc) if clear(r, rc) else (r, None)
 
     def still(s, sid, tok, quiet=0.4, cap=3.0):
-        """The newest sample once the page has stopped moving (scroll and visual viewport the same for quiet seconds).
-        A tap while a scroll still decelerates only stops it, so it never reaches the target (nav01-02, kb01-02)."""
+        """The newest sample once the page has stopped moving (scroll, visual viewport and the targets' rects the same for
+        quiet seconds). A tap while a scroll still decelerates only stops it, so it never reaches the target (nav01-02,
+        kb01-02). The rects see a scroll inside an element too: in Duet's column the page scrolls its own scroller, the
+        window stays at 0 (nav01-02: the link tapped at a mid-scroll 522 that settled at 374)."""
         t0, end, last, since, r = time.time() * 1000, time.time() + cap, None, time.time(), None
         while time.time() < end:
             for x in samples(sid, t0):
                 if mine(x, tok) and x.get("page") == s.page:
                     r = x
             if r is not None:
-                key = (r["scroll"]["x"], r["scroll"]["y"], json.dumps(r.get("vv"), sort_keys=True), r["sig"]["innerHeight"])
+                key = (r["scroll"]["x"], r["scroll"]["y"], json.dumps(r.get("vv"), sort_keys=True), r["sig"]["innerHeight"],
+                       json.dumps([x["rect"] for x in r.get("targets") or []]))
                 if key != last:
                     last, since = key, time.time()
                 elif time.time() - since >= quiet:
@@ -1360,12 +1366,13 @@ class Run:
         return r2 if r2 and menu_items(r2) else None
 
     def neutral(s, r):
-        """A page point (client px) on no control: the page's own targets, Duet's slots and an open menu avoided. Mid
-        page first: the top is under an expanded Live Activity, and a tap there opens its app (la01-03)."""
+        """A page point (client px) on no control: the page's own targets, Duet's slots and an open menu avoided. Never
+        the top third: it is under an expanded Live Activity, and a tap there opens its app (la01-03: /book's rows fill
+        mid page, the old last resort at 12% opened Duo e2e host). The page's left margin, outside its rows, before that."""
         g = r["sig"]
         busy = [t["rect"] for t in r.get("targets") or []] + [sl["rect"] for n in r.get("navs") or [] for sl in (n.get("slots") or []) + (n.get("menus") or [])]
-        for fy in (0.5, 0.7, 0.85, 0.3, 0.12):
-            for fx in (0.15, 0.5, 0.3):
+        for fy in (0.5, 0.7, 0.85, 0.6, 0.4, 0.95, 0.35):
+            for fx in (0.15, 0.5, 0.3, 0.015):
                 x, y = g["innerWidth"] * fx, g["innerHeight"] * fy
                 if not any(b["x"] - 8 <= x <= b["x"] + b["w"] + 8 and b["y"] - 8 <= y <= b["y"] + b["h"] + 8 for b in busy):
                     return {"x": x, "y": y, "w": 0, "h": 0}
@@ -1410,7 +1417,8 @@ class Run:
                 if rc is None and opener(r):  # folded into "…" or the lone tab's menu: open it, as a user would
                     r = s.open_menu(sid, tok, kind, r)
                     rc = r and s.find(r, action[1], back)
-                if rc is not None:
+                # Only a page target scrolls: Duet's buttons are fixed in the column, where clear() never holds (mod01-05).
+                if rc is not None and rc not in [b for _, b in duet_buttons(r, back)]:
                     r, rc = s.reveal(sid, tok, kind, r, rc, lambda r2: s.find(r2, action[1], back))
                     if rc is None:
                         s.why = f'"{action[1]}" never scrolled clear of Safari\'s bars'
@@ -1419,6 +1427,7 @@ class Run:
                     s.why = f'no control named "{action[1]}" on the page'
                     return None
                 x0, y0 = s.page_origin(r, kind)
+                s.t_tap = time.time() * 1000
                 s.sim.tap(x0 + rc["x"] + rc["w"] / 2, y0 + rc["y"] + rc["h"] / 2, hold=0.12)
             elif k == "scroll":  # slow drags of at most 300pt down the page's left part (clear of a column of controls)
                 g, (x0, y0) = r["sig"], s.page_origin(r, kind)

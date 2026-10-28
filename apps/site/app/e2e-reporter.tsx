@@ -102,6 +102,18 @@ function sample(s: string | null) {
     }
     return false;
   };
+  // The part of an element its clipping ancestors let through: a chip past the end of a sideways scroller is hidden,
+  // not under a control (pg03-05: /scroll's Chip 10 at 816..904, its row clipped at 851, the rail at 878).
+  const clipped = (el: Element, r: DOMRect) => {
+    let { left, right, top, bottom } = r;
+    for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (cs.overflowX === "visible" && cs.overflowY === "visible") continue;
+      const b = a.getBoundingClientRect();
+      left = Math.max(left, b.left); right = Math.min(right, b.right); top = Math.max(top, b.top); bottom = Math.min(bottom, b.bottom);
+    }
+    return right - left >= 1 && bottom - top >= 1 ? { left, right, top, bottom } : null;
+  };
   for (const el of document.body.querySelectorAll("*")) {
     if (el.closest("nav.duet, script, style, svg *")) continue;
     const r = el.getBoundingClientRect();
@@ -110,7 +122,8 @@ function sample(s: string | null) {
     const over = Math.max(r.right - hi, lo - r.left);
     if (over > 1 && shown(el) && !scroller(el)) out.push({ el: label(el), rect: rect(el), over: Math.round(over), text });
     if (text && r.top < innerHeight && r.bottom > 0) {
-      const i = slots.findIndex((s) => r.left < s.x + s.w - 2 && r.right > s.x + 2 && r.top < s.y + s.h - 2 && r.bottom > s.y + 2);
+      const v = clipped(el, r);
+      const i = v ? slots.findIndex((s) => v.left < s.x + s.w - 2 && v.right > s.x + 2 && v.top < s.y + s.h - 2 && v.bottom > s.y + 2) : -1;
       if (i >= 0 && shown(el)) under.push({ el: label(el), rect: rect(el), slot: i });
     }
   }

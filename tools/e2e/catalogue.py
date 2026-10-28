@@ -254,11 +254,15 @@ SUITES = [
     ]},
     {"id": "kb01", "title": "Keyboard up and down, Safari tab, outer screen", "page": "/probe", "start": TAB0, "steps": [
         (("tap", "Tap to open the keyboard"), "Tap the text field (the keyboard comes up)", {"active": "input", "keyboard": True}),
-        (("blur",), "Tap the page outside the field (the keyboard goes down)", {"active": None, "keyboard": False}),
+        # No focus check: on iOS a tap on a plain page area drops the keyboard but may leave focus on the field (kb01-03).
+        # What the user sees is judged: keyboard down, controls back in the column and painted.
+        (("blur",), "Tap the page outside the field (the keyboard goes down)", {"keyboard": False}),
     ]},
     {"id": "kb02", "title": "Keyboard up and down, Safari tab, unfolded", "page": "/probe", "start": ("tab", "open", 0, False), "steps": [
         (("tap", "Tap to open the keyboard"), "Tap the text field (the keyboard comes up)", {"active": "input", "keyboard": True}),
-        (("blur",), "Tap the page outside the field (the keyboard goes down)", {"active": None, "keyboard": False}),
+        # No focus check: on iOS a tap on a plain page area drops the keyboard but may leave focus on the field (kb01-03).
+        # What the user sees is judged: keyboard down, controls back in the column and painted.
+        (("blur",), "Tap the page outside the field (the keyboard goes down)", {"keyboard": False}),
     ]},
     {"id": "mod01", "title": "A full-screen page dialog opened and closed (#79), Safari tab", "page": "/sheet", "start": TAB0, "steps": [
         (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True, "label": "Close"}),
