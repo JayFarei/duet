@@ -4,6 +4,7 @@ Universal invariants, every state and every transition:
 - Duet's controls are fully visible, never overlap Safari's or the preview's own buttons, never sit under the status bar / camera / home indicator.
 - Page content is never clipped or hidden under native chrome or under Duet's controls; no horizontal overflow (document scrollWidth <= innerWidth, except the documented left-column scroll offset).
 - Transitions settle to the final placement within ~0.5s, with no slow drift, no flash in the wrong place.
+- On a Duo in Safari, Duet's invisible edge guards cover the points Safari samples, 4px in from the left and right of the fixed-layout rect clipped to the document, at mid-height (README "Full-screen `position: fixed` overlay or modal backdrop", #147).
 
 Per state (README "Placement" table is the spec):
 - Closed, Safari tab, portrait: column, right.
