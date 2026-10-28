@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, AppWindow, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
+import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
 import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
@@ -130,7 +130,7 @@ export function Duo3D() {
     if (posture !== s.posture) setS(fit({ ...s, posture }));
   };
 
-  const safari = s.app === "safari" || s.app === "split" || s.app === "window", preview = s.app === "sheet";
+  const safari = s.app === "safari" || s.app === "split", preview = s.app === "sheet";
   const split = s.app === "split";
 
   // What the simulation is showing, in words: the same scene the displays draw, asked for its note.
@@ -154,7 +154,6 @@ export function Duo3D() {
     ] : [
       { id: "single", label: "Single", icon: <Square size={18} />, on: s.app === "safari", pick: () => go({ app: "safari" }) },
       { id: "split", label: split ? "Swap" : "Split", icon: <Columns2 size={18} />, on: split, pick: () => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" }), hint: split ? "Swap Split View sides" : "Split View" },
-      { id: "window", label: "Window", icon: <AppWindow size={18} />, on: s.app === "window", pick: () => go({ app: "window" }) },
     ] },
     { key: "system", title: "System UI", opts: [
       { id: "shared", label: "iMessage", icon: <MessageSquareShare size={18} />, on: !!s.shared, off: !safari, pick: () => go({ shared: !s.shared }), hint: "Shared with You bar (Safari)" },

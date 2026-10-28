@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Activity, AppWindow, ChevronLeft, ChevronRight, Compass, Highlighter, House, PanelLeft, PanelRight, Pause, Play, Pointer, RotateCcw, RotateCw, Smartphone, Snail, Tablet } from "lucide-react";
+import { Activity, ChevronLeft, ChevronRight, Compass, Highlighter, House, PanelLeft, PanelRight, Pause, Play, Pointer, RotateCcw, RotateCw, Smartphone, Snail, Tablet } from "lucide-react";
 import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui/geometry";
 
 // A web iPhone Duo for desktop browsers: the site runs in an iframe shaped like the device's screen, and the
@@ -11,10 +11,9 @@ import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui
 // device, or from its device artwork (tools/media/frame.py).
 
 export type Posture = "closed" | "open";
-/** home: added to the Home Screen. safari: a full-screen tab. split: Safari in a split-view pane. window: a Safari
- *  window beside the Home Screen. sheet: a link opened from Messages, in the in-app Safari preview, which Messages always
+/** home: added to the Home Screen. safari: a full-screen tab. split: Safari in a split-view pane. sheet: a link opened from Messages, in the in-app Safari preview, which Messages always
  *  presents as a page sheet over itself. */
-export type App = "home" | "safari" | "split" | "window" | "sheet";
+export type App = "home" | "safari" | "split" | "sheet";
 /** live: Live Activities are running (the visitor's switch, kept across views). They grow the Dynamic Island down
  *  the closed strip, the only place the island is, so `island()` says where they show. The optional conditions
  *  (duo3d sets them; the 2D Duo never does): shared, Safari's Shared with You bar over a link a contact sent (#112);
@@ -74,7 +73,6 @@ const BAR = { bottom: 33.3, h: 49, w: 335.4, pill: 103.4, landPill: 107.6 };
 // Safari's `screen.*` keeps the closed screen in every state.
 const TAB = { w: 466, h: 678, page: { w: 382, h: 580 } }; // closed portrait: the window is the screen
 const PANE = { w: 469, page: { w: 385, h: 571 } }; // a split-view pane, either side, 669 tall
-const WINDOW = { w: 451, h: 666, page: { w: 369, h: 591 } }; // a window beside the Home Screen (device: 450-453 x 661-670)
 
 const ease = "cubic-bezier(0.32, 0.72, 0, 1)";
 // The turn runs on a near-critical spring (SETTLE): it leaves rest with no jolt, carries its weight through the
@@ -184,7 +182,7 @@ function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals
   const full = { w: W, h: H }, screen = { x: 0, y: 0, w: W, h: H };
   const push = island(s) ? DUO.island : 0;
   // The Shared with You bar, in Safari only: 40pt above the page in a column window, 46 under the open toolbar.
-  const tabbed = s.app === "safari" || s.app === "split" || s.app === "window";
+  const tabbed = s.app === "safari" || s.app === "split";
   const drop = s.shared && tabbed ? (s.app === "safari" && s.posture === "open" ? 46 : 40) : 0;
   const less = (p: Size): Size => ({ w: p.w, h: p.h - drop });
   if (s.app === "sheet") return preview(s, W, H, host, modeOf, vis, push);
@@ -208,18 +206,6 @@ function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals
         {w.chrome}
       </>,
       note: "Split view: each pane has Safari's column on its outer edge, and Duet paints its controls there, in whichever pane Safari is. Swap the panes; Duet follows.",
-    };
-  }
-  if (s.app === "window") {
-    const win = { x: W - WINDOW.w - 9, y: Math.round((H - WINDOW.h) / 2), w: WINDOW.w, h: WINDOW.h };
-    const page = less(WINDOW.page), signals = vis(sig(page, WINDOW, { screen: safariScreen(WINDOW.page) }), win.y + drop), mode = modeOf(signals);
-    const w = safariWindow({ win, page, col: "right", back: SAFARI.splitTop.left, host, mode, rounded: true, drop, forward: s.forward });
-    return {
-      ...w, signals, mode,
-      chrome: <><HomeScreen w={win.x} h={H} />{w.chrome}</>,
-      note: mode === "column"
-        ? "A Safari window beside the Home Screen keeps Safari's column, so Duet paints its controls there, as in a closed tab."
-        : "In this Safari window Duet keeps its controls inside the page.",
     };
   }
   if (s.posture === "closed") {
@@ -296,7 +282,7 @@ export const TOUR: State[] = [
   stop("closed", "home"), stop("closed", "home", { live: true }),
   stop("open", "home"), stop("open", "home", { turn: 90 }), stop("closed", "home", { turn: 90 }), stop("closed", "home"),
   stop("closed", "safari"), stop("closed", "safari", { live: true }), stop("open", "safari"),
-  stop("open", "split"), stop("open", "split", { pane: "left" }), stop("open", "window"),
+  stop("open", "split"), stop("open", "split", { pane: "left" }),
 ];
 const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
 /** The same view, whatever the Live Activities switch says: the phase list follows views, not the switch. */
@@ -306,10 +292,10 @@ export const island = (s: State) => s.live && s.posture === "closed" && !s.turn;
 /** The phase list: each row starts at a tour stop and lasts until the next row's. */
 const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
   { group: "Home Screen web app", rows: [["Closed", 0], ["Unfolded and turned", 2]] },
-  { group: "Safari", rows: [["Closed tab", 6], ["Unfolded", 8], ["Split view", 9], ["Window", 11]] },
+  { group: "Safari", rows: [["Closed tab", 6], ["Unfolded", 8], ["Split view", 9]] },
 ];
 /** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. */
-const ONLY: Partial<Record<App, Posture>> = { split: "open", window: "open" };
+const ONLY: Partial<Record<App, Posture>> = { split: "open" };
 export const fit = (s: State): State => {
   const only = ONLY[s.app];
   return !only || (s.posture === only && !s.turn) ? s : { ...s, app: "safari" };
@@ -323,7 +309,7 @@ const LIVE_NOTE: Partial<Record<App, string>> = {
  *  Built on first use: `scene` needs the styles defined further down. */
 let notes: string[] | undefined;
 const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => ([0, 90, -90] as const).flatMap((turn) =>
-  (["home", "safari", "split", "window", "sheet"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
+  (["home", "safari", "split", "sheet"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
     (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
       const n = SCREEN[posture], [W, H] = turn ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, turn, upside: false, app, pane, live });
       return `${m}|${scene(st, W, H, "", () => m).note}${island(st) ? LIVE_NOTE[st.app] ?? "" : ""}`;
@@ -708,8 +694,8 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
 
   // Fit the turned device and the controls in the window.
   // What a person can do to the device: fold it, turn it, pick an app, and, open and upright, multitask Safari.
-  // One pill of icons, so it fits beside Duet on a phone: fold, turn, pick what runs. Split View and a window need
-  // the device open and upright, and picking one gets it there; picking Split View again swaps Safari's side.
+  // One pill of icons, so it fits beside Duet on a phone: fold, turn, pick what runs. Split View needs
+  // the device open and upright, and picking it gets it there; picking Split View again swaps Safari's side.
   const split = s.app === "split", Pane = s.pane === "left" ? PanelLeft : PanelRight;
   const commands = (
     <div ref={bar} role="toolbar" aria-label="Device" data-wd-pop={embed ? (manual ? 1 : 0) : undefined} style={{ ...group, alignItems: "center", ...(embed && widths && { position: "relative",
@@ -727,7 +713,6 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
       <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
       <Tool label="Safari" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
       <Tool label={split ? "Swap Split View sides" : "Split View"} on={split} onClick={() => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" })}><Pane size={18} /></Tool>
-      <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
     </div>
   );
   // The icons burst out of the middle: each starts pulled to the centre and leaves later the further out it lands.
@@ -870,12 +855,11 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
   );
 }
 
-/** Where the page is running: in Safari (a tab, a split-view pane, a window) or added to the Home Screen as a web app. */
+/** Where the page is running: in Safari (a tab or a split-view pane) or added to the Home Screen as a web app. */
 const SHOWING: Record<App, [string, string]> = {
   home: ["Home Screen", "Web app (PWA)"],
   safari: ["Safari", "Full-screen tab"],
   split: ["Safari", "Split View"],
-  window: ["Safari", "Window"],
   sheet: ["Messages", "Link preview"],
 };
 function Showing({ app, row, style }: { app: App; row?: boolean; style?: CSSProperties }) {
@@ -1285,15 +1269,6 @@ function OtherApp() {
           <div style={{ flex: 1, display: "grid", gap: 8 }}><div style={bar(`${50 + ((i * 17) % 35)}%`)} /><div style={bar(`${70 + ((i * 11) % 25)}%`, 0.6)} /></div>
         </div>
       ))}
-    </div>
-  );
-}
-
-/** The Home Screen beside a Safari window: quiet icon tiles, so the eye stays on the window. */
-function HomeScreen({ w, h }: { w: number; h: number }) {
-  return (
-    <div style={{ position: "absolute", left: 0, top: 0, width: w, height: h, padding: "64px 34px 0", boxSizing: "border-box", display: "grid", gridTemplateColumns: "repeat(4, 64px)", gridAutoRows: 64, gap: "34px 30px", justifyContent: "center", alignContent: "start" }}>
-      {Array.from({ length: 20 }, (_, i) => <div key={i} style={{ borderRadius: 16, background: "var(--dim)", opacity: 0.25 }} />)}
     </div>
   );
 }
