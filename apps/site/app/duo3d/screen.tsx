@@ -6,6 +6,8 @@ import { Island, SCREEN, fit, island, scene } from "../duo/web-duo";
 import { channel, type Sync } from "./shared";
 
 const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
+// Opening: a touch past full and back, over about the time the 3D hinge takes to lay flat.
+const SPRING = "cubic-bezier(0.3, 1.22, 0.45, 1)";
 
 // One of the device's displays, as the 2D web Duo draws its screen: the inner one always in the open layout, the
 // outer one always closed, both live through the fold the way iOS holds a session on both. Scaled to duo's panel.
@@ -103,8 +105,22 @@ export function Screen() {
     ], { duration: 520, easing: EASE });
   }, [box?.x, box?.y, box?.w, box?.h]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!sc || !st || !sync || !view.w) return <div style={{ position: "fixed", inset: 0, background: "#000" }} />;
-  const scale = Math.min(view.w / n.w, view.h / n.h);
+  // Unfolding, the page on the inner display grows out of the half the cover stood over, the way it stretches with
+  // Safari's mode changes, instead of sitting there whole while the hinge opens and the far half fills in late.
+  const posture0 = sync?.s.posture, shut = useRef(posture0);
+  useLayoutEffect(() => {
+    const was = shut.current, el = frame.current;
+    shut.current = posture0;
+    if (display !== "inner" || was !== "closed" || !posture0 || posture0 === "closed" || !box || !el || cut) return;
+    // The cover's share of the display, along the hinge's normal: on the right as drawn, at the bottom or top turned.
+    const k = SCREEN.closed.w / SCREEN.open.w;
+    const from = upright > 0 ? `translate(0, ${box.h * (1 - k)}px) scale(1, ${k})` : upright < 0 ? `scale(1, ${k})` : `translate(${box.w * (1 - k)}px, 0) scale(${k}, 1)`;
+    el.animate([{ transform: from }, { transform: "none" }], { duration: 900, easing: SPRING });
+  }, [posture0]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!sc || !st || !sync) return <div style={{ position: "fixed", inset: 0, background: "#000" }} />;
+  // A display the 3D view hides has no size; its page still loads, so it is there the moment the display shows.
+  const scale = view.w ? Math.min(view.w / n.w, view.h / n.h) : 1;
   const motion = (props: string[]) => cut ? "none" : props.map((x) => `${x} 520ms ${EASE}`).join(", ");
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "hidden", background: "var(--bg)" }}>
