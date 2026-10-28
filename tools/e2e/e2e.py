@@ -109,8 +109,10 @@ def duet_buttons(r, back=False):
 
 
 def menu_items(r):
-    """Labels of an open Duet menu's items."""
-    return [b["label"] for n in live_navs(r) for m in n.get("menus") or [] for b in m.get("buttons") or []]
+    """Labels of an open Duet menu's items, not its own dismiss X (aria-label "Close", no menu role): mod01-05 read it
+    as the page's close button still shown after the dialog closed."""
+    return [b["label"] for n in live_navs(r) for m in n.get("menus") or [] for b in m.get("buttons") or []
+            if b.get("role") in ("menuitem", "menuitemradio")]
 
 
 def opener(r):
@@ -124,8 +126,11 @@ def opener(r):
 
 
 def key(r):
-    g = r["sig"]
-    return (g["angle"], g["innerWidth"], g["innerHeight"], g["outerWidth"], g["outerHeight"])
+    """The signals a placement answers to. The keyboard is one: kb02-03 judged its 1.1s to go down after the tap as
+    Duet settling late, while the controls came back on the sample the visual viewport grew."""
+    g, vv = r["sig"], r.get("vv") or {}
+    kb = bool(vv.get("h")) and vv["h"] < g["innerHeight"] - 100
+    return (g["angle"], g["innerWidth"], g["innerHeight"], g["outerWidth"], g["outerHeight"], kb)
 
 
 def nav(r):
@@ -1375,15 +1380,20 @@ class Run:
     def neutral(s, r):
         """A page point (client px) on no control: the page's own targets, Duet's slots and an open menu avoided. Never
         the top third: it is under an expanded Live Activity, and a tap there opens its app (la01-03: /book's rows fill
-        mid page, the old last resort at 12% opened Duo e2e host). The page's left margin, outside its rows, before that."""
-        g = r["sig"]
+        mid page, the old last resort at 12% opened Duo e2e host). The page's left margin, outside its rows, before that.
+        Only the visible part of the page: with the keyboard up that is the visual viewport's height from the page top,
+        and half the layout height is on the keyboard (kb02-03: y 309 of 618 with 286 visible landed on its bar). Not
+        from vv.y: WebKit reported offsetTop 112 while rects still mapped to the screen from the page top, and a tap
+        offset by it landed on the text field (rerun4, the field at client y 117 drawn at screen y0 + 117)."""
+        g, vv = r["sig"], r.get("vv") or {}
+        top, h = 0, vv.get("h") or g["innerHeight"]
         busy = [t["rect"] for t in r.get("targets") or []] + [sl["rect"] for n in r.get("navs") or [] for sl in (n.get("slots") or []) + (n.get("menus") or [])]
         for fy in (0.5, 0.7, 0.85, 0.6, 0.4, 0.95, 0.35):
             for fx in (0.15, 0.5, 0.3, 0.015):
-                x, y = g["innerWidth"] * fx, g["innerHeight"] * fy
+                x, y = g["innerWidth"] * fx, top + h * fy
                 if not any(b["x"] - 8 <= x <= b["x"] + b["w"] + 8 and b["y"] - 8 <= y <= b["y"] + b["h"] + 8 for b in busy):
                     return {"x": x, "y": y, "w": 0, "h": 0}
-        return {"x": g["innerWidth"] * 0.15, "y": g["innerHeight"] * 0.5, "w": 0, "h": 0}
+        return {"x": g["innerWidth"] * 0.15, "y": top + h * 0.5, "w": 0, "h": 0}
 
     def tap_native(s, kind, ident):
         """Taps a native button by accessibility identifier (never by label: "Book" matches Bookmarks)."""
@@ -1458,7 +1468,12 @@ class Run:
                 right = g["outerWidth"] if n.get("mode") == "column" and n.get("side") == "right" else g["innerWidth"]
                 s.sim.drag(x0 + right - 1, y, x0 + g["innerWidth"] * 0.3, y, ms=350, steps=12, end_hold_ms=50)
             elif k == "blur":
-                if not any(e.get("label") == "Done" and s.tap_native(kind, e.get("id")) for e in s.native(kind, s.angle) if e.get("id")):
+                # The keyboard's Done (by frame: it has no identifier), else the visible page off any control (the
+                # open screen's keyboard has no Done in the accessibility tree, and its accessory check mark neither).
+                done = next((e for e in s.native(kind, s.angle) if e.get("label") == "Done"), None)
+                if done:
+                    s.sim.tap(done["x"] + done["w"] / 2, done["y"] + done["h"] / 2, hold=0.12)
+                else:
                     rc, (x0, y0) = s.neutral(r), s.page_origin(r, kind)
                     s.sim.tap(x0 + rc["x"], y0 + rc["y"], hold=0.12)
             elif k == "home":
