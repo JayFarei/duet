@@ -259,7 +259,11 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
 // The largest Dynamic Type grows the bottom bar to 106pt (382x572 in 466x678, e2e round 3).
 const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 110] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
-const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome);
+// The full open window (951x669, 669x951) never has the column: a column-wide page there is the closed page's, not yet
+// resized (inTransit).
+const openWindow = (s: Signals) => Math.max(s.outerWidth, s.outerHeight) >= DUO_SIZES[1][1] - 1;
+const hasColumn = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && within(s.outerHeight - s.innerHeight, SAFARI_COLUMN.chrome)
+  && !openWindow(s);
 
 /** Side inset of a Home Screen app on the Duo: 84 measured (closed portrait). iPhones have up to 59 in landscape. */
 const STRIP_INSET = 76;
@@ -341,8 +345,10 @@ export function inTransit(s: Signals): boolean {
   // Safari's column is 84pt in every window measured, and comes with its bottom URL bar (chrome 98, 106 at the largest
   // Dynamic Type, preview 70 to 75), never with the 126pt bars of a full open window. Anything else is a stale layout
   // handed a new window (e2e round 3: entering split view, 867x543 in 951x669 for ~200ms before the pane; going home
-  // from a split pane, the pane's 385x571 page in the closed screen's 466x678 window, an 81pt "column").
-  if (page >= LANDED.page[1][0] && chrome > LANDED.columnChrome) return true;
+  // from a split pane, the pane's 385x571 page in the closed screen's 466x678 window, an 81pt "column"). Nor in the
+  // full open window at all: unfolding the closed preview hands it the closed page's 585x876 for ~45ms (e2e RC run,
+  // 2026-10-27).
+  if (page >= LANDED.page[1][0] && (chrome > LANDED.columnChrome || openWindow(s))) return true;
   // A Duo window, or the preview's sheet (a window a few points inside the closed screen; its inset lands ~100ms late,
   // so sizes alone decide).
   const sheet = short <= w - m && long <= h - m && short >= w - SHEET_SLACK && long >= h - SHEET_SLACK;

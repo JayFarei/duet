@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Unfolding from the in-app preview no longer flashes the closed screen's strip or Safari's column on the open screen: signals are also re-read on each layout (`ResizeObserver` on a viewport-sized box), since WebKit holds `resize` back while the window animates, and a column-wide page in the full open window counts as in transit (#115).
+
 ## 0.4.1
 
 - New `duet-ui/boot` export: `bootScript`, an inline script for the top of `<body>` that marks Safari's column on the closed Duo before the first paint (`data-duet-mode="column"`, `--duet-column`, `--duet-vh`, `--duet-inset-bottom` on `<html>`), so column styling no longer flashes the plain layout on load. Nothing is set on any other browser or device, and `useDuet()` takes it back if the mounted reading is not column. New `--duet-column` variable: the column's width, 0px outside column mode (#94).
