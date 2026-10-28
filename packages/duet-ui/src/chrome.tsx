@@ -104,7 +104,7 @@ function switchSide(el: HTMLElement, side: Side) {
 
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
-let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined;
+let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined, kbTimer: ReturnType<typeof setTimeout> | undefined;
 // The damper keeps history, so it is fed once per signal change (refresh, from the watcher), never from React's
 // getSnapshot (read), which React may call several times per render.
 function refresh() {
@@ -113,6 +113,8 @@ function refresh() {
   if (damper.pinned && !pinTimer) pinTimer = setTimeout(() => { pinTimer = undefined; listeners.forEach((f) => f()); }, damper.until! - performance.now() + 20);
   // So is a landing after a fold or turn (LAND_HOLD), which no resize may follow.
   if (damper.landUntil !== undefined && !landTimer) landTimer = setTimeout(() => { landTimer = undefined; listeners.forEach((f) => f()); }, damper.landUntil - performance.now() + 10);
+  // And a keyboard held up after focus left it (KEYBOARD_DOWN), if the visual viewport never grows back.
+  if (damper.kbUntil !== undefined && damper.kbUntil > performance.now() && !kbTimer) kbTimer = setTimeout(() => { kbTimer = undefined; listeners.forEach((f) => f()); }, damper.kbUntil - performance.now() + 10);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
 }

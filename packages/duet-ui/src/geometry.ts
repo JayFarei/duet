@@ -368,7 +368,10 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   last?: Context; stableKey?: string; lastKey?: string;
   /** A fold or turn was caught halfway, and the landing (its stable signals, first seen at landAt) must hold until
    *  landUntil before the controls show (LAND_HOLD). */
-  moving?: boolean; landKey?: string; landAt?: number; landUntil?: number }
+  moving?: boolean; landKey?: string; landAt?: number; landUntil?: number;
+  /** Focus left a keyboard that was up while the visual viewport is still short: it counts as up until then
+   *  (KEYBOARD_DOWN). */
+  kbUntil?: number }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 /** Longest pin: a loop that keeps resuming doubles the wait up to this. */
@@ -380,6 +383,10 @@ export const PREVIEW_RISE = 1000;
  *  closed landscape passes through the closed portrait window (382x580 in 466x678, angle 0) for ~90ms before the
  *  open one (simulator, e2e round 2), a state that reads as landed and would flash the column for a frame. */
 export const LAND_HOLD = 150;
+/** Longest a keyboard stays up after focus leaves it while the visual viewport is still short: the open screen's
+ *  grew back ~40ms after the blur (e2e kb02-03); a viewport left short with no focus (#122) must not hide the
+ *  controls for good. */
+export const KEYBOARD_DOWN = 1000;
 
 /** settling: the window is still moving after a geometry event (signals.ts settling()). A fold lands the viewport
  *  first and outerWidth up to ~2s later, flipping the mode on the way at an unchanged window size, so flips then are
@@ -398,6 +405,14 @@ export const LAND_HOLD = 150;
  *  matching (Open in Safari). */
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false, epoch = 0): Context {
   const key = `${s.outerWidth}x${s.outerHeight}`;
+  // The keyboard going down: focus leaves first, while iOS still holds the layout viewport scrolled up by the
+  // keyboard (visual viewport 286 of 618, offset 107), so the inline rail shown then was drawn 107px high for a
+  // frame, its top item off the screen (e2e kb02-03, #126). A keyboard that was up stays up until the viewport grows.
+  const short = s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
+  if (s.editing === false && short && (d.last?.keyboard || d.kbUntil !== undefined)) {
+    d.kbUntil ??= now + KEYBOARD_DOWN;
+    if (now < d.kbUntil) s = { ...s, editing: undefined };
+  } else d.kbUntil = undefined;
   // Pinch zoom holds the context committed in this window. A scale off 1 in another window is WebKit's, not the
   // user's: folding the open preview sheet (653 wide, its document briefly 935) onto the closed screen leaves
   // visualViewport.scale at 1.0152 with the visual viewport as wide as the page (366), held until the next
