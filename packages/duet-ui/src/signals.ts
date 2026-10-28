@@ -85,6 +85,9 @@ export function watchSignals(cb: () => void): () => void {
   document.addEventListener("visibilitychange", visible);
   screen.orientation?.addEventListener("change", on);
   visualViewport?.addEventListener("resize", on);
+  // Focus decides whether a short visual viewport is the keyboard (keyboardUp), and can change with no resize.
+  document.addEventListener("focusin", cb);
+  document.addEventListener("focusout", cb);
   subs.add(cb);
   watchers.add(cb);
   kick();
@@ -99,5 +102,7 @@ export function watchSignals(cb: () => void): () => void {
     document.removeEventListener("visibilitychange", visible);
     screen.orientation?.removeEventListener("change", on);
     visualViewport?.removeEventListener("resize", on);
+    document.removeEventListener("focusin", cb);
+    document.removeEventListener("focusout", cb);
   };
 }

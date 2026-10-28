@@ -89,7 +89,7 @@ There is no fold signal. The mode follows the geometry: folding or unfolding cha
 
 How a new reading is committed:
 
-- **Keyboard.** The keyboard does not change the mode. `useDuet().keyboard` is true while the visual viewport is shorter than the page, and `<Duet>` sets `data-keyboard`; in `column` mode the controls hide until it closes (it covers the lower column).
+- **Keyboard.** The keyboard does not change the mode. `useDuet().keyboard` is true while the visual viewport is shorter than the page, and `<Duet>` sets `data-keyboard`; in `column` and `inline` mode the controls hide until it closes (it covers the lower column, and the inline rail would slide off). It counts only while a text field has focus.
 - **Zoom.** While the page is zoomed (`visualViewport.scale` not 1, for example Safari zooming out when an input takes focus) the window signature is unreadable, so Duet keeps the last context.
 - **Drift.** While the window is still settling, a mode change at the same window size, page width and turn is held until the sizes stop moving; a change of window size, page width or turn commits at once.
 - **Loops.** A mode that flips twice in 2s at a stable window is pinned for 3s, doubling on each repeat up to 60s.
@@ -410,6 +410,22 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** from the moment a field (`:read-write:focus`, so inputs, textareas and `contenteditable`) takes focus, clips the column layer out of the document width and hides it, before the zoom and the keyboard. The keyboard never changes the mode. `useDuet().keyboard` is true while it is up, and `<Duet>` sets `data-keyboard`. In column mode the controls come back when focus leaves.
 - **You do:** nothing. Don't rely on Duet's column controls while the user types.
 - **Status:** [#61](https://github.com/JayFarei/duet/issues/61), [PR #63](https://github.com/JayFarei/duet/pull/63).
+
+### Inline controls with the keyboard up
+
+- **You see:** without the handling, on the open screen in a Safari tab, the inline rail slides up as the keyboard rises: "…" goes off the top of the screen and the lower items end up under the keyboard.
+- **Cause:** iOS scrolls the layout viewport up by the keyboard's height (109pt on the open Duo) to keep the field in view, and a fixed rail moves with it.
+- **Duet does:** hides inline controls while `useDuet().keyboard` is true, as in column mode; they come back when the keyboard closes. Strip mode (Home Screen apps) is unchanged.
+- **You do:** nothing. Don't rely on Duet's inline controls while the user types.
+- **Status:** [#123](https://github.com/JayFarei/duet/issues/123).
+
+### A short visual viewport after a turn, read as the keyboard
+
+- **You see:** without the handling, after turning the closed Duo from its side to upright (seen with a page dialog open), Duet's column controls stay hidden for good, as if the keyboard were up.
+- **Cause:** WebKit can leave `visualViewport.height` short after a turn (466 against a 580pt page) until the next resize, with no keyboard.
+- **Duet does:** counts the keyboard as up only while a text field (`:read-write`), a select or an iframe has focus, read through shadow roots, and re-reads on focus changes.
+- **You do:** nothing.
+- **Status:** [#122](https://github.com/JayFarei/duet/issues/122).
 
 ### Pinch zoom
 

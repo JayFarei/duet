@@ -73,6 +73,12 @@ test("a negative visual viewport (sheet folded from the open screen) is not a ke
   const c = detect({ ...at("in-app preview, page sheet (real"), visualHeight: -78 });
   assert.deepEqual([c.mode, c.keyboard], ["column", undefined]);
 });
+test("a short visual viewport with no field focused (left by a turn, #122) is not a keyboard", () => {
+  const upright = full({ ...P, innerWidth: 382, innerHeight: 580, visualHeight: 466 });
+  assert.deepEqual([detect({ ...upright, editing: false }).mode, detect({ ...upright, editing: false }).keyboard], ["column", undefined]);
+  assert.equal(detect({ ...upright, editing: true }).keyboard, true);
+  assert.equal(detect(upright).keyboard, true); // emulated signals say nothing about focus
+});
 for (const [i, s] of SPLIT_ENTRY.entries()) test(`split entry, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [i, s] of TURN_90_TO_0.entries()) test(`turn 90 to 0, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [i, s] of UNFOLD.entries()) test(`unfold, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
