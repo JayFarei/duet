@@ -99,6 +99,9 @@ export function watchSignals(cb: () => void): () => void {
   const nav = (window as Window & { navigation?: EventTarget }).navigation;
   nav?.addEventListener("currententrychange", cb);
   addEventListener("popstate", cb);
+  // Focus decides whether a short visual viewport is the keyboard (keyboardUp), and can change with no resize.
+  document.addEventListener("focusin", cb);
+  document.addEventListener("focusout", cb);
   subs.add(cb);
   watchers.add(cb);
   kick();
@@ -116,5 +119,7 @@ export function watchSignals(cb: () => void): () => void {
     ro?.disconnect();
     nav?.removeEventListener("currententrychange", cb);
     removeEventListener("popstate", cb);
+    document.removeEventListener("focusin", cb);
+    document.removeEventListener("focusout", cb);
   };
 }

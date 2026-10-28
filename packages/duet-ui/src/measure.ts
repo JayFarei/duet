@@ -2,6 +2,14 @@
 // (boot.ts) can bundle it without signals.ts.
 import type { Signals } from "./geometry.ts";
 
+/** A text field has focus (`:read-write`, as the column's focus rule in duet.css: inputs that take text, textareas,
+ *  contenteditable), or a select or an iframe, which open a picker or may hold a field. Through shadow roots. */
+function editing() {
+  let e = document.activeElement;
+  while (e?.shadowRoot?.activeElement) e = e.shadowRoot.activeElement;
+  return !!e?.matches(":read-write, select, iframe");
+}
+
 /** probe: an element padded by env(safe-area-inset-*), for the insets; without one they read 0. Browser only. */
 export function measure(probe?: Element): Signals {
   const pad = probe ? getComputedStyle(probe) : undefined;
@@ -26,5 +34,6 @@ export function measure(probe?: Element): Signals {
     standalone: (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches,
     scale: visualViewport?.scale ?? 1,
     canGoForward: (window as Window & { navigation?: { canGoForward?: boolean } }).navigation?.canGoForward === true,
+    editing: editing(),
   };
 }

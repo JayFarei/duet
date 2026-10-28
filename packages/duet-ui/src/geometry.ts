@@ -95,6 +95,9 @@ export interface Signals {
   /** navigation.canGoForward: the in-app preview shows a Forward button only with forward history, and its Back
    *  moves up a row (PREVIEW.gap.forward). Same-origin entries only (the Navigation API); unknown counts as none. */
   canGoForward?: boolean;
+  /** A text field (or an iframe, which may hold one) has focus: only then can a short visual viewport be the
+   *  keyboard. Unknown (an emulator's signals) does not rule it out. */
+  editing?: boolean;
 }
 
 export interface Context {
@@ -317,10 +320,12 @@ const hasColumn = (s: Signals) => columnWidth(s) && within(s.outerHeight - s.inn
 /** Side inset of a Home Screen app on the Duo: 84 measured (closed portrait). iPhones have up to 59 in landscape. */
 const STRIP_INSET = 76;
 
-/** The keyboard (or anything else) covers the bottom of the page: the visual viewport is shorter than the layout one.
- *  WebKit can report a negative visual height after the preview's sheet is folded from the open screen (-78 for a
- *  600pt page, e2e round 3, held until the next resize); no viewport is that short, so it is not a keyboard. */
-export const keyboardUp = (s: Signals) => s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
+/** The keyboard covers the bottom of the page: a text field has focus and the visual viewport is shorter than the
+ *  layout one. WebKit can report a negative visual height after the preview's sheet is folded from the open screen
+ *  (-78 for a 600pt page, e2e round 3, held until the next resize); no viewport is that short, so it is not a
+ *  keyboard. It can also leave the visual viewport short after a turn (466 for a 580pt page, closed Duo turned from
+ *  90 to upright with a page dialog open, #122) with no field focused, so without focus it is not a keyboard. */
+export const keyboardUp = (s: Signals) => s.editing !== false && s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
 
 /** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
  *  caller holds a sticky one (stable()). */
