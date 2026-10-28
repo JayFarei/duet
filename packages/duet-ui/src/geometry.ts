@@ -297,8 +297,10 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
  *  window sizes (453x661 and 450x670 outer, 369x591 and 366x600 inner), then taken for windowed Safari; 450x670
  *  with inset 34 is the in-app preview's sheet (isPreview), which goes inline. A pane with the compact URL bar has
  *  75pt of chrome, so any portrait Safari window on the Duo with the column counts. */
-// The largest Dynamic Type grows the bottom bar to 106pt (382x572 in 466x678, e2e round 3).
-const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 110] } as const;
+// The largest Dynamic Type grows the bottom bar to 106pt (382x572 in 466x678, e2e round 3). On a real Duo the bar
+// collapses further while the page scrolls: 59pt (382x619 in 466x678, iOS 27, 2026-10-28), so the column fell inline
+// once the scroll settled (#132).
+const SAFARI_COLUMN = { width: [80, 88], chrome: [50, 110] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
 // The full open window (951x669, 669x951) never has the column: a column-wide page there is the closed page's, not yet
 // resized (inTransit).
@@ -315,7 +317,11 @@ const bannerOf = (s: Signals) => {
   const chrome = s.outerHeight - s.innerHeight;
   return !openWindow(s) && chrome > SAFARI_COLUMN.chrome[1] && within(chrome - BANNER, SAFARI_COLUMN.chrome) ? BANNER : 0;
 };
-const hasColumn = (s: Signals) => columnWidth(s) && within(s.outerHeight - s.innerHeight - bannerOf(s), SAFARI_COLUMN.chrome);
+/** The keyboard on a real Duo shrinks the layout viewport, not only the visual one: 382x411 in 466x678 with the visual
+ *  viewport as tall, a 267pt "chrome" no Safari bar has (iOS 27, 2026-10-28, #132). Safari's column stays where it
+ *  was. Only with a text field focused: a stale layout handed a new window reads the same (inTransit). */
+const keyboardResized = (s: Signals) => s.editing === true && columnWidth(s) && s.outerHeight - s.innerHeight > SAFARI_COLUMN.chrome[1] + BANNER;
+const hasColumn = (s: Signals) => columnWidth(s) && (keyboardResized(s) || within(s.outerHeight - s.innerHeight - bannerOf(s), SAFARI_COLUMN.chrome));
 
 /** Side inset of a Home Screen app on the Duo: 84 measured (closed portrait). iPhones have up to 59 in landscape. */
 const STRIP_INSET = 76;
@@ -324,8 +330,10 @@ const STRIP_INSET = 76;
  *  layout one. WebKit can report a negative visual height after the preview's sheet is folded from the open screen
  *  (-78 for a 600pt page, e2e round 3, held until the next resize); no viewport is that short, so it is not a
  *  keyboard. It can also leave the visual viewport short after a turn (466 for a 580pt page, closed Duo turned from
- *  90 to upright with a page dialog open, #122) with no field focused, so without focus it is not a keyboard. */
-export const keyboardUp = (s: Signals) => s.editing !== false && s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
+ *  90 to upright with a page dialog open, #122) with no field focused, so without focus it is not a keyboard. A real
+ *  Duo shrinks the layout viewport with it instead (keyboardResized). */
+const shortView = (s: Signals) => s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
+export const keyboardUp = (s: Signals) => s.editing !== false && (shortView(s) || keyboardResized(s));
 
 /** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
  *  caller holds a sticky one (stable()). */
@@ -398,6 +406,8 @@ export function inTransit(s: Signals): boolean {
   // The turn speaks for the closed screen only: the open screen is landscape at angle 0.
   const closed = short <= w + 1 && long <= h + 1;
   if (closed && s.angle !== undefined && s.angle % 90 === 0 && (s.angle % 180 === 90) !== landscape) return true;
+  // A real Duo's keyboard shrinks the page below every landed chrome, with a field focused (keyboardResized).
+  if (keyboardResized(s)) return false;
   const page = s.outerWidth - s.innerWidth, chrome = s.outerHeight - s.innerHeight;
   if (!LANDED.page.some((r) => within(page, r)) || !within(chrome, LANDED.chrome)) return true;
   // Safari's column is 84pt in every window measured, and comes with its bottom URL bar (chrome 98, 106 at the largest
@@ -456,7 +466,7 @@ export const KEYBOARD_DOWN = 1000;
  *  load, fold, rotation or a new page show, and a mode they ask for is taken at once. Drifting ones (page height
  *  with the URL bar or find bar, the visual viewport with the keyboard, pinch zoom) move while the user scrolls or
  *  types, and never move the controls mid-gesture: a mode only they ask for waits until the window settles, and
- *  under pinch zoom the last context holds.
+ *  under pinch zoom the last context holds. They never take a tab out of Safari's column at all (#132).
  *
  *  The preview verdict is sticky the same way: a page that loaded as a tab stays a tab while it scrolls, since the
  *  URL bar collapsing changes only the page height. A tab becomes a preview only on a stable change or in the
@@ -467,10 +477,11 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   // The keyboard going down: focus leaves first, while iOS still holds the layout viewport scrolled up by the
   // keyboard (visual viewport 286 of 618, offset 107), so the inline rail shown then was drawn 107px high for a
   // frame, its top item off the screen (e2e kb02-03, #126). A keyboard that was up stays up until the viewport grows.
-  const short = s.visualHeight > 0 && s.visualHeight < s.innerHeight - 1;
+  // On a real Duo the layout viewport is the short one (keyboardResized).
+  const short = shortView(s) || keyboardResized({ ...s, editing: true });
   if (s.editing === false && short && (d.last?.keyboard || d.kbUntil !== undefined)) {
     d.kbUntil ??= now + KEYBOARD_DOWN;
-    if (now < d.kbUntil) s = { ...s, editing: undefined };
+    if (now < d.kbUntil) s = { ...s, editing: true };
   } else d.kbUntil = undefined;
   // Pinch zoom holds the context committed in this window. A scale off 1 in another window is WebKit's, not the
   // user's: folding the open preview sheet (653 wide, its document briefly 935) onto the closed screen leaves
@@ -508,8 +519,12 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     if (now < d.landUntil!) return moving();
   }
   Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
-  // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once.
-  if (d.last && c.mode !== d.last.mode && settling && stableKey === d.stableKey && !!d.last.preview === preview) {
+  // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once. Safari's column
+  // never leaves a tab on drift alone, so column to inline is held after the settle too: a real Duo's bar and
+  // keyboard read outside every range measured on the simulator (#132), and a wrong inline verdict committed once the
+  // scroll settled dropped the controls off the rail for good. Inline to column still moves, so a wrong inline heals.
+  const columnHeld = d.last?.mode === "column" && c.mode === "inline" && !d.pinned;
+  if (d.last && c.mode !== d.last.mode && (settling || columnHeld) && stableKey === d.stableKey && !!d.last.preview === preview) {
     const { width, height, insetTop, insetBottom, keyboard } = c;
     return { ...d.last, width, height, insetTop, insetBottom, keyboard, confidence: "held" };
   }

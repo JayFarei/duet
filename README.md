@@ -611,6 +611,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing, but don't set `viewport-fit=contain` or `shrink-to-fit=yes`: Duet only appends absent keys and leaves your values as they are.
 - **Status:** 0.2.0, 0.2.1. See [Viewport meta](#viewport-meta).
 
+### Scrolling or typing on a real Duo drops the controls off the column
+
+- **You see:** without the handling, on a real Duo in a closed Safari tab, scrolling up and down (fast or not), or scrolling and typing with the keyboard up, moves the controls out of Safari's column to the page edge, and they stay there.
+- **Cause:** the real device reads outside the ranges measured on the simulator. Safari's bottom bar collapses to 59pt while the page scrolls (the simulator's compact bar is 80), and the keyboard shrinks the layout viewport, not only the visual one (382x411 in 466x678). Both failed the column test, and the wrong verdict was committed once the scroll settled.
+- **Duet does:** counts the collapsed bar as Safari's column, and reads a page shrunk that far with a text field focused as the keyboard (the column stays, `useDuet().keyboard` is true). Signals that move while the user scrolls or types (page height, visual viewport) never take a tab out of the column, settled or not; moving into it still happens, so a wrong `inline` heals.
+- **You do:** nothing.
+- **Status:** [#132](https://github.com/JayFarei/duet/issues/132), 0.5.0-rc.
+
 ### Mode flips back and forth
 
 - **You see:** without the handling, the controls jump between the column and the page several times a second.

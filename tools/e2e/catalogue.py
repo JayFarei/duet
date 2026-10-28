@@ -236,6 +236,11 @@ SUITES = [
         (("scroll", 900), "Scroll the page down (the preview's top bar compacts)", {"scroll_gt": 500}),
         (("scroll", -2000), "Scroll back to the top (the top bar grows back)", {"scroll_lt": 50}),
     ]},
+    {"id": "scr03", "title": "Fast flicks up and down, Safari tab, outer screen (#132)", "page": "/scroll", "start": TAB0, "steps": [
+        (("fling", 7), "Flick the page fast down and up, 7 times, ending down", {"scroll_gt": 300}),
+        (("fling", 8), "Flick fast up and down again, 8 times", {}),
+        (("scroll", -4000), "Scroll back to the top", {"scroll_lt": 50}),
+    ]},
     {"id": "nav01", "title": "Link, Safari Back and Forward, outer screen upright", "page": "/", "start": TAB0, "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
         (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
@@ -264,6 +269,18 @@ SUITES = [
         # No focus check: on iOS a tap on a plain page area drops the keyboard but may leave focus on the field (kb01-03).
         # What the user sees is judged: keyboard down, controls back in the column and painted.
         (("blur",), "Tap the page outside the field (the keyboard goes down)", {"keyboard": False}),
+    ]},
+    {"id": "kb03", "title": "Keyboard up, scroll, type, down, then flicks, repeated, Safari tab, outer screen (#132)", "page": "/probe", "start": TAB0, "steps": [
+        (("tap", "Tap to open the keyboard"), "Tap the text field (the keyboard comes up)", {"active": "input", "keyboard": True}),
+        (("scroll", 300), "Scroll the page with the keyboard up", {"keyboard": True}),
+        (("type", "hello duo"), "Type \"hello duo\"", {"keyboard": True}),
+        (("blur",), "Tap the page outside the field (the keyboard goes down)", {"keyboard": False}),
+        (("fling", 5), "Flick the page fast down and up, 5 times", {"keyboard": False}),
+        (("scroll", -4000), "Scroll back to the top", {"scroll_lt": 50}),
+        (("tap", "Tap to open the keyboard"), "Tap the text field again", {"active": "input", "keyboard": True}),
+        (("type", " again"), "Type \" again\"", {"keyboard": True}),
+        (("blur",), "Tap the page outside the field", {"keyboard": False}),
+        (("fling", 4), "Flick fast up and down, 4 times", {"keyboard": False}),
     ]},
     {"id": "mod01", "title": "A full-screen page dialog opened and closed (#79), Safari tab", "page": "/sheet", "start": TAB0, "steps": [
         (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True, "label": "Close"}),

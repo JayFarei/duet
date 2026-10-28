@@ -85,7 +85,15 @@ test("a mode only drifting signals ask for waits for the window to settle", () =
   const short = { ...TAB, innerHeight: 640, visualHeight: 640 }; // chrome 38: no column signature
   const held = stable(d, short, undefined, 100, true);
   assert.deepEqual([held.mode, held.confidence, held.height], ["column", "held", 640]);
-  assert.equal(stable(d, short, undefined, 700, false).mode, "inline");
+  // Drift never takes a tab out of Safari's column, settled or not (#132).
+  const after = stable(d, short, undefined, 700, false);
+  assert.deepEqual([after.mode, after.confidence, after.height], ["column", "held", 640]);
+});
+test("a wrong inline verdict heals on drift: inline to column still moves once settled", () => {
+  const d = { flips: [] };
+  const short = { ...TAB, innerHeight: 640, visualHeight: 640 };
+  assert.equal(stable(d, short, undefined, 0).mode, "inline");
+  assert.equal(stable(d, TAB, undefined, 700).mode, "column");
 });
 test("a stable signal change commits at once, even while settling", () => {
   const d = { flips: [] };

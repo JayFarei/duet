@@ -151,6 +151,18 @@ function sample(s: string | null) {
   };
 }
 
+const TRACE_KEY = "duet-trace";
+function lean() {
+  const n = document.querySelector("nav.duet");
+  return {
+    t: Date.now(), page: PAGE, path: location.pathname, sig: readSignals(), frameAt, active: document.activeElement?.tagName.toLowerCase() ?? null,
+    vv: visualViewport ? { y: visualViewport.offsetTop, h: visualViewport.height, scale: visualViewport.scale } : null, y: scrollY,
+    nav: n && { mode: n.getAttribute("data-mode"), settling: n.getAttribute("data-settling"), hidden: n.getAttribute("data-hidden"),
+      confidence: n.getAttribute("data-confidence"), keyboard: n.getAttribute("data-keyboard"),
+      slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({ slot: s.getAttribute("data-duet-slot"), rect: rect(s) })) },
+  };
+}
+
 export function E2EReporter() {
   useEffect(() => {
     // The top page only: a same-origin iframe (/'s WebDuo demo of /skeleton) shares the tab's sessionStorage, so it
@@ -167,10 +179,29 @@ export function E2EReporter() {
       if (sq) sessionStorage.setItem(S_KEY, sq);
       s = sessionStorage.getItem(S_KEY);
     } catch { /* storage blocked: no reporting */ }
-    if (!origin) return;
-    const url = origin + "/beacon";
     let raf = 0;
     const frame = () => { frameAt = Date.now(); raf = requestAnimationFrame(frame); };
+    // ?trace: a real phone has no loopback beacon, so it records lean samples (signals, Duet's verdict, where the
+    // controls are) every 40ms and posts them in batches to the dev server's trace sink (/api/lab-trace, $DUET_TRACE).
+    let trace = false;
+    try {
+      if (new URLSearchParams(location.search).has("trace")) sessionStorage.setItem(TRACE_KEY, "1");
+      trace = sessionStorage.getItem(TRACE_KEY) === "1";
+    } catch { /* storage blocked: no trace */ }
+    if (trace) {
+      raf = requestAnimationFrame(frame);
+      let batch: unknown[] = [];
+      const take = setInterval(() => batch.push(lean()), 40);
+      const send = setInterval(() => {
+        if (!batch.length) return;
+        const body = batch.map((b) => JSON.stringify(b)).join("\n");
+        batch = [];
+        fetch("/api/lab-trace", { method: "POST", body, headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {});
+      }, 400);
+      return () => { clearInterval(take); clearInterval(send); cancelAnimationFrame(raf); };
+    }
+    if (!origin) return;
+    const url = origin + "/beacon";
     raf = requestAnimationFrame(frame);
     const id = setInterval(() => {
       try { fetch(url, { method: "POST", body: JSON.stringify(sample(s)), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }

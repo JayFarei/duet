@@ -68,6 +68,13 @@ Not covered yet:
 2. Scroll the page down (the preview's top bar compacts). Expect: controls in a column on the right in the gap of the preview's own column; the page stays scrolled down (more than 500pt).
 3. Scroll back to the top (the top bar grows back). Expect: controls in a column on the right in the gap of the preview's own column; the page is at the top (under 50pt).
 
+## scr03: Fast flicks up and down, Safari tab, outer screen (#132)
+
+1. Open /scroll in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Flick the page fast down and up, 7 times, ending down. Expect: controls in a column on the right; the page stays scrolled down (more than 300pt).
+3. Flick fast up and down again, 8 times. Expect: controls in a column on the right.
+4. Scroll back to the top. Expect: controls in a column on the right; the page is at the top (under 50pt).
+
 ## nav01: Link, Safari Back and Forward, outer screen upright
 
 1. Open / in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
@@ -97,13 +104,27 @@ Not covered yet:
 
 1. Open /probe in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
 2. Tap the text field (the keyboard comes up). Expect: controls in a column on the right; the text field has focus; the keyboard is up (data-keyboard).
-3. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; nothing has focus; the keyboard is down.
+3. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; the keyboard is down.
 
 ## kb02: Keyboard up and down, Safari tab, unfolded
 
 1. Open /probe in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
 2. Tap the text field (the keyboard comes up). Expect: controls inline on the right; the text field has focus; the keyboard is up (data-keyboard).
-3. Tap the page outside the field (the keyboard goes down). Expect: controls inline on the right; nothing has focus; the keyboard is down.
+3. Tap the page outside the field (the keyboard goes down). Expect: controls inline on the right; the keyboard is down.
+
+## kb03: Keyboard up, scroll, type, down, then flicks, repeated, Safari tab, outer screen (#132)
+
+1. Open /probe in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap the text field (the keyboard comes up). Expect: controls in a column on the right; the text field has focus; the keyboard is up (data-keyboard).
+3. Scroll the page with the keyboard up. Expect: controls in a column on the right; the keyboard is up (data-keyboard).
+4. Type "hello duo". Expect: controls in a column on the right; the keyboard is up (data-keyboard).
+5. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; the keyboard is down.
+6. Flick the page fast down and up, 5 times. Expect: controls in a column on the right; the keyboard is down.
+7. Scroll back to the top. Expect: controls in a column on the right; the page is at the top (under 50pt).
+8. Tap the text field again. Expect: controls in a column on the right; the text field has focus; the keyboard is up (data-keyboard).
+9. Type " again". Expect: controls in a column on the right; the keyboard is up (data-keyboard).
+10. Tap the page outside the field. Expect: controls in a column on the right; the keyboard is down.
+11. Flick fast up and down, 4 times. Expect: controls in a column on the right; the keyboard is down.
 
 ## mod01: A full-screen page dialog opened and closed (#79), Safari tab
 
