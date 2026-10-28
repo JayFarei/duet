@@ -88,3 +88,30 @@ test("Open in Safari from the preview: a tab's column, the preview flag gone", (
   const c = detect(sig(382, 580, 466, 678, { insetBottom: 0 }));
   assert.deepEqual([c.mode, c.side, c.preview], ["column", "right", undefined]);
 });
+
+// Forward history (#117): going back gives the preview a Forward button where Back was (428) and moves Back up a row
+// (374; e2e ctl02-05, simulator iOS 27.1). The gap 282..374 holds one button and no Live Activities allowance.
+const FORWARD = (x) => [["Cancel", x, 174], ["Page Menu", x, 234], ["Back", x, 374], ["Forward", x, 428], ["Share", x, 488], ["Reload", x, 542], ["Open in Safari", x, 596]];
+for (const [name, { s, origin: [x0, y0], x }] of Object.entries(PORTRAIT)) {
+  test(`preview ${name}, forward history: every control in the gap above the raised Back, clear of every native button`, () => {
+    const c = detect({ ...s, canGoForward: true });
+    assert.deepEqual([c.mode, c.preview, c.forward], ["column", true, true]);
+    const native = FORWARD(x);
+    for (const spec of SPECS) {
+      const p = plan(c, spec), tag = JSON.stringify(spec);
+      assert.ok(p.more || spec.tabs || spec.searchButton || !boxes(p).length, `something reachable ${tag}`);
+      for (const [k, b] of boxes(p)) {
+        const top = y0 + b.top, bottom = top + b.height;
+        assert.ok(top >= 234 + 48 - 0.5 && bottom <= 374 + 0.5, `${k} ${top}..${bottom} outside the gap ${tag}`);
+        for (const [n, , ny] of native) assert.ok(bottom <= ny || top >= ny + 48, `${k} overlaps ${n} ${tag}`);
+      }
+    }
+  });
+}
+
+test("forward history outside the preview changes nothing: a tab's column has its own Forward row", () => {
+  const s = sig(382, 580, 466, 678, { insetBottom: 0 });
+  const a = detect(s), b = detect({ ...s, canGoForward: true });
+  assert.equal(b.forward, undefined);
+  assert.deepEqual(b, a);
+});

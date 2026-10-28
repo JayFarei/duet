@@ -92,6 +92,9 @@ export interface Signals {
   /** visualViewport.scale: above 1 under pinch zoom, when innerWidth is in zoomed px and says nothing about the
    *  column. Unknown counts as 1. */
   scale?: number;
+  /** navigation.canGoForward: the in-app preview shows a Forward button only with forward history, and its Back
+   *  moves up a row (PREVIEW.gap.forward). Same-origin entries only (the Navigation API); unknown counts as none. */
+  canGoForward?: boolean;
 }
 
 export interface Context {
@@ -112,6 +115,8 @@ export interface Context {
   insetBottom: number;
   /** In-app Safari preview (SFSafariViewController, opened from a social or mail app). */
   preview?: boolean;
+  /** The in-app preview has forward history (Signals.canGoForward): its Back sits a row higher, and so does the band. */
+  forward?: boolean;
   /** The on-screen keyboard is up (visual viewport shorter than the page). The mode stays as it was; in column
    *  mode the controls hide until it goes down. */
   keyboard?: boolean;
@@ -176,7 +181,10 @@ const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "na
  *  with a bare island. Live Activities push the X and reader/menu buttons down as they push a tab's back + reader
  *  rows (one activity: ~45pt, device, 2026-10-27); the back button stays. Nothing tells the page, so columnBand
  *  assumes the worst case (DUO.island): a ~54pt gap, room for one button. */
-const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [44, 77], sheetInset: 4, gap: { top: 282, bottom: 428 } } as const;
+/** gap.forward: the band's bottom once the preview has forward history: going back gives it a Forward button and
+ *  moves its Back up a row (simulator iOS 27.1, e2e ctl02, #117). That gap has room for one button and none for the
+ *  Live Activities allowance. */
+const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [44, 77], sheetInset: 4, gap: { top: 282, bottom: 428, forward: 374 } } as const;
 /** Why the signals read as the in-app preview, for probes and logs; undefined when they do not. */
 export function previewReason(s: Signals): string | undefined {
   if (s.standalone || browserOf(s.userAgent) !== "safari") return;
@@ -300,7 +308,7 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
     && (preview ? columnWidth(s) : hasColumn(s)) && (s.scale ?? 1) === 1;
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
-  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }) };
+  if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }), ...(preview && s.canGoForward && { forward: true }) };
   // The turned full-screen preview (default and full styles, iOS 27.1): its buttons all sit in a top bar, and the 84pt
   // safe-area inset on the side the Duo is turned to (left at 90, right at 270) is page area nothing native uses
   // below that bar. The controls take it, like a Home Screen app's strip (e2e round 4: the sheet turned has only a
@@ -566,10 +574,13 @@ export function columnBand(c: Context): { top: number; bottom: number; reach: nu
   if (c.mode !== "column") return undefined;
   const rows = SAFARI.rows * (DUO.control + DUO.gap) + SAFARI.forward, pill = c.screenHeight - DUO.bottom - SAFARI.pill - DUO.gap;
   // In-app preview: the gap in its column at its worst case, from screen points to the page's (the page reaches the
-  // screen bottom). No reach: nothing rises into the zone Live Activities give its buttons.
+  // screen bottom). No reach: nothing rises into the zone Live Activities give its buttons. With forward history its
+  // Back is a row higher and the gap holds one button with little to spare, so the Live Activities allowance shrinks
+  // to what is left: an activity may then cover the button, never Back.
   if (c.preview) {
-    const y0 = DUO_SIZES[0][1] - c.height;
-    return { top: PREVIEW.gap.top + DUO.island + DUO.gap - y0, bottom: PREVIEW.gap.bottom - DUO.gap - y0, reach: 0 };
+    const y0 = DUO_SIZES[0][1] - c.height, back = c.forward ? PREVIEW.gap.forward : PREVIEW.gap.bottom;
+    const island = c.forward ? Math.max(0, back - PREVIEW.gap.top - 2 * DUO.gap - DUO.control) : DUO.island;
+    return { top: PREVIEW.gap.top + island + DUO.gap - y0, bottom: back - DUO.gap - y0, reach: 0 };
   }
   if (c.split) return { top: SAFARI.splitTop[c.side] + rows, bottom: pill, reach: c.side === "right" ? DUO.island : 0 };
   if (landscapeColumn(c)) return { top: SAFARI.landscape[c.side].top + rows, bottom: SAFARI.landscape[c.side].pill - DUO.gap, reach: 0 };
