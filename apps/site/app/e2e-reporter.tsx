@@ -18,6 +18,9 @@ const PAGE = Math.random().toString(36).slice(2, 10);
 // running timers and layout: a sample then reads a layout nobody sees (e2e rerun, 2026-10-28: unfolding the turned
 // preview laid out four sizes over ~220ms with no frame, the screen black, then the settled page).
 let frameAt = 0;
+// The last few touches the page received, with what they hit: a step whose tap did nothing shows whether WebKit
+// delivered it, and to what (mod01-05, a column X tapped after a turn left the visual viewport short).
+const taps: { t: number; type: string; x: number; y: number; target: string; vv: { y: number; h: number } | null }[] = [];
 
 function rect(el: Element) {
   const r = el.getBoundingClientRect();
@@ -146,6 +149,7 @@ function sample(s: string | null) {
     vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop, w: visualViewport.width, h: visualViewport.height, scale: visualViewport.scale } : null,
     overflow: out.slice(0, 20), overflowCount: out.length, underControls: under.slice(0, 10),
     targets: targets(),
+    taps: taps.slice(),
     dialogs: [...document.querySelectorAll("[role=dialog], dialog[open]")].filter(shown).map(rect),
     content: main ? { main: rect(main), children: [...main.children].slice(0, 16).filter(shown).map((c) => ({ el: label(c), rect: rect(c) })) } : null,
   };
@@ -203,10 +207,21 @@ export function E2EReporter() {
     if (!origin) return;
     const url = origin + "/beacon";
     raf = requestAnimationFrame(frame);
+    const touch = (e: Event) => {
+      const p = "touches" in e ? (e as TouchEvent).changedTouches[0] : (e as PointerEvent);
+      if (!p) return;
+      taps.push({ t: Date.now(), type: e.type, x: Math.round(p.clientX), y: Math.round(p.clientY), target: e.target instanceof Element ? label(e.target) : String(e.target),
+        vv: visualViewport ? { y: Math.round(visualViewport.offsetTop), h: Math.round(visualViewport.height) } : null });
+      if (taps.length > 8) taps.shift();
+    };
+    for (const type of ["touchstart", "pointerdown", "click"]) addEventListener(type, touch, { capture: true, passive: true });
     const id = setInterval(() => {
       try { fetch(url, { method: "POST", body: JSON.stringify(sample(s)), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
     }, 40);
-    return () => { clearInterval(id); cancelAnimationFrame(raf); };
+    return () => {
+      clearInterval(id); cancelAnimationFrame(raf);
+      for (const type of ["touchstart", "pointerdown", "click"]) removeEventListener(type, touch, { capture: true });
+    };
   }, []);
   return null;
 }
