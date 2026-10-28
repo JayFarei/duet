@@ -115,6 +115,12 @@ def menu_items(r):
             if b.get("role") in ("menuitem", "menuitemradio")]
 
 
+def closes(r):
+    """Close buttons on screen: Duet's (a slot's, not an open menu's own dismiss X) and the page's own (#135)."""
+    return ([f"Duet's at {b['rect']['x']:.0f},{b['rect']['y']:.0f}" for n in live_navs(r) for g in n.get("slots") or [] for b in g.get("buttons") or [] if b["label"] == "Close"]
+            + [f"the page's at {t['rect']['x']:.0f},{t['rect']['y']:.0f}" for t in r.get("targets") or [] if t["name"] == "Close"])
+
+
 def opener(r):
     """The rect of the button whose menu holds what Duet folded: "…", else the lone selected tab where the band holds
     one button (its menu lists the tabs, then the rest: closed landscape, the preview under Live Activities)."""
@@ -1265,6 +1271,8 @@ class Run:
                     bad.append(f"focus is on {r.get('active') or 'nothing'}, expected {v or 'nothing'}")
                 elif k == "dialog" and bool(r.get("dialogs")) != v:
                     bad.append("no page dialog open" if v else "the page dialog is still open")
+                elif k == "closes" and len(closes(r)) != v:
+                    bad.append(f"{len(closes(r))} close buttons on screen ({', '.join(closes(r)) or 'none'}), expected {v}")
                 elif k == "scroll_gt" and not r["scroll"]["y"] > v:
                     bad.append(f"page scrolled to {r['scroll']['y']}pt, expected more than {v}")
                 elif k == "scroll_lt" and not r["scroll"]["y"] < v:

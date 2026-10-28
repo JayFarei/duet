@@ -209,6 +209,7 @@ def steps_en(start, acts):
 #   label       Duet offers a control labelled this (on screen, or in the menu it folded into);  no_label: it does not
 #   keyboard    Duet's nav carries data-keyboard;  active: the focused element's tag ("input", or None for none)
 #   dialog      a page dialog is open (True) or not (False)
+#   closes      close buttons on screen, Duet's and the page's own together (one: a sheet shows a single X, #135)
 #   scroll_gt   the page is scrolled down more than this (pt);  scroll_lt: less than this
 #   la          Live Activities running
 # env: dark (appearance), content_size (Dynamic Type), set for the suite and restored after it.
@@ -266,10 +267,17 @@ SUITES = [
         (("blur",), "Tap the page outside the field (the keyboard goes down)", {"keyboard": False}),
     ]},
     {"id": "mod01", "title": "A full-screen page dialog opened and closed (#79), Safari tab", "page": "/sheet", "start": TAB0, "steps": [
-        (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True, "label": "Close"}),
-        (("turn", 90), None, {"dialog": True, "label": "Close"}),
-        (("turn", 0), None, {"dialog": True}),
+        (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True, "label": "Close", "closes": 1}),
+        (("turn", 90), None, {"dialog": True, "label": "Close", "closes": 1}),
+        (("turn", 0), None, {"dialog": True, "closes": 1}),
         (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False, "no_label": "Close"}),
+    ]},
+    # #135: the sheet hid its own X only in column mode, so the inner screen showed two (the sheet's and Duet's).
+    {"id": "mod02", "title": "A full-screen page dialog opened and closed, Safari tab, unfolded (#135)", "page": "/sheet", "start": ("tab", "open", 0, False), "steps": [
+        (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True, "label": "Close", "closes": 1}),
+        (("turn", 90), None, {"dialog": True, "closes": 1}),
+        (("turn", 0), None, {"dialog": True, "closes": 1}),
+        (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False, "no_label": "Close", "closes": 0}),
     ]},
     {"id": "la01", "title": "Live Activity expanded by a long press, Safari tab", "page": "/book", "start": ("tab", "closed", 0, True), "steps": [
         (("expand",), "Long-press the Live Activity in the Dynamic Island (it expands)", {}),
@@ -321,6 +329,7 @@ def check_en(c):
                     "keyboard": lambda: "the keyboard is up (data-keyboard)" if v else "the keyboard is down",
                     "active": lambda: "the text field has focus" if v else "nothing has focus",
                     "dialog": lambda: "the dialog is open" if v else "the dialog is closed",
+                    "closes": lambda: f"{v} close button{'' if v == 1 else 's'} on screen",
                     "scroll_gt": lambda: f"the page stays scrolled down (more than {v}pt)", "scroll_lt": lambda: f"the page is at the top (under {v}pt)",
                     "la": lambda: f"{v} Live Activit{'y' if v == 1 else 'ies'} running"}[k]())
     return out

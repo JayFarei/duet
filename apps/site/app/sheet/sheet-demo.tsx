@@ -47,7 +47,7 @@ function Sheets() {
   const page = (
     <main style={{ paddingTop: "calc(24px + env(safe-area-inset-top))", paddingBottom: 140, ...bleed(20) }}>
       <h1 style={title}>Sheets</h1>
-      <p style={{ ...dim, marginBottom: 16 }}>Open a row. The sheet sits on a full-screen scrim (position: fixed, inset: 0). In Safari&apos;s column the controls hold only a close button, and the sheet&apos;s own X steps aside.</p>
+      <p style={{ ...dim, marginBottom: 16 }}>Open a row. The sheet sits on a full-screen scrim (position: fixed, inset: 0). While Duet shows its close button (in Safari&apos;s column, or beside the page unfolded) the sheet&apos;s own X steps aside.</p>
       {ROWS.map((r) => (
         <button key={r} style={row} onClick={() => setOpen(r)}><span style={{ flex: 1 }}>{r}</span><ChevronRight size={18} color="var(--dim)" /></button>
       ))}
