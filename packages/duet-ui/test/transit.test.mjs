@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { DUO, detect, inTransit, isPreview, LAND_HOLD, plan, stable } from "../src/geometry.ts";
+import { DUO, detect, inTransit, isPreview, KEYBOARD_DOWN, LAND_HOLD, plan, stable } from "../src/geometry.ts";
 
 const F = JSON.parse(readFileSync(new URL("./fixtures/states.json", import.meta.url), "utf8"));
 const full = (s) => ({
@@ -78,6 +78,23 @@ test("a short visual viewport with no field focused (left by a turn, #122) is no
   assert.deepEqual([detect({ ...upright, editing: false }).mode, detect({ ...upright, editing: false }).keyboard], ["column", undefined]);
   assert.equal(detect({ ...upright, editing: true }).keyboard, true);
   assert.equal(detect(upright).keyboard, true); // emulated signals say nothing about focus
+});
+test("the keyboard going down: still up after focus leaves, until the visual viewport grows back (#126)", () => {
+  // Open screen, wide (e2e kb02-03): focus left at once while the visual viewport was still 286 of 618 (offset 107),
+  // and the inline rail shown then was drawn 107px high for a frame.
+  const open = full({ outerWidth: 951, outerHeight: 669, innerWidth: 951, innerHeight: 618, screenWidth: 951, screenHeight: 669 });
+  const d = { flips: [] };
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: true }, undefined, 0).keyboard, true);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 5000).keyboard, true, "blurred, viewport still short");
+  assert.equal(d.kbUntil, 5000 + KEYBOARD_DOWN);
+  assert.equal(stable(d, { ...open, editing: false }, undefined, 5040).keyboard, undefined, "viewport back");
+  // Capped: a viewport left short with no focus (#122) shows the controls again after KEYBOARD_DOWN.
+  stable(d, { ...open, visualHeight: 286, editing: true }, undefined, 6000);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 6010).keyboard, true);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 6010 + KEYBOARD_DOWN).keyboard, undefined);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 9000).keyboard, undefined);
+  // Never up, never held (#122).
+  assert.equal(stable({ flips: [] }, { ...open, visualHeight: 286, editing: false }, undefined, 0).keyboard, undefined);
 });
 for (const [i, s] of SPLIT_ENTRY.entries()) test(`split entry, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [i, s] of TURN_90_TO_0.entries()) test(`turn 90 to 0, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
