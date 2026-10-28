@@ -697,6 +697,26 @@ class Run:
             bad.append(f'clipped text {o["el"][:60]} by {o["over"]}pt')
         for o in [o for o in overs if not o["text"] and not o["el"].startswith(("div.duet-scroller", "main", "section.stage", "span.duet-guard"))][:3]:
             bad.append(f'overflowing block {o["el"][:60]} by {o["over"]}pt')
+        # The edge guards must cover the points Safari samples for an overlay to fill its column with, on every sample:
+        # 4px in from the left and right of the rect fixed boxes are laid out in, clipped to the document, at mid-height
+        # (LocalFrameView::fixedContainerEdges). After a turn back upright WebKit sometimes kept that rect 578 wide in
+        # the 366-wide window, the right sample point fell 4px in from the 450-wide document, the 16px guard at x 570
+        # missed it, and the column filled with the page's overlay (#147). The rect is read off the guards, each 8px
+        # past its edge (duet.css); in window coordinates the document spans -scroll.x to its width less scroll.x.
+        miss = {}
+        for smp in allr:
+            sc, h, gs = smp["scroll"], smp["sig"]["innerHeight"], {g["side"]: g["rect"] for g in smp.get("guards", [])}
+            if len(gs) < 2:
+                continue
+            fl, fr = gs["left"]["x"] + 8, gs["right"]["x"] + gs["right"]["w"] - 8
+            doc = max(sc["scrollWidth"], sc["clientWidth"])
+            for side, at in (("left", max(fl, -sc["x"]) + 4), ("right", min(fr, doc - sc["x"]) - 4)):
+                r = gs[side]
+                if not (r["x"] + 2 < at < r["x"] + r["w"] - 2 and r["y"] < h / 2 < r["y"] + r["h"]):
+                    miss.setdefault(side, []).append((at, r["x"], r["x"] + r["w"], sc["clientWidth"], h))
+        for side, ms in miss.items():
+            at, x0, x1, cw, h = ms[-1]
+            bad.append(f"{side} edge guard misses Safari's sample point in {len(ms)} of {len(allr)} samples: x {at:.0f} at mid-height, guard at {x0:.0f}..{x1:.0f}, in a {cw}x{h} window")
         if last["scroll"]["scrollWidth"] > W0:
             note.append(f"scrollWidth {last['scroll']['scrollWidth']} > {W0} (column bleed, documented)")
         for u in last.get("underControls", [])[:3]:

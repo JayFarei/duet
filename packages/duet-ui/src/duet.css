@@ -313,12 +313,17 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
    open, WebKit samples the edge against the landscape viewport (578x388, mid-edge at y 194) while fixed boxes are
    laid out in the 600-tall one (guard centred on 300), so a 64px guard missed and the column filled with the scrim
    for good; 240px covers both midpoints and stays under 0.9 of the shortest viewport, so it never counts as a
-   container itself (#142). */
+   container itself (#142). The right one is 300px wide, reaching inward: after that same turn WebKit sometimes keeps
+   laying fixed boxes out against the 578-wide landscape window (right guard at x 570 in the 366-wide one) while it
+   samples the right edge of that rect clipped to the document, 450 wide with the column layer, so 4px in from 450.
+   A 16px guard missed it and the column filled with the scrim; 300px reaches back over both points and stays under
+   0.9 of the narrowest window less the sampler's 4px margins ((366 - 8) x 0.9 = 322), so it still never counts as a
+   container (#147). The left one needs no width: the window grows to the right, its left edge never moves. */
 .duet-guard {
   position: fixed; z-index: 2147483647; top: 50%; width: 16px; height: 240px; margin-top: -120px; pointer-events: none;
   background-image: linear-gradient(transparent, transparent);
 }
-.duet-guard[data-side="right"] { right: -8px; }
+.duet-guard[data-side="right"] { right: -8px; width: 300px; }
 .duet-guard[data-side="left"] { left: -8px; }
 /* Mid-turn or mid-fold the layer still carries the last posture's positions (the old screen's column), which would
    widen the document past the new window, and Safari then zooms the page to fit it (scale 1.14 unfolding from

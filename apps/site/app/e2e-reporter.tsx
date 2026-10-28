@@ -145,7 +145,9 @@ function sample(s: string | null) {
     visible: document.visibilityState, frameAt, focus: document.hasFocus(),
     active: document.activeElement && document.activeElement !== document.body ? document.activeElement.tagName.toLowerCase() : null,
     sig, preview: isPreview(sig), reason: previewReason(sig) ?? null,
-    html: { mode: h.getAttribute("data-duet-mode"), split: h.getAttribute("data-duet-split"), emulated: h.getAttribute("data-duet-emulated") },
+    html: { mode: h.getAttribute("data-duet-mode"), split: h.getAttribute("data-duet-split"), emulated: h.getAttribute("data-duet-emulated"), close: h.hasAttribute("data-duet-close"), pending: h.hasAttribute("data-duet-pending") },
+    // The invisible edge guards (duet.css): e2e.py checks each still straddles its viewport edge (#147).
+    guards: [...document.querySelectorAll(".duet-guard")].map((g) => ({ side: g.getAttribute("data-side"), rect: rect(g) })),
     navs,
     scroll: { scrollWidth: h.scrollWidth, clientWidth: W, bodyScrollWidth: document.body.scrollWidth, x: scrollX, y: scrollY },
     vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop, w: visualViewport.width, h: visualViewport.height, scale: visualViewport.scale } : null,
