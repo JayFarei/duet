@@ -1,12 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { AppWindow, Compass, House, PanelLeft, PanelRight, RotateCcw, RotateCw, Smartphone, Tablet } from "lucide-react";
+import { AppWindow, Compass, House, Laptop, LocateFixed, PanelLeft, PanelRight, RectangleVertical, RotateCcw, RotateCw, Smartphone, Tablet, Tent } from "lucide-react";
 import { ONLY_OPEN, Phases, Rule, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
 import { CHANNEL, DUO_PORT, type Sync } from "./shared";
 
 const HOLD = 2600; // a tour stop, the 3D hinge settling included
 const SWAP = 450; // the interface turns upright this far into the device's turn
+
+// Stand poses, the device on a table seen a little from above. Both are landscape with the hinge across: the
+// interface turns with the hardware. Nightstand is a tent on the closed side, the cover display facing you;
+// elevated is a laptop, one half flat and the other raised. duo tips the whole device by `pitch`.
+type Stand = "flat" | "nightstand" | "elevated";
+const ABOVE = 0.3; // radians the table is tipped toward you
+const STANDS: Record<Exclude<Stand, "flat">, { posture: "open" | "closed"; deg: number }> = {
+  nightstand: { posture: "closed", deg: 70 },
+  elevated: { posture: "open", deg: 110 },
+};
+// Nightstand straddles the hinge, so it tips by half the fold; elevated lays the fixed half flat.
+const pitch = (stand: Stand, deg: number) =>
+  stand === "nightstand" ? (deg * Math.PI) / 360 + ABOVE : stand === "elevated" ? -Math.PI / 2 + ABOVE : 0;
 
 // The web Duo's controls on doan-labs/duo's 3D device. duo renders Apple's model and bends its hinge; both of its
 // displays frame /duo3d/screen, which draws what the 2D web Duo draws on its screen. The fold is duo's: an angle,
@@ -14,6 +27,7 @@ const SWAP = 450; // the interface turns upright this far into the device's turn
 export function Duo3D() {
   const [s, setS] = useState<State>(TOUR[0]);
   const [deg, setDeg] = useState(0);
+  const [stand, setStand] = useState<Stand>("flat");
   const [upright, setUpright] = useState<Turn>(0);
   const [tour, setTour] = useState(false);
   const [at, setAt] = useState(0);
@@ -27,9 +41,11 @@ export function Duo3D() {
   // The device turns the short way round, so its roll keeps counting past a full turn.
   const hw = hardware(s);
   spin.current += ((((hw - spin.current) % 360) + 540) % 360) - 180;
-  const pose = { deg, roll: (-spin.current * Math.PI) / 180 };
+  const pose = { deg, roll: (-spin.current * Math.PI) / 180, pitch: pitch(stand, deg) };
   const send = () => duo.current?.contentWindow?.postMessage(pose, "*");
-  useEffect(send, [deg, pose.roll]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(send, [deg, pose.roll, pose.pitch]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The camera eases back in front of the device, after a drag has orbited it.
+  const front = () => duo.current?.contentWindow?.postMessage({ reset: true }, "*");
   useEffect(() => {
     const hi = (e: MessageEvent) => { if (e.source === duo.current?.contentWindow && (e.data?.live || e.data?.ready)) send(); };
     addEventListener("message", hi);
@@ -53,20 +69,28 @@ export function Duo3D() {
     return () => clearTimeout(t);
   }, [s.turn, s.upside]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const go = (next: Partial<State>, fromTour = false) => {
+  // An app keeps the stand; a fold, a turn, a tour stop or an app that only runs upright leaves it.
+  const go = (next: Partial<State>, fromTour = false, to: Stand = stand) => {
     if (!fromTour) setTour(false);
     const n = { ...s, ...next };
-    if (next.app && ONLY_OPEN(n.app)) Object.assign(n, { posture: "open", turn: 0, upside: false });
+    if (next.app && ONLY_OPEN(n.app)) { Object.assign(n, { posture: "open", turn: 0, upside: false }); to = "flat"; }
+    setStand(to);
     const f = fit(n);
     if (!fromTour) setAt(TOUR.findIndex((t) => sameView(t, f)));
     setS(f);
-    setDeg(f.posture === "open" ? 180 : 0);
+    setDeg(to !== "flat" ? STANDS[to].deg : f.posture === "open" ? 180 : 0);
+  };
+  // A stand is landscape with the hardware turned clockwise; it puts the camera back in front to be seen as posed.
+  const pose3 = (to: Stand) => {
+    front();
+    if (to === "flat") return go({ turn: 0, upside: false }, false, "flat");
+    go({ posture: STANDS[to].posture, turn: 90, upside: false }, false, to);
   };
 
   useEffect(() => {
     if (!tour) return;
     let i = at;
-    const t = setInterval(() => { i = (i + 1) % TOUR.length; setAt(i); go({ ...TOUR[i] }, true); }, HOLD);
+    const t = setInterval(() => { i = (i + 1) % TOUR.length; setAt(i); go({ ...TOUR[i] }, true, "flat"); }, HOLD);
     return () => clearInterval(t);
   }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -88,13 +112,18 @@ export function Duo3D() {
       {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: "min(68vh, 760px)", border: 0, display: "block", background: "transparent" }} />}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", padding: "0 16px" }}>
         <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
-          <Tool label={s.posture === "open" ? "Fold" : "Unfold"} onClick={() => go({ posture: s.posture === "open" ? "closed" : "open" })}>
+          <Tool label={s.posture === "open" ? "Fold" : "Unfold"} onClick={() => go({ posture: s.posture === "open" ? "closed" : "open" }, false, "flat")}>
             {s.posture === "open" ? <Tablet size={18} style={{ rotate: "90deg" }} /> : <Smartphone size={18} />}
           </Tool>
           <Rule />
           {([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
-            <Tool key={by} label={label} onClick={() => go(rotate(s, by))}><Icon size={18} /></Tool>
+            <Tool key={by} label={label} onClick={() => go(rotate(s, by), false, "flat")}><Icon size={18} /></Tool>
           ))}
+          <Rule />
+          {([["flat", "Upright", RectangleVertical], ["nightstand", "Nightstand", Tent], ["elevated", "Elevated", Laptop]] as const).map(([to, label, Icon]) => (
+            <Tool key={to} label={label} on={stand === to} onClick={() => pose3(to)}><Icon size={18} /></Tool>
+          ))}
+          <Tool label="Front view" onClick={front}><LocateFixed size={18} /></Tool>
           <Rule />
           <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
           <Tool label="Safari" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
@@ -106,7 +135,7 @@ export function Duo3D() {
           <input type="range" aria-label="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ width: 120, accentColor: "var(--accent)" }} />
         </label>
       </div>
-      <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live })} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
+      <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
     </div>
   );
 }
