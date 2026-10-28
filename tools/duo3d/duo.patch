@@ -16,11 +16,62 @@ index 7352869..cbcbb7f 100644
  
  /**
   * From main.ts every frame: the display in use leads, the other mirrors it. So
+diff --git a/packages/shell/flat-panels.ts b/packages/shell/flat-panels.ts
+index 2c08be7..a97ec81 100644
+--- a/packages/shell/flat-panels.ts
++++ b/packages/shell/flat-panels.ts
+@@ -23,6 +23,8 @@ export function flatPanels(css: CSS3DRenderer, panels: Panel[]) {
+   const ours = new Map<HTMLElement, string>()
+   const theirs = new Map<HTMLElement, string>()
+   const asked = new Map<HTMLElement, string>()
++  // The offset each panel was last placed at, raw px: see `hold` below.
++  const held = new Map<HTMLElement, [number, number]>()
+ 
+   const set = (el: HTMLElement, t: string | null) => {
+     if (el.style.transform !== ours.get(el)) {
+@@ -61,6 +63,16 @@ export function flatPanels(css: CSS3DRenderer, panels: Panel[]) {
+     // Rounded, the string settles once the motion drops below a device pixel.
+     const snap = (n: number) => Math.round(n * dpr) / dpr
+     const unit = (n: number) => Math.round(n * 1e4) / 1e4
++    // A camera that drifts by a millionth of a pixel can sit on a rounding edge
++    // and flip a still panel by a whole pixel every few frames. Keep the last
++    // offset until the raw one is most of a device pixel away from it.
++    const hold = (el: HTMLElement, x: number, y: number) => {
++      const h = held.get(el)
++      if (h && Math.abs(x - h[0]) < 0.75 / dpr && Math.abs(y - h[1]) < 0.75 / dpr) return h
++      const n: [number, number] = [snap(x), snap(y)]
++      held.set(el, n)
++      return n
++    }
+ 
+     const shown = panels.filter((p) => p.o.element.style.display !== 'none')
+     const flat = shown.map((p) => {
+@@ -78,7 +90,8 @@ export function flatPanels(css: CSS3DRenderer, panels: Panel[]) {
+       // The element transforms about its centre, so the offset carries it.
+       const cx = p.w / 2
+       const cy = p.h / 2
+-      return `matrix(${unit(a)},${unit(b)},${unit(c)},${unit(d)},${snap(x0 - cx + a * cx + c * cy)},${snap(y0 - cy + b * cx + d * cy)})`
++      const [ox, oy] = hold(p.o.element, x0 - cx + a * cx + c * cy, y0 - cy + b * cx + d * cy)
++      return `matrix(${unit(a)},${unit(b)},${unit(c)},${unit(d)},${ox},${oy})`
+     })
+     const on = shown.length > 0 && flat.every((m) => m !== null)
+ 
 diff --git a/packages/shell/main.ts b/packages/shell/main.ts
-index 489947a..45f0046 100644
+index 489947a..1b9f976 100644
 --- a/packages/shell/main.ts
 +++ b/packages/shell/main.ts
-@@ -57,6 +57,8 @@ startBuilderPreview()
+@@ -38,7 +38,9 @@ const OUTER = new THREE.Vector4(0.23396, 0.27173 - 5.8974, 7.73936, 11.2513).mul
+   (EYE.z - INNER_Z) / (EYE.z - 0.825538)
+ )
+ 
+-const mix = (a: number, b: number, t: number) => a + (b - a) * t
++// Lands on the target once within eps: an endless exponential tail keeps nudging
++// the live panels' transforms and re-rasterizing their text long after the eye sees it stop.
++const mix = (a: number, b: number, t: number, eps = 0) => (Math.abs(b - a) <= eps ? b : a + (b - a) * t)
+ // GLSL has no imports: hand the shaders their constants as defines.
+ const defines = `#define HINGE_Z ${HINGE_Z}\n#define INNER_Z ${INNER_Z}\n#define OUTER_Z ${OUTER_Z.toFixed(6)}\n`
+ const foldShader = defines + foldGlsl
+@@ -57,6 +59,8 @@ startBuilderPreview()
  type Pose = {
    deg?: number
    yaw?: number
@@ -29,7 +80,7 @@ index 489947a..45f0046 100644
    bg?: string
    paused?: boolean
    app?: string
-@@ -83,7 +85,7 @@ paint(new URLSearchParams(location.search).get('bg'))
+@@ -83,7 +87,7 @@ paint(new URLSearchParams(location.search).get('bg'))
  let pose: ((m: Pose) => void) | null = null
  let queued: Pose | null = null
  // Development runs the site and the shell on two localhost ports; that pair is the one exception.
@@ -38,7 +89,7 @@ index 489947a..45f0046 100644
  /** False until the first frame the phone is drawn in; the scene fades in there. */
  let shown = false
  addEventListener('message', (e: MessageEvent<Pose>) => {
-@@ -181,6 +183,8 @@ controls.update()
+@@ -181,6 +185,8 @@ controls.update()
  // `phone` turns with the Flip button; `body` inside it gives a little under a
  // finger on a button (packages/shell/buttons.ts) and carries every mesh and panel.
  const phone = new THREE.Group()
@@ -47,7 +98,20 @@ index 489947a..45f0046 100644
  scene.add(phone)
  const body = new THREE.Group()
  phone.add(body)
-@@ -589,6 +593,8 @@ let targetAngle = Number(q.get('deg') ?? view().deg ?? 180)
+@@ -401,6 +407,12 @@ body.add(ledLight)
+ // CSS3DRenderer and drawn over the WebGL canvas. The baked textures show
+ // underneath while the hinge moves, when a flat DOM panel can't bend.
+ const css = new CSS3DRenderer()
++let panelsUnder = false
++/** A display drawn as a hole in the canvas: colour and alpha zeroed, depth kept. */
++const hole = (m: THREE.Material, on: boolean) => {
++  m.blending = on ? THREE.CustomBlending : THREE.NormalBlending
++  m.blendSrc = m.blendDst = m.blendSrcAlpha = m.blendDstAlpha = THREE.ZeroFactor
++}
+ // Hidden until the first frame, with the canvas: see `shown` in the loop below.
+ css.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity 0.45s ease'
+ document.body.appendChild(css.domElement)
+@@ -589,6 +601,8 @@ let targetAngle = Number(q.get('deg') ?? view().deg ?? 180)
  let angle = targetAngle
  let yaw = Number(q.get('yaw') ?? view().yaw ?? 0)
  let targetYaw = yaw
@@ -56,7 +120,7 @@ index 489947a..45f0046 100644
  
  function setAngle(v: number) {
    targetAngle = Math.min(180, Math.max(0, v))
-@@ -613,6 +619,7 @@ const lead = () => follow(targetAngle > HANDOVER)
+@@ -613,6 +627,7 @@ const lead = () => follow(targetAngle > HANDOVER)
  // that arrived during the model load is applied here.
  pose = (m) => {
    if (typeof m.deg === 'number') setAngle(m.deg)
@@ -64,15 +128,19 @@ index 489947a..45f0046 100644
    if (typeof m.yaw === 'number') {
      // A page turns the phone to face its reader, which only holds from the front: a new yaw brings the camera home.
      homing ||= m.yaw !== targetYaw
-@@ -747,6 +754,7 @@ renderer.setAnimationLoop((now) => {
+@@ -745,8 +760,9 @@ renderer.setAnimationLoop((now) => {
+   const dt = Math.min(now - last, 50)
+   const k = 1 - 0.92 ** (dt / 16.7)
    last = now
-   angle = mix(angle, targetAngle, k)
-   yaw = mix(yaw, targetYaw, k)
-+  roll = mix(roll, targetRoll, k)
+-  angle = mix(angle, targetAngle, k)
+-  yaw = mix(yaw, targetYaw, k)
++  angle = mix(angle, targetAngle, k, 0.01)
++  yaw = mix(yaw, targetYaw, k, 1e-4)
++  roll = mix(roll, targetRoll, k, 1e-4)
    // Not while the boot screen is up: the phone turns once the OS is on the glass.
    if (hud.spinning() && booted()) targetYaw += 0.004
    hud.angle(angle)
-@@ -758,6 +766,7 @@ renderer.setAnimationLoop((now) => {
+@@ -758,6 +774,7 @@ renderer.setAnimationLoop((now) => {
    bend.value = ((180 - angle) / 180) * Math.PI
    hinge.rotation.y = bend.value
    phone.rotation.y = yaw
@@ -80,6 +148,34 @@ index 489947a..45f0046 100644
    // Facing you means facing the eye: a drag orbits the camera, not the phone, and still turns it as you see it.
    setPose(yaw - controls.getAzimuthalAngle(), angle)
    hardware.tick(dt / 1000)
+@@ -784,7 +801,6 @@ renderer.setAnimationLoop((now) => {
+   controls.update()
+   frame()
+   hud.orbit(controls.getAzimuthalAngle(), controls.getPolarAngle(), controls.getDistance(), yaw)
+-  renderer.render(scene, camera)
+   if (spotsTo) {
+     const spots = hardware.spots()
+     const now = JSON.stringify(spots)
+@@ -832,6 +848,19 @@ renderer.setAnimationLoop((now) => {
+     coverTouch = touch
+     outerLive.element.style.pointerEvents = touch ? 'auto' : 'none'
+   }
++  // Off face-on a flat panel has no depth test, so it paints over the frame
++  // that stands in front of the glass and breaks the phone's outline. There
++  // the panels go under the canvas, and each display holding one draws a hole
++  // in it instead: transparent pixels, depth tested like the glass they stand
++  // for, so the frame covers the panel exactly where it covers the display.
++  const under = angle >= 1 && angle <= FLAT
++  if (under !== panelsUnder) {
++    panelsUnder = under
++    css.domElement.style.zIndex = under ? '-1' : ''
++  }
++  hole(screens.inner.material, under && innerLive.visible)
++  hole(screens.outer.material, under && outerLive.visible)
++  renderer.render(scene, camera)
+   css.render(scene, camera)
+   flatten(camera)
+   // The first frame that has the phone in it. Until here the page is a backdrop
 diff --git a/packages/shell/os.tsx b/packages/shell/os.tsx
 index 7baf908..a743603 100644
 --- a/packages/shell/os.tsx
