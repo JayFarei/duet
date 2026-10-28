@@ -155,6 +155,14 @@ Not covered yet:
 4. Turn the phone wide (951x669). Expect: controls inline on the right; the dialog is open; 1 close button on screen.
 5. Tap Duet's "Close". Expect: controls inline on the right; the dialog is closed; Duet no longer offers "Close"; 0 close buttons on screen.
 
+## mod03: A sheet's scrim runs on under Safari's top bar, Safari tab, unfolded (#136)
+
+1. Open /sheet in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
+2. Tap "Weekend in Lisbon" (a full-screen dialog opens). Expect: controls inline on the right; the dialog is open.
+3. Turn the phone tall, turned right (90). Expect: controls inline on the right; the dialog is open; Safari's top bar takes the page's colour under it.
+4. Turn the phone wide (951x669). Expect: controls inline on the right; the dialog is open.
+5. Tap Duet's "Close". Expect: controls inline on the right; the dialog is closed.
+
 ## la01: Live Activity expanded by a long press, Safari tab
 
 1. Open /book in a Safari tab, folded, on the outer screen, upright, music playing. Expect: controls in a column on the right.
