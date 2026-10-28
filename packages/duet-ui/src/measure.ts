@@ -25,5 +25,6 @@ export function measure(probe?: Element): Signals {
     angle: screen.orientation?.angle ?? ((((window as Window & { orientation?: number }).orientation ?? 0) + 360) % 360),
     standalone: (navigator as Navigator & { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches,
     scale: visualViewport?.scale ?? 1,
+    canGoForward: (window as Window & { navigation?: { canGoForward?: boolean } }).navigation?.canGoForward === true,
   };
 }

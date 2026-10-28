@@ -80,7 +80,7 @@ Duet re-reads the signals on resize, orientation change (including `screen.orien
 | Order | Mode | Conditions (all must hold) | Controls |
 | --- | --- | --- | --- |
 | 1 | `strip` | Running as a Home Screen app (`navigator.standalone` or `display-mode: standalone`) on a Duo (`duo` true), and the left or right safe-area inset is at least 76px (the Duo's strip is 84; an iPhone's landscape sensor inset is 59, an Android cutout 62). The right side wins if both are. Also the in-app Safari preview turned sideways in its default or full style (below): closed screen, 678x466 window, an 84px safe-area inset on the turned side. | In the strip iOS gives the app, beside the page (in the preview, in the inset below its top bar) |
-| 2 | `column` | Not a Home Screen app; not inside an iframe; not the in-app Safari preview turned sideways (below); the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the page is not zoomed (`visualViewport.scale` 1); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column (or the in-app preview's) its own buttons leave empty, so the page keeps its full width |
+| 2 | `column` | Not a Home Screen app; not inside an iframe; not the in-app Safari preview turned sideways (below); the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px (not checked in the in-app preview, whose top bar compacts on scroll); portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the page is not zoomed (`visualViewport.scale` 1); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column (or the in-app preview's) its own buttons leave empty, so the page keeps its full width |
 | 3 | `inline` | Everything else: unfolded at full width, landscape of unknown turn, other browsers, in-app web views, the in-app Safari preview unfolded, other phones, desktops | An 84px strip inside the page, on the side the user picks |
 
 "Safari" means the user agent has `Version/x Safari/` and none of the tokens of other iOS browsers and apps (`CriOS`, `FxiOS`, `EdgiOS`, `OPiOS`, `GSA/`, `Ddg/`); an in-app web view drops the `Safari/` token. `useDuet().browser` reports the result: `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` or `"other"`. Other browsers draw their own chrome where Safari has its column, so they always get `inline`.
@@ -137,9 +137,9 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 
 ### In-app preview
 
-Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. The gap holds two buttons: "…" and the selected tab (the tab pill minimized); everything else folds into "…". Turned sideways, the preview's layout depends on its style. The sheet keeps a column on the side the Duo is turned to, with a gap of about 26pt, too small for a button: there Duet hides its controls (`useDuet().hidden` is `"preview"`, the controls get `visibility: hidden` and no inset) instead of drawing an inline strip across the page, so the page keeps its full width and the preview's own close, back, share and "Open in Safari" stay usable. The default and full styles move every native button into a top bar (window y 24 to 68) and give the page an 84px safe-area inset on the turned side (left at 90, right at 270) that nothing draws in: Duet uses `strip` there, its controls in that inset from below the top bar to above the home indicator, and the page keeps its width. Turning back to portrait, or opening the page in Safari, brings the column back. A strip across page content was flagged in review and is never used. Duet sets `useDuet().preview` in both. The gap was measured with a bare Dynamic Island; how Live Activities move the preview's buttons is not yet known. Duet takes a Safari window that is not standalone to be the preview when it is either:
+Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. Live Activities push close and reader/menu down (one about 45pt on a real Duo) while back stays put, and a page can't tell, so Duet assumes the worst case (`DUO.island`, two activities, as in a Safari tab): the gap is then about 54pt, room for one button, and none of Duet's buttons can ever sit under the preview's. That button is the selected tab, its menu listing the tabs, then everything else (or "…", or search alone, when the page has no tabs), centred in the gap. Turned sideways, the preview's layout depends on its style. The sheet keeps a column on the side the Duo is turned to, with a gap of about 26pt, too small for a button: there Duet hides its controls (`useDuet().hidden` is `"preview"`, the controls get `visibility: hidden` and no inset) instead of drawing an inline strip across the page, so the page keeps its full width and the preview's own close, back, share and "Open in Safari" stay usable. The default and full styles move every native button into a top bar (window y 24 to 68) and give the page an 84px safe-area inset on the turned side (left at 90, right at 270) that nothing draws in: Duet uses `strip` there, its controls in that inset from below the top bar to above the home indicator, and the page keeps its width. Turning back to portrait, or opening the page in Safari, brings the column back. A strip across page content was flagged in review and is never used. Duet sets `useDuet().preview` in both. Duet takes a Safari window that is not standalone to be the preview when it is either:
 
-- the closed screen's 466x678 window with the column signature, at most 77px of chrome below the page (the preview has 75, a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
+- the closed screen's 466x678 window with the column signature, 44 to 77px of chrome (the preview has 75, down to 46 as its top bar compacts on scroll in the default and full styles; a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
 - a page sheet: a window inside the closed 466x678 screen, in either orientation (450x670 on a real Duo, 662x458 turned) with the column signature and a bottom safe-area inset, or
 - exactly 375x667 at `devicePixelRatio` 3, the size earlier builds gave the preview.
 
@@ -431,7 +431,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** an empty gap at the top of the strip or column, even when no Live Activity runs.
 - **Cause:** Live Activities grow the Dynamic Island down the strip and push Safari's buttons with it, and a page can't tell whether any are running.
-- **Duet does:** always reserves the worst case measured on device (two activities). `leading` and `primary` may rise into that space before they fold, back, actions and "…" never do. Closed landscape and the in-app preview were measured with a bare island only.
+- **Duet does:** always reserves the worst case measured on device (two activities). `leading` and `primary` may rise into that space before they fold, back, actions and "…" never do. In the in-app preview nothing rises into it. Closed landscape was measured with a bare island only.
 - **You do:** nothing.
 - **Status:** see [Claimable space](#claimable-space).
 
@@ -442,6 +442,30 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** puts "…" and the selected tab (or search) in one two-item rail, as tall as Safari's back + forward pill, centred between Safari's buttons and at least 5pt clear of each. Everything else folds into "…". Where even the rail has no room (closed landscape), the selected tab is the only button and its menu lists the tabs, then what folded. An island menu too wide for the screen opens as a morph instead.
 - **You do:** nothing. Keep the important actions first, they are the last to fold.
 - **Status:** [#97](https://github.com/JayFarei/duet/issues/97).
+
+### In-app preview top bar compacting on scroll
+
+- **You see:** without handling, scrolling a page in the in-app preview (default or full style, closed portrait) moves Duet's controls out of the preview's column into an inline strip across the page.
+- **Cause:** the preview's top bar compacts as the page scrolls: the chrome above the page shrinks from 75 to 46px, below both the preview's old chrome range and the column's.
+- **Duet does:** takes 44 to 77px of chrome as the preview, and in the preview checks only the column's width, so it stays `column` with the controls in place through the scroll.
+- **You do:** nothing.
+- **Status:** [#104](https://github.com/JayFarei/duet/issues/104). See [In-app preview](#in-app-preview).
+
+### In-app preview buttons and Live Activities
+
+- **You see:** without handling, a Live Activity pushes the preview's close and reader/menu buttons down onto Duet's controls in the gap.
+- **Cause:** Live Activities grow the Dynamic Island (one pushes those buttons about 45pt) while back stays put, and a page can't tell whether any are running.
+- **Duet does:** sizes the gap for the worst case (two activities, `DUO.island`), about 54pt: one button, the selected tab (or "…", or search), centred. Nothing rises into the space the activities can take, so no Duet button sits under a native one.
+- **You do:** nothing. Keep the important tabs and actions first, the tab's menu lists them.
+- **Status:** [#104](https://github.com/JayFarei/duet/issues/104).
+
+### In-app preview with forward history
+
+- **You see:** without handling, after going back once in the in-app preview, Duet's button covers the preview's Back.
+- **Cause:** with forward history the preview adds a Forward button where Back was and moves Back up a row (its top from 428 to 374pt), so the free gap ends higher.
+- **Duet does:** reads `navigation.canGoForward` (re-read on `currententrychange` and `popstate`) and, in the preview, ends the gap above the raised Back. That gap holds one button with no room left for Live Activities, so with forward history an activity may push the preview's reader/menu button onto Duet's button, never onto Back.
+- **You do:** nothing. The Navigation API only sees same-origin entries: coming back from another site, the preview shows Forward but Duet can't know, and its button may cover Back until the next same-origin navigation.
+- **Status:** [#117](https://github.com/JayFarei/duet/issues/117), [PR #118](https://github.com/JayFarei/duet/pull/118).
 
 ### Menus and popovers under Safari's buttons
 
