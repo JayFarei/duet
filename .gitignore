@@ -13,3 +13,4 @@ playwright-report
 /docs/media/raw
 /docs/media/*-draft.mp4
 /apps/site/public/duo3d-web
+.env*.local
