@@ -682,9 +682,14 @@ export function morphBox(c: Context, p: Plan, b: Box, n: number) {
 }
 
 /** Island menu placement: the button stretches sideways into a pill as tall as itself, outer edge on the
- *  button's. In the column it never rises above columnTop. */
+ *  button's. In the column it stays inside [columnTop, columnBottom]; a band shorter than the pill (the closed
+ *  preview without forward history, which keeps a Live Activities allowance) can't hold it, so it stays on its
+ *  button, which plan() already placed clear of the native buttons. Pushing it down to columnTop there drew it
+ *  over the preview's Back (#133). */
 export function islandBox(p: Plan, b: Box, n: number, side: Side) {
-  const w = 2 * ISLAND.pad + n * ISLAND.item, top = Math.max(b.top + b.height / 2 - DUO.control / 2, p.columnTop ?? -Infinity);
+  const w = 2 * ISLAND.pad + n * ISLAND.item, y = b.top + b.height / 2 - DUO.control / 2;
+  const lo = p.columnTop ?? -Infinity, hi = (p.columnBottom ?? Infinity) - DUO.control;
+  const top = lo <= hi ? Math.min(Math.max(y, lo), hi) : y;
   return { top, left: side === "left" ? p.left : p.left + DUO.control - w, width: w, height: DUO.control, x0: p.left };
 }
 
