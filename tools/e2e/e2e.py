@@ -563,9 +563,13 @@ class Run:
             bad.append(f"off screen in {len(offs)} samples, first at +{offs[0][0]:.0f}ms: {offs[0][1]}")
         # 3. final state
         # A visual viewport short with no keyboard (a turn with a page dialog open, #122): Safari draws its bar at its
-        # bottom and takes touches from there down, so a column control below it can't be tapped (#140).
+        # bottom and takes touches from there down, so a column control below it can't be tapped (#140). The in-app
+        # preview sometimes reports the height as -75 for a whole step (j27-06); like the library (shortView), a height
+        # that is not positive says nothing (#152).
         vh = (last.get("vv") or {}).get("h") or g["innerHeight"]
-        if n.get("mode") == "column" and not n.get("keyboard") and vh < g["innerHeight"] - 1:
+        if vh <= 0:
+            note.append(f"visual viewport height {vh}, not judged for Safari's bar")
+        if n.get("mode") == "column" and not n.get("keyboard") and 0 < vh < g["innerHeight"] - 1:
             for x in all_slots(last):
                 if x["rect"]["y"] + x["rect"]["h"] > vh + 1:
                     bad.append(f'{x["slot"]} reaches y {x["rect"]["y"] + x["rect"]["h"]:.0f}, under Safari\'s bar from the {vh:.0f}pt visual viewport\'s bottom')
