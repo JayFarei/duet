@@ -48,12 +48,18 @@ function scheme(): "light" | "dark" {
 }
 
 // The header's links and buttons, hidden ones included: on a phone-width page the site's nav is often folded into
-// its own menu, and those are the sections an app would have as tabs. One per label and destination.
+// its own menu, and those are the sections an app would have as tabs. One per label and destination. Only a page
+// without a header or nav up top is read by position instead, and then only its first band, short of the content.
 const MAX = 40;
 function candidates(): { list: Candidate[]; els: Map<number, HTMLElement> } {
   const sel = "a[href], button, [role=button]";
-  const scoped = [...document.querySelectorAll<HTMLElement>(`header :is(${sel}), nav :is(${sel}), [role=banner] :is(${sel}), [role=navigation] :is(${sel})`)];
-  const top = [...document.querySelectorAll<HTMLElement>(sel)].filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.top + scrollY < 140; });
+  const near = (el: Element, y: number) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.top + scrollY < y; };
+  const bars = "header, nav, [role=banner], [role=navigation]";
+  // A header or nav inside the content (an article's, a product shot's) is not the site's.
+  const site = (el: Element) => !el.closest(`:is(${bars})`)?.parentElement?.closest("main, article, section, aside, [role=main]");
+  const scoped = [...document.querySelectorAll<HTMLElement>(`:is(${bars}) :is(${sel})`)].filter(site);
+  const headed = [...document.querySelectorAll(bars)].some((el) => near(el, 140) && !el.parentElement?.closest("main, article, section, aside, [role=main]"));
+  const top = headed ? [] : [...document.querySelectorAll<HTMLElement>(sel)].filter((el) => near(el, 60));
   const seen = new Set<string>(), list: Candidate[] = [], els = new Map<number, HTMLElement>();
   for (const el of [...new Set([...top, ...scoped])]) {
     if (list.length >= MAX || el.closest("footer, [role=contentinfo], #duo3d-duet")) continue;
@@ -132,23 +138,47 @@ function Shell() {
     // A beat for the site's own scripts to draw their header.
     const t = setTimeout(async () => {
       const { list, els } = candidates();
-      if (!list.length) return;
+      if (!list.length) { (window as unknown as { __duo3d: object }).__duo3d = { candidates: [] }; return; }
       try {
         const res = await fetch(location.origin + "/duo3d/optimize", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url: here(), title: document.title, candidates: list }) });
-        if (res.ok) setOptimized(build(await res.json(), list, els));
-        else console.warn("duo3d optimize:", await res.text());
-      } catch (e) { console.warn("duo3d optimize:", e); }
+        if (!res.ok) throw new Error(await res.text());
+        const found: Optimized = await res.json();
+        setOptimized(build(found, list, els));
+        // For tools/duo3d/corpus: what was read off the page and what the model made of it.
+        (window as unknown as { __duo3d: object }).__duo3d = { candidates: list, found };
+      } catch (e) { console.warn("duo3d optimize:", e); (window as unknown as { __duo3d: object }).__duo3d = { candidates: list, error: String(e) }; }
     }, 500);
     return () => clearTimeout(t);
   }, []);
+  // Some sites' hydration resets <html>'s attributes, Duet's mode and insets among them: Duet then mounts again.
+  const [gen, setGen] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    let n = 0;
+    const mo = new MutationObserver(() => { if (!document.documentElement.hasAttribute("data-duet-mode") && n++ < 5) setGen((g) => g + 1); });
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-duet-mode"] });
+    return () => mo.disconnect();
+  }, [on]);
   if (!on) return null;
   return (
     <>
     <style>{BESIDE}</style>
-    <Duet appearance={appearance} back={{ onPress: () => history.back() }} {...(optimized ?? SAFARI)} />
+    <Duet key={gen} appearance={appearance} back={{ onPress: () => history.back() }} {...(optimized ?? SAFARI)} />
     </>
   );
 }
 
-const mount = () => { const el = document.createElement("div"); el.id = "duo3d-duet"; document.body.appendChild(el); createRoot(el).render(<Shell />); };
+// Duet's stylesheet goes in with it, at the end of <body>: a site's hydration may clear <head> of what it did not
+// render, or <body> too, when Duet is put back.
+const mount = () => {
+  const el = document.createElement("div"), css = document.createElement("link"), root = document.createElement("div");
+  el.id = "duo3d-duet";
+  css.rel = "stylesheet";
+  css.href = location.origin + "/duo3d-web/duet.css";
+  el.append(css, root);
+  document.body.appendChild(el);
+  createRoot(root).render(<Shell />);
+  let n = 0;
+  new MutationObserver(() => { if (!el.isConnected && document.body && n++ < 20) document.body.appendChild(el); }).observe(document.documentElement, { childList: true, subtree: true });
+};
 if (document.body) mount(); else addEventListener("DOMContentLoaded", mount);

@@ -3,9 +3,10 @@
 // assets resolve upstream, and duet-shell.tsx (Duet with Back, Forward and Reload) added. Local only: the page's
 // own scripts run on this origin, so its API calls and history routing may fail, as any page framed this way.
 const PRIVATE = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.|\[?::1\]?$|.*\.local$|.*\.ts\.net$)/;
-const DROP = ["x-frame-options", "content-security-policy", "content-security-policy-report-only", "content-encoding", "content-length", "transfer-encoding", "set-cookie", "strict-transport-security"];
 
 export async function GET(req: Request) {
+  // An open proxy anywhere else: never in production.
+  if (process.env.NODE_ENV === "production") return new Response("Not found", { status: 404 });
   const raw = new URL(req.url).searchParams.get("url") ?? "";
   let url: URL;
   try { url = new URL(/^https?:\/\//.test(raw) ? raw : `https://${raw}`); } catch { return new Response("Bad url", { status: 400 }); }
@@ -14,8 +15,9 @@ export async function GET(req: Request) {
   try {
     res = await fetch(url, { redirect: "follow", headers: { "user-agent": req.headers.get("user-agent") ?? "", "accept-language": req.headers.get("accept-language") ?? "en" } });
   } catch (e) { return new Response(`Could not load ${url}: ${(e as Error).message}`, { status: 502 }); }
-  const headers = new Headers(res.headers);
-  for (const h of DROP) headers.delete(h);
+  // Only the type passes on: the rest is the upstream's own (frame blockers, cookies, its encoding) or, from a Next.js
+  // site, its middleware's headers, which Next would act on here.
+  const headers = new Headers({ "content-type": res.headers.get("content-type") ?? "" });
   if (!(headers.get("content-type") ?? "").includes("text/html")) return new Response(res.body, { status: res.status, headers });
 
   // The origin is the frame's own, read in the page: behind tailscale serve the request's is localhost.
@@ -24,9 +26,8 @@ export async function GET(req: Request) {
 <script>(() => {
   const o = location.origin, proxy = (u) => o + "/duo3d/web?url=" + encodeURIComponent(u);
   window.__duo3dUrl = ${JSON.stringify(final).replace(/</g, "\\u003c")};
-  const css = document.createElement("link"); css.rel = "stylesheet"; css.href = o + "/duo3d-web/duet.css";
-  const js = document.createElement("script"); js.src = o + "/duo3d-web/duet.js";
-  document.head.append(css, js);
+  // Parser-inserted, so it runs even where the site's own hydration then clears <head> of what it did not render.
+  document.write('<script src="' + o + '/duo3d-web/duet.js"><\\/script>');
   if (parent !== window) parent.postMessage({ type: "duo3d:url", url: window.__duo3dUrl }, o);
   // Links load through here again, in this frame, as Safari's own tab would.
   addEventListener("click", (e) => {

@@ -14,3 +14,4 @@ playwright-report
 /docs/media/*-draft.mp4
 /apps/site/public/duo3d-web
 .env*.local
+tools/duo3d/corpus/out/

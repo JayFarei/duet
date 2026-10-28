@@ -7,6 +7,7 @@ import { ICONS, ROLES, type Candidate, type Optimized, type Role, type Icon } fr
 const cache = new Map<string, Optimized>();
 
 export async function POST(req: Request) {
+  if (process.env.NODE_ENV === "production") return new Response("Not found", { status: 404 });
   const key = process.env.TYPESAFE_KEY;
   if (!key) return Response.json({ error: "TYPESAFE_KEY is not set" }, { status: 503 });
   const { url, title, candidates } = (await req.json()) as { url: string; title: string; candidates: Candidate[] };
