@@ -563,9 +563,13 @@ class Run:
             bad.append(f"off screen in {len(offs)} samples, first at +{offs[0][0]:.0f}ms: {offs[0][1]}")
         # 3. final state
         # A visual viewport short with no keyboard (a turn with a page dialog open, #122): Safari draws its bar at its
-        # bottom and takes touches from there down, so a column control below it can't be tapped (#140).
+        # bottom and takes touches from there down, so a column control below it can't be tapped (#140). The in-app
+        # preview sometimes reports the height as -75 for a whole step (j27-06); like the library (shortView), a height
+        # that is not positive says nothing (#152).
         vh = (last.get("vv") or {}).get("h") or g["innerHeight"]
-        if n.get("mode") == "column" and not n.get("keyboard") and vh < g["innerHeight"] - 1:
+        if vh <= 0:
+            note.append(f"visual viewport height {vh}, not judged for Safari's bar")
+        if n.get("mode") == "column" and not n.get("keyboard") and 0 < vh < g["innerHeight"] - 1:
             for x in all_slots(last):
                 if x["rect"]["y"] + x["rect"]["h"] > vh + 1:
                     bad.append(f'{x["slot"]} reaches y {x["rect"]["y"] + x["rect"]["h"]:.0f}, under Safari\'s bar from the {vh:.0f}pt visual viewport\'s bottom')
@@ -697,26 +701,37 @@ class Run:
             bad.append(f'clipped text {o["el"][:60]} by {o["over"]}pt')
         for o in [o for o in overs if not o["text"] and not o["el"].startswith(("div.duet-scroller", "main", "section.stage", "span.duet-guard"))][:3]:
             bad.append(f'overflowing block {o["el"][:60]} by {o["over"]}pt')
-        # The edge guards must cover the points Safari samples for an overlay to fill its column with, on every sample:
-        # 4px in from the left and right of the rect fixed boxes are laid out in, clipped to the document, at mid-height
+        # The edge guards must cover the points Safari samples for an overlay to fill its column with: 4px in from the
+        # left and right of the rect fixed boxes are laid out in, clipped to the document, at mid-height
         # (LocalFrameView::fixedContainerEdges). After a turn back upright WebKit sometimes kept that rect 578 wide in
         # the 366-wide window, the right sample point fell 4px in from the 450-wide document, the 16px guard at x 570
-        # missed it, and the column filled with the page's overlay (#147). The rect is read off the guards, each 8px
-        # past its edge (duet.css); in window coordinates the document spans -scroll.x to its width less scroll.x.
-        miss = {}
+        # missed it, and the column filled with the page's overlay for good (#147). The rect is read off the guards, each
+        # 8px past its edge (duet.css); in window coordinates the document spans -scroll.x to its width less scroll.x.
+        # Only a miss that lasts counts: in the final sample or for SETTLE_S. Mid-turn the layout lags the window for a
+        # frame or two (678 wide in the 382-wide one, j25-05) and Safari samples again once it lands (#151). Samples with
+        # the keyboard up are skipped: innerHeight is then the keyboard-short visual viewport, not the rect fixed boxes
+        # are laid out in, and Duet hides the column layer while a field has focus.
+        miss, run = {}, {}
         for smp in allr:
             sc, h, gs = smp["scroll"], smp["sig"]["innerHeight"], {g["side"]: g["rect"] for g in smp.get("guards", [])}
-            if len(gs) < 2:
+            if len(gs) < 2 or any(n.get("keyboard") for n in smp.get("navs") or []):
                 continue
             fl, fr = gs["left"]["x"] + 8, gs["right"]["x"] + gs["right"]["w"] - 8
             doc = max(sc["scrollWidth"], sc["clientWidth"])
             for side, at in (("left", max(fl, -sc["x"]) + 4), ("right", min(fr, doc - sc["x"]) - 4)):
                 r = gs[side]
-                if not (r["x"] + 2 < at < r["x"] + r["w"] - 2 and r["y"] < h / 2 < r["y"] + r["h"]):
-                    miss.setdefault(side, []).append((at, r["x"], r["x"] + r["w"], sc["clientWidth"], h))
-        for side, ms in miss.items():
-            at, x0, x1, cw, h = ms[-1]
-            bad.append(f"{side} edge guard misses Safari's sample point in {len(ms)} of {len(allr)} samples: x {at:.0f} at mid-height, guard at {x0:.0f}..{x1:.0f}, in a {cw}x{h} window")
+                if r["x"] + 2 < at < r["x"] + r["w"] - 2 and r["y"] < h / 2 < r["y"] + r["h"]:
+                    run.pop(side, None)
+                    continue
+                run.setdefault(side, smp["rx"])
+                m = miss.setdefault(side, {"n": 0, "long": False})
+                m["n"] += 1
+                m["last"] = (at, r["x"], r["x"] + r["w"], sc["clientWidth"], h)
+                m["long"] |= smp["rx"] - run[side] >= SETTLE_S * 1000 or smp is last
+        for side, m in miss.items():
+            at, x0, x1, cw, h = m["last"]
+            msg = f"{side} edge guard misses Safari's sample point in {m['n']} of {len(allr)} samples: x {at:.0f} at mid-height, guard at {x0:.0f}..{x1:.0f}, in a {cw}x{h} window"
+            (bad if m["long"] else note).append(msg if m["long"] else msg + f" (each under {SETTLE_S}s, mid-change, not judged)")
         if last["scroll"]["scrollWidth"] > W0:
             note.append(f"scrollWidth {last['scroll']['scrollWidth']} > {W0} (column bleed, documented)")
         for u in last.get("underControls", [])[:3]:
