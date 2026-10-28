@@ -1,0 +1,113 @@
+diff --git a/packages/shell/device.ts b/packages/shell/device.ts
+index 7352869..cbcbb7f 100644
+--- a/packages/shell/device.ts
++++ b/packages/shell/device.ts
+@@ -53,9 +53,11 @@ export type Stage = { name: string; side?: 'left' | 'right' }[]
+ const displays: Display[] = []
+ const inUse = () => displays.find((d) => d.wide === active.wide) ?? displays[0]!
+ /** The displays have booted (os.tsx renders them once the registry is in); before that there is nothing to launch on. */
+-export const booted = () => displays.length > 0
++/** `?screens=<url>`: both displays show an embedding page's own content (os.tsx), live through the whole fold. */
++export const SCREENS = new URLSearchParams(location.search).get('screens')
++export const booted = () => !!SCREENS || displays.length > 0
+ /** An app is up somewhere, so the baked home screen is not what the device is doing. */
+-export const busy = () => displays.some((d) => d.covered())
++export const busy = () => !!SCREENS || displays.some((d) => d.covered())
+ 
+ /**
+  * From main.ts every frame: the display in use leads, the other mirrors it. So
+diff --git a/packages/shell/main.ts b/packages/shell/main.ts
+index 489947a..45f0046 100644
+--- a/packages/shell/main.ts
++++ b/packages/shell/main.ts
+@@ -57,6 +57,8 @@ startBuilderPreview()
+ type Pose = {
+   deg?: number
+   yaw?: number
++  /** The device turned about the view axis, radians anticlockwise: a page that turns its interface (screens mode). */
++  roll?: number
+   bg?: string
+   paused?: boolean
+   app?: string
+@@ -83,7 +85,7 @@ paint(new URLSearchParams(location.search).get('bg'))
+ let pose: ((m: Pose) => void) | null = null
+ let queued: Pose | null = null
+ // Development runs the site and the shell on two localhost ports; that pair is the one exception.
+-const local = (o: string) => location.hostname === 'localhost' && new URL(o).hostname === 'localhost'
++const local = (o: string) => new URL(o).hostname === location.hostname
+ /** False until the first frame the phone is drawn in; the scene fades in there. */
+ let shown = false
+ addEventListener('message', (e: MessageEvent<Pose>) => {
+@@ -181,6 +183,8 @@ controls.update()
+ // `phone` turns with the Flip button; `body` inside it gives a little under a
+ // finger on a button (packages/shell/buttons.ts) and carries every mesh and panel.
+ const phone = new THREE.Group()
++// Roll (screens mode) turns the phone about the view axis after its yaw: Z outermost.
++phone.rotation.order = 'ZYX'
+ scene.add(phone)
+ const body = new THREE.Group()
+ phone.add(body)
+@@ -589,6 +593,8 @@ let targetAngle = Number(q.get('deg') ?? view().deg ?? 180)
+ let angle = targetAngle
+ let yaw = Number(q.get('yaw') ?? view().yaw ?? 0)
+ let targetYaw = yaw
++let roll = 0
++let targetRoll = 0
+ 
+ function setAngle(v: number) {
+   targetAngle = Math.min(180, Math.max(0, v))
+@@ -613,6 +619,7 @@ const lead = () => follow(targetAngle > HANDOVER)
+ // that arrived during the model load is applied here.
+ pose = (m) => {
+   if (typeof m.deg === 'number') setAngle(m.deg)
++  if (typeof m.roll === 'number') targetRoll = m.roll
+   if (typeof m.yaw === 'number') {
+     // A page turns the phone to face its reader, which only holds from the front: a new yaw brings the camera home.
+     homing ||= m.yaw !== targetYaw
+@@ -747,6 +754,7 @@ renderer.setAnimationLoop((now) => {
+   last = now
+   angle = mix(angle, targetAngle, k)
+   yaw = mix(yaw, targetYaw, k)
++  roll = mix(roll, targetRoll, k)
+   // Not while the boot screen is up: the phone turns once the OS is on the glass.
+   if (hud.spinning() && booted()) targetYaw += 0.004
+   hud.angle(angle)
+@@ -758,6 +766,7 @@ renderer.setAnimationLoop((now) => {
+   bend.value = ((180 - angle) / 180) * Math.PI
+   hinge.rotation.y = bend.value
+   phone.rotation.y = yaw
++  phone.rotation.z = roll
+   // Facing you means facing the eye: a drag orbits the camera, not the phone, and still turns it as you see it.
+   setPose(yaw - controls.getAzimuthalAngle(), angle)
+   hardware.tick(dt / 1000)
+diff --git a/packages/shell/os.tsx b/packages/shell/os.tsx
+index 7baf908..a743603 100644
+--- a/packages/shell/os.tsx
++++ b/packages/shell/os.tsx
+@@ -5,7 +5,7 @@
+ import { colors, fonts, layout, leading, tracking, typeScale } from '@doan-labs/duo-uikit/tokens.stylex.ts'
+ import * as stylex from '@stylexjs/stylex'
+ import { createRoot } from 'react-dom/client'
+-import { device } from './device.ts'
++import { device, SCREENS } from './device.ts'
+ import { development } from './runtime/development.ts'
+ import { shots } from './runtime/photos.ts'
+ import { bootRegistry } from './runtime/registry.ts'
+@@ -41,6 +41,17 @@ export function os(
+   }
+   // The registry boot is the long wait, so the display wears the same logo the
+   // device shows coming out of a restart until the springboard can take over.
++  // `?screens=<url>`: the display shows that page instead of the OS (`display=inner|outer` added), for an
++  // embedding page that brings its own content. Local experiment, see device.ts `SCREENS`.
++  if (SCREENS) {
++    const src = new URL(SCREENS)
++    src.searchParams.set('display', wide ? 'inner' : 'outer')
++    const frame = document.createElement('iframe')
++    frame.src = src.href
++    frame.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:transparent'
++    root.append(frame)
++    return root
++  }
+   const view = createRoot(root)
+   view.render(<BootScreen />)
+   void Promise.all([bootRegistry(), new Promise((r) => setTimeout(r, BOOT_MS))])

@@ -10,20 +10,20 @@ import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui
 // exactly as it would on the phone. Every size is measured on the Duo simulator (docs/research-notes.md), on the
 // device, or from its device artwork (tools/media/frame.py).
 
-type Posture = "closed" | "open";
+export type Posture = "closed" | "open";
 /** home: added to the Home Screen. safari: a full-screen tab. split: Safari in a split-view pane. window: a Safari
  *  window beside the Home Screen. */
-type App = "home" | "safari" | "split" | "window";
+export type App = "home" | "safari" | "split" | "window";
 /** live: Live Activities are running (the visitor's switch, kept across views). They grow the Dynamic Island down
  *  the closed strip, the only place the island is, so `island()` says where they show. */
-interface State { posture: Posture; turn: Turn; upside: boolean; app: App; pane: Side; live: boolean }
+export interface State { posture: Posture; turn: Turn; upside: boolean; app: App; pane: Side; live: boolean }
 /** The interface's turn, degrees clockwise from the natural orientation. iOS never turns upside down, so a quarter
  *  either way is all; turned on to its head (`upside`), the device keeps the quarter turn it came from. */
-type Turn = -90 | 0 | 90;
+export type Turn = -90 | 0 | 90;
 /** Where the hardware points, in degrees clockwise. */
-const hardware = (s: State) => s.upside ? 180 : s.turn;
+export const hardware = (s: State) => s.upside ? 180 : s.turn;
 /** A quarter turn of the hardware either way, round and round: the interface follows, except on to its head. */
-const rotate = (s: State, by: -90 | 90): Partial<State> => {
+export const rotate = (s: State, by: -90 | 90): Partial<State> => {
   const to = (((hardware(s) + by) % 360) + 360) % 360;
   return to === 180 ? { upside: true } : { turn: (to === 270 ? -90 : to) as Turn, upside: false };
 };
@@ -31,7 +31,7 @@ const UPSIDE_NOTE = "Upside down, iOS keeps the last way up, so the page stays a
 
 // Natural orientation: closed is portrait (outer display), open is landscape (inner display). A clockwise turn puts
 // the outer camera bottom right, an anticlockwise one top left.
-const SCREEN = { closed: { w: 466, h: 678 }, open: { w: 951, h: 669 } };
+export const SCREEN = { closed: { w: 466, h: 678 }, open: { w: 951, h: 669 } };
 // A graphite finish around a black front: the site stays colourless.
 const FINISH = { band: "#3a3a3c", rim: "#6e6e73", front: "#0b0c10", button: "linear-gradient(#6e6e73, #2c2c2e)" };
 const BODY_SHADE = `inset 0 0 0 1.5px ${FINISH.rim}, inset 0 0 0 3.5px ${FINISH.band}`;
@@ -143,7 +143,7 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
 /** Where the page sits on the screen, the signals it gets and the system chrome around it. W x H is the screen as
  *  the user sees it (upright). `modeOf`: the mode the page shows for a set of signals. Live Activities push iOS's
  *  clock and Safari's rows down, telling the page nothing. */
-function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode): Scene {
+export function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode): Scene {
   const full = { w: W, h: H }, screen = { x: 0, y: 0, w: W, h: H };
   const push = island(s) ? DUO.island : 0;
   if (s.app === "home") {
@@ -206,7 +206,7 @@ function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals
 }
 
 const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, turn: 0, upside: false, app, pane: "right", live: false, ...o });
-const TOUR: State[] = [
+export const TOUR: State[] = [
   stop("closed", "home"), stop("closed", "home", { live: true }),
   stop("open", "home"), stop("open", "home", { turn: 90 }), stop("closed", "home", { turn: 90 }), stop("closed", "home"),
   stop("closed", "safari"), stop("closed", "safari", { live: true }), stop("open", "safari"),
@@ -214,9 +214,9 @@ const TOUR: State[] = [
 ];
 const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
 /** The same view, whatever the Live Activities switch says: the phase list follows views, not the switch. */
-const sameView = (a: State, b: State) => same({ ...a, live: false }, { ...b, live: false });
+export const sameView = (a: State, b: State) => same({ ...a, live: false }, { ...b, live: false });
 /** Live Activities show: the island exists on the closed outer display only, and is measured upright only. */
-const island = (s: State) => s.live && s.posture === "closed" && !s.turn;
+export const island = (s: State) => s.live && s.posture === "closed" && !s.turn;
 /** The phase list: each row starts at a tour stop and lasts until the next row's. */
 const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
   { group: "Home Screen web app", rows: [["Closed", 0], ["Unfolded and turned", 2]] },
@@ -224,7 +224,7 @@ const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
 ];
 /** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. */
 const ONLY: Partial<Record<App, Posture>> = { split: "open", window: "open" };
-const fit = (s: State): State => {
+export const fit = (s: State): State => {
   const only = ONLY[s.app];
   return !only || (s.posture === only && !s.turn) ? s : { ...s, app: "safari" };
 };
@@ -807,7 +807,7 @@ function Showing({ app, row, style }: { app: App; row?: boolean; style?: CSSProp
 
 /** The tour's phases, grouped by where the page runs: the current one follows the tour, and picking one jumps there
  *  (which pauses the tour). `row`: chips under the stage, where there is no room beside it. */
-function Phases({ app, at, tour, onPick, onTour, live, onLive, row, style }: { app?: App; at: number; tour: boolean; onPick: (i: number) => void; onTour: () => void; live: boolean; onLive: () => void; row?: boolean; style?: CSSProperties }) {
+export function Phases({ app, at, tour, onPick, onTour, live, onLive, row, style }: { app?: App; at: number; tour: boolean; onPick: (i: number) => void; onTour: () => void; live: boolean; onLive: () => void; row?: boolean; style?: CSSProperties }) {
   const starts = PHASES.flatMap((g) => g.rows.map(([, i]) => i)).sort((a, b) => a - b);
   const current = at < 0 ? -1 : starts.filter((i) => i <= at).at(-1);
   const item = (label: string, i: number) => {
@@ -974,7 +974,7 @@ const CAMERA_PILL = { position: "absolute", width: CAMERA.d + 2, borderRadius: 9
  *  (call + Maps), grow it down the strip within DUO.island: the first activity joins the camera's pill, the second
  *  splits off below as its own bubble. They spring out of the camera and back into it, like iOS. In device
  *  coordinates, so it stays with the hardware when turned. */
-function Island({ live: want }: { live: boolean }) {
+export function Island({ live: want }: { live: boolean }) {
   // Mounted closed, then grown: a device that closes with activities running springs them out of the camera.
   const [live, setLive] = useState(false);
   useEffect(() => { const r = requestAnimationFrame(() => setLive(want)); return () => cancelAnimationFrame(r); }, [want]);
@@ -1110,7 +1110,7 @@ function Glyph({ d, style, size = 24 }: { d: string; style?: CSSProperties; size
 
 // --- controls -------------------------------------------------------------------------------------
 
-const control: CSSProperties = { height: 40, borderRadius: 99, border: 0, font: "500 15px -apple-system, system-ui", color: "var(--ink)", cursor: "pointer" };
+export const control: CSSProperties = { height: 40, borderRadius: 99, border: 0, font: "500 15px -apple-system, system-ui", color: "var(--ink)", cursor: "pointer" };
 
 function Segmented<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: [T, string][] }) {
   return (
@@ -1123,17 +1123,17 @@ function Segmented<T extends string>({ value, onChange, options }: { value: T; o
   );
 }
 
-const group: CSSProperties = { display: "flex", padding: 3, gap: 2, borderRadius: 99, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" };
+export const group: CSSProperties = { display: "flex", padding: 3, gap: 2, borderRadius: 99, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" };
 const glyphBox: CSSProperties = { width: 31, height: 34, padding: 0, display: "grid", placeItems: "center" };
 
 /** One icon in a toolbar, named by its tooltip. `on`: the current choice; `off`: not possible from here. */
-function Tool({ label, on, off, onClick, children }: { label: string; on?: boolean; off?: boolean; onClick: () => void; children: ReactNode }) {
+export function Tool({ label, on, off, onClick, children }: { label: string; on?: boolean; off?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button onClick={onClick} disabled={off} aria-label={label} title={label} aria-pressed={on}
       style={{ ...control, ...glyphBox, background: on ? "var(--accent)" : "transparent", color: on ? "var(--bg)" : "var(--ink)", opacity: off ? 0.3 : 1, cursor: off ? "default" : "pointer", transition: "background 0.2s, color 0.2s" }}>{children}</button>
   );
 }
-const Rule = () => <i aria-hidden style={{ width: 1, height: 18, margin: "0 3px", background: "var(--line)" }} />;
+export const Rule = () => <i aria-hidden style={{ width: 1, height: 18, margin: "0 3px", background: "var(--line)" }} />;
 
 function Button({ onClick, label, on, children }: { onClick: () => void; label: string; on?: boolean; children: ReactNode }) {
   return (
