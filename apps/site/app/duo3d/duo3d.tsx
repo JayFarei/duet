@@ -144,7 +144,7 @@ export function Duo3D() {
       { id: "pwa", label: "PWA", icon: <LayoutGrid size={18} />, on: s.app === "home", pick: () => go({ app: "home" }) },
       { id: "preview", label: "Preview", icon: <MessageSquareText size={18} />, on: preview, pick: () => preview || go({ app: "sheet" }), hint: "A link from Messages, opened in-app" },
     ] },
-    { key: "layout", title: "Layout", one: true, opts: preview ? [
+    { key: "layout", title: "Layout", one: true, slots: 3, opts: preview ? [
       { id: "sheet", label: "Sheet", icon: <PanelBottom size={18} />, on: s.app === "sheet", pick: () => go({ app: "sheet" }) },
       { id: "full", label: "Full screen", icon: <Maximize2 size={18} />, on: s.app === "preview", pick: () => go({ app: "preview" }) },
     ] : s.app === "home" ? [
@@ -172,7 +172,7 @@ export function Duo3D() {
     <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: list ? "16px 16px 0" : "20px 22px 0" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ font: `700 ${list ? 18 : 21}px/1.15 -apple-system, system-ui`, letterSpacing: -0.4 }}>Duo 3D, local</div>
-        <div aria-live="polite" style={{ marginTop: 6, maxWidth: 560, font: `400 ${list ? 12 : 13}px/1.45 -apple-system, system-ui`, color: "var(--dim)" }}>
+        <div aria-live="polite" title={note} style={{ marginTop: 6, maxWidth: 560, height: `${(list ? 4 : 3) * 1.45}em`, overflow: "hidden", display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: list ? 4 : 3, font: `400 ${list ? 12 : 13}px/1.45 -apple-system, system-ui`, color: "var(--dim)" }}>
           <b style={{ color: "var(--ink)", fontWeight: 600 }}>{where}{duet ? "" : ", without Duet"}.</b> {duet ? note : "The same site as a plain mobile site: nothing paints in Safari's column."}
         </div>
       </div>
@@ -203,7 +203,7 @@ export function Duo3D() {
       {sections.map((x, i) => (
         <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "grid", gap: 8, alignContent: "start", padding: "0 10px", borderLeft: i ? "0.5px solid var(--line)" : undefined }}>
           <div style={caption}>{x.one ? x.opts.find((o) => o.on)?.label : x.title}</div>
-          <div style={{ display: "flex", gap: 4 }}>
+          <div style={{ display: "flex", gap: 4, minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
             {x.opts.map((o) => <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
           </div>
         </div>
@@ -261,7 +261,7 @@ export function Duo3D() {
 }
 
 interface Opt { id: string; label: string; icon: ReactNode; on: boolean; off?: boolean; pick: () => void; hint?: string }
-interface Section { key: string; title: string; one?: boolean; opts: Opt[] }
+interface Section { key: string; title: string; one?: boolean; slots?: number; opts: Opt[] }
 
 const caption: CSSProperties = { font: "500 12px -apple-system, system-ui", color: "var(--dim)", whiteSpace: "nowrap" };
 const row: CSSProperties = { ...control, width: "100%", borderRadius: 0, display: "flex", alignItems: "center", gap: 10, background: "transparent", font: "500 15px -apple-system, system-ui" };
