@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { AppWindow, ArrowRight, Compass, Globe, House, Keyboard, MessageSquareShare, MessageSquareText, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { AppWindow, ArrowRight, Compass, Globe, House, Keyboard, Maximize2, MessageSquareShare, MessageSquareText, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
 import { ONLY_OPEN, Phases, Rule, Segmented, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
 import { CHANNEL, DUO_PORT, type Sync } from "./shared";
 
@@ -69,7 +69,7 @@ export function Duo3D() {
   });
 
   // Both displays follow the state; a display that loads late asks for it.
-  const sync: Sync = { s, upright, src, duet };
+  const sync: Sync = { s: { ...s, laptop: stand === "elevated" }, upright, src, duet };
   const ch = useRef<BroadcastChannel | null>(null), last = useRef(sync);
   last.current = sync;
   useEffect(() => {
@@ -123,28 +123,18 @@ export function Duo3D() {
     if (posture !== s.posture) setS(fit({ ...s, posture }));
   };
 
-  const safari = s.app === "safari" || s.app === "split" || s.app === "window", messages = s.app === "sheet" || s.app === "preview";
+  const safari = s.app === "safari" || s.app === "split" || s.app === "window";
   const split = s.app === "split", Pane = s.pane === "left" ? PanelLeft : PanelRight;
+  const row: CSSProperties = { display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", alignItems: "center", padding: "0 16px" };
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "20px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
       <header style={{ textAlign: "center", padding: "0 16px" }}>
         <div style={{ font: "800 26px/1 -apple-system, system-ui", letterSpacing: -0.5 }}>Duo 3D, local</div>
         <div style={{ color: "var(--dim)", font: "400 14px/1.4 -apple-system, system-ui", marginTop: 6 }}>doan-labs/duo renders Apple&apos;s model on this machine only; Duet runs live on both displays.</div>
       </header>
-      {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: "min(68vh, 760px)", border: 0, display: "block", background: "transparent" }} />}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", padding: "0 16px" }}>
-        {/* First in the row, worded: the camera back in front of the device after a drag has orbited it. */}
-        <button type="button" onClick={front} style={{ ...control, display: "flex", alignItems: "center", gap: 8, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
-          <Rotate3d size={18} /> Reset view
-        </button>
-        {/* Before and after: the same site as a plain mobile site, then with Duet. */}
-        <form onSubmit={(e) => { e.preventDefault(); setPage(String(new FormData(e.currentTarget).get("url") ?? "").trim()); }} style={{ ...group, alignItems: "center", gap: 6, padding: "0 6px 0 14px" }}>
-          <Globe size={16} style={{ color: "var(--dim)", flexShrink: 0 }} />
-          <input name="url" type="text" inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="Any URL, or empty for the skeleton" defaultValue={page}
-            style={{ width: 240, height: 36, border: 0, background: "transparent", color: "var(--ink)", font: "400 15px -apple-system, system-ui", outline: "none" }} />
-          <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center" }}><ArrowRight size={16} /></button>
-        </form>
-        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />
+      {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: "min(64vh, 720px)", border: 0, display: "block", background: "transparent" }} />}
+      {/* Three questions, one row each: how the device is held, what is on its screen, which page and with or without Duet. */}
+      <div style={row}>
         <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
           {POSTURES.map(([to, label, Icon]) => (
             <Tool key={to} label={label} on={now === to} onClick={() => posture(to)}><Icon /></Tool>
@@ -153,36 +143,39 @@ export function Duo3D() {
           {([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
             <Tool key={by} label={label} onClick={() => go(rotate(s, by), false, "flat")}><Icon size={18} /></Tool>
           ))}
+          <Rule />
+          <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ width: 110, margin: "0 8px", accentColor: "var(--accent)" }} />
+          <Tool label="Reset view" onClick={front}><Rotate3d size={18} /></Tool>
         </div>
-        {/* Pick the app first; only what that app can show comes next. */}
+      </div>
+      <div style={row}>
+        {/* Every app view in one picker; Split again swaps its sides. */}
         <div role="toolbar" aria-label="App" style={{ ...group, alignItems: "center" }}>
-          <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home", keyboard: false })}><House size={18} /></Tool>
-          <Tool label="Safari" on={safari} onClick={() => safari || go({ app: "safari" })}><Compass size={18} /></Tool>
-          <Tool label="Messages, a link opened in-app" on={messages} onClick={() => messages || go({ app: "sheet", shared: false, forward: false })}><MessageSquareText size={18} /></Tool>
+          <Tool label="Home Screen web app" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
+          <Rule />
+          <Tool label="Safari" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
+          <Tool label={split ? "Swap Split View sides" : "Safari in Split View"} on={split} onClick={() => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" })}><Pane size={18} /></Tool>
+          <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
+          <Rule />
+          <Tool label="Messages link, page sheet" on={s.app === "sheet"} onClick={() => go({ app: "sheet" })}><MessageSquareText size={18} /></Tool>
+          <Tool label="Messages link, full screen" on={s.app === "preview"} onClick={() => go({ app: "preview" })}><Maximize2 size={18} /></Tool>
         </div>
-        {safari && (
-          <div role="toolbar" aria-label="Safari" style={{ ...group, alignItems: "center" }}>
-            <Tool label="One tab" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
-            <Tool label={split ? "Swap Split View sides" : "Split View"} on={split} onClick={() => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" })}><Pane size={18} /></Tool>
-            <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
-            <Rule />
-            <Tool label="Shared with You bar" on={!!s.shared} onClick={() => go({ shared: !s.shared })}><MessageSquareShare size={18} /></Tool>
-            <Tool label="Forward history" on={!!s.forward} onClick={() => go({ forward: !s.forward })}><ArrowRight size={18} /></Tool>
-            <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
-          </div>
-        )}
-        {messages && (
-          <div role="toolbar" aria-label="Link preview" style={{ ...group, alignItems: "center" }}>
-            {/* The in-app preview's two presentations: a page sheet over Messages, or full screen. */}
-            <Segmented value={s.app} onChange={(v) => go({ app: v as "sheet" | "preview" })} options={[["sheet", "Sheet"], ["preview", "Full screen"]]} />
-            <Rule />
-            <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
-          </div>
-        )}
-        <label style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
-          Fold
-          <input type="range" aria-label="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ width: 120, accentColor: "var(--accent)" }} />
-        </label>
+        {/* What can sit over any of them; Safari's own bars only exist in Safari. */}
+        <div role="toolbar" aria-label="Overlays" style={{ ...group, alignItems: "center" }}>
+          <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
+          <Tool label="Shared with You bar (Safari)" on={!!s.shared} off={!safari} onClick={() => go({ shared: !s.shared })}><MessageSquareShare size={18} /></Tool>
+          <Tool label="Forward history (Safari)" on={!!s.forward} off={!safari} onClick={() => go({ forward: !s.forward })}><ArrowRight size={18} /></Tool>
+        </div>
+      </div>
+      <div style={row}>
+        {/* Before and after: the same site as a plain mobile site, then with Duet. */}
+        <form onSubmit={(e) => { e.preventDefault(); setPage(String(new FormData(e.currentTarget).get("url") ?? "").trim()); }} style={{ ...group, alignItems: "center", gap: 6, padding: "0 6px 0 14px" }}>
+          <Globe size={16} style={{ color: "var(--dim)", flexShrink: 0 }} />
+          <input name="url" type="text" inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="Any URL, or empty for the skeleton" defaultValue={page}
+            style={{ width: 240, height: 36, border: 0, background: "transparent", color: "var(--ink)", font: "400 15px -apple-system, system-ui", outline: "none" }} />
+          <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center" }}><ArrowRight size={16} /></button>
+        </form>
+        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />
       </div>
       <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
     </div>

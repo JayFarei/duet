@@ -18,8 +18,9 @@ export type App = "home" | "safari" | "split" | "window" | "sheet" | "preview";
 /** live: Live Activities are running (the visitor's switch, kept across views). They grow the Dynamic Island down
  *  the closed strip, the only place the island is, so `island()` says where they show. The optional conditions
  *  (duo3d sets them; the 2D Duo never does): shared, Safari's Shared with You bar over a link a contact sent (#112);
- *  forward, forward history, Safari's back grown into a back + forward pill; keyboard, the on-screen keyboard up. */
-export interface State { posture: Posture; turn: Turn; upside: boolean; app: App; pane: Side; live: boolean; shared?: boolean; forward?: boolean; keyboard?: boolean }
+ *  forward, forward history, Safari's back grown into a back + forward pill; keyboard, the on-screen keyboard up; laptop, open on a table with
+ *  one half raised, where the keyboard takes the whole lower half. */
+export interface State { posture: Posture; turn: Turn; upside: boolean; app: App; pane: Side; live: boolean; shared?: boolean; forward?: boolean; keyboard?: boolean; laptop?: boolean }
 /** The interface's turn, degrees clockwise from the natural orientation. iOS never turns upside down, so a quarter
  *  either way is all; turned on to its head (`upside`), the device keeps the quarter turn it came from. */
 export type Turn = -90 | 0 | 90;
@@ -159,13 +160,15 @@ export function scene(s: State, W: number, H: number, host: string, modeOf: (s: 
   // Closed is measured on the Duo Lab sim (iOS 26): a frosted panel 303pt tall upright, 227 turned, with the form
   // accessory capsule above it and Safari's address shrunk to a pill above that (a tab's visual viewport 272 of 598
   // upright, 142 turned). Open is derived from the closed panel, not yet captured.
-  const k = !s.keyboard ? null : KEYS(s.posture === "closed", W, H);
-  const kb = !k ? 0 : k.panel + (s.posture === "closed" ? 104 : 59);
+  // In laptop posture the lower half is the keyboard, hinge to edge, with nothing floating above it.
+  const laptop = !!s.laptop && s.posture === "open" && W < H;
+  const k = !s.keyboard ? null : laptop ? LAPTOP(W, H) : KEYS(s.posture === "closed", W, H);
+  const kb = !k ? 0 : laptop ? k.panel : k.panel + (s.posture === "closed" ? 104 : 59);
   const vis = (g: Signals, top: number): Signals => kb ? { ...g, visualHeight: Math.max(0, Math.min(g.innerHeight, H - kb - top)) } : g;
   const r = place(s, W, H, host, (g) => modeOf(g), vis);
   if (!k) return r;
   const page = { x: r.clip.x + 20, w: r.clip.w - 40 };
-  return { ...r, chrome: <>{r.chrome}<Keyboard w={W} top={H - k.panel} k={k} bar={page} host={s.posture === "closed" ? host : undefined} /></>, note: `${r.note} With the keyboard up only the visual viewport shrinks, so Duet keeps its layout.` };
+  return { ...r, chrome: <>{r.chrome}<Keyboard w={W} top={H - k.panel} k={k} bar={laptop ? undefined : page} host={s.posture === "closed" && s.app !== "home" ? host : undefined} /></>, note: `${r.note} With the keyboard up only the visual viewport shrinks, so Duet keeps its layout.` };
 }
 
 /** The keyboard's measure for a screen, in points: panel height, the band above the keys (suggestions), key height,
@@ -176,6 +179,10 @@ function KEYS(closed: boolean, W: number, H: number): Keys {
     : closed ? { band: 49, key: 33, row: 9, bottom: 19, span: 518, font: 23 }
     : { band: 52, key: W < H ? 46 : 42, row: 10, bottom: 34, span: Math.min(W - 14, 640), font: 25 };
   return { ...k, panel: k.band + 4 * k.key + 3 * k.row + k.bottom };
+}
+function LAPTOP(W: number, H: number): Keys {
+  const panel = Math.round(H / 2), band = 60, row = 14, bottom = 40;
+  return { panel, band, row, bottom, key: (panel - band - 3 * row - bottom) / 4, span: W - 40, font: 30 };
 }
 
 function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode, vis: (g: Signals, top: number) => Signals): Scene {
@@ -1192,7 +1199,7 @@ function SharedBar({ left, top = 0, width, h }: { left: number; top?: number; wi
 /** The on-screen keyboard as iOS 26 draws it: a frosted panel with a faint suggestion band, white rounded keys in
  *  four rows (letters, shift and delete, 123 / emoji / space / mic / return), the form accessory capsule floating
  *  above it (previous, next, done) and, on the closed screen, Safari's address shrunk to a pill above that. */
-function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; bar: { x: number; w: number }; host?: string }) {
+function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; bar?: { x: number; w: number }; host?: string }) {
   const gap = Math.round(k.span / 60), unit = (k.span - 9 * gap) / 10;
   const key = (c: ReactNode, width: number | string, i: number | string, size = k.font): ReactNode => (
     <div key={i} style={{ width, height: k.key, flex: width === "auto" ? 1 : "none", borderRadius: 9, background: "var(--wd-key)", display: "grid", placeItems: "center", font: `400 ${size}px -apple-system, system-ui`, color: "var(--ink)" }}>{c}</div>
@@ -1203,11 +1210,11 @@ function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; b
   return (
     <div data-wd-system style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
       {host && <div style={{ position: "absolute", left: (w - 88) / 2, top: top - 59 - 46, width: 88, height: 30, borderRadius: 99, ...glass, display: "grid", placeItems: "center", font: "500 13px -apple-system, system-ui", color: "var(--ink)" }}>{host}</div>}
-      <div style={{ position: "absolute", left: bar.x, top: top - 59, width: bar.w, height: 47, borderRadius: 99, ...glass, display: "flex", alignItems: "center", gap: 22, padding: "0 16px", boxSizing: "border-box", color: "var(--ink)" }}>
+      {bar && <div style={{ position: "absolute", left: bar.x, top: top - 59, width: bar.w, height: 47, borderRadius: 99, ...glass, display: "flex", alignItems: "center", gap: 22, padding: "0 16px", boxSizing: "border-box", color: "var(--ink)" }}>
         <Glyph d="m18 15-6-6-6 6" size={22} style={{ margin: 0, opacity: 0.45 }} /><Glyph d="m6 9 6 6 6-6" size={22} style={{ margin: 0, opacity: 0.45 }} />
         <Glyph d="M20 6 9 17l-5-5" size={24} style={{ margin: "0 0 0 auto" }} />
-      </div>
-      <div style={{ position: "absolute", left: 0, top, width: w, height: k.panel, borderRadius: "34px 34px 0 0", background: "var(--wd-kb)", backdropFilter: "blur(24px) saturate(1.4)", boxShadow: "inset 0 0.5px 0 rgb(255 255 255 / 0.5), 0 0 0 0.5px rgb(0 0 0 / 0.08)", boxSizing: "border-box", paddingTop: k.band, display: "flex", flexDirection: "column", alignItems: "center" }}>
+      </div>}
+      <div style={{ position: "absolute", left: 0, top, width: w, height: k.panel, borderRadius: bar ? "34px 34px 0 0" : 0, background: "var(--wd-kb)", backdropFilter: "blur(24px) saturate(1.4)", boxShadow: "inset 0 0.5px 0 rgb(255 255 255 / 0.5), 0 0 0 0.5px rgb(0 0 0 / 0.08)", boxSizing: "border-box", paddingTop: k.band, display: "flex", flexDirection: "column", alignItems: "center" }}>
         {[1, 2].map((i) => <i key={i} style={{ position: "absolute", top: 12, left: w / 2 + (i === 1 ? -1 : 1) * k.span / 6, width: 1, height: 22, background: "var(--line)" }} />)}
         <div style={{ width: k.span, display: "flex", flexDirection: "column", gap: k.row }}>
           {row(letters("qwertyuiop"))}

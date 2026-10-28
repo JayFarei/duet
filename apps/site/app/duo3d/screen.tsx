@@ -82,9 +82,14 @@ export function Screen() {
     return () => { mo?.disconnect(); el?.removeEventListener("load", attach); };
   }, [!!sc]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The interface turning upright is a cut, as on iOS under the device's own turn: the page lands in its new frame
+  // at once instead of sliding there from the old orientation's, which showed black where it had not reached yet.
+  const was = useRef(upright), cut = was.current !== upright;
+  useEffect(() => { was.current = upright; });
+
   if (!sc || !st || !sync || !view.w) return <div style={{ position: "fixed", inset: 0, background: "#000" }} />;
   const scale = Math.min(view.w / n.w, view.h / n.h);
-  const motion = (props: string[]) => props.map((x) => `${x} 520ms cubic-bezier(0.32, 0.72, 0, 1)`).join(", ");
+  const motion = (props: string[]) => cut ? "none" : props.map((x) => `${x} 520ms cubic-bezier(0.32, 0.72, 0, 1)`).join(", ");
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "hidden", background: "var(--bg)" }}>
       <div style={{ position: "absolute", left: 0, top: 0, width: n.w, height: n.h, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
