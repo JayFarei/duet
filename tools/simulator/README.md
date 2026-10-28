@@ -29,6 +29,10 @@ Column tap points with this lab URL: "…" (418,410), tab pill (418,506), Safari
 
 `drift.py` uses Safari's own glyphs as the control: if they move, the tracker is wrong, not our chrome. `tap.py` compares glyph masks, not raw pixels, so page content reflowing behind the column does not count as a reaction.
 
+Known baselines (column without children, `/scroll?marker`): flicks to the page end failed at 12 to 18pt while Safari's toolbar grew back with a measured range, and pass at 2pt with the `100dvh` range (#100).
+
+Per-frame trace: start the site with `DUET_TRACE=<file.csv>` and add `&trace` to the `/scroll` lab URL. Each frame appends `t, scrollY, innerHeight, clientHeight, scrollHeight, visualViewport height, visualViewport offsetTop, the layer's computed translateY, its rect top, a 100dvh probe, events since the last frame` (`s` scroll, `r` resize, `vr` visualViewport resize) through the dev-only `/api/lab-trace` route. The computed translateY minus scrollY is the main-thread error; drift.py on a recording is what Safari actually painted, and the two can disagree.
+
 Known baselines: the user's drift video fails at 11pt; the pre-fix build fails at 30pt; the inner-scroller build passes at 0.0pt with 6 controls.
 
 ## Layout overlap (WebKit, no simulator)

@@ -6,7 +6,7 @@ Automated placement checks for Duet on the iPhone Duo simulator: Safari tab in e
 
 ```sh
 tools/e2e/run.sh                                   # whole matrix on "Duo Lab"
-tools/e2e/run.sh --only tab,fold                   # scenarios: tab, preview-sheet, preview-default, preview-full, open-in-safari, open-in-safari-90, open-in-safari-270, fold, dark, preview-unfolded, open-in-safari-unfold, split, split-turn, dynamic-type
+tools/e2e/run.sh --only tab,fold                   # scenarios: tab, preview-sheet, preview-default, preview-full, open-in-safari, open-in-safari-90, open-in-safari-270, fold, dark, preview-unfolded, open-in-safari-unfold, split, split-turn, dynamic-type, live-tab, live-preview-sheet, live-preview-default, live-preview-full
 tools/e2e/run.sh --md /path/round.md               # also write a markdown table
 DUO_UDID=<udid> tools/e2e/run.sh                   # another Duo simulator
 tools/e2e/.venv/bin/python -I tools/e2e/e2e.py --udid <udid> --rerender tools/e2e/reports/<ts>   # re-assess a saved run with current rules
@@ -15,6 +15,17 @@ tools/e2e/.venv/bin/python -I tools/e2e/e2e.py --udid <udid> --rerender tools/e2
 `run.sh` rebuilds the `duet-ui` dist (`pnpm -s build`) and `fold/fold.bin` when stale, starts whatever is not already up and stops only what it started: the site from this checkout (`next dev -p 3140`, required to answer `/?e2e=1` with 200), the beacon (`:3141`), the host app plus UI-test runner (built with Xcode 27.1, see SDK), and a `.venv` with pillow. Output goes to `tools/e2e/reports/<ts>/`: `index.html` (table, overlays, contact sheets), `steps/<id>.json` (every sample, native frames, expectation, verdict), `shots/`.
 
 Exit status: 1 when any step FAILs, 2 when any step is BLOCKED or the environment cannot start (broken dist build, site not answering, fold tool missing), else 0. split, split-turn and open-in-safari-unfold need the simulator helper (Split view below) and are BLOCKED without it.
+
+## Catalogue and parallel runs
+
+[CATALOGUE.md](CATALOGUE.md) lists, in plain English, every state a page can be shown in (Safari tab or in-app preview sheet, default, full; folded or unfolded; each angle; music Live Activity on or off), every transition between them (turn, fold, unfold, start or stop music, Open in Safari) and the journeys that walk all of them: each journey sets up its starting condition (posture, angle, music) before opening the page, so "open unfolded" and "open folded, then unfold" are separate journeys. `catalogue.py` holds the states, transitions and expectations as data and generates the journeys (a greedy edge cover, stable ids `j01`...); regenerate CATALOGUE.md with `python3 tools/e2e/catalogue.py > tools/e2e/CATALOGUE.md` after changing it.
+
+```sh
+tools/e2e/run.sh --catalogue --only j07 --page /confirm   # replay one journey on "Duo Lab" (the report shows this line per journey)
+tools/e2e/matrix.sh --page /confirm                       # every journey, sharded over the four "Duo e2e N" simulators
+```
+
+Every step of a journey is filmed; the report has one section per journey with its steps in words, each step's verdict and first reason, the stitched film and its replay command. `matrix.sh` builds once, starts the site once, then runs one `run.sh` per simulator, each with its own beacon and UI-test runner (`BEACON_PORT` 3151 to 3154: the host gets `-beacon`, the runner a copy of the xctestrun with `E2E_BEACON`) and every Nth journey (`--shard i/N`), and joins the shard reports with `e2e.py --merge` into `reports/matrix-<ts>/index.html`. The four simulators are clones of "Duo Lab" (iPhone Duo, iOS 27.1); `DUO_SIMS` overrides them.
 
 ## Rotation and fold
 
@@ -87,7 +98,7 @@ The second app is always `DuoE2EHost` (`dev.duolab.e2e.host`), never another Hom
 ## Limits
 
 - Split view exists only in the wide unfolded posture: turning to the tall posture keeps the focused app full screen, and so does folding; split view does not come back on turning wide again.
-- Live Activities cannot be started on the simulator without an app that owns one, so the island-pushed variant of the preview gap is covered by unit fixtures (`DUO.island` reach). `dynamic-type` runs the preview and the tab at the largest accessibility text size instead: Safari's and the preview's buttons are fixed size, so the gap must not move. Safari's bottom bar does grow there (98 -> 106pt), which the library's column signature now admits.
+- Live Activities: the `live-*` scenarios start a real music activity from `DuoE2EHost` (`host/Host/Live.swift`, driven through the beacon's `/la`) and film every step; `run.sh` loads the runtime's `chronod` and `liveactivitiesd`, which the simulator leaves unloaded. ActivityKit starts an activity only from the foreground, so in a Safari tab the host comes forward and Safari goes back in front (the page is not reloaded). The island's activity frame is read from SpringBoard on every closed step and checked as a native obstacle; in closed landscape the island shows no activity. Each scenario's clips are stitched into one captioned film, `shots/<scenario>.mp4`, linked at the top of the report. `dynamic-type` runs the preview and the tab at the largest accessibility text size: Safari's and the preview's buttons are fixed size, so the gap must not move. Safari's bottom bar does grow there (98 -> 106pt), which the library's column signature now admits.
 - Folding with the preview open (`pvu-fold`) intermittently leaves WebKit reporting a negative `visualViewport.height` (-78) until the next resize; the library treats a non-positive visual height as no keyboard (`keyboardUp`), else the controls hid as if the keyboard were up.
 - No split view in the tall posture, so there is nothing to place there; `split-turn` checks that Safari takes the screen.
 - `split-drag` (experimental, only with `--only split-drag`) tries a direct pane swap by dragging the pane's top handle. Round 4: blocked, the drag does not swap the panes and the simulator's accessibility tree exposes no pane handle to aim at (the dump is saved as `steps/<step>-ui.json`). `split` moves between panes through full width (quit the other app, open in split view on the other side), the path SpringBoard drives reliably.

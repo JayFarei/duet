@@ -85,5 +85,32 @@ function Marker() {
     const t = [setTimeout(() => jumpTo("outlook"), 3000), setTimeout(() => jumpTo("check"), 6000)];
     return () => t.forEach(clearTimeout);
   }, []);
+  useEffect(() => {
+    if (!new URLSearchParams(location.search).has("trace")) return;
+    // Per frame: scroll, viewport, the layer's timeline transform and where it actually lands (rect top, 0 when held).
+    let rows: string[] = [], raf = 0, ev = "";
+    const t0 = performance.now();
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;top:0;left:0;width:1px;height:100dvh;visibility:hidden;pointer-events:none";
+    document.body.appendChild(probe);
+    const mark = (e: Event) => { ev += (e.target === visualViewport ? "v" : "") + e.type[0]; };
+    addEventListener("resize", mark); addEventListener("scroll", mark); visualViewport?.addEventListener("resize", mark);
+    const tick = () => {
+      const el = document.querySelector<HTMLElement>(".duet[data-mode=column]");
+      const cs = el && getComputedStyle(el), m = cs ? new DOMMatrix(cs.transform === "none" ? undefined : cs.transform) : null;
+      const vv = visualViewport;
+      rows.push([Math.round(performance.now() - t0), scrollY.toFixed(1), innerHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight,
+        vv ? vv.height.toFixed(1) : "", vv ? vv.offsetTop.toFixed(1) : "", m ? m.f.toFixed(1) : "", el ? el.getBoundingClientRect().top.toFixed(1) : "", probe.getBoundingClientRect().height.toFixed(1), ev].join(","));
+      ev = "";
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    const flush = () => { if (rows.length) { navigator.sendBeacon("/api/lab-trace", rows.join("\n")); rows = []; } };
+    const iv = setInterval(flush, 1000);
+    return () => {
+      cancelAnimationFrame(raf); clearInterval(iv); probe.remove();
+      removeEventListener("resize", mark); removeEventListener("scroll", mark); visualViewport?.removeEventListener("resize", mark);
+    };
+  }, []);
   return on ? <div style={{ position: "fixed", top: 300, left: 20, width: 40, height: 40, background: "blue", zIndex: 99 }} /> : null;
 }

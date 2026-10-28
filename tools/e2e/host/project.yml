@@ -4,7 +4,7 @@ targets:
   DuoE2EHost:
     type: application
     platform: iOS
-    sources: [Host]
+    sources: [Host, Shared]
     info:
       path: Host/Info.plist
       properties:
@@ -13,7 +13,20 @@ targets:
         UIApplicationSupportsMultipleScenes: true
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight, UIInterfaceOrientationPortraitUpsideDown]
         NSAppTransportSecurity: {NSAllowsArbitraryLoads: true}
+        NSSupportsLiveActivities: true
+        UIBackgroundModes: [audio]
+    dependencies: [{target: DuoE2EActivity, embed: true}]
     settings: {base: {GENERATE_INFOPLIST_FILE: YES, MARKETING_VERSION: "1.0", CURRENT_PROJECT_VERSION: "1", SWIFT_VERSION: "6.0", CODE_SIGNING_ALLOWED: NO, PRODUCT_BUNDLE_IDENTIFIER: dev.duolab.e2e.host}}
+  DuoE2EActivity:
+    type: app-extension
+    platform: iOS
+    sources: [Activity, Shared]
+    info:
+      path: Activity/Info.plist
+      properties:
+        CFBundleDisplayName: Duo e2e activity
+        NSExtension: {NSExtensionPointIdentifier: com.apple.widgetkit-extension}
+    settings: {base: {GENERATE_INFOPLIST_FILE: YES, MARKETING_VERSION: "1.0", CURRENT_PROJECT_VERSION: "1", SWIFT_VERSION: "6.0", CODE_SIGNING_ALLOWED: NO, PRODUCT_BUNDLE_IDENTIFIER: dev.duolab.e2e.host.activity}}
   DuoE2ERunner:
     type: bundle.ui-testing
     platform: iOS
