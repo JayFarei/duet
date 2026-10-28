@@ -116,3 +116,15 @@ test("closed preview, short band: the island pill opens on its button, never ont
   }
   assert.ok(n > 20);
 });
+
+// #135: a sheet hides its own X while Duet's close is on screen (<html data-duet-close>), in every mode, so the open
+// screen shows one X too. With the keyboard up only strip controls stay, and the landscape closed preview hides them.
+test("controls shown for data-duet-close", async () => {
+  const { controlsShown } = await import("../src/geometry.ts");
+  for (const mode of ["strip", "column", "inline"]) assert.equal(controlsShown({ mode }), true, mode);
+  assert.equal(controlsShown({ mode: "strip", keyboard: true }), true);
+  assert.equal(controlsShown({ mode: "column", keyboard: true }), false);
+  assert.equal(controlsShown({ mode: "inline", keyboard: true }), false);
+  assert.equal(controlsShown({ mode: "inline", hidden: "preview" }), false);
+  assert.equal(controlsShown({ mode: "column", hidden: "moving" }), true);
+});

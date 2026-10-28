@@ -142,10 +142,18 @@ Not covered yet:
 ## mod01: A full-screen page dialog opened and closed (#79), Safari tab
 
 1. Open /sheet in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
-2. Tap "Weekend in Lisbon" (a full-screen dialog opens). Expect: controls in a column on the right; the dialog is open; Duet offers "Close".
-3. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the dialog is open; Duet offers "Close".
-4. Turn the phone upright. Expect: controls in a column on the right; the dialog is open.
+2. Tap "Weekend in Lisbon" (a full-screen dialog opens). Expect: controls in a column on the right; the dialog is open; Duet offers "Close"; 1 close button on screen.
+3. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the dialog is open; Duet offers "Close"; 1 close button on screen.
+4. Turn the phone upright. Expect: controls in a column on the right; the dialog is open; 1 close button on screen.
 5. Tap Duet's "Close". Expect: controls in a column on the right; the dialog is closed; Duet no longer offers "Close".
+
+## mod02: A full-screen page dialog opened and closed, Safari tab, unfolded (#135)
+
+1. Open /sheet in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
+2. Tap "Weekend in Lisbon" (a full-screen dialog opens). Expect: controls inline on the right; the dialog is open; Duet offers "Close"; 1 close button on screen.
+3. Turn the phone tall, turned right (90). Expect: controls inline on the right; the dialog is open; 1 close button on screen.
+4. Turn the phone wide (951x669). Expect: controls inline on the right; the dialog is open; 1 close button on screen.
+5. Tap Duet's "Close". Expect: controls inline on the right; the dialog is closed; Duet no longer offers "Close"; 0 close buttons on screen.
 
 ## la01: Live Activity expanded by a long press, Safari tab
 

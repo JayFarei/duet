@@ -112,14 +112,14 @@ A modal or sheet on the web usually sits on a full-screen scrim: `position: fixe
 - **What you see:** nothing to handle. While the overlay is open, the controls stay in the column and keep working. Safari's own buttons there are unaffected either way.
 - **Cause:** Safari 26 hit-tests the middle of each viewport edge, 4px in, for a fixed or sticky box (WebKit's `LocalFrameView::fixedContainerEdges`). When one covers that point, Safari paints the box's colour, or plain chrome when the box has a `backdrop-filter`, over everything beyond that edge, Safari's column included. Duet's column layer is in-document content, so it disappears under that fill. Measured on the simulator: a scrim 3px short of the edge still hides the column, 6px short does not, and a scrim of 90% width or 40% height does not.
 - **What Duet does:** on a Duo in Safari it renders a small fixed guard (`.duet-guard`, 16x64px, transparent, `pointer-events: none`, top `z-index`) straddling that point on each viewport edge, in every mode, so it is there through folds and turns too. Safari's hit test lands on the guard, which is too small to count as a container, so it finds none and keeps painting the column normally. The guard takes no taps and paints nothing.
-- **What you must do:** nothing for visibility. For a native feel, pass `close` to `<Duet>` while the sheet is open, so the controls hold only its close button, and hide the sheet's own X in column mode:
+- **What you must do:** nothing for visibility. For a native feel, pass `close` to `<Duet>` while the sheet is open, so the controls hold only its close button, and hide the sheet's own X while Duet shows its close (`<html data-duet-close>`, set in every mode, so the open screen shows one X too):
 
   ```tsx
   <Duet tabs={tabs} close={open ? { label: "Close", onPress: () => setOpen(false) } : undefined}>
   ```
 
   ```css
-  html[data-duet-mode="column"] .sheet-x { display: none; }
+  html[data-duet-close] .sheet-x { display: none; }
   ```
 
   The old workaround, making the scrim `position: absolute` in column mode, still works and is no longer needed.
@@ -400,7 +400,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You see:** without the handling, in column mode, while a modal or sheet scrim (`position: fixed; inset: 0`) is open, every Duet control in Safari's column disappears, the close button included, so the user has no way to close the sheet from the column.
 - **Cause:** Safari 26 hit-tests a point 4px in from the middle of each viewport edge for a fixed or sticky box and, when one covers it, paints that box's colour over the inset beyond that edge, Safari's column included, instead of the page's in-document content.
 - **Duet does:** on a Duo in Safari renders `.duet-guard`, a small invisible fixed box (16x64px, `pointer-events: none`, top `z-index`) on each viewport edge, so that hit test lands on it and the column keeps showing the controls. Your scrim stays `position: fixed`.
-- **You do:** nothing for a fixed `<div>` scrim. `<dialog>.showModal()` is not covered: its `::backdrop` sits in the top layer, above any `z-index`, so use a fixed `<div>` scrim instead. For one X, in the column, pass `close` to `<Duet>` while the sheet is open and hide the sheet's own X in column mode (`html[data-duet-mode="column"] .sheet-close { display: none; }`). See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
+- **You do:** nothing for a fixed `<div>` scrim. `<dialog>.showModal()` is not covered: its `::backdrop` sits in the top layer, above any `z-index`, so use a fixed `<div>` scrim instead. For one X, in the column, pass `close` to `<Duet>` while the sheet is open and hide the sheet's own X while Duet shows its close (`html[data-duet-close] .sheet-x { display: none; }`, see [Sheet X shown twice](#sheet-x-shown-twice)). See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
 - **Status:** [#79](https://github.com/JayFarei/duet/issues/79), [PR #83](https://github.com/JayFarei/duet/pull/83), 0.4.0-rc.2.
 
 ### Page dialog open through a turn or fold
@@ -658,6 +658,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** starts a prominent primary closed, as the tinted round button, and opens it into the pill only with `expanded: true`, on the same spring as label changes.
 - **You do:** leave it closed by default; set `expanded` for a state worth reading (Booking, Booked), or from the start on a page whose whole point is the action.
 - **Status:** [#101](https://github.com/JayFarei/duet/issues/101). See [Call to action](#call-to-action).
+
+### Sheet X shown twice
+
+- **You see:** on the open screen (or in inline mode) with a sheet open, two close buttons: the sheet's own X and Duet's close in the side controls.
+- **Cause:** the recipe hid the sheet's X with `html[data-duet-mode="column"]`, so it only applied in Safari's column on the closed screen, while Duet shows its `close` button in every mode.
+- **Duet does:** sets `data-duet-close` on `<html>` whenever its close button is on screen, in every mode. Inline and column controls hide with the keyboard up, so the attribute drops then and the sheet's X is the one left. A turn's few hidden frames keep it, so the sheet's X does not flash.
+- **You do:** hide your X with `html[data-duet-close] .sheet-x { display: none; }` instead of the column-mode selector.
+- **Status:** [#135](https://github.com/JayFarei/duet/issues/135).
 
 ## Limitations
 

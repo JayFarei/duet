@@ -566,6 +566,11 @@ export function magnet(side: Side, dx: number): { offset: number; free: boolean 
 }
 
 /** Width the inline strip takes from the page (same column width as Safari's). */
+// Whether the controls are on screen to show a close button, for <html data-duet-close> (#135). Column and inline
+// controls step aside with the keyboard (duet.css) and a landscape closed preview hides them, leaving the page's own
+// X. A turn's few hidden frames ("moving") still count, so the page's X doesn't flash on every fold or turn.
+export const controlsShown = (c: Pick<Context, "mode" | "keyboard" | "hidden">) => c.hidden !== "preview" && !(c.keyboard && c.mode !== "strip");
+
 export const INLINE_WIDTH = 84;
 
 /** Where the page goes beside the controls, and the insets left for it to keep clear by (chrome.tsx writes them on

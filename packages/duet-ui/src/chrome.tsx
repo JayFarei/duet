@@ -3,7 +3,7 @@
 import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, isSplit, pageInsets, islandBox, islandFits, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { DUO, columnBand, controlsShown, isSplit, pageInsets, islandBox, islandFits, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
@@ -477,6 +477,12 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const h = document.documentElement;
     h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
   }, []);
+  // data-duet-close: Duet's close button is on screen, in any mode, so a sheet hides its own X and shows one (#135).
+  const closeShown = !!p.close && controlsShown(ctx);
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-duet-close", closeShown);
+    return () => document.documentElement.removeAttribute("data-duet-close");
+  }, [closeShown]);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
   const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column");
