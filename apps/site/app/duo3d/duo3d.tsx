@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { AppWindow, Compass, House, Laptop, PanelLeft, PanelRight, RectangleVertical, RotateCcw, RotateCw, Rotate3d, Smartphone, Tablet, Tent } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { AppWindow, Compass, House, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
 import { ONLY_OPEN, Phases, Rule, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
 import { CHANNEL, DUO_PORT, type Sync } from "./shared";
 
@@ -20,6 +20,19 @@ const STANDS: Record<Exclude<Stand, "flat">, { posture: "open" | "closed"; deg: 
 // Nightstand straddles the hinge, so it tips by half the fold; elevated lays the fixed half flat.
 const pitch = (stand: Stand, deg: number) =>
   stand === "nightstand" ? (deg * Math.PI) / 360 + ABOVE : stand === "elevated" ? -Math.PI / 2 + ABOVE : 0;
+
+// The device side-on or face-on, drawn for the posture picker: closed is the narrow D, flat on the hinge side, with
+// the camera top right; open is wide with the hinge down the middle; tent and laptop stand on a table line.
+type Posture = "closed" | "open" | "tent" | "laptop";
+const glyph = (d: ReactNode) => () => (
+  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
+);
+const POSTURES: [Posture, string, () => ReactNode][] = [
+  ["closed", "Closed", glyph(<><path d="M7 3h7a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><circle cx="15.5" cy="6.5" r="0.9" fill="currentColor" /></>)],
+  ["open", "Open", glyph(<><rect x="2.5" y="5" width="19" height="14" rx="3.5" /><path d="M12 5v14" strokeDasharray="1.5 2" /><circle cx="18.5" cy="8" r="0.9" fill="currentColor" /></>)],
+  ["tent", "Tent", glyph(<><path d="M5 19L12 6l7 13" /><path d="M2.5 19.5h19" strokeWidth={1} /></>)],
+  ["laptop", "Laptop", glyph(<><path d="M3 18h13l3-12" /><path d="M2 19.5h20" strokeWidth={1} /></>)],
+];
 
 // The web Duo's controls on doan-labs/duo's 3D device. duo renders Apple's model and bends its hinge; both of its
 // displays frame /duo3d/screen, which draws what the 2D web Duo draws on its screen. The fold is duo's: an angle,
@@ -80,11 +93,16 @@ export function Duo3D() {
     setS(f);
     setDeg(to !== "flat" ? STANDS[to].deg : f.posture === "open" ? 180 : 0);
   };
-  // A stand is landscape with the hardware turned clockwise; it puts the camera back in front to be seen as posed.
-  const pose3 = (to: Stand) => {
-    front();
-    if (to === "flat") return go({ turn: 0, upside: false }, false, "flat");
-    go({ posture: STANDS[to].posture, turn: 90, upside: false }, false, to);
+  // The posture picker. A stand is landscape with the hardware turned clockwise, and puts the camera back in front
+  // to be seen as posed; closed or open lays the device flat, upright again when it leaves a stand.
+  const now: Posture = stand === "nightstand" ? "tent" : stand === "elevated" ? "laptop" : s.posture;
+  const posture = (to: Posture) => {
+    if (to === "tent" || to === "laptop") {
+      const st = to === "tent" ? "nightstand" : "elevated";
+      front();
+      return go({ posture: STANDS[st].posture, turn: 90, upside: false }, false, st);
+    }
+    go({ posture: to, ...(stand !== "flat" && { turn: 0 as Turn, upside: false }) }, false, "flat");
   };
 
   useEffect(() => {
@@ -116,16 +134,12 @@ export function Duo3D() {
           <Rotate3d size={18} /> Reset view
         </button>
         <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
-          <Tool label={s.posture === "open" ? "Fold" : "Unfold"} onClick={() => go({ posture: s.posture === "open" ? "closed" : "open" }, false, "flat")}>
-            {s.posture === "open" ? <Tablet size={18} style={{ rotate: "90deg" }} /> : <Smartphone size={18} />}
-          </Tool>
+          {POSTURES.map(([to, label, Icon]) => (
+            <Tool key={to} label={label} on={now === to} onClick={() => posture(to)}><Icon /></Tool>
+          ))}
           <Rule />
           {([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
             <Tool key={by} label={label} onClick={() => go(rotate(s, by), false, "flat")}><Icon size={18} /></Tool>
-          ))}
-          <Rule />
-          {([["flat", "Upright", RectangleVertical], ["nightstand", "Nightstand", Tent], ["elevated", "Elevated", Laptop]] as const).map(([to, label, Icon]) => (
-            <Tool key={to} label={label} on={stand === to} onClick={() => pose3(to)}><Icon size={18} /></Tool>
           ))}
           <Rule />
           <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
