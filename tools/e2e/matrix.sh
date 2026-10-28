@@ -25,6 +25,9 @@ trap cleanup EXIT INT TERM
 
 N=$(echo $SIMS | wc -w | tr -d ' ')
 FIRST=$(echo $SIMS | cut -d' ' -f1)
+# Each shard's beacon binds 0.0.0.0:315i; anything on that port (a `tailscale serve` of an old report too) loses the
+# whole shard and the confirm pass, so check them all before booting anything.
+i=0; for u in $SIMS; do i=$((i+1)); node -e 'require("net").createServer().listen(+process.argv[1],"0.0.0.0",function(){this.close()}).on("error",()=>process.exit(1))' $((3150+i)) || blocked "beacon port $((3150+i)) is in use"; done
 xcrun simctl boot "$FIRST" 2>/dev/null || true
 xcrun simctl bootstatus "$FIRST" -b >/dev/null || blocked "simulator $FIRST did not boot"
 (cd "$ROOT/packages/duet-ui" && pnpm -s build) || blocked "duet-ui build failed"
