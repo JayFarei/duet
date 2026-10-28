@@ -8,6 +8,7 @@
 - Page transitions: controls that appear scale up out of a blur, controls that go away shrink into one (kept 450ms so they can), and the rest slide to their new places on the same spring. Reduced motion crossfades instead (#101).
 - Site: a call to action example at `/book`, a class list and a class page with "Book · 2 credits" (#101).
 - Column mode: a page opened from a link shared in Messages keeps Safari's column under the Shared with You bar ("From <name>", +40pt top chrome). Before, the controls fell into the page. `offsetTop` is 40 there and every control lands where it does without the bar (#112).
+- Unfolding from the in-app preview no longer flashes the closed screen's strip or Safari's column on the open screen: signals are also re-read on each layout (`ResizeObserver` on a viewport-sized box), since WebKit holds `resize` back while the window animates, and a column-wide page in the full open window counts as in transit (#115).
 
 ## 0.4.1
 

@@ -21,16 +21,20 @@ if (typeof window !== "undefined" && window.top !== window) {
 export const emulatedSignals = () => emulated;
 
 let probe: HTMLDivElement | null = null;
-/** The current signals, read from the window (or the emulating host page). Browser only. */
-export function readSignals(): Signals {
-  if (emulated) return emulated;
+// Fixed over the whole layout viewport, so watchSignals can observe its size too.
+function probeEl() {
   if (!probe) {
     probe = document.createElement("div");
-    probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;"
+    probe.style.cssText = "position:fixed;inset:0;visibility:hidden;pointer-events:none;"
       + "padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
     document.body.appendChild(probe);
   }
-  return measure(probe);
+  return probe;
+}
+/** The current signals, read from the window (or the emulating host page). Browser only. */
+export function readSignals(): Signals {
+  if (emulated) return emulated;
+  return measure(probeEl());
 }
 
 /** Geometry after an event is not final: a fold moves outerWidth up to ~2s after the viewport, and nothing fires when
@@ -85,6 +89,11 @@ export function watchSignals(cb: () => void): () => void {
   document.addEventListener("visibilitychange", visible);
   screen.orientation?.addEventListener("change", on);
   visualViewport?.addEventListener("resize", on);
+  // WebKit holds resize events back while the window animates, yet lays out every frame: unfolding the in-app
+  // preview, the page took four sizes over ~220ms before the first resize, the old controls on screen all along (e2e
+  // RC run, 2026-10-27). The probe spans the viewport, so its size changes with each of those layouts.
+  const ro = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(on);
+  ro?.observe(probeEl());
   subs.add(cb);
   watchers.add(cb);
   kick();
@@ -99,5 +108,6 @@ export function watchSignals(cb: () => void): () => void {
     document.removeEventListener("visibilitychange", visible);
     screen.orientation?.removeEventListener("change", on);
     visualViewport?.removeEventListener("resize", on);
+    ro?.disconnect();
   };
 }

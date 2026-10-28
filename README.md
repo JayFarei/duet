@@ -443,6 +443,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing. If your own code reacts to `useDuet()`, ignore readings with `confidence: "moving"`.
 - **Status:** [#68](https://github.com/JayFarei/duet/issues/68), [#69](https://github.com/JayFarei/duet/issues/69), [PR #70](https://github.com/JayFarei/duet/pull/70), 0.4.0-rc.1. See [Which mode](#which-mode).
 
+### Unfolding the in-app preview
+
+- **You see:** without the handling, unfolding from the closed preview turned sideways leaves the closed screen's controls (the strip, or Safari's column) on the open screen for 50 to 130ms before they land inline.
+- **Cause:** WebKit holds `resize` back while the window animates, yet lays the page out every frame: the page took four sizes over ~220ms with no event. One of them, 585x876 in the 669x951 window, is the closed page's 84pt column handed the open window, which reads as Safari's column.
+- **Duet does:** also watches a viewport-sized box with a `ResizeObserver`, which reports every layout, so the window starts settling (controls hidden, `confidence: "moving"`) on the first new size. A column-wide page in the full open window is in transit, never the column: Safari has no column there.
+- **You do:** nothing.
+- **Status:** [#115](https://github.com/JayFarei/duet/issues/115). See [Turning or folding mid-transition](#turning-or-folding-mid-transition).
+
 ### Text field focus and the on-screen keyboard
 
 - **You see:** without the handling, focusing an input in column mode makes Safari zoom out (to about 0.94), and the keyboard covers the lower column and the controls in it.

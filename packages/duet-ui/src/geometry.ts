@@ -289,7 +289,10 @@ export const isSplit = (s: Signals) => !s.standalone && isIOS(s) !== false && Ma
 // The largest Dynamic Type grows the bottom bar to 106pt (382x572 in 466x678, e2e round 3).
 const SAFARI_COLUMN = { width: [80, 88], chrome: [68, 110] } as const;
 const within = (v: number, [a, b]: readonly [number, number]) => v >= a && v <= b;
-const columnWidth = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width);
+// The full open window (951x669, 669x951) never has the column: a column-wide page there is the closed page's, not yet
+// resized (inTransit).
+const openWindow = (s: Signals) => Math.max(s.outerWidth, s.outerHeight) >= DUO_SIZES[1][1] - 1;
+const columnWidth = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_COLUMN.width) && !openWindow(s);
 /** Shared with You: a page opened from a link a contact sent in Messages has a "From <name>" bar with a close button
  *  above it, under the status bar, until the user closes it (real Duo, iOS 27, 2026-10-27: closed tab 382x580 to
  *  382x540 in 466x678, closed landscape 594x328 in 678x466, split pane 385x531 in 469x669, each chrome 98 to 138 with
@@ -298,8 +301,8 @@ const columnWidth = (s: Signals) => within(s.outerWidth - s.innerWidth, SAFARI_C
  *  window never has the column, so a column there is a stale layout, bar or not (LANDED). */
 const BANNER = 40;
 const bannerOf = (s: Signals) => {
-  const chrome = s.outerHeight - s.innerHeight, open = Math.max(s.outerWidth, s.outerHeight) >= DUO_SIZES[1][1] - 1;
-  return !open && chrome > SAFARI_COLUMN.chrome[1] && within(chrome - BANNER, SAFARI_COLUMN.chrome) ? BANNER : 0;
+  const chrome = s.outerHeight - s.innerHeight;
+  return !openWindow(s) && chrome > SAFARI_COLUMN.chrome[1] && within(chrome - BANNER, SAFARI_COLUMN.chrome) ? BANNER : 0;
 };
 const hasColumn = (s: Signals) => columnWidth(s) && within(s.outerHeight - s.innerHeight - bannerOf(s), SAFARI_COLUMN.chrome);
 
@@ -387,8 +390,10 @@ export function inTransit(s: Signals): boolean {
   // Safari's column is 84pt in every window measured, and comes with its bottom URL bar (chrome 98, 106 at the largest
   // Dynamic Type, preview 70 to 75), never with the 126pt bars of a full open window. Anything else is a stale layout
   // handed a new window (e2e round 3: entering split view, 867x543 in 951x669 for ~200ms before the pane; going home
-  // from a split pane, the pane's 385x571 page in the closed screen's 466x678 window, an 81pt "column").
-  if (page >= LANDED.page[1][0] && chrome - bannerOf(s) > LANDED.columnChrome) return true;
+  // from a split pane, the pane's 385x571 page in the closed screen's 466x678 window, an 81pt "column"). Nor in the
+  // full open window at all: unfolding the closed preview hands it the closed page's 585x876 for ~45ms (e2e RC run,
+  // 2026-10-27).
+  if (page >= LANDED.page[1][0] && (chrome - bannerOf(s) > LANDED.columnChrome || openWindow(s))) return true;
   // A Duo window, or the preview's sheet (a window a few points inside the closed screen; its inset lands ~100ms late,
   // so sizes alone decide).
   const sheet = short <= w - m && long <= h - m && short >= w - SHEET_SLACK && long >= h - SHEET_SLACK;
