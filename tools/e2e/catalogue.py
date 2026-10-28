@@ -55,9 +55,17 @@ def top_bars(sig):
     return sig["outerWidth"] > sig["outerHeight"] and sig["outerWidth"] > 600 and sig["innerWidth"] == sig["outerWidth"]
 
 
-def expect(state, sig=None):
+def expect(state, sig=None, keyboard=False):
     """Expected placement in a state. A closed landscape tab has two windows, the column one (turned from portrait)
-    and the top bars one (opened or folded into landscape); which one Safari chose is read from the final sample."""
+    and the top bars one (opened or folded into landscape); which one Safari chose is read from the final sample.
+    keyboard: the on-screen keyboard is up, and column controls hide until it goes down (Context.keyboard)."""
+    e = placement(state, sig)
+    if keyboard and e.get("mode") == "column":
+        return {"preview": e.get("preview"), "hidden": True}
+    return e
+
+
+def placement(state, sig):
     surface, posture, angle, _ = state
     if posture == "open":
         if surface == "tab":

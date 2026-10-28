@@ -51,6 +51,9 @@ r=next(k for k,v in j["devices"].items() if any(d["udid"]==u for d in v)); print
   LA_NEW=1
 fi
 
+# The keyboard's one-time "slide to type" sheet covers the keyboard on a clone's first text field (kb01-03): mark it seen.
+xcrun simctl spawn "$UDID" defaults write com.apple.Preferences DidShowContinuousPathIntroduction -bool true
+
 if [ -n "$E2E_SHARED" ]; then
   wait_up "$SITE/" 30 || blocked "site not up on :$E2E_SITE_PORT"  # a busy host can miss one 2s probe
 elif ! up "$SITE/"; then
