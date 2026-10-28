@@ -12,11 +12,14 @@ import { DUO, SAFARI, detect, type Mode, type Side, type Signals } from "duet-ui
 
 export type Posture = "closed" | "open";
 /** home: added to the Home Screen. safari: a full-screen tab. split: Safari in a split-view pane. window: a Safari
- *  window beside the Home Screen. */
-export type App = "home" | "safari" | "split" | "window";
+ *  window beside the Home Screen. sheet, preview: a link opened from Messages in the in-app Safari preview, as a page
+ *  sheet or full screen. */
+export type App = "home" | "safari" | "split" | "window" | "sheet" | "preview";
 /** live: Live Activities are running (the visitor's switch, kept across views). They grow the Dynamic Island down
- *  the closed strip, the only place the island is, so `island()` says where they show. */
-export interface State { posture: Posture; turn: Turn; upside: boolean; app: App; pane: Side; live: boolean }
+ *  the closed strip, the only place the island is, so `island()` says where they show. The optional conditions
+ *  (duo3d sets them; the 2D Duo never does): shared, Safari's Shared with You bar over a link a contact sent (#112);
+ *  forward, forward history, Safari's back grown into a back + forward pill; keyboard, the on-screen keyboard up. */
+export interface State { posture: Posture; turn: Turn; upside: boolean; app: App; pane: Side; live: boolean; shared?: boolean; forward?: boolean; keyboard?: boolean }
 /** The interface's turn, degrees clockwise from the natural orientation. iOS never turns upside down, so a quarter
  *  either way is all; turned on to its head (`upside`), the device keeps the quarter turn it came from. */
 export type Turn = -90 | 0 | 90;
@@ -119,22 +122,28 @@ const safariScreen = (page: Size): Size => page.w > page.h ? { w: SCREEN.closed.
 /** A Safari window: the page at the top on its inner side, Safari's column on the `col` edge, the address bar
  *  below the page. In column mode Duet paints into the column, so the frame spans it (in a split pane both
  *  possible columns, and the pane shows only its own); otherwise the frame is just the page. */
-function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?: number; low?: number; pill?: { top: number; h: number }; barX?: number; host: string; mode: Mode; split?: boolean; rounded?: boolean }) {
-  const { win, page, col, mode, low = BAR.bottom } = o, colW = win.w - page.w, pageX = col === "left" ? colW : 0, column = mode === "column", bar = win.h - page.h;
+function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?: number; low?: number; pill?: { top: number; h: number }; barX?: number; host: string; mode: Mode; split?: boolean; rounded?: boolean; drop?: number; forward?: boolean; preview?: { close: number; back: number } }) {
+  const { win, page, col, mode, low = BAR.bottom, drop = 0 } = o, colW = win.w - page.w, pageX = col === "left" ? colW : 0, column = mode === "column", bar = win.h - drop - page.h;
   // The address bar centres on the page, or where given (sideways, on the screen); its bottom is the pill's.
   const barW = Math.min(BAR.w, page.w - 36), barX = o.barX ?? pageX + page.w / 2;
-  const frame: Box = !column ? { x: pageX, y: 0, ...page }
-    : o.split ? { x: col === "right" ? -colW : 0, y: 0, w: page.w + 2 * colW, h: win.h }
-    : { x: 0, y: 0, w: win.w, h: win.h };
+  // `drop`: the Shared with You bar above the page, across the page only (the column keeps its height).
+  const frame: Box = !column ? { x: pageX, y: drop, ...page }
+    : o.split ? { x: col === "right" ? -colW : 0, y: drop, w: page.w + 2 * colW, h: win.h - drop }
+    : { x: 0, y: drop, w: win.w, h: win.h - drop };
+  const colX = col === "left" ? 0 : page.w, pill = o.pill ?? { top: win.h - low - BAR.pill, h: BAR.pill };
   return {
     clip: win, clipR: o.rounded ? 30 : undefined, frame,
     under: o.rounded ? <div style={{ ...windowBg, left: win.x, top: win.y, width: win.w, height: win.h }} /> : undefined,
     chrome: (
       <div style={{ position: "absolute", left: win.x, top: win.y, width: win.w, height: win.h, borderRadius: o.rounded ? 30 : undefined, overflow: "hidden", pointerEvents: "none" }}>
         {/* In column mode the page runs on under the pill (Duet extends it by outer minus inner height). */}
-        {!column && <div style={{ position: "absolute", left: pageX, top: page.h, width: page.w, height: bar, background: "var(--card)" }} />}
-        <UrlBar left={barX - barW / 2} top={win.h - BAR.bottom - BAR.h} width={barW} host={o.host} />
-        <SafariColumn x={col === "left" ? 0 : page.w} h={win.h} col={col} back={o.back} clock={o.clock} pill={o.pill ?? { top: win.h - low - BAR.pill, h: BAR.pill }} over={column} />
+        {!column && <div style={{ position: "absolute", left: pageX, top: drop + page.h, width: page.w, height: bar, background: "var(--card)" }} />}
+        {drop > 0 && <SharedBar left={pageX} width={page.w} h={drop} />}
+        {o.preview
+          ? <><PreviewBar left={pageX} top={drop + page.h} width={page.w} h={bar} host={o.host} />
+              <PreviewColumn x={colX} h={win.h} col={col} close={o.preview.close} back={o.preview.back} pill={pill} over={column} /></>
+          : <><UrlBar left={barX - barW / 2} top={win.h - BAR.bottom - BAR.h} width={barW} host={o.host} />
+              <SafariColumn x={colX} h={win.h} col={col} back={o.back} clock={o.clock} pill={pill} over={column} forward={o.forward} /></>}
       </div>
     ),
   };
@@ -144,11 +153,25 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
  *  the user sees it (upright). `modeOf`: the mode the page shows for a set of signals. Live Activities push iOS's
  *  clock and Safari's rows down, telling the page nothing. */
 export function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode): Scene {
+  // The keyboard covers the bottom of the screen and shortens the visual viewport, nothing else: Duet keeps its mode.
+  // Closed portrait is measured (a tab's visual viewport 272 of 598); elsewhere it is about half the screen.
+  const kb = !s.keyboard ? 0 : s.posture === "closed" && W < H ? H - 272 : Math.round(H * (s.posture === "closed" ? 0.45 : 0.5));
+  const vis = (g: Signals, top: number): Signals => kb ? { ...g, visualHeight: Math.max(0, Math.min(g.innerHeight, H - kb - top)) } : g;
+  const r = place(s, W, H, host, (g) => modeOf(g), vis);
+  return kb ? { ...r, chrome: <>{r.chrome}<Keyboard w={W} h={kb} top={H - kb} /></>, note: `${r.note} With the keyboard up only the visual viewport shrinks, so Duet keeps its layout.` } : r;
+}
+
+function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode, vis: (g: Signals, top: number) => Signals): Scene {
   const full = { w: W, h: H }, screen = { x: 0, y: 0, w: W, h: H };
   const push = island(s) ? DUO.island : 0;
+  // The Shared with You bar, in Safari only: 40pt above the page in a column window, 46 under the open toolbar.
+  const tabbed = s.app === "safari" || s.app === "split" || s.app === "window";
+  const drop = s.shared && tabbed ? (s.app === "safari" && s.posture === "open" ? 46 : 40) : 0;
+  const less = (p: Size): Size => ({ w: p.w, h: p.h - drop });
+  if (s.app === "sheet" || s.app === "preview") return preview(s, W, H, host, modeOf, vis, push);
   if (s.app === "home") {
     const strip = W < H ? s.posture === "closed" : s.posture === "open"; // natural orientation only
-    const signals = sig(full, full, { insetRight: strip ? STRIP : 0, standalone: true });
+    const signals = vis(sig(full, full, { insetRight: strip ? STRIP : 0, standalone: true }), 0);
     return strip
       ? { clip: screen, frame: screen, signals, mode: modeOf(signals), chrome: <Status x={W - DUO.centerFromEdge} top={(s.posture === "closed" ? 84 : 26) + push} />,
           note: "Added to the Home Screen, the app owns the display and iOS gives it the strip. Duet draws its controls there, like a native app." }
@@ -157,8 +180,8 @@ export function scene(s: State, W: number, H: number, host: string, modeOf: (s: 
   }
   if (s.app === "split") {
     const win = { x: s.pane === "right" ? W - PANE.w : 0, y: 0, w: PANE.w, h: H }, otherX = s.pane === "right" ? 0 : W - PANE.w;
-    const signals = sig(PANE.page, win, { screen: safariScreen(PANE.page) }), mode = modeOf(signals);
-    const w = safariWindow({ win, page: PANE.page, col: s.pane, back: SAFARI.splitTop[s.pane], clock: s.pane === "right" ? 40 : undefined, host, mode, split: true, rounded: true });
+    const page = less(PANE.page), signals = vis(sig(page, win, { screen: safariScreen(PANE.page) }), drop), mode = modeOf(signals);
+    const w = safariWindow({ win, page, col: s.pane, back: SAFARI.splitTop[s.pane], clock: s.pane === "right" ? 40 : undefined, host, mode, split: true, rounded: true, drop, forward: s.forward });
     return {
       ...w, signals, mode,
       chrome: <>
@@ -170,8 +193,8 @@ export function scene(s: State, W: number, H: number, host: string, modeOf: (s: 
   }
   if (s.app === "window") {
     const win = { x: W - WINDOW.w - 9, y: Math.round((H - WINDOW.h) / 2), w: WINDOW.w, h: WINDOW.h };
-    const signals = sig(WINDOW.page, WINDOW, { screen: safariScreen(WINDOW.page) }), mode = modeOf(signals);
-    const w = safariWindow({ win, page: WINDOW.page, col: "right", back: SAFARI.splitTop.left, host, mode, rounded: true });
+    const page = less(WINDOW.page), signals = vis(sig(page, WINDOW, { screen: safariScreen(WINDOW.page) }), win.y + drop), mode = modeOf(signals);
+    const w = safariWindow({ win, page, col: "right", back: SAFARI.splitTop.left, host, mode, rounded: true, drop, forward: s.forward });
     return {
       ...w, signals, mode,
       chrome: <><HomeScreen w={win.x} h={H} />{w.chrome}</>,
@@ -184,12 +207,12 @@ export function scene(s: State, W: number, H: number, host: string, modeOf: (s: 
     // Sideways Safari moves its column to the camera's side and drops the clock. Its buttons keep clear of the camera:
     // back and reader sit below it when it is at the top, the pill rises above it when it is at the bottom. The page
     // reads the side from screen.orientation.angle: an anticlockwise interface turn is 90, a clockwise one 270.
-    const portrait = W < H, page = portrait ? TAB.page : { w: W - STRIP, h: H - 98 }, col: Side = portrait || s.turn > 0 ? "right" : "left";
-    const signals = sig(page, full, { screen: safariScreen(page), angle: portrait ? 0 : s.turn > 0 ? 270 : 90 }), mode = modeOf(signals);
+    const portrait = W < H, page = less(portrait ? TAB.page : { w: W - STRIP, h: H - 98 }), col: Side = portrait || s.turn > 0 ? "right" : "left";
+    const signals = vis(sig(page, full, { screen: safariScreen(page), angle: portrait ? 0 : s.turn > 0 ? 270 : 90 }), drop), mode = modeOf(signals);
     const land = SAFARI.landscape[col];
     const w = safariWindow(portrait
-      ? { win: screen, page, col, back: DUO.top + push, clock: 84 + push, host, mode }
-      : { win: screen, page, col, back: land.top, pill: { top: land.pill, h: BAR.landPill }, barX: W / 2, host, mode });
+      ? { win: screen, page, col, back: DUO.top + push, clock: 84 + push, host, mode, drop, forward: s.forward }
+      : { win: screen, page, col, back: land.top, pill: { top: land.pill, h: BAR.landPill }, barX: W / 2, host, mode, drop, forward: s.forward });
     return {
       ...w, signals, mode,
       note: portrait
@@ -197,14 +220,58 @@ export function scene(s: State, W: number, H: number, host: string, modeOf: (s: 
         : "Turned sideways, Safari keeps its column on the camera's side and moves its buttons. Duet follows them into the gap between.",
     };
   }
-  const page = { w: W, h: H - OPEN_BAR }, signals = sig(page, full, { screen: safariScreen(page) });
+  const page = less({ w: W, h: H - OPEN_BAR }), signals = vis(sig(page, full, { screen: safariScreen(page) }), OPEN_BAR + drop);
   return {
-    clip: screen, frame: { x: 0, y: OPEN_BAR, ...page }, signals, mode: modeOf(signals),
-    chrome: <OpenSafari w={W} host={host} />,
+    clip: screen, frame: { x: 0, y: OPEN_BAR + drop, ...page }, signals, mode: modeOf(signals),
+    chrome: <><OpenSafari w={W} host={host} forward={s.forward} />{drop > 0 && <SharedBar left={0} top={OPEN_BAR} width={W} h={drop} />}</>,
     note: "Unfolded, Safari runs full width with its toolbar on top. Duet reserves an 84pt strip inside the page.",
   };
 }
 
+/** A link opened from Messages in the in-app Safari preview (SFSafariViewController), as duet-ui's PREVIEW measures it.
+ *  Closed portrait: the full-screen window (page 382x603) or the page sheet (450x670, page 366x600) over Messages,
+ *  both with an 84pt column (close, reader, then a free gap from 282 to 428, back, and a share/reload/Safari pill)
+ *  and inset 34. Turned: the sheet is 662x458 (page 578x388), full screen is the whole screen with the buttons in an
+ *  84pt safe-area inset. Unfolded only a sheet exists: 653x661 wide, 653x869 tall, no column. */
+function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode, vis: (g: Signals, top: number) => Signals, push: number): Scene {
+  const sheet = s.app === "sheet", portrait = W < H, ins = { insetBottom: 34, screen: SCREEN.closed };
+  const messages = sheet && <div style={{ position: "absolute", inset: 0, background: "var(--bg)" }}><OtherApp /><div style={{ position: "absolute", inset: 0, background: "rgb(0 0 0 / 0.3)" }} /></div>;
+  const say = (m: Mode) => m === "column" ? "Duet paints its controls into the free gap of the preview's own column, between its reader and back buttons."
+    : m === "strip" ? "The preview's buttons take an 84pt inset on the turned side, so Duet keeps a strip of its own on the other."
+    : "Here Duet keeps its controls inside the page, clear of the preview's buttons.";
+  if (s.posture === "open") {
+    const win = portrait ? { w: 653, h: 869 } : { w: 653, h: 661 }, box = { x: (W - win.w) / 2, y: (H - win.h) / 2, ...win };
+    const page = { w: win.w, h: win.h - 70 }, signals = vis(sig(page, win, { insetBottom: 34, screen: safariScreen(page) }), box.y), mode = modeOf(signals);
+    return {
+      clip: box, clipR: 30, frame: { x: 0, y: 0, ...page }, signals, mode,
+      under: messages,
+      chrome: <div style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, borderRadius: 30, overflow: "hidden", pointerEvents: "none" }}><PreviewBar left={0} top={page.h} width={page.w} h={70} host={host} buttons /></div>,
+      note: `Unfolded, a link from Messages opens as a sheet with no column of its own. ${say(mode)}`,
+    };
+  }
+  const col: Side = portrait || s.turn > 0 ? "right" : "left";
+  if (!sheet && !portrait) {
+    // Full screen turned: the page spans the screen, the preview's buttons float in an 84pt inset on the turned side.
+    const page = { w: W, h: H - 75 }, signals = vis(sig(page, { w: W, h: H }, { ...ins, [col === "right" ? "insetRight" : "insetLeft"]: STRIP, angle: s.turn > 0 ? 270 : 90 }), 0), mode = modeOf(signals);
+    return {
+      clip: { x: 0, y: 0, w: W, h: H }, frame: { x: 0, y: 0, ...page }, signals, mode,
+      chrome: <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+        <PreviewBar left={0} top={page.h} width={W} h={75} host={host} />
+        <PreviewColumn x={col === "right" ? W - STRIP : 0} h={H} col={col} close={23.5} back={H - 75 - BAR.pill - 2 * DUO.gap - DUO.control} pill={{ top: H - BAR.bottom - BAR.pill, h: BAR.pill }} over />
+      </div>,
+      note: `Turned, the full-screen preview gives the page the whole width. ${say(mode)}`,
+    };
+  }
+  const win = sheet ? (portrait ? { x: 8, y: 4, w: 450, h: 670 } : { x: 8, y: 4, w: 662, h: 458 }) : { x: 0, y: 0, w: W, h: H };
+  const page = portrait ? (sheet ? { w: 366, h: 600 } : { w: 382, h: 603 }) : { w: 578, h: 388 };
+  const signals = vis(sig(page, win, { ...ins, angle: portrait ? 0 : s.turn > 0 ? 270 : 90 }), win.y), mode = modeOf(signals);
+  const close = portrait ? DUO.top + push - win.y : SAFARI.landscape[col].top, back = portrait ? 428 - win.y : win.h - BAR.bottom - BAR.pill - DUO.gap - DUO.control;
+  const w = safariWindow({ win, page, col, back, host, mode, rounded: sheet, preview: { close, back } });
+  return {
+    ...w, signals, mode, under: <>{messages}{w.under}</>,
+    note: `${sheet ? "A link from Messages opens in a page sheet" : "A link opened full screen in the in-app preview"}: its own column, like a tab's, with different buttons. ${say(mode)}`,
+  };
+}
 const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, turn: 0, upside: false, app, pane: "right", live: false, ...o });
 export const TOUR: State[] = [
   stop("closed", "home"), stop("closed", "home", { live: true }),
@@ -237,7 +304,7 @@ const LIVE_NOTE: Partial<Record<App, string>> = {
  *  Built on first use: `scene` needs the styles defined further down. */
 let notes: string[] | undefined;
 const allNotes = () => notes ??= [...new Set((["closed", "open"] as const).flatMap((posture) => ([0, 90, -90] as const).flatMap((turn) =>
-  (["home", "safari", "split", "window"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
+  (["home", "safari", "split", "window", "sheet", "preview"] as const).flatMap((app) => (["left", "right"] as const).flatMap((pane) =>
     (["strip", "column", "inline"] as const).flatMap((m) => [false, true].map((live) => {
       const n = SCREEN[posture], [W, H] = turn ? [n.h, n.w] : [n.w, n.h], st = fit({ posture, turn, upside: false, app, pane, live });
       return `${m}|${scene(st, W, H, "", () => m).note}${island(st) ? LIVE_NOTE[st.app] ?? "" : ""}`;
@@ -790,6 +857,8 @@ const SHOWING: Record<App, [string, string]> = {
   safari: ["Safari", "Full-screen tab"],
   split: ["Safari", "Split View"],
   window: ["Safari", "Window"],
+  sheet: ["Messages", "Link preview, sheet"],
+  preview: ["Messages", "Link preview, full screen"],
 };
 function Showing({ app, row, style }: { app: App; row?: boolean; style?: CSSProperties }) {
   const [title, sub] = SHOWING[app], size = row ? 36 : 60;
@@ -1035,16 +1104,73 @@ function Battery() {
 /** Safari's own column: clock, back and reader at the top (`back`: the back button's top), the +/tabs pill at the
  *  bottom (`low`: its bottom above the window's), centred DUO.centerFromEdge from the window's outer edge. `over`: drawn over a frame that includes the
  *  column, where the page paints the rest. */
-function SafariColumn({ x, h, col, back, clock, pill, over }: { x: number; h: number; col: Side; back: number; clock?: number; pill: { top: number; h: number }; over?: boolean }) {
+function SafariColumn({ x, h, col, back, clock, pill, over, forward }: { x: number; h: number; col: Side; back: number; clock?: number; pill: { top: number; h: number }; over?: boolean; forward?: boolean }) {
   const cx = col === "right" ? STRIP - DUO.centerFromEdge : DUO.centerFromEdge, at = (top: number): CSSProperties => ({ position: "absolute", left: cx - DUO.control / 2, top, transition: `top ${MOVE}ms ${ease}` });
+  // With forward history back grows into a back + forward pill (100.7pt), and the reader moves 13pt under it.
+  const backH = forward ? DUO.control + DUO.groupItem : DUO.control, reader = back + backH + (forward ? 13 : DUO.gap);
   return (
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
       {clock !== undefined && <Status x={cx} top={clock} />}
-      <div data-wd-system data-wd-col style={{ ...column, ...at(back) }}><Glyph d="m15 18-6-6 6-6" /></div>
-      <div data-wd-system data-wd-col style={{ ...column, ...at(back + DUO.control + DUO.gap) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
+      <div data-wd-system data-wd-col style={{ ...column, ...at(back), height: backH, display: "flex", flexDirection: "column", justifyContent: "space-around", transition: `top ${MOVE}ms ${ease}, height ${MOVE}ms ${ease}` }}>
+        <Glyph d="m15 18-6-6 6-6" />{forward && <Glyph d="m9 18 6-6-6-6" />}
+      </div>
+      <div data-wd-system data-wd-col style={{ ...column, ...at(reader) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
       <div data-wd-system data-wd-col style={{ ...at(pill.top), width: DUO.control, height: pill.h, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" /><Glyph d="M8 8h12v12H8zM4 16V4h12" />
       </div>
+    </div>
+  );
+}
+
+/** The in-app preview's column: close and reader at the top, its back button below the free gap, and the
+ *  share/reload/Safari pill at the bottom. */
+function PreviewColumn({ x, h, col, close, back, pill, over }: { x: number; h: number; col: Side; close: number; back: number; pill: { top: number; h: number }; over?: boolean }) {
+  const cx = col === "right" ? STRIP - DUO.centerFromEdge : DUO.centerFromEdge, at = (top: number): CSSProperties => ({ ...column, position: "absolute", left: cx - DUO.control / 2, top, transition: `top ${MOVE}ms ${ease}` });
+  return (
+    <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
+      <div data-wd-system data-wd-col style={at(close)}><Glyph d="M18 6 6 18M6 6l12 12" /></div>
+      <div data-wd-system data-wd-col style={at(close + DUO.control + DUO.gap)}><Glyph d="M4 6h16M4 12h16M4 18h10" /></div>
+      <div data-wd-system data-wd-col style={at(back)}><Glyph d="m15 18-6-6 6-6" /></div>
+      <div data-wd-system data-wd-col style={{ ...at(pill.top), height: pill.h, flexDirection: "column", display: "flex", justifyContent: "space-around", alignItems: "center" }}>
+        <Glyph d="M12 3v12M8 7l4-4 4 4M5 12v8h14v-8" /><Glyph d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5" /><Glyph d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm3.5 5.5-2 5-5 2 2-5z" />
+      </div>
+    </div>
+  );
+}
+
+/** The preview's band under the page: the site's host, small, and on the open screen's sheet its buttons too. */
+function PreviewBar({ left, top, width, h, host, buttons }: { left: number; top: number; width: number; h: number; host: string; buttons?: boolean }) {
+  return (
+    <div data-wd-system style={{ position: "absolute", left, top, width, height: h, background: "var(--card)", borderTop: "0.5px solid var(--line)", display: "flex", alignItems: "center", justifyContent: buttons ? "space-between" : "center", padding: "0 20px 14px", boxSizing: "border-box", font: "500 13px -apple-system, system-ui", color: "var(--dim)", pointerEvents: "none" }}>
+      {buttons && <div style={{ ...circle, width: 40, height: 40, color: "var(--ink)" }}><Glyph d="M18 6 6 18M6 6l12 12" size={20} /></div>}
+      <span>{host}</span>
+      {buttons && <div style={{ ...circle, width: 40, height: 40, color: "var(--ink)" }}><Glyph d="M12 3v12M8 7l4-4 4 4M5 12v8h14v-8" size={20} /></div>}
+    </div>
+  );
+}
+
+/** Safari's Shared with You bar: who sent the link, over the page's width. */
+function SharedBar({ left, top = 0, width, h }: { left: number; top?: number; width: number; h: number }) {
+  return (
+    <div data-wd-system style={{ position: "absolute", left, top, width, height: h, background: "var(--card)", borderBottom: "0.5px solid var(--line)", display: "flex", alignItems: "center", gap: 8, padding: "0 14px", boxSizing: "border-box", font: "500 13px -apple-system, system-ui", color: "var(--ink)", pointerEvents: "none" }}>
+      <i style={{ width: 24, height: 24, borderRadius: 99, background: "linear-gradient(#a0a0a8, #6e6e73)", flex: "none" }} />
+      <span style={{ flex: 1 }}>From <b style={{ fontWeight: 600 }}>Alex</b></span>
+      <Glyph d="M18 6 6 18M6 6l12 12" size={16} style={{ margin: 0, opacity: 0.5 }} />
+    </div>
+  );
+}
+
+/** The on-screen keyboard: three rows of letter keys and a space bar, drawn over everything. */
+function Keyboard({ w, h, top }: { w: number; h: number; top: number }) {
+  const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"], key = Math.min(44, (w - 24) / 10 - 6);
+  return (
+    <div data-wd-system style={{ position: "absolute", left: 0, top, width: w, height: h, background: "color-mix(in srgb, var(--card), #888 18%)", padding: "10px 6px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, pointerEvents: "none" }}>
+      {rows.map((r) => (
+        <div key={r} style={{ display: "flex", gap: 6 }}>
+          {[...r].map((c) => <div key={c} style={{ width: key, height: Math.min(42, (h - 80) / 4), borderRadius: 6, background: "var(--card)", display: "grid", placeItems: "center", font: "400 18px -apple-system, system-ui", color: "var(--ink)" }}>{c}</div>)}
+        </div>
+      ))}
+      <div style={{ width: "50%", height: Math.min(42, (h - 80) / 4), borderRadius: 6, background: "var(--card)" }} />
     </div>
   );
 }
@@ -1055,12 +1181,14 @@ function UrlBar({ left, top, width, host, h = BAR.h }: { left: number; top: numb
 
 /** Safari unfolded (Duo simulator): back and bookmarks, the address field centred, the +/tabs pill, then the clock
  *  and battery at the end of the row; the tab bar under it. */
-function OpenSafari({ w, host }: { w: number; host: string }) {
+function OpenSafari({ w, host, forward }: { w: number; host: string; forward?: boolean }) {
   const at = (left: number, width = 44): CSSProperties => ({ ...circle, position: "absolute", left, top: 24, width, height: 44 });
   return (
     <div style={{ position: "absolute", left: 0, top: 0, width: w, height: OPEN_BAR, background: "var(--card)", borderBottom: "0.5px solid var(--line)", color: "var(--ink)", pointerEvents: "none" }}>
-      <div data-wd-system style={at(20)}><Glyph d="m15 18-6-6 6-6" style={{ opacity: 0.35 }} /></div>
-      <div data-wd-system style={at(75)}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
+      <div data-wd-system style={{ ...at(20, forward ? 89 : 44), display: "flex", justifyContent: "space-evenly", alignItems: "center" }}>
+        <Glyph d="m15 18-6-6 6-6" style={{ margin: 0, opacity: forward ? 1 : 0.35 }} />{forward && <Glyph d="m9 18 6-6-6-6" style={{ margin: 0 }} />}
+      </div>
+      <div data-wd-system style={at(forward ? 120 : 75)}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
       <UrlBar left={(w - 356) / 2} top={23} width={356} h={46} host={host} />
       <div data-wd-system style={{ ...at(w - 234, 89), display: "flex", justifyContent: "space-evenly", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" style={{ margin: 0 }} /><Glyph d="M8 8h12v12H8zM4 16V4h12" style={{ margin: 0 }} />

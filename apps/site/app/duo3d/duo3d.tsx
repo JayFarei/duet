@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { AppWindow, Compass, House, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
+import { AppWindow, ArrowRight, Compass, Globe, House, Keyboard, Maximize2, MessageSquareShare, MessageSquareText, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
 import { ONLY_OPEN, Phases, Rule, Segmented, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
 import { CHANNEL, DUO_PORT, type Sync } from "./shared";
 
@@ -45,7 +45,9 @@ export function Duo3D() {
   const [tour, setTour] = useState(false);
   const [duet, setDuet] = useState(true);
   const [at, setAt] = useState(0);
-  const src = "/skeleton";
+  // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
+  const [page, setPage] = useState("");
+  const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : "/skeleton";
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
   const url = useSyncExternalStore(() => () => {}, () => {
     const screens = `${location.origin}/duo3d/screen`;
@@ -135,6 +137,12 @@ export function Duo3D() {
           <Rotate3d size={18} /> Reset view
         </button>
         {/* Before and after: the same site as a plain mobile site, then with Duet. */}
+        <form onSubmit={(e) => { e.preventDefault(); setPage(String(new FormData(e.currentTarget).get("url") ?? "").trim()); }} style={{ ...group, alignItems: "center", gap: 6, padding: "0 6px 0 14px" }}>
+          <Globe size={16} style={{ color: "var(--dim)", flexShrink: 0 }} />
+          <input name="url" type="text" inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="Any URL, or empty for the skeleton" defaultValue={page}
+            style={{ width: 240, height: 36, border: 0, background: "transparent", color: "var(--ink)", font: "400 15px -apple-system, system-ui", outline: "none" }} />
+          <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center" }}><ArrowRight size={16} /></button>
+        </form>
         <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />
         <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
           {POSTURES.map(([to, label, Icon]) => (
@@ -149,6 +157,16 @@ export function Duo3D() {
           <Tool label="Safari" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
           <Tool label={split ? "Swap Split View sides" : "Split View"} on={split} onClick={() => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" })}><Pane size={18} /></Tool>
           <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
+          <Rule />
+          {/* A link opened from Messages: the in-app preview as a page sheet, then full screen. */}
+          <Tool label="Link preview, sheet" on={s.app === "sheet"} onClick={() => go({ app: "sheet" })}><MessageSquareText size={18} /></Tool>
+          <Tool label="Link preview, full screen" on={s.app === "preview"} onClick={() => go({ app: "preview" })}><Maximize2 size={18} /></Tool>
+        </div>
+        {/* Conditions the harness tests, on top of any view: each toggles on its own. */}
+        <div role="toolbar" aria-label="Conditions" style={{ ...group, alignItems: "center" }}>
+          <Tool label="Shared with You bar" on={!!s.shared} onClick={() => go({ shared: !s.shared })}><MessageSquareShare size={18} /></Tool>
+          <Tool label="Forward history" on={!!s.forward} onClick={() => go({ forward: !s.forward })}><ArrowRight size={18} /></Tool>
+          <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
         </div>
         <label style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
           Fold

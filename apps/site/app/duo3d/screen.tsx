@@ -9,7 +9,9 @@ import { CHANNEL, type Sync } from "./shared";
 // outer one always closed, both live through the fold the way iOS holds a session on both. Scaled to duo's panel.
 export function Screen() {
   const display = useSyncExternalStore(() => () => {}, () => new URLSearchParams(location.search).get("display") === "outer" ? "outer" : "inner", () => "inner");
-  const host = useSyncExternalStore(() => () => {}, () => location.host, () => "");
+  const here = useSyncExternalStore(() => () => {}, () => location.host, () => "");
+  // A page loaded through /duo3d/web says where it really is, for Safari's address bar.
+  const [page, setPage] = useState<{ src: string; host: string } | null>(null);
   const [sync, setSync] = useState<Sync | null>(null);
   const [view, setView] = useState({ w: 0, h: 0 });
   const [seen, setSeen] = useState<{ signals: string; mode: Mode } | null>(null);
@@ -32,6 +34,7 @@ export function Screen() {
   // Without Duet nothing paints in Safari's column, so the page is framed as an inline one: just the page.
   const duet = sync?.duet ?? true;
   const modeOf = (x: Signals): Mode => { if (!duet) return "inline"; const j = JSON.stringify(x); return seen?.signals === j ? seen.mode : detect(x).mode; };
+  const host = page && page.src === sync?.src ? page.host : here;
   const sc = st && scene({ ...st, turn: upright }, W, H, host, modeOf);
 
   const signals = sc ? JSON.stringify(sc.signals) : "";
@@ -43,6 +46,14 @@ export function Screen() {
     addEventListener("message", ready);
     return () => removeEventListener("message", ready);
   }, [signals]);
+
+  useEffect(() => {
+    const on = (e: MessageEvent) => {
+      if (e.source === frame.current?.contentWindow && e.data?.type === "duo3d:url") setPage({ src: sync?.src ?? "", host: new URL(e.data.url).host.replace(/^www\./, "") });
+    };
+    addEventListener("message", on);
+    return () => removeEventListener("message", on);
+  }, [sync?.src]);
 
   // Duet off and on: the page swaps layouts itself, morphing each control (skeleton-app.tsx).
   useEffect(() => {
