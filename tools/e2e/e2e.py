@@ -1511,7 +1511,7 @@ class Run:
                 for k, (a, nxt, words, exp_en, check) in enumerate(steps, 1):
                     act = s.journey_action(t, a, cur) if a[0] == "open" else s.suite_action(t, a, cur, check)
                     res = s.step(f"{sid0}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
-                                 lambda sig, st=nxt: catalogue.expect(st, sig), words, video=True,
+                                 lambda sig, st=nxt, kb=(check or {}).get("keyboard"): catalogue.expect(st, sig, kb), words, video=True,
                                  extra={"journey": sid0, "expect_en": exp_en, "check": check or None, "state": list(nxt), "live": live[k - 1]}, check=check)
                     rec["steps"].append(res["id"])
                     cur = nxt
