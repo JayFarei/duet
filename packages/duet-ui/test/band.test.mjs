@@ -61,3 +61,25 @@ for (const [name, c] of Object.entries(CONTEXTS)) {
     }
   });
 }
+
+// A turn can leave Safari with a short visual viewport and no keyboard (466 for a 580pt page, #122), its minimized bar
+// drawn at the visual viewport's bottom and taking touches there: the band moves up clear of it, so a page dialog's
+// Close is not half under Safari's bar (#140).
+test("short visual viewport with no keyboard: the band ends above it, Close stays", () => {
+  const c = detect(sig(382, 580, 466, 678, { visualHeight: 466, editing: false }));
+  assert.equal(c.mode, "column");
+  assert.equal(c.keyboard, undefined);
+  assert.equal(c.visualBottom, 466);
+  const full = columnBand(detect(sig(382, 580, 466, 678))), col = columnBand(c);
+  assert.ok(col.bottom <= 466 - DUO.gap + 0.01, `band ends at ${col.bottom}`);
+  assert.ok(Math.abs((col.bottom - col.top) - (full.bottom - full.top)) < 0.01, "band height changed");
+  const p = plan(c, { back: true, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized: false });
+  assert.ok(p.back, "Close dropped");
+  assert.ok(p.back.top >= col.top - 0.01 && p.back.top + p.back.height <= 466 - DUO.gap + 0.01, `Close at ${p.back.top}`);
+  // A visual viewport short by less than the band's margin to the pill (the bar collapsing mid-scroll) moves nothing.
+  assert.deepEqual(columnBand(detect(sig(382, 580, 466, 678, { visualHeight: 550, editing: false }))), full);
+  // The keyboard: the controls hide, the band is left alone.
+  const kb = detect(sig(382, 580, 466, 678, { visualHeight: 300, editing: true }));
+  assert.equal(kb.keyboard, true);
+  assert.equal(kb.visualBottom, undefined);
+});

@@ -21,16 +21,20 @@ if (typeof window !== "undefined" && window.top !== window) {
 export const emulatedSignals = () => emulated;
 
 let probe: HTMLDivElement | null = null;
-/** The current signals, read from the window (or the emulating host page). Browser only. */
-export function readSignals(): Signals {
-  if (emulated) return emulated;
+// Fixed over the whole layout viewport, so watchSignals can observe its size too.
+function probeEl() {
   if (!probe) {
     probe = document.createElement("div");
-    probe.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;"
+    probe.style.cssText = "position:fixed;inset:0;visibility:hidden;pointer-events:none;"
       + "padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)";
     document.body.appendChild(probe);
   }
-  return measure(probe);
+  return probe;
+}
+/** The current signals, read from the window (or the emulating host page). Browser only. */
+export function readSignals(): Signals {
+  if (emulated) return emulated;
+  return measure(probeEl());
 }
 
 /** Geometry after an event is not final: a fold moves outerWidth up to ~2s after the viewport, and nothing fires when
@@ -71,7 +75,8 @@ export const settling = () => !!settle && Date.now() - settle.start < SETTLE.cap
 
 /** Calls `cb` whenever the signals may have changed, so it can call readSignals() and detect() again: on resize,
  *  rotation (a turn from one landscape to the other keeps the window size, so screen.orientation too), the keyboard
- *  (visualViewport), and on pageshow and visibilitychange, as when an in-app preview's "Open in Safari" hands the
+ *  (visualViewport), history (navigation currententrychange, popstate: the preview's Back follows forward history), and on
+ *  pageshow and visibilitychange, as when an in-app preview's "Open in Safari" hands the
  *  page to a Safari tab without reloading it. Each event, and the call itself (a fresh tab settles with no event),
  *  starts a settle (SETTLE): `cb` runs at once, on every size change while it polls, and once when sizes hold.
  *  Returns the unsubscribe. Browser only. */
@@ -85,6 +90,18 @@ export function watchSignals(cb: () => void): () => void {
   document.addEventListener("visibilitychange", visible);
   screen.orientation?.addEventListener("change", on);
   visualViewport?.addEventListener("resize", on);
+  // WebKit holds resize events back while the window animates, yet lays out every frame: unfolding the in-app
+  // preview, the page took four sizes over ~220ms before the first resize, the old controls on screen all along (e2e
+  // RC run, 2026-10-27). The probe spans the viewport, so its size changes with each of those layouts.
+  const ro = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(on);
+  ro?.observe(probeEl());
+  // History moves no geometry, but the in-app preview's Back follows forward history (Signals.canGoForward).
+  const nav = (window as Window & { navigation?: EventTarget }).navigation;
+  nav?.addEventListener("currententrychange", cb);
+  addEventListener("popstate", cb);
+  // Focus decides whether a short visual viewport is the keyboard (keyboardUp), and can change with no resize.
+  document.addEventListener("focusin", cb);
+  document.addEventListener("focusout", cb);
   subs.add(cb);
   watchers.add(cb);
   kick();
@@ -99,5 +116,10 @@ export function watchSignals(cb: () => void): () => void {
     document.removeEventListener("visibilitychange", visible);
     screen.orientation?.removeEventListener("change", on);
     visualViewport?.removeEventListener("resize", on);
+    ro?.disconnect();
+    nav?.removeEventListener("currententrychange", cb);
+    removeEventListener("popstate", cb);
+    document.removeEventListener("focusin", cb);
+    document.removeEventListener("focusout", cb);
   };
 }

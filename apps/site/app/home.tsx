@@ -152,6 +152,7 @@ function Page({ self = false }: { self?: boolean }) {
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
           <a href="/panes" className="pill">Panes example</a>
           <a href="/sheet" className="pill">Sheets example</a>
+          <a href="/book" className="pill">Call to action example</a>
         </div>
       </Section>
 

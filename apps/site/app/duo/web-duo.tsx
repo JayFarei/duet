@@ -36,19 +36,19 @@ const UPSIDE_NOTE = "Upside down, iOS keeps the last way up, so the page stays a
 // the outer camera bottom right, an anticlockwise one top left.
 export const SCREEN = { closed: { w: 466, h: 678 }, open: { w: 951, h: 669 } };
 // A graphite finish around a black front: the site stays colourless.
-const FINISH = { band: "#3a3a3c", rim: "#6e6e73", front: "#0b0c10", button: "linear-gradient(#6e6e73, #2c2c2e)" };
-const BODY_SHADE = `inset 0 0 0 1.5px ${FINISH.rim}, inset 0 0 0 3.5px ${FINISH.band}`;
+export const FINISH = { band: "#3a3a3c", rim: "#6e6e73", front: "#0b0c10", button: "linear-gradient(#6e6e73, #2c2c2e)" };
+export const BODY_SHADE = `inset 0 0 0 1.5px ${FINISH.rim}, inset 0 0 0 3.5px ${FINISH.band}`;
 // Corners fitted to Apple's iPhone Duo simulator artwork (body and screen masks): a superellipse of radius `r` and
 // CSS corner-shape `k` (1 is a circle), and the closest circle where corner-shape is unsupported.
-interface Corner { r: number; k: number; round: number }
-const C = {
+export interface Corner { r: number; k: number; round: number }
+export const C = {
   free: { r: 103.5, k: 1.6, round: 75 }, hinge: { r: 40, k: 2.25, round: 30 }, // the body: free edge, hinge spine
   screen: { r: 74.5, k: 1.4, round: 60.5 }, inner: { r: 67.5, k: 1.4, round: 55 }, // outer and inner display
   spine: { r: 9, k: 1, round: 9 }, none: { r: 0, k: 1, round: 0 },
 } satisfies Record<string, Corner>;
 // Closed: hinge spine on the left (26pt), free edge on the right (13pt). Open: 13pt sides, both free edges.
 // Corners run top left, top right, bottom right, bottom left.
-const BODY = {
+export const BODY = {
   closed: { w: 505, h: 706, x: 26, y: 14, r: [C.hinge, C.free, C.free, C.hinge], screenR: [C.spine, C.screen, C.screen, C.spine] },
   open: { w: 977, h: 697, x: 13, y: 14, r: [C.free, C.free, C.free, C.free], screenR: [C.inner, C.inner, C.inner, C.inner] },
 };
@@ -56,13 +56,13 @@ const BODY = {
 const GROW = { x: BODY.closed.w / (BODY.open.w / 2), y: BODY.closed.h / BODY.open.h };
 /** Corners as the device draws them, for an element marked `data-wd-shape`: site.css swaps in the superellipse
  *  radii where corner-shape works, and other browsers keep the closest circle. */
-const corners = (c: Corner[]) => ({
+export const corners = (c: Corner[]) => ({
   borderRadius: c.map((x) => `${x.round}px`).join(" "), "--wd-r": c.map((x) => `${x.r}px`).join(" "), cornerShape: c.map((x) => `superellipse(${x.k})`).join(" "),
 }) as CSSProperties;
 // Volume on top and power on the right, relative to the free edge (body right).
 const BUTTONS = [{ right: 271, top: -4, w: 66, h: 6 }, { right: 191, top: -4, w: 66, h: 6 }, { right: -3, top: 196, w: 5, h: 113 }];
 // Outer display camera, screen coordinates in natural portrait (seen in recordings at the top of the strip).
-const CAMERA = { x: 418, y: 48, d: 38 };
+export const CAMERA = { x: 418, y: 48, d: 38 };
 const STRIP = 84; // iOS's strip and Safari's column
 const OPEN_BAR = 126; // Safari's chrome above the page, unfolded
 // Safari's bottom row (Duo simulator, 3x captures): the address bar and the +/tabs pill share a bottom 33.3pt above
@@ -1039,7 +1039,7 @@ const spring = (damping: number, n = 40) => {
 const SPRING = spring(0.55), SETTLE = spring(0.8);
 
 /** The Dynamic Island at rest, around the outer display's camera. */
-const CAMERA_PILL = { position: "absolute", width: CAMERA.d + 2, borderRadius: 99, background: "#000", boxShadow: "0 0 0 1px var(--wd-island-rim)" } satisfies CSSProperties;
+export const CAMERA_PILL = { position: "absolute", width: CAMERA.d + 2, borderRadius: 99, background: "#000", boxShadow: "0 0 0 1px var(--wd-island-rim)" } satisfies CSSProperties;
 
 /** The outer display's camera, in the Dynamic Island. Two Live Activities, the worst case measured on the device
  *  (call + Maps), grow it down the strip within DUO.island: the first activity joins the camera's pill, the second
