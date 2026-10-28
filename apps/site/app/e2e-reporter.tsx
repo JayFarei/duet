@@ -13,7 +13,9 @@ const loopback = (q: string) => {
 };
 // One id per page load, so the driver can tell two documents with the same URL apart (a dismissing preview and
 // the Safari tab it opened, a stale tab).
-const PAGE = Math.random().toString(36).slice(2, 10);
+// The early sampler (./e2e-early) picked it at first paint: the same page reports on through hydration.
+const early = typeof window === "undefined" ? undefined : (window as Window & { __duetE2E?: { page: string; stop: number } }).__duetE2E;
+const PAGE = early?.page ?? Math.random().toString(36).slice(2, 10);
 // When the page last rendered a frame (requestAnimationFrame). WebKit can hold rendering while a fold animates yet keep
 // running timers and layout: a sample then reads a layout nobody sees (e2e rerun, 2026-10-28: unfolding the turned
 // preview laid out four sizes over ~220ms with no frame, the screen black, then the settled page).
@@ -205,6 +207,7 @@ export function E2EReporter() {
       return () => { clearInterval(take); clearInterval(send); cancelAnimationFrame(raf); };
     }
     if (!origin) return;
+    if (early) early.stop = 1;
     const url = origin + "/beacon";
     raf = requestAnimationFrame(frame);
     const touch = (e: Event) => {

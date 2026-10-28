@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { detect, isPreview, PIN_MAX, PREVIEW_RISE, previewReason, stable } from "../src/geometry.ts";
+import { detect, isPreview, PIN_MAX, PREVIEW_RISE, previewPending, previewReason, stable } from "../src/geometry.ts";
 
 const F = JSON.parse(readFileSync(new URL("./fixtures/states.json", import.meta.url), "utf8"));
 const full = (s) => ({
@@ -175,4 +175,59 @@ test("column layer leaves the document width while a text field has focus", () =
 test("column follow layer keeps the document from rubber-banding", () => {
   const css = readFileSync(new URL("../src/duet.css", import.meta.url), "utf8");
   assert.match(css, /:where\(html\[data-duet-mode="column"\]:has\(> body \.duet\[data-follow\]\)\) \{ overscroll-behavior-y: none; \}/);
+});
+
+// #143: the preview's bottom inset reads 0 until viewport-fit=cover is set on mount, and in the sheet ~100ms later
+// still, so the first readings were a tab's and the controls showed over the preview's share and reload buttons.
+test("previewPending: a sheet or full screen preview before its inset lands, never a tab", () => {
+  const first = at("in-app preview, page sheet, first sample");
+  assert.equal(previewPending(first), true);
+  assert.equal(previewPending({ ...PREVIEW, insetBottom: 0 }), true);
+  assert.equal(previewPending(PREVIEW), false, "already the preview");
+  assert.equal(previewPending(TAB), false);
+  assert.equal(previewPending(at("tab, scrolled")), false);
+});
+// The pre-paint boot reads the sheet's very first frames (~70ms, iOS 27.1, e2e pvl01): the page reads the whole screen
+// inside the sheet's 450x670 window, no column, inset 0. The window alone tells it, as no tab is smaller than the screen.
+test("previewPending: the sheet's unlaid first frame, before its column and inset (#143)", () => {
+  const unlaid = { ...at("in-app preview, page sheet, first sample"), innerWidth: 466, innerHeight: 678, visualHeight: 678, insetBottom: 0 };
+  assert.equal(isPreview(unlaid), false);
+  assert.equal(previewPending(unlaid), true);
+  assert.equal(previewPending({ ...unlaid, insetBottom: 34 }), true);
+  assert.equal(stable({ flips: [] }, unlaid, undefined, 0).hidden, "pending");
+  // Not in another browser, nor installed to the home screen.
+  assert.equal(previewPending({ ...unlaid, standalone: true }), false);
+  assert.equal(previewPending({ ...unlaid, userAgent: unlaid.userAgent + " CriOS/130.0" }), false);
+});
+test("the sheet's controls stay hidden until its late inset lands, then show as the preview (#143)", () => {
+  const d = { flips: [] };
+  const first = stable(d, at("in-app preview, page sheet, first sample"), undefined, 0);
+  assert.deepEqual([first.mode, first.preview, first.hidden], ["column", undefined, "pending"]);
+  assert.equal(d.pendingUntil, PREVIEW_RISE);
+  const c = stable(d, at("in-app preview, page sheet (real"), undefined, 100, true);
+  assert.deepEqual([c.mode, c.preview, c.hidden], ["column", true, undefined]);
+  assert.equal(d.pendingUntil, undefined);
+});
+test("full screen preview before its inset lands: hidden, not a tab's controls (#143)", () => {
+  const d = { flips: [] };
+  assert.equal(stable(d, { ...PREVIEW, insetBottom: 0 }, undefined, 0).hidden, "pending");
+  assert.equal(stable(d, PREVIEW, undefined, 50, true).hidden, undefined);
+});
+test("an inset that never lands shows the controls once PREVIEW_RISE is past (#143)", () => {
+  const d = { flips: [] }, first = at("in-app preview, page sheet, first sample");
+  assert.equal(stable(d, first, undefined, 0).hidden, "pending");
+  assert.equal(stable(d, first, undefined, PREVIEW_RISE - 1).hidden, "pending");
+  const c = stable(d, first, undefined, PREVIEW_RISE + 10);
+  assert.deepEqual([c.mode, c.hidden], ["column", undefined]);
+});
+test("a tab is never pending, even with its bar collapsed into the preview's chrome band (59pt, real Duo) (#143)", () => {
+  const d = { flips: [] };
+  assert.equal(stable(d, TAB, undefined, 0).hidden, undefined);
+  const collapsed = { ...TAB, innerHeight: 619, visualHeight: 619 };
+  assert.ok(previewPending(collapsed), "59pt sits in the preview's chrome band");
+  // A quick scroll right after load, inside PREVIEW_RISE.
+  assert.equal(stable(d, collapsed, undefined, 200, true).hidden, undefined);
+  assert.equal(stable(d, collapsed, undefined, PREVIEW_RISE + 100, true).hidden, undefined);
+  // Back from another tab (a new page show): still the same page, long past its first second.
+  assert.equal(stable(d, collapsed, undefined, PREVIEW_RISE + 200, false, 1).hidden, undefined);
 });

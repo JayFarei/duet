@@ -118,7 +118,7 @@ function switchSide(el: HTMLElement, side: Side) {
 
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
-let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined, kbTimer: ReturnType<typeof setTimeout> | undefined;
+let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined, kbTimer: ReturnType<typeof setTimeout> | undefined, pendingTimer: ReturnType<typeof setTimeout> | undefined;
 // The damper keeps history, so it is fed once per signal change (refresh, from the watcher), never from React's
 // getSnapshot (read), which React may call several times per render.
 function refresh() {
@@ -129,6 +129,8 @@ function refresh() {
   if (damper.landUntil !== undefined && !landTimer) landTimer = setTimeout(() => { landTimer = undefined; listeners.forEach((f) => f()); }, damper.landUntil - performance.now() + 10);
   // And a keyboard held up after focus left it (KEYBOARD_DOWN), if the visual viewport never grows back.
   if (damper.kbUntil !== undefined && damper.kbUntil > performance.now() && !kbTimer) kbTimer = setTimeout(() => { kbTimer = undefined; listeners.forEach((f) => f()); }, damper.kbUntil - performance.now() + 10);
+  // And controls hidden while a preview's inset is pending (#143), if it never lands.
+  if (damper.pendingUntil !== undefined && !pendingTimer) pendingTimer = setTimeout(() => { pendingTimer = undefined; listeners.forEach((f) => f()); }, damper.pendingUntil - performance.now() + 10);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
 }
@@ -480,6 +482,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   // data-duet-close: Duet's close button is on screen, in any mode, so a sheet hides its own X and shows one (#135).
   // Only when the plan placed it: a band with no room for it leaves the sheet its own X (#142).
   const closeShown = !!p.close && controlsShown(ctx) && !!planFor(ctx.side).back;
+  // The pre-paint boot hid the server-rendered controls in a (pending) preview; a client reading (stable() always sets
+  // confidence, the server snapshot never does) hides them itself while it must (#143).
+  useLayout(() => { if (ctx.confidence) document.documentElement.removeAttribute("data-duet-pending"); }, [!!ctx.confidence]);
   useEffect(() => {
     document.documentElement.toggleAttribute("data-duet-close", closeShown);
     return () => document.documentElement.removeAttribute("data-duet-close");

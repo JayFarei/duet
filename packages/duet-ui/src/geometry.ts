@@ -140,8 +140,10 @@ export interface Context {
    *  caught halfway (stable() only, see inTransit), so the controls hide for those frames instead of showing in a
    *  place that is right for neither posture. "preview": the in-app preview turned to landscape, whose column has no
    *  room for a button and where an inline strip would cover the page (docs/research-notes.md, "Preview placement in
-   *  the gap"); the preview's own back and close buttons remain, and Duet's return in portrait or in a tab. */
-  hidden?: "moving" | "preview";
+   *  the gap"); the preview's own back and close buttons remain, and Duet's return in portrait or in a tab.
+   *  "pending": the first second of a page whose signals would read as the preview once its bottom inset lands
+   *  (previewPending), so the controls never show at a tab's places, over the preview's own buttons (#143). */
+  hidden?: "moving" | "preview" | "pending";
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
@@ -221,14 +223,23 @@ export function previewReason(s: Signals): string | undefined {
   if (!columnWidth(s)) return;
   if (within(chrome, PREVIEW.chrome) && Math.abs(s.outerWidth - DUO_SIZES[0][0]) <= 1 && Math.abs(s.outerHeight - DUO_SIZES[0][1]) <= 1)
     return `466x678 window, ${chrome}pt chrome, inset ${s.insetBottom}`;
-  // The sheet: a window inside the closed screen on both sides, in either orientation.
+  if (closedSheet(s)) return `${s.outerWidth}x${s.outerHeight} sheet in the ${s.screenWidth}x${s.screenHeight} screen, inset ${s.insetBottom}`;
+}
+/** The sheet's window: inside the closed screen on both sides, in either orientation. No tab window is smaller than
+ *  the screen (previewReason). */
+function closedSheet(s: Signals): boolean {
   const [w, h] = DUO_SIZES[0], m = PREVIEW.sheetInset;
-  const short = (a: number, b: number) => Math.min(a, b), long = (a: number, b: number) => Math.max(a, b);
-  if (short(s.screenWidth, s.screenHeight) === w && long(s.screenWidth, s.screenHeight) === h
-    && short(s.outerWidth, s.outerHeight) <= w - m && long(s.outerWidth, s.outerHeight) <= h - m)
-    return `${s.outerWidth}x${s.outerHeight} sheet in the ${s.screenWidth}x${s.screenHeight} screen, inset ${s.insetBottom}`;
+  return Math.min(s.screenWidth, s.screenHeight) === w && Math.max(s.screenWidth, s.screenHeight) === h
+    && Math.min(s.outerWidth, s.outerHeight) <= w - m && Math.max(s.outerWidth, s.outerHeight) <= h - m;
 }
 export const isPreview = (s: Signals) => previewReason(s) !== undefined;
+/** Signals that read as a tab only because the page is not laid out yet: the in-app preview before its inset lands.
+ *  The inset reads 0 until viewport-fit=cover applies, and the sheet's first frames (~70ms, iOS 27.1, e2e pvl01) even
+ *  read the whole 466x678 screen as the page inside its 450x670 window, no column; the pre-paint boot reads just those.
+ *  The verdicts were a tab's and its controls showed over the preview's share and reload buttons until hydration
+ *  (#143). So: the preview with its inset, or a Safari page in the sheet's window, whatever its page reads. */
+export const previewPending = (s: Signals) => !isPreview(s)
+  && (isPreview({ ...s, insetBottom: 34 }) || (!s.standalone && browserOf(s.userAgent) === "safari" && closedSheet(s)));
 
 /** The in-app preview on the open screen, default, full screen and over full screen styles (iOS 27.1, e2e matrix
  *  2026-10-27; the sheet is UNFOLDED_SHEETS). No column, and no Safari tab has these chrome and inset pairs (a tab
@@ -445,7 +456,10 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   moving?: boolean; landKey?: string; landAt?: number; landUntil?: number;
   /** Focus left a keyboard that was up while the visual viewport is still short: it counts as up until then
    *  (KEYBOARD_DOWN). */
-  kbUntil?: number }
+  kbUntil?: number;
+  /** When the page first read its signals and whether they were a preview pending its inset then (previewPending),
+   *  and until when its controls stay hidden for it (PREVIEW_RISE). */
+  bornAt?: number; bornPending?: boolean; pendingUntil?: number }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 /** Longest pin: a loop that keeps resuming doubles the wait up to this. */
@@ -500,6 +514,7 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     }
     s = { ...s, scale: 1 };
   }
+  d.bornAt ??= now; d.bornPending ??= previewPending(s);
   const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`, raw = isPreview(s);
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
@@ -551,7 +566,13 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   if (c.device === "desktop") return d.last = c;
   const h = `${s.innerWidth}${s.outerWidth > s.outerHeight ? "L" : "P"}`, heights = d.heights ??= {};
   heights[h] = Math.min(heights[h] ?? Infinity, s.innerHeight);
-  return d.last = { ...c, stableHeight: heights[h] };
+  d.last = { ...c, stableHeight: heights[h] };
+  // A page that would be the preview once its inset lands keeps its controls hidden for its first PREVIEW_RISE ms
+  // instead of showing them at a tab's places (the caller re-reads at pendingUntil). Only a page whose first reading
+  // was pending: a tab loads with 98 or 80pt of chrome, and its bar collapsing into the preview's band on a quick
+  // scroll (59pt, real Duo) must not hide its controls.
+  d.pendingUntil = d.bornPending && !preview && previewPending(s) && now - d.bornAt < PREVIEW_RISE ? d.bornAt + PREVIEW_RISE : undefined;
+  return d.pendingUntil === undefined ? d.last : { ...d.last, hidden: "pending" };
 }
 
 /** Inline side drag, like a magnet: the controls resist leaving their edge (rubber band up to MAGNET.hold),
@@ -573,7 +594,8 @@ export function magnet(side: Side, dx: number): { offset: number; free: boolean 
 /** Width the inline strip takes from the page (same column width as Safari's). */
 // Whether the controls are on screen to show a close button, for <html data-duet-close> (#135). Column and inline
 // controls step aside with the keyboard (duet.css) and a landscape closed preview hides them, leaving the page's own
-// X. A turn's few hidden frames ("moving") still count, so the page's X doesn't flash on every fold or turn.
+// X. A turn's few hidden frames ("moving") and a load's wait for the preview's inset ("pending") still count, so the
+// page's X doesn't flash on every fold or turn.
 export const controlsShown = (c: Pick<Context, "mode" | "keyboard" | "hidden">) => c.hidden !== "preview" && !(c.keyboard && c.mode !== "strip");
 
 export const INLINE_WIDTH = 84;

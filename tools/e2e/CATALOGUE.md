@@ -108,6 +108,11 @@ Not covered yet:
 1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
 2. Tap Duet's tab button (its island opens). Expect: controls in a column on the right in the gap of the preview's own column; Duet's menu is open, clear of every native button.
 
+## pvl01: Slow load in the in-app preview (sheet): no controls over its buttons before hydration (#143)
+
+1. Open /book?slowjs=1500 in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Tap Duet's tab button (its island opens). Expect: controls in a column on the right in the gap of the preview's own column; Duet's menu is open, clear of every native button.
+
 ## nav02: Link and Safari Back, outer screen on its side
 
 1. Open / in a Safari tab, folded, on the outer screen, on its side, landscape right (90), no music. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.

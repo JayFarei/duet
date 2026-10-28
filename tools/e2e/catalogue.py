@@ -270,6 +270,12 @@ SUITES = [
     {"id": "isl02", "title": "Tab menu island in the in-app preview (sheet), no forward history (#133)", "page": "/book", "start": PV0, "steps": [
         (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),
     ]},
+    # #143: on a slow load the preview's bottom inset reads 0 and its server-rendered controls paint at a tab's places,
+    # over the preview's Close and Back, until the page hydrates. ?slowjs holds its JS 1.5s (apps/site/proxy.ts) and the
+    # early sampler reports from the first paint (apps/site/app/e2e-early.ts), so the flash check (6b) sees those frames.
+    {"id": "pvl01", "title": "Slow load in the in-app preview (sheet): no controls over its buttons before hydration (#143)", "page": "/book?slowjs=1500", "start": PV0, "steps": [
+        (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),
+    ]},
     {"id": "nav02", "title": "Link and Safari Back, outer screen on its side", "page": "/", "start": ("tab", "closed", 90, False), "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
         (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),

@@ -222,6 +222,9 @@
 .duet { pointer-events: auto; }
 /* Mid fold or turn (Context.hidden "moving") and in the turned in-app preview ("preview"): not drawn. */
 .duet[data-hidden] { visibility: hidden; pointer-events: none; }
+/* Before the mounted chrome reads the window, in the in-app preview (boot.ts): the server-rendered controls stand at a
+   tab's places, over the preview's own buttons (#143). */
+html[data-duet-pending] .duet { visibility: hidden; pointer-events: none; }
 /* Loading, and while the window settles after a fold, turn or resize: the controls appear where they settle, without transitions or entrance animations. */
 /* The root itself keeps its animation: in Safari's column it is the scroll follow (duet-follow), not an entrance. */
 .duet[data-settling], .duet[data-settling] * { transition: none !important; }

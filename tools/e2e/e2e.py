@@ -86,8 +86,10 @@ def openurl(udid, url):
     r.check_returncode()
 
 
-def samples(step, since=0):
-    return http("GET", f"/samples?step={step}&since={since}") or []
+def samples(step, since=0, early=False):
+    """A step's samples. early: also the lean ones a page sends from its first paint until its reporter mounts
+    (apps/site/app/e2e-early.ts); only the flash check reads them (6b)."""
+    return [r for r in http("GET", f"/samples?step={step}&since={since}") or [] if early or not r.get("early")]
 
 
 def mine(r, tok):
@@ -296,7 +298,7 @@ class Run:
         if filming and rec is None:
             res["notes"].append(f"not filmed: {s.film_why}")
         t0 = time.time() * 1000
-        s.why, s.rebase = "no sample from the page", None
+        s.why, s.rebase, s.early = "no sample from the page", None, []
         try:
             first = action(sid, t0)
         except subprocess.CalledProcessError as x:  # a simctl call failed (simulator gone): this step, not the run
@@ -348,6 +350,7 @@ class Run:
                     quiet = r["rx"]
                 if allr[-1]["rx"] - quiet >= QUIET_S * 1000:
                     break
+        s.early = [r for r in samples(sid, t0, early=True) if r.get("early") and mine(r, tok) and r.get("page") == s.page]
         return allr
 
     def native(s, kind, angle=0):
@@ -642,6 +645,22 @@ class Run:
                     if ix > 2 and iy > 2:
                         bad.append(f'{sl["slot"]} overlaps native "{e["label"]}" by {ix:.0f}x{iy:.0f}')
         res["slots"], res["menus"] = slots, menus
+        # 6b. no flash over the preview's buttons: every sample showing the controls, in the final posture, clears the
+        # native frames too, not only the final one. A preview reports its bottom inset late, so a page reading the
+        # first signals drew the controls at a tab's places, over Close and Back, for up to a second (#143).
+        if fp is not None and s.position == "closed" and kind == "preview" and native:
+            pose = lambda r: (r["sig"]["angle"], r["sig"]["outerWidth"], r["sig"]["outerHeight"])
+            # From the first paint: a slow page (?slowjs) shows its server-rendered controls until it hydrates.
+            if s.early:
+                note.append(f"{len(s.early)} samples before hydration")
+            for r in [r for r in s.early + allr if r is not last and shown_place(r) is not None and pose(r) == pose(last)]:
+                x0, y0 = s.origin(r, kind)
+                hit = [(x["slot"], e["label"]) for x in all_slots(r) for e in native if not (e["label"] == "Address" and e["w"] > 200)
+                       and min(x["rect"]["x"] + x0 + x["rect"]["w"], e["x"] + e["w"]) - max(x["rect"]["x"] + x0, e["x"]) > 2
+                       and min(x["rect"]["y"] + y0 + x["rect"]["h"], e["y"] + e["h"]) - max(x["rect"]["y"] + y0, e["y"]) > 2]
+                if hit:
+                    bad.append(f'{hit[0][0]} flashed over native "{hit[0][1]}" +{r["rx"] - t0:.0f}ms')
+                    break
         if expect.get("gap") and slots:
             col = [e for e in native if e["w"] <= 60]
             above = [e for e in col if e["label"] in ("Page Menu", "Cancel", "Done", "Close")]
