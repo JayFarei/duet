@@ -607,8 +607,14 @@ class Run:
                     note.append(f"native Back puts Safari in the {pane} pane, the driver expected {s.split}")
         elif s.position == "open":
             note.append(f"unfolded: no native frames ({getattr(s, 'native_why', None) or 'none found'}), overlap not checked")
-        if slots:
-            for sl in slots:
+        # An open menu (island pill or morph list) is judged like a slot for overlap, not for the preview gap: the pill
+        # reaches across the page and a morph list may open beside the column (#133).
+        menus = []
+        if fp is not None and s.position == "closed":
+            menus = [{"slot": "menu", "x": m["rect"]["x"] + x0, "y": m["rect"]["y"] + y0, "w": m["rect"]["w"], "h": m["rect"]["h"]}
+                     for n in live_navs(last) for m in n.get("menus") or []]
+        if slots or menus:
+            for sl in slots + menus:
                 for e in native:
                     if e["label"] == "Address" and e["w"] > 200:
                         continue
@@ -1269,6 +1275,8 @@ class Run:
                     bad.append(f"page scrolled to {r['scroll']['y']}pt, expected more than {v}")
                 elif k == "scroll_lt" and not r["scroll"]["y"] < v:
                     bad.append(f"page scrolled to {r['scroll']['y']}pt, expected under {v}")
+                elif k == "menu" and bool(menu_items(r)) != v:
+                    bad.append("Duet's menu is " + ("closed, expected open" if v else f"open ({', '.join(menu_items(r))}), expected closed"))
                 elif k == "la" and (http("GET", "/la/state") or {}).get("count", 0) != v:
                     bad.append(f"Live Activities running: {(http('GET', '/la/state') or {}).get('count', 0)}, expected {v}")
         if bad:
@@ -1503,6 +1511,15 @@ class Run:
                     return None
                 s.sim.tap(*c, hold=0.12)
                 land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "menu":  # opens what Duet folded ("…" or the lone tab) and leaves it open, so the step judges it (#133)
+                op = opener(r)
+                if op is None:
+                    s.why = "no folded menu to open"
+                    return None
+                x0, y0 = s.page_origin(r, kind)
+                s.t_tap = time.time() * 1000
+                s.sim.tap(x0 + op["x"] + op["w"] / 2, y0 + op["y"] + op["h"] / 2, hold=0.12)
+                land["delay"] = 1.0
             elif k == "expand":
                 isl = s.island(s.angle)
                 if not isl:

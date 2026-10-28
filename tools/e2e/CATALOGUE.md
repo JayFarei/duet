@@ -75,6 +75,19 @@ Not covered yet:
 3. Tap Safari's Back. Expect: controls in a column on the right; the address is /.
 4. Swipe in from the right edge (Safari Forward). Expect: controls in a column on the right; the address is /book.
 
+## isl01: Tab menu island in the in-app preview (default style), no forward history (#133)
+
+1. Open /book in the in-app preview, default style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right in the gap of the preview's own column; the address is /book?c=sauna.
+3. Tap Duet's tab button (its island opens). Expect: controls in a column on the right in the gap of the preview's own column; Duet's menu is open, clear of every native button.
+4. Tap "Classes" in the island (it closes). Expect: controls in a column on the right in the gap of the preview's own column; Duet's menu is closed; the address is /book.
+5. Tap Duet's tab button on the class list. Expect: controls in a column on the right in the gap of the preview's own column; Duet's menu is open, clear of every native button.
+
+## isl02: Tab menu island in the in-app preview (sheet), no forward history (#133)
+
+1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Tap Duet's tab button (its island opens). Expect: controls in a column on the right in the gap of the preview's own column; Duet's menu is open, clear of every native button.
+
 ## nav02: Link and Safari Back, outer screen on its side
 
 1. Open / in a Safari tab, folded, on the outer screen, on its side, landscape right (90), no music. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
@@ -97,13 +110,13 @@ Not covered yet:
 
 1. Open /probe in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
 2. Tap the text field (the keyboard comes up). Expect: controls in a column on the right; the text field has focus; the keyboard is up (data-keyboard).
-3. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; nothing has focus; the keyboard is down.
+3. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; the keyboard is down.
 
 ## kb02: Keyboard up and down, Safari tab, unfolded
 
 1. Open /probe in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
 2. Tap the text field (the keyboard comes up). Expect: controls inline on the right; the text field has focus; the keyboard is up (data-keyboard).
-3. Tap the page outside the field (the keyboard goes down). Expect: controls inline on the right; nothing has focus; the keyboard is down.
+3. Tap the page outside the field (the keyboard goes down). Expect: controls inline on the right; the keyboard is down.
 
 ## mod01: A full-screen page dialog opened and closed (#79), Safari tab
 
