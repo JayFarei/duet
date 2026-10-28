@@ -186,6 +186,11 @@ html[data-duet-mode="column"] .sheet-x { display: none; }
 .t-bar i { background: var(--s); min-width: 0; }
 .hero .t-bar { max-width: 720px; margin: 16px auto 0; }
 .t-note { max-width: 720px; margin: 14px auto 0; color: var(--dim); font: 400 14px/1.45 -apple-system, system-ui; }
+.t-open { max-width: 720px; margin: 16px auto 0; padding: 0; list-style: none; text-align: left; }
+.t-open li { padding: 10px 0; border-top: 0.5px solid var(--line); font-size: 14px; line-height: 1.4; }
+.t-open li .t-dim { font-size: 13px; }
+.t-open-why { display: block; margin: 4px 0 0 18px; color: var(--dim); }
+.t-open-why a { text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 
 .t-mult { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; color: var(--dim); font: 500 17px/1.2 -apple-system, system-ui; }
 .t-mult br { flex-basis: 100%; content: ""; }

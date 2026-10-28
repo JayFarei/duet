@@ -7,11 +7,12 @@ import { useTheme, useTint } from "../theme";
 
 // The page's data, as scripts/e2e-snapshot.mjs writes it to public/e2e/summary.json.
 type Status = "PASS" | "FAIL" | "UNVERIFIED";
-type Step = { d: string; s: Status; why: string[]; expect: string; j: string; tr: string; ms: number };
+// note: why a step is not PASS, written by a person after the run (scripts/e2e-notes.json).
+type Step = { d: string; s: Status; why: string[]; expect: string; j: string; tr: string; ms: number; note: string | null };
 type Cell = { surface: string; screen: string; angle: number; live: boolean; pass: number; fail: number; unverified: number; steps: string[]; rep: string; film: string };
 type Rect = [string, number, number, number, number];
 type Row = { t: number; place: string | null; hidden: string | null; flash: boolean; screen: string; rects: Rect[] };
-type Side = { run: string; status: Status; reasons: string[]; expect: string; film: string; onset: number; change: number; final: number; sampleMs: number; box: [number, number]; rows: Row[] };
+type Side = { run: string; commit: string | null; status: Status; reasons: string[]; expect: string; film: string; onset: number; change: number; final: number; sampleMs: number; box: [number, number]; rows: Row[] };
 type Edge = { title: string; see: string; cause: string; does: string; you?: string; issues: number[]; status?: string; film?: string; step?: string };
 export type Summary = {
   run: { id: string; date: string; commit: string; branch: string; label: string; journeys: number; steps: number; frames: number; sampleMs: number; pass: number; fail: number; unverified: number; journeysPass: number; journeysFail: number; journeysUnverified: number; confirm: { rerun: number; journeys: number } };
@@ -90,8 +91,10 @@ function Page({ data }: { data: Summary }) {
         </div>
         <Bar pass={run.pass} fail={run.fail} unverified={run.unverified} />
         <p className="t-note">
-          Last run {date} on <a href={`${REPO}/commit/${run.commit}`}><code>{run.commit}</code></a> ({run.label}, a release candidate). Steps: {run.pass} pass, {run.fail} fail, {run.unverified} unverified. Red here is real: these are open bugs on that build.
+          Last run {date} on <a href={`${REPO}/commit/${run.commit}`}><code>{run.commit}</code></a> ({run.label}, a release candidate). Steps: {run.pass} pass, {run.fail} fail, {run.unverified} unverified.
+          {run.fail ? " Red here is real: these are open bugs on that build." : " No step failed. A step is unverified when the run could not show it either way; each one is below, with why."}
         </p>
+        <Open data={data} />
       </section>
 
       <Section id="space" title="The space" lede="The gap depends on where the page is, which screen, which way the phone is held and whether a Live Activity takes the top. Then something moves.">
@@ -140,6 +143,22 @@ function Bar({ pass, fail, unverified }: { pass: number; fail: number; unverifie
 }
 
 const Dot = ({ s }: { s: Status }) => <i className="t-dot" data-s={s} title={s} />;
+
+/** Every step that is not PASS, with the person-checked reason when there is one, else the judge's. */
+function Open({ data }: { data: Summary }) {
+  const open = Object.entries(data.steps).filter(([, s]) => s.s !== "PASS");
+  if (!open.length) return null;
+  return (
+    <ul className="t-open">
+      {open.map(([id, s]) => (
+        <li key={id}>
+          <Dot s={s.s} /> <code>{id}</code> {s.d}<span className="t-dim"> {data.journeys[s.j] ?? ""}</span>
+          <span className="t-open-why">{s.note ? <Rich text={s.note} /> : s.why[0]}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 /* -- The space ------------------------------------------------------------------------------------------------- */
 
@@ -225,7 +244,9 @@ function CellPanel({ cell, data }: { cell: Cell; data: Summary }) {
             <li key={id}>
               <Dot s={s.s} /> <code>{id}</code> {s.d}
               <span className="t-dim"> {data.journeys[s.j] ?? ""}</span>
-              {s.s !== "PASS" && s.why.slice(0, 2).map((w, i) => <code key={i} className="t-why">{w}</code>)}
+              {s.note && <span className="t-why"><Rich text={s.note} /></span>}
+              {/* The judge's "passed alone" line is out of date once a note says what is known since. */}
+              {s.s !== "PASS" && s.why.filter((w) => !(s.note && /passed alone/.test(w))).slice(0, 2).map((w, i) => <code key={i} className="t-why">{w}</code>)}
             </li>
           ))}
         </ul>
@@ -275,7 +296,7 @@ function Replay({ pair }: { pair: Summary["pair"] }) {
   return (
     <div className="card t-replay">
       <p className="t-p" style={{ marginTop: 0 }}>
-        <code>{pair.id}</code> {pair.desc}, expecting {before.expect}. The same step on {before.run.startsWith("matrix") ? "0.5.0-rc.1" : before.run} and after the fix in <a href={`${REPO}/pull/116`}>PR #116</a> for <a href={`${REPO}/issues/115`}>#115</a>.
+        <code>{pair.id}</code> {pair.desc}, expecting {before.expect}. The same step on {before.commit ? <a href={`${REPO}/commit/${before.commit}`}><code>{before.commit}</code></a> : before.run}, before the fix in <a href={`${REPO}/pull/116`}>PR #116</a> for <a href={`${REPO}/issues/115`}>#115</a>, and on {after.commit ? <a href={`${REPO}/commit/${after.commit}`}><code>{after.commit}</code></a> : after.run}, with it.
       </p>
       <div className="t-pair">
         {([["Before", before, a], ["After", after, b]] as const).map(([k, s, ref]) => {
@@ -405,7 +426,7 @@ function Loop({ data }: { data: Summary }) {
         <div className="tile">
           <p className="tile-k">Confirm pass</p>
           <h3 className="tile-h">{run.confirm.rerun} steps re-run</h3>
-          <p className="tile-p">After the matrix, every journey with a red step ({run.confirm.journeys} this run) runs again alone. A red that repeats alone is FAIL. A red that passes alone is UNVERIFIED, not PASS: we don&apos;t know which run was right.</p>
+          <p className="tile-p">After the matrix, every journey with a red step ({run.confirm.journeys} this run) runs again alone. A red that repeats alone at the same step is FAIL. Anything else is UNVERIFIED, not PASS, and a person writes down why: it may be load, the simulator, or a bug that only shows sometimes.</p>
         </div>
         <div className="tile">
           <p className="tile-k">The judge</p>

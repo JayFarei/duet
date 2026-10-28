@@ -2,10 +2,12 @@
 // Snapshot of an e2e matrix report (tools/e2e) for the /testing page: public/e2e/summary.json plus small films.
 //
 //   node apps/site/scripts/e2e-snapshot.mjs --report <matrix dir> [--pair j27-02 --before <dir> --after <dir>]
-//                                          [--readme README.md] [--commit <sha>] [--label "rc.1"]
+//                                          [--readme README.md] [--commit <sha>] [--label "rc.1"] [--notes <json>]
 //
 // --report: the matrix (counts, the state grid, one film per cell, edge case films).
 // --pair: one step shown red in --before (default --report) and green in --after, replayed against its samples.
+// --notes: step id -> why it is not PASS, checked by a person (default scripts/e2e-notes.json). The judge's own reason
+// says what the confirm pass saw; a note says what is known since, and the page shows it first.
 // Needs ffmpeg and ffprobe. Reads report dirs only; rewrites apps/site/public/e2e.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -31,6 +33,7 @@ const PAIR = arg("pair", "j27-02");
 const BEFORE = arg("before", REPORT);
 const AFTER = arg("after");
 const README = arg("readme", path.join(ROOT, "README.md"));
+const NOTES = arg("notes", path.join(HERE, "e2e-notes.json"));
 
 const sh = (cmd, ...a) => execFileSync(cmd, a, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 const readJSON = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
@@ -218,16 +221,19 @@ const run = load(REPORT);
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.mkdirSync(OUT, { recursive: true });
 
-const stamp = path.basename(REPORT).match(/(\d{8})-(\d{6})/);
-const date = stamp ? `${stamp[1].slice(0, 4)}-${stamp[1].slice(4, 6)}-${stamp[1].slice(6)}T${stamp[2].slice(0, 2)}:${stamp[2].slice(2, 4)}:00Z`
-  : fs.statSync(path.join(REPORT, "results.json")).mtime.toISOString();
-let commit = arg("commit");
+function started(dir) {
+  const m = path.basename(/matrix-/.test(dir) ? dir : path.dirname(dir)).match(/(\d{8})-(\d{6})/);
+  return m ? `${m[1].slice(0, 4)}-${m[1].slice(4, 6)}-${m[1].slice(6)}T${m[2].slice(0, 2)}:${m[2].slice(2, 4)}:00Z`
+    : fs.statSync(path.join(dir, "results.json")).mtime.toISOString();
+}
+// The commit the report's checkout was on when the run started.
+function commitOf(dir) {
+  try { return sh("git", "-C", dir, "log", "-1", `--before=${started(dir)}`, "--format=%h").trim() || null; } catch { return null; }
+}
+const date = started(REPORT);
+const commit = arg("commit") ?? commitOf(REPORT);
 let branch = null;
-try {
-  // The commit the report's checkout was on when the run started.
-  commit ??= sh("git", "-C", REPORT, "log", "-1", `--before=${date}`, "--format=%h").trim();
-  branch = sh("git", "-C", REPORT, "rev-parse", "--abbrev-ref", "HEAD").trim();
-} catch { /* not in a checkout */ }
+try { branch = sh("git", "-C", REPORT, "rev-parse", "--abbrev-ref", "HEAD").trim(); } catch { /* not in a checkout */ }
 
 const R = run.results;
 const count = (xs, k) => xs.filter((x) => x.status === k).length;
@@ -252,9 +258,14 @@ for (const [surface] of SURFACES) for (const [screen] of SCREENS) for (const ang
 }
 
 const journeys = new Map(run.journeys.map((j) => [j.id, j.title]));
+const notes = fs.existsSync(NOTES) ? readJSON(NOTES) : {};
+for (const id of Object.keys(notes)) {
+  if (run.byId.get(id)?.status === "PASS" || !run.byId.has(id)) console.warn(`note for ${id} skipped: not a red step in this run`);
+}
+for (const r of R) if (r.status !== "PASS" && !notes[r.id]) console.warn(`${r.id} is ${r.status} with no note`);
 const steps = Object.fromEntries(R.map((r) => [r.id, {
   d: r.desc, s: r.status, why: r.reasons, expect: r.expect_en ?? null, j: r.journey ?? null, tr: transition(r.desc),
-  ms: r.samples_n ?? 0,
+  ms: r.samples_n ?? 0, note: r.status !== "PASS" ? notes[r.id] ?? null : null,
 }]));
 
 const transitions = TRANSITIONS.map(([k, label]) => {
@@ -282,7 +293,8 @@ if (AFTER) {
     const tl = timeline(res, readJSON(path.join(d, "steps", `${PAIR}.json`)));
     const c = clip(path.join(d, "shots", `${PAIR}.mp4`), path.join(OUT, "pair", `${name}.mp4`), { width: 480, gop: 6 });
     bytes += c.bytes;
-    return { run: path.basename(dir === REPORT || /matrix-/.test(dir) ? dir : path.dirname(dir)), status: res.status, reasons: res.reasons,
+    return { run: path.basename(dir === REPORT || /matrix-/.test(dir) ? dir : path.dirname(dir)), commit: dir === REPORT ? commit : commitOf(dir),
+      status: res.status, reasons: res.reasons,
       expect: res.expect_en, film: `/e2e/pair/${name}.mp4`, onset: c.onset, change: res.t.change, final: res.t.final, sampleMs: res.sample_ms, ...tl };
   };
   const b = run.byId.get(PAIR);
