@@ -459,6 +459,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#115](https://github.com/JayFarei/duet/issues/115). See [Turning or folding mid-transition](#turning-or-folding-mid-transition).
 
+### Island menu in the closed preview
+
+- **You see:** without the handling, in the in-app preview on the closed screen with no forward history, tapping Duet's tab button opens its pill about 8pt lower than the button, over the preview's own Back button.
+- **Cause:** the preview's gap keeps the Live Activities allowance, so the band Duet may draw in is about 32pt, shorter than a button (49). The button is centred on the band, clear of Page Menu and Back; the pill was clamped to the band's top, which pushed it down past the band's bottom.
+- **Duet does:** keeps the pill inside the band, and on its button when the band can't hold it. A list menu there already opens beside the column.
+- **You do:** nothing.
+- **Status:** [#133](https://github.com/JayFarei/duet/issues/133), 0.5.0-rc. See [In-app preview](#in-app-preview).
+
 ### Text field focus and the on-screen keyboard
 
 - **You see:** without the handling, focusing an input in column mode makes Safari zoom out (to about 0.94), and the keyboard covers the lower column and the controls in it.

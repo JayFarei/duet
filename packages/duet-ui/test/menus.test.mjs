@@ -43,6 +43,7 @@ for (const [name, c] of Object.entries(COLUMNS)) {
           assert.equal(m.scroll, m.height < 2 * MORPH.pad + n * MORPH.row - 0.01, `scrolls only when capped: ${why}`);
           const isl = islandBox(p, anchor, n, c.side);
           assert.ok(isl.top >= p.columnTop - 0.01, `island above columnTop: ${why}`);
+          assert.ok(isl.top + isl.height <= p.columnBottom + 0.01, `island below columnBottom: ${why}`);
         }
       }
     }
@@ -95,4 +96,23 @@ test("no reach where the island cannot push Safari's rows: landscape and the lef
     const c = COLUMNS[name], p = plan(c, REGTAIL);
     for (const b of [p.leading, p.more, p.back].filter(Boolean)) assert.ok(b.top >= p.columnTop - 0.01, name);
   }
+});
+
+// #133: the closed preview without forward history keeps a Live Activities allowance, so its band (~32pt) is shorter
+// than a control. plan() centres the lone button on it; the island pill stays on that button instead of being pushed
+// down to columnTop, which put its bottom over the preview's Back (native Back top 428, screen points).
+test("closed preview, short band: the island pill opens on its button, never onto the preview's Back", () => {
+  const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
+  const spec = { back: true, leading: 0, actions: 0, tabs: 3, primary: true, searchButton: false, accessory: false, minimized: false };
+  let n = 0;
+  for (let ih = 560; ih <= 660; ih++) {
+    const c = detect(sig(382, ih, 466, 678, { insetBottom: 34, pixelRatio: 3, userAgent: UA, angle: 0 }));
+    if (c.mode !== "column" || !c.preview) continue;
+    const p = plan(c, spec), b = p.tabs, y0 = 678 - c.height;
+    assert.ok(b, `382x${ih}`); n++;
+    const isl = islandBox(p, b, 3, c.side), y = b.top + b.height / 2 - DUO.control / 2;
+    if (p.columnBottom - p.columnTop < DUO.control) assert.equal(isl.top, y, `382x${ih} pill on its button`);
+    assert.ok(y0 + isl.top + isl.height <= 428 + 0.5, `382x${ih} pill bottom ${y0 + isl.top + isl.height} over Back`);
+  }
+  assert.ok(n > 20);
 });

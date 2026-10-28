@@ -210,6 +210,7 @@ def steps_en(start, acts):
 #   keyboard    Duet's nav carries data-keyboard;  active: the focused element's tag ("input", or None for none)
 #   dialog      a page dialog is open (True) or not (False)
 #   scroll_gt   the page is scrolled down more than this (pt);  scroll_lt: less than this
+#   menu        a Duet menu is open (True) or not (False); an open menu is judged like a slot, never over a native button
 #   la          Live Activities running
 # env: dark (appearance), content_size (Dynamic Type), set for the suite and restored after it.
 TAB0, PV0 = ("tab", "closed", 0, False), ("sheet", "closed", 0, False)
@@ -245,6 +246,17 @@ SUITES = [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
         (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
         (("forward",), "Swipe in from the right edge (Safari Forward)", {"path": "/book"}),
+    ]},
+    # #133: the preview without forward history keeps the Live Activities allowance, so its band is shorter than a
+    # button and /book's tabs merge into one; its island pill was clamped to the band's top, over the preview's Back.
+    {"id": "isl01", "title": "Tab menu island in the in-app preview (default style), no forward history (#133)", "page": "/book", "start": ("default", "closed", 0, False), "steps": [
+        (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna"}),
+        (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),
+        (("tap", "Classes", "back"), "Tap \"Classes\" in the island (it closes)", {"menu": False, "path": "/book"}),
+        (("menu",), "Tap Duet's tab button on the class list", {"menu": True}),
+    ]},
+    {"id": "isl02", "title": "Tab menu island in the in-app preview (sheet), no forward history (#133)", "page": "/book", "start": PV0, "steps": [
+        (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),
     ]},
     {"id": "nav02", "title": "Link and Safari Back, outer screen on its side", "page": "/", "start": ("tab", "closed", 90, False), "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
@@ -339,6 +351,7 @@ def check_en(c):
                     "active": lambda: "the text field has focus" if v else "nothing has focus",
                     "dialog": lambda: "the dialog is open" if v else "the dialog is closed",
                     "scroll_gt": lambda: f"the page stays scrolled down (more than {v}pt)", "scroll_lt": lambda: f"the page is at the top (under {v}pt)",
+                    "menu": lambda: "Duet's menu is open, clear of every native button" if v else "Duet's menu is closed",
                     "la": lambda: f"{v} Live Activit{'y' if v == 1 else 'ies'} running"}[k]())
     return out
 
