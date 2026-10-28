@@ -29,7 +29,9 @@ export function Screen() {
   const st = sync && fit({ ...sync.s, posture });
   const upright = sync?.upright ?? 0;
   const n = SCREEN[posture], [W, H] = upright ? [n.h, n.w] : [n.w, n.h];
-  const modeOf = (x: Signals) => { const j = JSON.stringify(x); return seen?.signals === j ? seen.mode : detect(x).mode; };
+  // Without Duet nothing paints in Safari's column, so the page is framed as an inline one: just the page.
+  const duet = sync?.duet ?? true;
+  const modeOf = (x: Signals): Mode => { if (!duet) return "inline"; const j = JSON.stringify(x); return seen?.signals === j ? seen.mode : detect(x).mode; };
   const sc = st && scene({ ...st, turn: upright }, W, H, host, modeOf);
 
   const signals = sc ? JSON.stringify(sc.signals) : "";
@@ -41,6 +43,15 @@ export function Screen() {
     addEventListener("message", ready);
     return () => removeEventListener("message", ready);
   }, [signals]);
+
+  // Duet off and on: the page swaps layouts itself, morphing each control (skeleton-app.tsx).
+  useEffect(() => {
+    const post = () => frame.current?.contentWindow?.postMessage({ type: "skeleton:duet", on: duet }, location.origin);
+    const ready = (e: MessageEvent) => { if (e.source === frame.current?.contentWindow && e.data?.type === "skeleton:ready") post(); };
+    post();
+    addEventListener("message", ready);
+    return () => removeEventListener("message", ready);
+  }, [duet, !!sc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The mode Duet actually laid out in, so the frame follows it, flip damper included.
   useEffect(() => {

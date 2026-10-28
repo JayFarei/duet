@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AppWindow, Compass, House, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
-import { ONLY_OPEN, Phases, Rule, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
+import { ONLY_OPEN, Phases, Rule, Segmented, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
 import { CHANNEL, DUO_PORT, type Sync } from "./shared";
 
 const HOLD = 2600; // a tour stop, the 3D hinge settling included
@@ -43,6 +43,7 @@ export function Duo3D() {
   const [stand, setStand] = useState<Stand>("flat");
   const [upright, setUpright] = useState<Turn>(0);
   const [tour, setTour] = useState(false);
+  const [duet, setDuet] = useState(true);
   const [at, setAt] = useState(0);
   const src = "/skeleton";
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
@@ -66,7 +67,7 @@ export function Duo3D() {
   });
 
   // Both displays follow the state; a display that loads late asks for it.
-  const sync: Sync = { s, upright, src };
+  const sync: Sync = { s, upright, src, duet };
   const ch = useRef<BroadcastChannel | null>(null), last = useRef(sync);
   last.current = sync;
   useEffect(() => {
@@ -133,6 +134,8 @@ export function Duo3D() {
         <button type="button" onClick={front} style={{ ...control, display: "flex", alignItems: "center", gap: 8, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
           <Rotate3d size={18} /> Reset view
         </button>
+        {/* Before and after: the same site as a plain mobile site, then with Duet. */}
+        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />
         <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
           {POSTURES.map(([to, label, Icon]) => (
             <Tool key={to} label={label} on={now === to} onClick={() => posture(to)}><Icon /></Tool>
