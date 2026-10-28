@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, AppWindow, ArrowLeftRight, ArrowRight, Check, ChevronDown, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
+import { Activity, AppWindow, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
 import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
@@ -48,7 +48,6 @@ export function Duo3D() {
   const [duet, setDuet] = useState(true);
   const [at, setAt] = useState(0);
   const [more, setMore] = useState(false);
-  const [open, setOpen] = useState("");
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
   // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
@@ -128,7 +127,7 @@ export function Duo3D() {
     if (posture !== s.posture) setS(fit({ ...s, posture }));
   };
 
-  const safari = s.app === "safari" || s.app === "split" || s.app === "window", preview = s.app === "sheet" || s.app === "preview";
+  const safari = s.app === "safari" || s.app === "split" || s.app === "window", preview = s.app === "sheet";
   const split = s.app === "split";
 
   // What the simulation is showing, in words: the same scene the displays draw, asked for its note.
@@ -189,7 +188,6 @@ export function Duo3D() {
               <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center", background: "transparent" }}><ArrowRight size={16} /></button>
             </form>
             {list && <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />}
-            <Pill onClick={front}><Rotate3d size={16} /> Reset view</Pill>
             <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
           </div>
         )}
@@ -211,36 +209,28 @@ export function Duo3D() {
     </div>
   );
 
-  // Rotate and fold act on the device itself, so they sit right under it.
+  // Rotate, fold and the camera act on the device itself, so they sit right under it. Reset view is always in reach,
+  // since a stray drag or swipe orbits the model.
   const handle = (
-    <div style={{ alignSelf: "center", width: "min(340px, calc(100% - 32px))", margin: "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, paddingRight: 14, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
-      {turns}<span style={{ width: 8 }} />{fold}
+    <div style={{ alignSelf: "center", width: list ? "calc(100% - 24px)" : "min(380px, calc(100% - 32px))", margin: list ? "4px 0 6px" : "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
+      {turns}<span style={{ width: 8 }} />{fold}<span style={{ width: 8 }} /><Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>
     </div>
   );
 
-  // Narrow: an accordion, one question open at a time, each row showing what is chosen.
-  const accordion = list && (
-    <div style={{ display: "grid", gap: 8, padding: "0 12px 12px" }}>
-      {sections.map((x) => {
-        const cur = x.opts.find((o) => o.on), on = x.opts.filter((o) => o.on).length;
-        return (
-          <div key={x.key} style={{ borderRadius: 16, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)", overflow: "hidden" }}>
-            <button onClick={() => setOpen(open === x.key ? "" : x.key)} aria-expanded={open === x.key} style={{ ...row, height: 48, padding: "0 14px" }}>
-              <span style={{ display: "grid", placeItems: "center", width: 26, color: "var(--accent)" }}>{x.one ? cur?.icon : x.opts[0].icon}</span>
-              <span style={{ flex: 1, textAlign: "left" }}>{x.one ? cur?.label : x.title}</span>
-              {!x.one && on > 0 && <span style={{ font: "500 12px -apple-system, system-ui", color: "var(--dim)" }}>{on} on</span>}
-              <ChevronDown size={16} style={{ color: "var(--dim)", transform: open === x.key ? "rotate(180deg)" : undefined, transition: "transform 0.2s" }} />
-            </button>
-            {open === x.key && x.opts.map((o) => (
-              <button key={o.id} onClick={o.pick} disabled={o.off} aria-pressed={o.on} style={{ ...row, height: 44, padding: "0 14px", opacity: o.off ? 0.35 : 1, background: o.on ? "color-mix(in srgb, var(--accent), transparent 85%)" : "transparent" }}>
-                <span style={{ display: "grid", placeItems: "center", width: 26 }}>{o.icon}</span>
-                <span style={{ flex: 1, textAlign: "left" }}>{o.hint && !x.one ? o.hint : o.label}</span>
-                {o.on && <Check size={16} style={{ color: "var(--accent)" }} />}
-              </button>
-            ))}
+  // Narrow: every question open at once, one row each, its title over what is chosen and the icons beside it.
+  const rows = list && (
+    <div style={{ display: "grid", gap: 6, padding: "0 12px 14px" }}>
+      {sections.map((x) => (
+        <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 6px 6px 14px", borderRadius: 16, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={caption}>{x.title}</div>
+            <div style={{ font: "600 14px/1.3 -apple-system, system-ui", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.one ? x.opts.find((o) => o.on)?.label : x.opts.filter((o) => o.on).map((o) => o.label).join(", ") || "None"}</div>
           </div>
-        );
-      })}
+          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
+            {x.opts.map((o) => <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -254,7 +244,7 @@ export function Duo3D() {
         </div>
         {handle}
         {panel}
-        {accordion}
+        {rows}
       </div>
     </div>
   );
@@ -264,7 +254,6 @@ interface Opt { id: string; label: string; icon: ReactNode; on: boolean; off?: b
 interface Section { key: string; title: string; one?: boolean; slots?: number; opts: Opt[] }
 
 const caption: CSSProperties = { font: "500 12px -apple-system, system-ui", color: "var(--dim)", whiteSpace: "nowrap" };
-const row: CSSProperties = { ...control, width: "100%", borderRadius: 0, display: "flex", alignItems: "center", gap: 10, background: "transparent", font: "500 15px -apple-system, system-ui" };
 const lit = (on?: boolean): CSSProperties => on
   ? { background: "color-mix(in srgb, var(--accent), transparent 80%)", boxShadow: "inset 0 0 0 1.5px var(--accent)", color: "var(--ink)" }
   : { background: "color-mix(in srgb, var(--ink), transparent 94%)", color: "var(--ink)" };
@@ -276,6 +265,3 @@ function Square42({ label, on, off, onClick, children }: { label: string; on?: b
   );
 }
 
-function Pill({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return <button onClick={onClick} style={{ ...control, display: "flex", alignItems: "center", gap: 8, padding: "0 16px", whiteSpace: "nowrap", ...lit() }}>{children}</button>;
-}
