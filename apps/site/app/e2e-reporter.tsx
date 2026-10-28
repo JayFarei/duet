@@ -14,6 +14,10 @@ const loopback = (q: string) => {
 // One id per page load, so the driver can tell two documents with the same URL apart (a dismissing preview and
 // the Safari tab it opened, a stale tab).
 const PAGE = Math.random().toString(36).slice(2, 10);
+// When the page last rendered a frame (requestAnimationFrame). WebKit can hold rendering while a fold animates yet keep
+// running timers and layout: a sample then reads a layout nobody sees (e2e rerun, 2026-10-28: unfolding the turned
+// preview laid out four sizes over ~220ms with no frame, the screen black, then the settled page).
+let frameAt = 0;
 
 function rect(el: Element) {
   const r = el.getBoundingClientRect();
@@ -133,7 +137,7 @@ function sample(s: string | null) {
   return {
     t: Date.now(), page: PAGE, path: location.pathname + location.search, s,
     // A backgrounded page (home screen, a split view menu) still lays out for the app switcher; nobody sees it.
-    visible: document.visibilityState, focus: document.hasFocus(),
+    visible: document.visibilityState, frameAt, focus: document.hasFocus(),
     active: document.activeElement && document.activeElement !== document.body ? document.activeElement.tagName.toLowerCase() : null,
     sig, preview: isPreview(sig), reason: previewReason(sig) ?? null,
     html: { mode: h.getAttribute("data-duet-mode"), split: h.getAttribute("data-duet-split"), emulated: h.getAttribute("data-duet-emulated") },
@@ -165,10 +169,13 @@ export function E2EReporter() {
     } catch { /* storage blocked: no reporting */ }
     if (!origin) return;
     const url = origin + "/beacon";
+    let raf = 0;
+    const frame = () => { frameAt = Date.now(); raf = requestAnimationFrame(frame); };
+    raf = requestAnimationFrame(frame);
     const id = setInterval(() => {
       try { fetch(url, { method: "POST", body: JSON.stringify(sample(s)), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
     }, 40);
-    return () => clearInterval(id);
+    return () => { clearInterval(id); cancelAnimationFrame(raf); };
   }, []);
   return null;
 }

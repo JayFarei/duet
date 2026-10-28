@@ -38,6 +38,7 @@ SETTLE_S = 0.5  # controls must show in the final placement within this of the f
 GRACE_S = 0.15  # the old placement may linger this long after the signals first change (one render of the chrome)
 SLIDE_S = 0.15  # once shown in the final placement, slots must stop moving within this (no slow slide)
 SPRING_S = 0.6  # a page change in place (a tap opens a page, a call to action turns "Booked") springs its slots (#101)
+UNPAINTED_S = 0.08  # a sample this long after the page's last frame (requestAnimationFrame) reads a layout nobody sees
 GAP_S = 0.15    # sampling gaps longer than this are reported (the page was throttled)
 ICON_SD = 6.0   # a visible slot icon whose screenshot crop has a luminance stddev under this is not painted
 STATE_TIMEOUT = 30
@@ -471,6 +472,12 @@ class Run:
             allr = [r for r in allr if r.get("visible") != "hidden"]
             if not allr:
                 res["status"] = "BLOCKED"; bad.append("the page stayed hidden after the action"); return
+        # WebKit can hold rendering while a fold animates, yet run timers and lay out: those samples are layouts the
+        # screen never shows (it keeps the last frame, black in the simulator's unfold). Not judged, like hidden ones.
+        unpainted = {r["rx"] for r in allr if r.get("frameAt") and r["t"] - r["frameAt"] > UNPAINTED_S * 1000}
+        if unpainted:
+            note.append(f"{len(unpainted)} samples with no frame painted for over {UNPAINTED_S * 1000:.0f}ms (rendering held), not judged")
+            allr = [r for r in allr if r["rx"] not in unpainted] or allr[-1:]
         if stale:
             note.append(f"{len(stale)} samples of the hidden layout in the first render after the page was shown again, not judged")
         last = allr[-1]
@@ -497,7 +504,7 @@ class Run:
         # expected one; anywhere else is a flash, however short.
         flashes, cur = [], None
         for i, r in enumerate(timeline):  # hidden samples end a flash (nobody sees the page) but are not one
-            p = None if r.get("visible") == "hidden" or r["rx"] in stale else shown_place(r)
+            p = None if r.get("visible") == "hidden" or r["rx"] in stale or r["rx"] in unpainted else shown_place(r)
             old = prev is not None and p == prev["place"] and (key(r) == prev["key"] or r["rx"] < t_change + GRACE_S * 1000)
             wrong = p is not None and not ok(p) and not old
             if wrong and cur is None:
@@ -1445,7 +1452,11 @@ class Run:
             elif k == "forward":  # Safari's Forward is a swipe in from the web view's right edge (no Forward button)
                 g, (x0, y0) = r["sig"], s.page_origin(r, kind)
                 y = y0 + g["innerHeight"] / 2
-                s.sim.drag(x0 + g["innerWidth"] - 1, y, x0 + g["innerWidth"] * 0.3, y, ms=350, steps=12, end_hold_ms=50)
+                # The web view's edge, not the page's: with Safari's column on the right the page ends 84pt short of
+                # it, and a swipe from there is no edge swipe (rerun, 2026-10-28: nav01-04 stayed on /).
+                n = nav(r)
+                right = g["outerWidth"] if n.get("mode") == "column" and n.get("side") == "right" else g["innerWidth"]
+                s.sim.drag(x0 + right - 1, y, x0 + g["innerWidth"] * 0.3, y, ms=350, steps=12, end_hold_ms=50)
             elif k == "blur":
                 if not any(e.get("label") == "Done" and s.tap_native(kind, e.get("id")) for e in s.native(kind, s.angle) if e.get("id")):
                     rc, (x0, y0) = s.neutral(r), s.page_origin(r, kind)
