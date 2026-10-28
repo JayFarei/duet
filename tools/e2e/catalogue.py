@@ -316,6 +316,16 @@ SUITES = [
         (("turn", 0), None, {"dialog": True}),
         (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False}),
     ]},
+    # #142: in the in-app preview the close folded into a "…" that close mode never draws, and the sheet still hid its
+    # own X: no close at all. Turned, Duet hides for the preview and the sheet shows its own.
+    {"id": "mod04", "title": "A full-screen page dialog opened and closed, in-app preview (sheet) (#142)", "page": "/sheet", "start": PV0, "steps": [
+        (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True, "label": "Close", "closes": 1}),
+        (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False, "no_label": "Close", "closes": 0}),
+        (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" again", {"dialog": True, "label": "Close", "closes": 1}),
+        (("turn", 90), None, {"dialog": True, "closes": 1}),
+        (("turn", 0), None, {"dialog": True, "label": "Close", "closes": 1}),
+        (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False, "no_label": "Close", "closes": 0}),
+    ]},
     # Safari's minimized bar alone does not take Duet's column taps (#140: a short visual viewport after a turn does).
     {"id": "bar01", "title": "A column control tapped while Safari's bar is minimized, Safari tab", "page": "/scroll", "start": TAB0, "steps": [
         (("scroll", 900), "Scroll the page down (Safari minimizes its bar)", {"scroll_gt": 500}),

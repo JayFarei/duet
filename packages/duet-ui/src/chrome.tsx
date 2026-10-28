@@ -478,7 +478,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
   }, []);
   // data-duet-close: Duet's close button is on screen, in any mode, so a sheet hides its own X and shows one (#135).
-  const closeShown = !!p.close && controlsShown(ctx);
+  // Only when the plan placed it: a band with no room for it leaves the sheet its own X (#142).
+  const closeShown = !!p.close && controlsShown(ctx) && !!planFor(ctx.side).back;
   useEffect(() => {
     document.documentElement.toggleAttribute("data-duet-close", closeShown);
     return () => document.documentElement.removeAttribute("data-duet-close");

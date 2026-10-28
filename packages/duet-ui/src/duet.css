@@ -306,9 +306,13 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
    keeps showing the controls. That hit test skips layers with nothing fixed or sticky in them, so the guard is fixed
    and outside the layer; it keeps a (transparent) background, since a box with no background, no backdrop and no
    children counts as transparent and the hit test then retries without it, honouring pointer-events. It takes no
-   taps (simulator, 2026-10-27, #79). */
+   taps (simulator, 2026-10-27, #79). It is 240px tall: in the in-app preview, turned back upright with the overlay
+   open, WebKit samples the edge against the landscape viewport (578x388, mid-edge at y 194) while fixed boxes are
+   laid out in the 600-tall one (guard centred on 300), so a 64px guard missed and the column filled with the scrim
+   for good; 240px covers both midpoints and stays under 0.9 of the shortest viewport, so it never counts as a
+   container itself (#142). */
 .duet-guard {
-  position: fixed; z-index: 2147483647; top: 50%; width: 16px; height: 64px; margin-top: -32px; pointer-events: none;
+  position: fixed; z-index: 2147483647; top: 50%; width: 16px; height: 240px; margin-top: -120px; pointer-events: none;
   background-image: linear-gradient(transparent, transparent);
 }
 .duet-guard[data-side="right"] { right: -8px; }

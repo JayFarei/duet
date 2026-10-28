@@ -21,8 +21,12 @@ test("guard is a fixed box above every page layer that takes no taps", () => {
   assert.equal(g["pointer-events"], "none");
   // Without a background (and no children) the box counts as transparent and the hit test retries past it.
   assert.ok(g["background-image"] || g.background, "has a background");
-  // Small, so Safari does not treat it as an edge container itself (under 0.9 of the viewport either way).
-  assert.ok(px(g.width) <= 32 && px(g.height) <= 100);
+  // Small, so Safari does not treat it as an edge container itself (under 0.9 of the viewport either way,
+  // 388 being the shortest: the closed screen turned sideways in the in-app preview).
+  assert.ok(px(g.width) <= 32 && px(g.height) < 0.9 * 388);
+  // Tall enough that, laid out in the 600-tall upright preview, it still covers the midpoint of the 388-tall
+  // landscape viewport WebKit samples against after a turn back upright with an overlay open (#142).
+  assert.ok(300 - px(g.height) / 2 < 388 / 2 - 4 && 300 + px(g.height) / 2 > 300 + 4, `${g.height}`);
   assert.equal(g.top, "50%");
   assert.equal(px(g["margin-top"]), -px(g.height) / 2);
 });

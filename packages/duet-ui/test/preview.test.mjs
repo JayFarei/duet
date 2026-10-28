@@ -61,6 +61,13 @@ for (const [name, { s, origin: [x0, y0], x }] of Object.entries(PORTRAIT)) {
     const p = plan(detect(s), { back: true, leading: 2, actions: 1, tabs: 0, primary: true, searchButton: false, accessory: false, minimized: false });
     assert.deepEqual(boxes(p).map(([k]) => k), ["more"]);
   });
+  test(`preview ${name}: a sheet's close (back alone) shows itself, centred in the gap, not folded into "…" (#142)`, () => {
+    const p = plan(detect(s), { back: true, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized: false, menuExtra: 0 });
+    assert.deepEqual(boxes(p).map(([k]) => k), ["back"]);
+    assert.equal(p.menu.back, false);
+    const top = y0 + p.back.top, above = top - (234 + DUO.island + 48), below = 428 - (top + DUO.control);
+    assert.ok(above > 0 && Math.abs(above - below) < 0.5, `${above} above, ${below} below`);
+  });
 }
 
 test("preview turned: the gap is ~26pt, so inline, on the side away from the preview's column", () => {

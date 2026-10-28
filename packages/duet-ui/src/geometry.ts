@@ -827,6 +827,9 @@ export function plan(c: Context, s: Spec): Plan {
   } else if (p.searchButton) {
     // One slot without tabs: "…" takes the search button's place, search first in its menu.
     p.more = { top: lone, height: DUO.control }; delete p.searchButton; p.menu.search = true;
+  } else if (s.back && !back && menuCount() === 1) {
+    // One slot holding back alone (a sheet's close, Props.close): back itself, not a "…" holding only it (#142).
+    p.back = { top: lone, height: DUO.control }; p.menu.back = false;
   } else if (menuCount()) p.more = { top: lone, height: DUO.control };
   return { ...p, ...accessory(c, s, centerX, bottom) };
 }
