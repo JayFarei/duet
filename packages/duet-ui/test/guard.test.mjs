@@ -36,6 +36,9 @@ for (const side of ["left", "right"]) {
   });
 }
 
-test("guard renders only in column mode, on each column side, outside the layer", () => {
-  assert.match(chrome, /ctx\.mode === "column" && !emulatedSignals\(\) && sides\.map\(\(side\) => <span key=\{side\} className="duet-guard" data-side=\{side\} aria-hidden \/>\)/);
+// Not only in column mode: a turn or fold passes through transit, and a guard that unmounts there leaves Safari's column
+// filled with the page's overlay once the column is back (#119, e2e mod01-04).
+test("guard renders on both edges whenever the page is in Safari on a Duo, whatever the mode, outside the layer", () => {
+  assert.match(chrome, /ctx\.duo && ctx\.browser === "safari" && !emulatedSignals\(\) && \(\["left", "right"\] as const\)\.map\(\(side\) => <span key=\{side\} className="duet-guard" data-side=\{side\} aria-hidden \/>\)/);
+  assert.doesNotMatch(chrome, /ctx\.mode === "column" && !emulatedSignals\(\) && sides\.map/);
 });

@@ -111,7 +111,7 @@ A modal or sheet on the web usually sits on a full-screen scrim: `position: fixe
 
 - **What you see:** nothing to handle. While the overlay is open, the controls stay in the column and keep working. Safari's own buttons there are unaffected either way.
 - **Cause:** Safari 26 hit-tests the middle of each viewport edge, 4px in, for a fixed or sticky box (WebKit's `LocalFrameView::fixedContainerEdges`). When one covers that point, Safari paints the box's colour, or plain chrome when the box has a `backdrop-filter`, over everything beyond that edge, Safari's column included. Duet's column layer is in-document content, so it disappears under that fill. Measured on the simulator: a scrim 3px short of the edge still hides the column, 6px short does not, and a scrim of 90% width or 40% height does not.
-- **What Duet does:** in column mode it renders a small fixed guard (`.duet-guard`, 16x64px, transparent, `pointer-events: none`, top `z-index`) straddling that point on each edge that faces a column. Safari's hit test lands on the guard, which is too small to count as a container, so it finds none and keeps painting the column normally. The guard takes no taps and paints nothing.
+- **What Duet does:** on a Duo in Safari it renders a small fixed guard (`.duet-guard`, 16x64px, transparent, `pointer-events: none`, top `z-index`) straddling that point on each viewport edge, in every mode, so it is there through folds and turns too. Safari's hit test lands on the guard, which is too small to count as a container, so it finds none and keeps painting the column normally. The guard takes no taps and paints nothing.
 - **What you must do:** nothing for visibility. For a native feel, pass `close` to `<Duet>` while the sheet is open, so the controls hold only its close button, and hide the sheet's own X in column mode:
 
   ```tsx
@@ -367,9 +367,17 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, in column mode, while a modal or sheet scrim (`position: fixed; inset: 0`) is open, every Duet control in Safari's column disappears, the close button included, so the user has no way to close the sheet from the column.
 - **Cause:** Safari 26 hit-tests a point 4px in from the middle of each viewport edge for a fixed or sticky box and, when one covers it, paints that box's colour over the inset beyond that edge, Safari's column included, instead of the page's in-document content.
-- **Duet does:** in column mode renders `.duet-guard`, a small invisible fixed box (16x64px, `pointer-events: none`, top `z-index`) on each column edge, so that hit test lands on it and the column keeps showing the controls. Your scrim stays `position: fixed`.
+- **Duet does:** on a Duo in Safari renders `.duet-guard`, a small invisible fixed box (16x64px, `pointer-events: none`, top `z-index`) on each viewport edge, so that hit test lands on it and the column keeps showing the controls. Your scrim stays `position: fixed`.
 - **You do:** nothing for a fixed `<div>` scrim. `<dialog>.showModal()` is not covered: its `::backdrop` sits in the top layer, above any `z-index`, so use a fixed `<div>` scrim instead. For one X, in the column, pass `close` to `<Duet>` while the sheet is open and hide the sheet's own X in column mode (`html[data-duet-mode="column"] .sheet-close { display: none; }`). See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
 - **Status:** [#79](https://github.com/JayFarei/duet/issues/79), [PR #83](https://github.com/JayFarei/duet/pull/83), 0.4.0-rc.2.
+
+### Page dialog open through a turn or fold
+
+- **You see:** without handling, with a full-screen page dialog open in a Safari tab on the closed Duo, turning the phone on its side and back upright leaves Safari's column without Duet's close button, and tapping where it was does nothing.
+- **Cause:** through the turn the page is in transit, not in column mode. A guard rendered only in column mode unmounts for those frames, Safari's edge hit test finds the scrim and fills the column with it, and that fill stays once the column and the guard are back.
+- **Duet does:** keeps `.duet-guard` mounted whenever the page is in Safari on a Duo, in every mode, so no frame of a turn, fold or unfold leaves the edge sample point on the scrim. The guard is invisible and takes no taps, so it changes nothing outside the column.
+- **You do:** nothing.
+- **Status:** [#119](https://github.com/JayFarei/duet/issues/119).
 
 ### Sideways swipe pans the page into the column
 
