@@ -1280,13 +1280,31 @@ class Run:
             d = max(-300, min(300, rc["y"] + rc["h"] / 2 - vh * 0.4))
             y1 = y0 + g["innerHeight"] * (0.75 if d > 0 else 0.25)
             s.sim.drag(x0 + g["innerWidth"] * 0.3, y1, x0 + g["innerWidth"] * 0.3, y1 - d, ms=500, steps=12, end_hold_ms=200)
-            time.sleep(1.0)  # momentum and the bars compacting
-            r2 = s.now_sample(sid, tok, time.time() * 1000)
+            r2 = s.still(sid, tok)
             rc2 = r2 and refind(r2)
             if rc2 is None:
                 break
             r, rc = r2, rc2
         return r, rc
+
+    def still(s, sid, tok, quiet=0.4, cap=3.0):
+        """The newest sample once the page has stopped moving (scroll and visual viewport the same for quiet seconds).
+        A tap while a scroll still decelerates only stops it, so it never reaches the target (nav01-02, kb01-02)."""
+        t0, end, last, since, r = time.time() * 1000, time.time() + cap, None, time.time(), None
+        while time.time() < end:
+            for x in samples(sid, t0):
+                if mine(x, tok) and x.get("page") == s.page:
+                    r = x
+            if r is not None:
+                key = (r["scroll"]["x"], r["scroll"]["y"], json.dumps(r.get("vv"), sort_keys=True), r["sig"]["innerHeight"])
+                if key != last:
+                    last, since = key, time.time()
+                elif time.time() - since >= quiet:
+                    return r
+            time.sleep(0.1)
+        if r is None:
+            s.why = "the page is not reporting"
+        return r
 
     def page_origin(s, r, kind):
         """Page origin in points of the lit display (sim.py taps in those)."""
