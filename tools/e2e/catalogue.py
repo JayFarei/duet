@@ -58,9 +58,10 @@ def top_bars(sig):
 def expect(state, sig=None, keyboard=False):
     """Expected placement in a state. A closed landscape tab has two windows, the column one (turned from portrait)
     and the top bars one (opened or folded into landscape); which one Safari chose is read from the final sample.
-    keyboard: the on-screen keyboard is up, and column controls hide until it goes down (Context.keyboard)."""
+    keyboard: the on-screen keyboard is up, and column and inline controls hide until it goes down (Context.keyboard,
+    #123: iOS scrolls the layout viewport by the keyboard, so a fixed inline rail would slide off)."""
     e = placement(state, sig)
-    if keyboard and e.get("mode") == "column":
+    if keyboard and e.get("mode") in ("column", "inline"):
         return {"preview": e.get("preview"), "hidden": True}
     return e
 
