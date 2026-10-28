@@ -515,6 +515,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing. Unmeasured: the bar at the largest Dynamic Type, in the in-app preview and on scroll.
 - **Status:** [#112](https://github.com/JayFarei/duet/issues/112).
 
+### In-app preview with forward history
+
+- **You see:** without handling, after going back once in the in-app preview, Duet's button covers the preview's Back.
+- **Cause:** with forward history the preview adds a Forward button where Back was and moves Back up a row (its top from 428 to 374pt), so the free gap ends higher.
+- **Duet does:** reads `navigation.canGoForward` (re-read on `currententrychange` and `popstate`) and, in the preview, ends the gap above the raised Back. That gap holds one button with no room left for Live Activities, so with forward history an activity may push the preview's reader/menu button onto Duet's button, never onto Back.
+- **You do:** nothing. The Navigation API only sees same-origin entries: coming back from another site, the preview shows Forward but Duet can't know, and its button may cover Back until the next same-origin navigation.
+- **Status:** [#117](https://github.com/JayFarei/duet/issues/117).
+
 ### Menus and popovers under Safari's buttons
 
 - **You see:** without the handling, a menu that reaches into the column is drawn under Safari's back, reader or +/tabs buttons.

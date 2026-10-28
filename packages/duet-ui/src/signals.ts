@@ -75,7 +75,8 @@ export const settling = () => !!settle && Date.now() - settle.start < SETTLE.cap
 
 /** Calls `cb` whenever the signals may have changed, so it can call readSignals() and detect() again: on resize,
  *  rotation (a turn from one landscape to the other keeps the window size, so screen.orientation too), the keyboard
- *  (visualViewport), and on pageshow and visibilitychange, as when an in-app preview's "Open in Safari" hands the
+ *  (visualViewport), history (navigation currententrychange, popstate: the preview's Back follows forward history), and on
+ *  pageshow and visibilitychange, as when an in-app preview's "Open in Safari" hands the
  *  page to a Safari tab without reloading it. Each event, and the call itself (a fresh tab settles with no event),
  *  starts a settle (SETTLE): `cb` runs at once, on every size change while it polls, and once when sizes hold.
  *  Returns the unsubscribe. Browser only. */
@@ -94,6 +95,10 @@ export function watchSignals(cb: () => void): () => void {
   // RC run, 2026-10-27). The probe spans the viewport, so its size changes with each of those layouts.
   const ro = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(on);
   ro?.observe(probeEl());
+  // History moves no geometry, but the in-app preview's Back follows forward history (Signals.canGoForward).
+  const nav = (window as Window & { navigation?: EventTarget }).navigation;
+  nav?.addEventListener("currententrychange", cb);
+  addEventListener("popstate", cb);
   subs.add(cb);
   watchers.add(cb);
   kick();
@@ -109,5 +114,7 @@ export function watchSignals(cb: () => void): () => void {
     screen.orientation?.removeEventListener("change", on);
     visualViewport?.removeEventListener("resize", on);
     ro?.disconnect();
+    nav?.removeEventListener("currententrychange", cb);
+    removeEventListener("popstate", cb);
   };
 }
