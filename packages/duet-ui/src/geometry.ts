@@ -127,6 +127,11 @@ export interface Context {
   /** The on-screen keyboard is up (visual viewport shorter than the page). The mode stays as it was; in column
    *  mode the controls hide until it goes down. */
   keyboard?: boolean;
+  /** Page y where the visual viewport ends, set only while it is short with no keyboard up: a turn can leave Safari
+   *  that way (466 for a 580pt page, closed Duo turned from 90 to upright with a page dialog open, #122), with its
+   *  minimized bar drawn at the visual viewport's bottom and taking touches from there down. columnBand keeps the
+   *  controls above it (#140). */
+  visualBottom?: number;
   /** From stable() only. "sure": nothing is moving. "settling": the window is still settling after an event, so
    *  the mode may still change. "held": the last committed context, kept while the page is pinch-zoomed or while a
    *  drifting signal (viewport height) alone asks for another mode before the window settles. */
@@ -341,7 +346,7 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
   const keyboard = keyboardUp(s);
-  const kb = keyboard ? { keyboard } : {};
+  const kb = keyboard ? { keyboard } : shortView(s) ? { visualBottom: s.visualHeight } : {};
   if (s.standalone && duo && (s.insetRight >= STRIP_INSET || s.insetLeft >= STRIP_INSET)) {
     return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
@@ -525,8 +530,8 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   // scroll settled dropped the controls off the rail for good. Inline to column still moves, so a wrong inline heals.
   const columnHeld = d.last?.mode === "column" && c.mode === "inline" && !d.pinned;
   if (d.last && c.mode !== d.last.mode && (settling || columnHeld) && stableKey === d.stableKey && !!d.last.preview === preview) {
-    const { width, height, insetTop, insetBottom, keyboard } = c;
-    return { ...d.last, width, height, insetTop, insetBottom, keyboard, confidence: "held" };
+    const { width, height, insetTop, insetBottom, keyboard, visualBottom } = c;
+    return { ...d.last, width, height, insetTop, insetBottom, keyboard, visualBottom, confidence: "held" };
   }
   d.stableKey = stableKey;
   if (d.mode && c.mode !== d.mode && !settling) {
@@ -674,9 +679,16 @@ export function columnBand(c: Context): { top: number; bottom: number; reach: nu
   }
   // Safari's buttons stay put in screen points; the layer starts at the page top, below a Shared with You bar.
   const y = c.offsetTop;
-  if (c.split) return { top: SAFARI.splitTop[c.side] + rows - y, bottom: pill - y, reach: c.side === "right" ? DUO.island : 0 };
-  if (landscapeColumn(c)) return { top: SAFARI.landscape[c.side].top + rows - y, bottom: SAFARI.landscape[c.side].pill - DUO.gap - y, reach: 0 };
-  return { top: DUO.top + DUO.island + rows - y, bottom: pill - y, reach: DUO.island };
+  const band = c.split ? { top: SAFARI.splitTop[c.side] + rows - y, bottom: pill - y, reach: c.side === "right" ? DUO.island : 0 }
+    : landscapeColumn(c) ? { top: SAFARI.landscape[c.side].top + rows - y, bottom: SAFARI.landscape[c.side].pill - DUO.gap - y, reach: 0 }
+    : { top: DUO.top + DUO.island + rows - y, bottom: pill - y, reach: DUO.island };
+  // A short visual viewport with no keyboard (Context.visualBottom): Safari's bar takes touches from its bottom down,
+  // so the band moves up clear of it, keeping its height by taking the lift from the Live Activities allowance first.
+  // Live Activities may then cover the top button, as in the preview. A band left too short drops its buttons.
+  const lift = c.visualBottom === undefined ? 0 : Math.max(0, band.bottom - (c.visualBottom - DUO.gap));
+  if (!lift) return band;
+  const rise = Math.min(lift, band.reach);
+  return { top: band.top - rise, bottom: band.bottom - lift, reach: band.reach - rise };
 }
 
 /** Morph menu placement: the button grows into a labelled list, outer edge on the button's, opening down from

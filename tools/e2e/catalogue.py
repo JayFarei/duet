@@ -316,6 +316,11 @@ SUITES = [
         (("turn", 0), None, {"dialog": True}),
         (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False}),
     ]},
+    # Safari's minimized bar alone does not take Duet's column taps (#140: a short visual viewport after a turn does).
+    {"id": "bar01", "title": "A column control tapped while Safari's bar is minimized, Safari tab", "page": "/scroll", "start": TAB0, "steps": [
+        (("scroll", 900), "Scroll the page down (Safari minimizes its bar)", {"scroll_gt": 500}),
+        (("menu",), "Tap Duet's \"…\" (its menu opens)", {"menu": True}),
+    ]},
     {"id": "la01", "title": "Live Activity expanded by a long press, Safari tab", "page": "/book", "start": ("tab", "closed", 0, True), "steps": [
         (("expand",), "Long-press the Live Activity in the Dynamic Island (it expands)", {}),
         (("blur",), "Tap the page (the Live Activity shrinks back)", {}),

@@ -2,6 +2,7 @@
 
 ## 0.5.0 (Unreleased)
 
+- Column mode: after a turn leaves the visual viewport short with no keyboard (466 for a 580pt page), the column band ends above it, so Duet's close no longer sits under Safari's minimized bar, which takes touches from the visual viewport's bottom down. New `Context.visualBottom` (#140).
 - Column mode without children: the controls no longer sit up to 18pt too high after a flick to the end of the page while Safari's toolbar grows back. The scroll timeline's range is now `scrollHeight - 100dvh`, which CSS keeps live through the toolbar change, instead of a value measured in JavaScript that went stale with no event to refresh it (#100).
 - Call to action: `primary` takes `prominent: true` (new `DuetPrimary` type) to make it the page's call to action. Where there is room it is a tinted pill with icon and label by the thumb; in a closed Safari tab it keeps the thumb slot and the tabs (or search) fold into "…" as a radio group instead. Its label, icon and tint can change at runtime: the pill's width springs to the new label and the tint crossfades (#101). It starts closed, as the round tinted button; `expanded: true` opens it into the labelled pill on the same spring.
 - `folded: true` on a `leading` or action item keeps it in "…" even where the strip has room, so a page can fold its secondary actions and change that at runtime (#101).

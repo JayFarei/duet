@@ -559,6 +559,13 @@ class Run:
         if offs:
             bad.append(f"off screen in {len(offs)} samples, first at +{offs[0][0]:.0f}ms: {offs[0][1]}")
         # 3. final state
+        # A visual viewport short with no keyboard (a turn with a page dialog open, #122): Safari draws its bar at its
+        # bottom and takes touches from there down, so a column control below it can't be tapped (#140).
+        vh = (last.get("vv") or {}).get("h") or g["innerHeight"]
+        if n.get("mode") == "column" and not n.get("keyboard") and vh < g["innerHeight"] - 1:
+            for x in all_slots(last):
+                if x["rect"]["y"] + x["rect"]["h"] > vh + 1:
+                    bad.append(f'{x["slot"]} reaches y {x["rect"]["y"] + x["rect"]["h"]:.0f}, under Safari\'s bar from the {vh:.0f}pt visual viewport\'s bottom')
         if "preview" in expect and last.get("preview") != expect["preview"]:
             bad.append(f'preview detected={last.get("preview")}, expected {expect["preview"]}')
         fp = shown_place(last)
@@ -634,7 +641,7 @@ class Run:
                     iy = min(sl["y"] + sl["h"], e["y"] + e["h"]) - max(sl["y"], e["y"])
                     if ix > 2 and iy > 2:
                         bad.append(f'{sl["slot"]} overlaps native "{e["label"]}" by {ix:.0f}x{iy:.0f}')
-        res["slots"] = slots
+        res["slots"], res["menus"] = slots, menus
         if expect.get("gap") and slots:
             col = [e for e in native if e["w"] <= 60]
             above = [e for e in col if e["label"] in ("Page Menu", "Cancel", "Done", "Close")]
@@ -714,8 +721,13 @@ class Run:
         except Exception as e:  # noqa: BLE001
             res["notes"].append(f"icons not checked ({e})"); return
         blank, n = [], 0
+        # An open menu draws over the slots it covers (bar01-02: the island pill over the rail's icons).
+        under = lambda i: any(m["x"] <= i["x"] + i["w"] / 2 <= m["x"] + m["w"] and m["y"] <= i["y"] + i["h"] / 2 <= m["y"] + m["h"]
+                              for m in res.get("menus") or [])
         for sl in res["slots"]:
             for i in sl.get("icons", []):
+                if under(i):
+                    continue
                 b = [round(v) for v in box(i)]
                 if b[0] < 0 or b[1] < 0 or b[2] > im.width or b[3] > im.height or b[2] - b[0] < 4 or b[3] - b[1] < 4:
                     continue
