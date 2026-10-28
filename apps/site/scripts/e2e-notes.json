@@ -1,0 +1,9 @@
+{
+  "j33-03": "The simulator's in-app preview has no Open in Safari button at 90°, so the step can't reach its state. A phone covers it: device check D11.",
+  "j45-03": "The simulator's in-app preview has no Open in Safari button at 90°, so the step can't reach its state. A phone covers it: device check D11.",
+  "j03-01": "No sample came from the page while four simulators ran at once. Run alone, it passed.",
+  "j26-02": "The unfold flash showed only while four simulators ran at once. Run alone, it passed.",
+  "j38-02": "The unfold flash showed only while four simulators ran at once. Run alone, it passed.",
+  "life03-02": "Red under load, and it failed 1 of 2 runs alone, so it is not a load artefact. Open as #130.",
+  "scr01-04": "The rail went off screen for one frame. Run alone, the journey failed at a different step (scr01-06). Open as #131."
+}
