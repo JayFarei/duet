@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { AppWindow, ArrowRight, Compass, Globe, House, Keyboard, Maximize2, MessageSquareShare, MessageSquareText, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
+import { AppWindow, ArrowRight, Compass, Globe, House, Keyboard, Maximize2, MessageSquareShare, MessageSquareText, PanelBottom, PanelLeft, PanelRight, RotateCcw, RotateCw, Rotate3d } from "lucide-react";
 import { ONLY_OPEN, Phases, Rule, Segmented, TOUR, Tool, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
 import { CHANNEL, DUO_PORT, type Sync } from "./shared";
 
@@ -123,6 +123,7 @@ export function Duo3D() {
     if (posture !== s.posture) setS(fit({ ...s, posture }));
   };
 
+  const safari = s.app === "safari" || s.app === "split" || s.app === "window", messages = s.app === "sheet" || s.app === "preview";
   const split = s.app === "split", Pane = s.pane === "left" ? PanelLeft : PanelRight;
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: "20px 0", background: "linear-gradient(180deg, var(--bg), color-mix(in srgb, var(--bg), #888 12%))" }}>
@@ -152,22 +153,32 @@ export function Duo3D() {
           {([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
             <Tool key={by} label={label} onClick={() => go(rotate(s, by), false, "flat")}><Icon size={18} /></Tool>
           ))}
-          <Rule />
-          <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
-          <Tool label="Safari" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
-          <Tool label={split ? "Swap Split View sides" : "Split View"} on={split} onClick={() => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" })}><Pane size={18} /></Tool>
-          <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
-          <Rule />
-          {/* A link opened from Messages: the in-app preview as a page sheet, then full screen. */}
-          <Tool label="Link preview, sheet" on={s.app === "sheet"} onClick={() => go({ app: "sheet" })}><MessageSquareText size={18} /></Tool>
-          <Tool label="Link preview, full screen" on={s.app === "preview"} onClick={() => go({ app: "preview" })}><Maximize2 size={18} /></Tool>
         </div>
-        {/* Conditions the harness tests, on top of any view: each toggles on its own. */}
-        <div role="toolbar" aria-label="Conditions" style={{ ...group, alignItems: "center" }}>
-          <Tool label="Shared with You bar" on={!!s.shared} onClick={() => go({ shared: !s.shared })}><MessageSquareShare size={18} /></Tool>
-          <Tool label="Forward history" on={!!s.forward} onClick={() => go({ forward: !s.forward })}><ArrowRight size={18} /></Tool>
-          <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
+        {/* Pick the app first; only what that app can show comes next. */}
+        <div role="toolbar" aria-label="App" style={{ ...group, alignItems: "center" }}>
+          <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home", keyboard: false })}><House size={18} /></Tool>
+          <Tool label="Safari" on={safari} onClick={() => safari || go({ app: "safari" })}><Compass size={18} /></Tool>
+          <Tool label="Messages, a link opened in-app" on={messages} onClick={() => messages || go({ app: "sheet", shared: false, forward: false })}><MessageSquareText size={18} /></Tool>
         </div>
+        {safari && (
+          <div role="toolbar" aria-label="Safari" style={{ ...group, alignItems: "center" }}>
+            <Tool label="One tab" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
+            <Tool label={split ? "Swap Split View sides" : "Split View"} on={split} onClick={() => go(split ? { pane: s.pane === "left" ? "right" : "left" } : { app: "split" })}><Pane size={18} /></Tool>
+            <Tool label="Safari window" on={s.app === "window"} onClick={() => go({ app: "window" })}><AppWindow size={18} /></Tool>
+            <Rule />
+            <Tool label="Shared with You bar" on={!!s.shared} onClick={() => go({ shared: !s.shared })}><MessageSquareShare size={18} /></Tool>
+            <Tool label="Forward history" on={!!s.forward} onClick={() => go({ forward: !s.forward })}><ArrowRight size={18} /></Tool>
+            <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
+          </div>
+        )}
+        {messages && (
+          <div role="toolbar" aria-label="Link preview" style={{ ...group, alignItems: "center" }}>
+            <Tool label="Link preview, sheet" on={s.app === "sheet"} onClick={() => go({ app: "sheet" })}><PanelBottom size={18} /></Tool>
+            <Tool label="Link preview, full screen" on={s.app === "preview"} onClick={() => go({ app: "preview" })}><Maximize2 size={18} /></Tool>
+            <Rule />
+            <Tool label="Keyboard" on={!!s.keyboard} onClick={() => go({ keyboard: !s.keyboard })}><Keyboard size={18} /></Tool>
+          </div>
+        )}
         <label style={{ ...control, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
           Fold
           <input type="range" aria-label="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ width: 120, accentColor: "var(--accent)" }} />

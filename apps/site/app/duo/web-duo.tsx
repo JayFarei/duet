@@ -154,11 +154,26 @@ function safariWindow(o: { win: Box; page: Size; col: Side; back: number; clock?
  *  clock and Safari's rows down, telling the page nothing. */
 export function scene(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode): Scene {
   // The keyboard covers the bottom of the screen and shortens the visual viewport, nothing else: Duet keeps its mode.
-  // Closed portrait is measured (a tab's visual viewport 272 of 598); elsewhere it is about half the screen.
-  const kb = !s.keyboard ? 0 : s.posture === "closed" && W < H ? H - 272 : Math.round(H * (s.posture === "closed" ? 0.45 : 0.5));
+  // Closed is measured on the Duo Lab sim (iOS 26): a frosted panel 303pt tall upright, 227 turned, with the form
+  // accessory capsule above it and Safari's address shrunk to a pill above that (a tab's visual viewport 272 of 598
+  // upright, 142 turned). Open is derived from the closed panel, not yet captured.
+  const k = !s.keyboard ? null : KEYS(s.posture === "closed", W, H);
+  const kb = !k ? 0 : k.panel + (s.posture === "closed" ? 104 : 59);
   const vis = (g: Signals, top: number): Signals => kb ? { ...g, visualHeight: Math.max(0, Math.min(g.innerHeight, H - kb - top)) } : g;
   const r = place(s, W, H, host, (g) => modeOf(g), vis);
-  return kb ? { ...r, chrome: <>{r.chrome}<Keyboard w={W} h={kb} top={H - kb} /></>, note: `${r.note} With the keyboard up only the visual viewport shrinks, so Duet keeps its layout.` } : r;
+  if (!k) return r;
+  const page = { x: r.clip.x + 20, w: r.clip.w - 40 };
+  return { ...r, chrome: <>{r.chrome}<Keyboard w={W} top={H - k.panel} k={k} bar={page} host={s.posture === "closed" ? host : undefined} /></>, note: `${r.note} With the keyboard up only the visual viewport shrinks, so Duet keeps its layout.` };
+}
+
+/** The keyboard's measure for a screen, in points: panel height, the band above the keys (suggestions), key height,
+ *  the gap between rows, the bottom margin and the width the keys span (centred). */
+interface Keys { panel: number; band: number; key: number; row: number; bottom: number; span: number; font: number }
+function KEYS(closed: boolean, W: number, H: number): Keys {
+  const k = closed && W < H ? { band: 52, key: 44, row: 11, bottom: 39, span: W - 14, font: 25 }
+    : closed ? { band: 49, key: 33, row: 9, bottom: 19, span: 518, font: 23 }
+    : { band: 52, key: W < H ? 46 : 42, row: 10, bottom: 34, span: Math.min(W - 14, 640), font: 25 };
+  return { ...k, panel: k.band + 4 * k.key + 3 * k.row + k.bottom };
 }
 
 function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals) => Mode, vis: (g: Signals, top: number) => Signals): Scene {
@@ -1160,17 +1175,37 @@ function SharedBar({ left, top = 0, width, h }: { left: number; top?: number; wi
   );
 }
 
-/** The on-screen keyboard: three rows of letter keys and a space bar, drawn over everything. */
-function Keyboard({ w, h, top }: { w: number; h: number; top: number }) {
-  const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"], key = Math.min(44, (w - 24) / 10 - 6);
+/** The on-screen keyboard as iOS 26 draws it: a frosted panel with a faint suggestion band, white rounded keys in
+ *  four rows (letters, shift and delete, 123 / emoji / space / mic / return), the form accessory capsule floating
+ *  above it (previous, next, done) and, on the closed screen, Safari's address shrunk to a pill above that. */
+function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; bar: { x: number; w: number }; host?: string }) {
+  const gap = Math.round(k.span / 60), unit = (k.span - 9 * gap) / 10;
+  const key = (c: ReactNode, width: number | string, i: number | string, size = k.font): ReactNode => (
+    <div key={i} style={{ width, height: k.key, flex: width === "auto" ? 1 : "none", borderRadius: 9, background: "var(--wd-key)", display: "grid", placeItems: "center", font: `400 ${size}px -apple-system, system-ui`, color: "var(--ink)" }}>{c}</div>
+  );
+  const row = (keys: ReactNode[], pad = 0, between = false) => <div style={{ display: "flex", gap, padding: `0 ${pad}px`, justifyContent: between ? "space-between" : "center" }}>{keys}</div>;
+  const letters = (r: string) => [...r.toUpperCase()].map((c) => key(c, unit, c));
+  const wide = unit * 1.36, fn = unit * 1.6;
   return (
-    <div data-wd-system style={{ position: "absolute", left: 0, top, width: w, height: h, background: "color-mix(in srgb, var(--card), #888 18%)", padding: "10px 6px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, pointerEvents: "none" }}>
-      {rows.map((r) => (
-        <div key={r} style={{ display: "flex", gap: 6 }}>
-          {[...r].map((c) => <div key={c} style={{ width: key, height: Math.min(42, (h - 80) / 4), borderRadius: 6, background: "var(--card)", display: "grid", placeItems: "center", font: "400 18px -apple-system, system-ui", color: "var(--ink)" }}>{c}</div>)}
+    <div data-wd-system style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+      {host && <div style={{ position: "absolute", left: (w - 88) / 2, top: top - 59 - 46, width: 88, height: 30, borderRadius: 99, ...glass, display: "grid", placeItems: "center", font: "500 13px -apple-system, system-ui", color: "var(--ink)" }}>{host}</div>}
+      <div style={{ position: "absolute", left: bar.x, top: top - 59, width: bar.w, height: 47, borderRadius: 99, ...glass, display: "flex", alignItems: "center", gap: 22, padding: "0 16px", boxSizing: "border-box", color: "var(--ink)" }}>
+        <Glyph d="m18 15-6-6-6 6" size={22} style={{ margin: 0, opacity: 0.45 }} /><Glyph d="m6 9 6 6 6-6" size={22} style={{ margin: 0, opacity: 0.45 }} />
+        <Glyph d="M20 6 9 17l-5-5" size={24} style={{ margin: "0 0 0 auto" }} />
+      </div>
+      <div style={{ position: "absolute", left: 0, top, width: w, height: k.panel, borderRadius: "34px 34px 0 0", background: "var(--wd-kb)", backdropFilter: "blur(24px) saturate(1.4)", boxShadow: "inset 0 0.5px 0 rgb(255 255 255 / 0.5), 0 0 0 0.5px rgb(0 0 0 / 0.08)", boxSizing: "border-box", paddingTop: k.band, display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {[1, 2].map((i) => <i key={i} style={{ position: "absolute", top: 12, left: w / 2 + (i === 1 ? -1 : 1) * k.span / 6, width: 1, height: 22, background: "var(--line)" }} />)}
+        <div style={{ width: k.span, display: "flex", flexDirection: "column", gap: k.row }}>
+          {row(letters("qwertyuiop"))}
+          {row(letters("asdfghjkl"))}
+          {row([key(<Glyph d="M12 3 3 12h5v8h8v-8h5z" size={k.font} style={{ margin: 0, fill: "currentColor", strokeWidth: 1 }} />, wide, "shift"),
+            <div key="l" style={{ display: "flex", gap }}>{letters("zxcvbnm")}</div>,
+            key(<Glyph d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zM12 9l6 6M18 9l-6 6" size={k.font} style={{ margin: 0, strokeWidth: 1.6 }} />, wide, "del")], 0, true)}
+          {row([key("123", fn, "num", k.font * 0.68), key(<Glyph d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" size={k.font} style={{ margin: 0, strokeWidth: 1.6 }} />, unit, "emoji"),
+            key("", "auto", "space"), key(<Glyph d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v3" size={k.font} style={{ margin: 0, strokeWidth: 1.6 }} />, unit, "mic"),
+            key(<Glyph d="M20 5v6a2 2 0 0 1-2 2H5M9 9l-4 4 4 4" size={k.font} style={{ margin: 0, strokeWidth: 1.6 }} />, fn, "ret")])}
         </div>
-      ))}
-      <div style={{ width: "50%", height: Math.min(42, (h - 80) / 4), borderRadius: 6, background: "var(--card)" }} />
+      </div>
     </div>
   );
 }
