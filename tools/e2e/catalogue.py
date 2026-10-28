@@ -244,6 +244,16 @@ SUITES = [
         (("fling", 8), "Flick fast up and down again, 8 times", {}),
         (("scroll", -4000), "Scroll back to the top", {"scroll_lt": 50}),
     ]},
+    # #132 in the in-app preview: QA saw fast flicks up and down break the layout of Duet's controls (2026-10-28).
+    {"id": "scr04", "title": "Fast flicks up and down, in-app preview (sheet) (#132)", "page": "/probe", "start": PV0, "steps": [
+        (("fling", 7), "Flick the page fast down and up, 7 times, ending down", {"scroll_gt": 300}),
+        (("fling", 8), "Flick fast up and down again, 8 times", {}),
+        (("scroll", -4000), "Scroll back to the top", {"scroll_lt": 50}),
+    ]},
+    {"id": "scr05", "title": "Fast flicks up and down on /scroll, in-app preview (sheet) (#132)", "page": "/scroll", "start": PV0, "steps": [
+        (("fling", 7), "Flick the page fast down and up, 7 times, ending down", {"scroll_gt": 300}),
+        (("fling", 8), "Flick fast up and down again, 8 times", {}),
+    ]},
     {"id": "nav01", "title": "Link, Safari Back and Forward, outer screen upright", "page": "/", "start": TAB0, "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
         (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),

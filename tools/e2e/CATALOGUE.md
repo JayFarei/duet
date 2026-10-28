@@ -75,6 +75,19 @@ Not covered yet:
 3. Flick fast up and down again, 8 times. Expect: controls in a column on the right.
 4. Scroll back to the top. Expect: controls in a column on the right; the page is at the top (under 50pt).
 
+## scr04: Fast flicks up and down, in-app preview (sheet) (#132)
+
+1. Open /probe in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Flick the page fast down and up, 7 times, ending down. Expect: controls in a column on the right in the gap of the preview's own column; the page stays scrolled down (more than 300pt).
+3. Flick fast up and down again, 8 times. Expect: controls in a column on the right in the gap of the preview's own column.
+4. Scroll back to the top. Expect: controls in a column on the right in the gap of the preview's own column; the page is at the top (under 50pt).
+
+## scr05: Fast flicks up and down on /scroll, in-app preview (sheet) (#132)
+
+1. Open /scroll in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Flick the page fast down and up, 7 times, ending down. Expect: controls in a column on the right in the gap of the preview's own column; the page stays scrolled down (more than 300pt).
+3. Flick fast up and down again, 8 times. Expect: controls in a column on the right in the gap of the preview's own column.
+
 ## nav01: Link, Safari Back and Forward, outer screen upright
 
 1. Open / in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
@@ -162,6 +175,22 @@ Not covered yet:
 3. Turn the phone tall, turned right (90). Expect: controls inline on the right; the dialog is open; Safari's top bar takes the page's colour under it.
 4. Turn the phone wide (951x669). Expect: controls inline on the right; the dialog is open.
 5. Tap Duet's "Close". Expect: controls inline on the right; the dialog is closed.
+
+## mod04: A full-screen page dialog opened and closed, in-app preview (sheet) (#142)
+
+1. Open /sheet in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Tap "Weekend in Lisbon" (a full-screen dialog opens). Expect: controls in a column on the right in the gap of the preview's own column; the dialog is open; Duet offers "Close"; 1 close button on screen.
+3. Tap Duet's "Close". Expect: controls in a column on the right in the gap of the preview's own column; the dialog is closed; Duet no longer offers "Close"; 0 close buttons on screen.
+4. Tap "Weekend in Lisbon" again. Expect: controls in a column on the right in the gap of the preview's own column; the dialog is open; Duet offers "Close"; 1 close button on screen.
+5. Turn the phone on its side, landscape right (90). Expect: controls hidden, the page keeps its full width, the preview's own buttons untouched; the dialog is open; 1 close button on screen.
+6. Turn the phone upright. Expect: controls in a column on the right in the gap of the preview's own column; the dialog is open; Duet offers "Close"; 1 close button on screen.
+7. Tap Duet's "Close". Expect: controls in a column on the right in the gap of the preview's own column; the dialog is closed; Duet no longer offers "Close"; 0 close buttons on screen.
+
+## bar01: A column control tapped while Safari's bar is minimized, Safari tab
+
+1. Open /scroll in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Scroll the page down (Safari minimizes its bar). Expect: controls in a column on the right; the page stays scrolled down (more than 500pt).
+3. Tap Duet's "…" (its menu opens). Expect: controls in a column on the right; Duet's menu is open, clear of every native button.
 
 ## la01: Live Activity expanded by a long press, Safari tab
 
