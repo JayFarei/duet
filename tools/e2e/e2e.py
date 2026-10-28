@@ -1268,13 +1268,17 @@ class Run:
                     return rc
         return None
 
-    def reveal(s, sid, tok, kind, r, rc, refind, tries=3):
+    def reveal(s, sid, tok, kind, r, rc, refind, tries=8):
         """(sample, rect) with a page target scrolled clear of Safari's bars, as a user would before tapping it: a
         target below the fold (kb01: /probe's text field at y 697 in a 580pt viewport) gets slow drags of at most 300pt,
-        then is found again. Unchanged when it is already in view."""
+        then is found again. Unchanged when it is already in view; None when it never comes clear (a tap there would
+        land on Safari's bar, nav01-02 at 3 drags)."""
+        def clear(r, rc):
+            vh = (r.get("vv") or {}).get("h") or r["sig"]["innerHeight"]
+            return rc["y"] >= 60 and rc["y"] + rc["h"] <= vh - 100
         for _ in range(tries):
             g, vh = r["sig"], (r.get("vv") or {}).get("h") or r["sig"]["innerHeight"]
-            if rc["y"] >= 60 and rc["y"] + rc["h"] <= vh - 100:
+            if clear(r, rc):
                 break
             x0, y0 = s.page_origin(r, kind)
             d = max(-300, min(300, rc["y"] + rc["h"] / 2 - vh * 0.4))
@@ -1285,7 +1289,7 @@ class Run:
             if rc2 is None:
                 break
             r, rc = r2, rc2
-        return r, rc
+        return (r, rc) if clear(r, rc) else (r, None)
 
     def still(s, sid, tok, quiet=0.4, cap=3.0):
         """The newest sample once the page has stopped moving (scroll and visual viewport the same for quiet seconds).
@@ -1408,6 +1412,9 @@ class Run:
                     rc = r and s.find(r, action[1], back)
                 if rc is not None:
                     r, rc = s.reveal(sid, tok, kind, r, rc, lambda r2: s.find(r2, action[1], back))
+                    if rc is None:
+                        s.why = f'"{action[1]}" never scrolled clear of Safari\'s bars'
+                        return None
                 if rc is None:
                     s.why = f'no control named "{action[1]}" on the page'
                     return None
