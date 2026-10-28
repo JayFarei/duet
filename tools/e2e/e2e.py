@@ -312,7 +312,7 @@ class Run:
             res.update(status="BLOCKED", reasons=["state not reached: " + s.why])
             s.finish(res, [], [], None)
             return res
-        s.page = first.get("page")
+        s.page, res["t0"] = first.get("page"), t0
         allr = s.collect(sid, tok, t0)
         if callable(expect):
             expect = res["expect"] = expect(allr[-1]["sig"] if allr else None)
@@ -745,7 +745,7 @@ class Run:
         if shot:
             res["overlay"] = s.overlay(res, shot)
         with open(os.path.join(s.out, "steps", res["id"] + ".json"), "w") as f:
-            json.dump({**res, "samples": allr}, f)
+            json.dump({**res, "samples": allr, "early": s.early}, f)
         s.results.append(res)
         s.log(f"  {res['status']} " + "; ".join(res["reasons"]) + (f"  [{'; '.join(res['notes'])}]" if res["notes"] else ""))
 
@@ -1949,7 +1949,7 @@ if __name__ == "__main__":
             res = json.load(open(os.path.join(r.out, "steps", f)))
             if res.get("expect") is not None and res.get("samples"):
                 r.position = "open" if max(res["samples"][-1]["sig"]["outerWidth"], res["samples"][-1]["sig"]["outerHeight"]) > 900 else "closed"
-                t0 = res["samples"][0]["rx"]
+                t0, r.early = res.get("t0", res["samples"][0]["rx"]), res.get("early", [])
                 res.update(status="PASS", reasons=[], notes=[])
                 r.assess(res, res["samples"], res.get("native", []), res["expect"], t0, res["kind"], res.get("prev"))
                 r.check_icons(res, os.path.join(r.out, res["shot"]) if res.get("shot") else None)
