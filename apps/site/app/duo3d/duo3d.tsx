@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, AppWindow, ArrowLeftRight, ArrowRight, Check, ChevronDown, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, Maximize2, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
+import { Activity, AppWindow, ArrowLeftRight, ArrowRight, Check, ChevronDown, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
 import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
@@ -145,8 +145,8 @@ export function Duo3D() {
       { id: "preview", label: "Preview", icon: <MessageSquareText size={18} />, on: preview, pick: () => preview || go({ app: "sheet" }), hint: "A link from Messages, opened in-app" },
     ] },
     { key: "layout", title: "Layout", one: true, slots: 3, opts: preview ? [
-      { id: "sheet", label: "Sheet", icon: <PanelBottom size={18} />, on: s.app === "sheet", pick: () => go({ app: "sheet" }) },
-      { id: "full", label: "Full screen", icon: <Maximize2 size={18} />, on: s.app === "preview", pick: () => go({ app: "preview" }) },
+      // Messages always opens a link in a page sheet over itself; full screen is another host app's choice, not one here.
+      { id: "sheet", label: "Sheet", icon: <PanelBottom size={18} />, on: true, pick: () => {}, hint: "Messages opens links in a page sheet" },
     ] : s.app === "home" ? [
       { id: "single", label: "Single", icon: <Square size={18} />, on: true, pick: () => {} },
     ] : [
