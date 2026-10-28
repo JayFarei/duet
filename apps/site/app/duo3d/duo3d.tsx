@@ -167,21 +167,20 @@ export function Duo3D() {
   ));
   const where = sections.slice(0, 3).map((x) => x.opts.find((o) => o.on)?.label).join(" · ");
 
-  const wide = width >= 1180, list = width < 700;
+  const list = width < 700;
   const header = (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: list ? "16px 16px 0" : "22px 26px 0" }}>
+    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: list ? "16px 16px 0" : "20px 22px 0" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ font: `700 ${list ? 18 : 24}px/1.15 -apple-system, system-ui`, letterSpacing: -0.4 }}>Duo 3D, local</div>
-        <div aria-live="polite" style={{ marginTop: 6, maxWidth: 620, font: `400 ${list ? 12 : 13}px/1.45 -apple-system, system-ui`, color: "var(--dim)" }}>
+        <div style={{ font: `700 ${list ? 18 : 21}px/1.15 -apple-system, system-ui`, letterSpacing: -0.4 }}>Duo 3D, local</div>
+        <div aria-live="polite" style={{ marginTop: 6, maxWidth: 560, font: `400 ${list ? 12 : 13}px/1.45 -apple-system, system-ui`, color: "var(--dim)" }}>
           <b style={{ color: "var(--ink)", fontWeight: 600 }}>{where}{duet ? "" : ", without Duet"}.</b> {duet ? note : "The same site as a plain mobile site: nothing paints in Safari's column."}
         </div>
       </div>
       {!list && <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />}
-      {wide && <Pill onClick={front}><Rotate3d size={16} /> Reset view</Pill>}
       <div style={{ position: "relative" }}>
         <Square42 label="More" on={more} onClick={() => setMore((m) => !m)}><Ellipsis size={18} /></Square42>
         {more && (
-          <div style={{ position: "absolute", right: 0, top: 48, zIndex: 5, width: list ? "calc(100vw - 32px)" : 420, maxWidth: 420, padding: 14, borderRadius: 18, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line), 0 18px 50px rgb(0 0 0 / 0.35)", display: "grid", gap: 12, justifyItems: "stretch" }}>
+          <div style={{ position: "absolute", right: 0, top: 48, zIndex: 5, width: list ? "calc(100vw - 64px)" : 400, maxWidth: 400, padding: 14, borderRadius: 18, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line), 0 18px 50px rgb(0 0 0 / 0.35)", display: "grid", gap: 12, justifyItems: "stretch" }}>
             {/* Before and after: the same site as a plain mobile site, then with Duet. */}
             <form onSubmit={(e) => { e.preventDefault(); setPage(String(new FormData(e.currentTarget).get("url") ?? "").trim()); }} style={{ ...group, alignItems: "center", gap: 6, padding: "0 6px 0 14px" }}>
               <Globe size={16} style={{ color: "var(--dim)", flexShrink: 0 }} />
@@ -190,7 +189,7 @@ export function Duo3D() {
               <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center", background: "transparent" }}><ArrowRight size={16} /></button>
             </form>
             {list && <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />}
-            {!wide && <Pill onClick={front}><Rotate3d size={16} /> Reset view</Pill>}
+            <Pill onClick={front}><Rotate3d size={16} /> Reset view</Pill>
             <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
           </div>
         )}
@@ -198,29 +197,30 @@ export function Duo3D() {
     </div>
   );
 
-  // Wide: one row, every choice named under its icon. Compact: icons only, a one-of group titled by its choice.
+  // Icons only, a one-of group titled by its choice, so the four questions sit in one row under the stage.
   const panel = !list && (
-    <div style={{ margin: "0 18px 18px", padding: wide ? "14px 18px" : "12px 14px", borderRadius: 20, background: "color-mix(in srgb, var(--card), transparent 25%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", display: "flex", flexWrap: "wrap", alignItems: "stretch", columnGap: wide ? 0 : 10, rowGap: 12 }}>
+    <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", columnGap: 6, rowGap: 12, padding: "4px 14px 18px" }}>
       {sections.map((x, i) => (
-        <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "grid", gap: 8, alignContent: "start", padding: wide ? "0 18px" : "0 6px", borderLeft: wide && i ? "0.5px solid var(--line)" : undefined, ...(wide && !i && { paddingLeft: 0 }) }}>
-          <div style={caption}>{wide || !x.one ? x.title : x.opts.find((o) => o.on)?.label}</div>
-          <div style={{ display: "flex", gap: wide ? 6 : 4 }}>
-            {x.opts.map((o) => wide
-              ? <Choice key={o.id} o={o} />
-              : <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
+        <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "grid", gap: 8, alignContent: "start", padding: "0 10px", borderLeft: i ? "0.5px solid var(--line)" : undefined }}>
+          <div style={caption}>{x.one ? x.opts.find((o) => o.on)?.label : x.title}</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {x.opts.map((o) => <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
           </div>
         </div>
       ))}
-      <div style={{ display: "grid", gap: 8, alignContent: "start", padding: wide ? "0 0 0 18px" : "0 6px", borderLeft: wide ? "0.5px solid var(--line)" : undefined, flex: 1, minWidth: 220 }}>
-        <div style={caption}>Rotate and fold</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>{turns}<span style={{ width: 8 }} />{fold}</div>
-      </div>
+    </div>
+  );
+
+  // Rotate and fold act on the device itself, so they sit right under it.
+  const handle = (
+    <div style={{ alignSelf: "center", width: "min(340px, calc(100% - 32px))", margin: "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, paddingRight: 14, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
+      {turns}<span style={{ width: 8 }} />{fold}
     </div>
   );
 
   // Narrow: an accordion, one question open at a time, each row showing what is chosen.
   const accordion = list && (
-    <div style={{ display: "grid", gap: 8, padding: "0 16px" }}>
+    <div style={{ display: "grid", gap: 8, padding: "0 12px 12px" }}>
       {sections.map((x) => {
         const cur = x.opts.find((o) => o.on), on = x.opts.filter((o) => o.on).length;
         return (
@@ -241,18 +241,21 @@ export function Duo3D() {
           </div>
         );
       })}
-      <div style={{ borderRadius: 16, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)", display: "flex", alignItems: "center", gap: 4, padding: "6px 14px 6px 6px" }}>{turns}<span style={{ width: 8 }} />{fold}</div>
     </div>
   );
 
+  // A compact card centred on the page, the way it sits on the site's landing page.
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", gap: 12, padding: list ? "12px 0 24px" : 18, boxSizing: "border-box", background: "var(--bg)" }}>
-      <div style={{ position: "relative", display: "flex", flexDirection: "column", borderRadius: list ? 0 : 26, background: "radial-gradient(120% 90% at 50% 35%, color-mix(in srgb, var(--bg), #888 14%), var(--bg))", boxShadow: list ? undefined : "0 0 0 0.5px var(--line)" }}>
+    <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: list ? 16 : 32, boxSizing: "border-box", background: "var(--bg)" }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 860, display: "flex", flexDirection: "column", borderRadius: list ? 22 : 28, background: "radial-gradient(120% 90% at 50% 35%, color-mix(in srgb, var(--bg), #888 14%), var(--bg))", boxShadow: "0 0 0 0.5px var(--line), 0 30px 80px rgb(0 0 0 / 0.25)" }}>
         {header}
-        {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: list ? "44vh" : wide ? "min(62vh, 700px)" : "min(56vh, 640px)", border: 0, display: "block", background: "transparent" }} />}
+        <div style={{ position: "relative" }}>
+          {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: list ? "min(44vh, 380px)" : "min(50vh, 500px)", border: 0, display: "block", background: "transparent" }} />}
+        </div>
+        {handle}
         {panel}
+        {accordion}
       </div>
-      {accordion}
     </div>
   );
 }
@@ -265,17 +268,6 @@ const row: CSSProperties = { ...control, width: "100%", borderRadius: 0, display
 const lit = (on?: boolean): CSSProperties => on
   ? { background: "color-mix(in srgb, var(--accent), transparent 80%)", boxShadow: "inset 0 0 0 1.5px var(--accent)", color: "var(--ink)" }
   : { background: "color-mix(in srgb, var(--ink), transparent 94%)", color: "var(--ink)" };
-
-/** A choice with its name under it, for the wide row. */
-function Choice({ o }: { o: Opt }) {
-  return (
-    <button onClick={o.pick} disabled={o.off} aria-pressed={o.on} title={o.hint ?? o.label}
-      style={{ ...control, height: "auto", width: 66, padding: 0, display: "grid", justifyItems: "center", gap: 5, background: "transparent", opacity: o.off ? 0.35 : 1, cursor: o.off ? "default" : "pointer" }}>
-      <span style={{ width: 46, height: 46, borderRadius: 13, display: "grid", placeItems: "center", transition: "background 0.2s, box-shadow 0.2s", ...lit(o.on) }}>{o.icon}</span>
-      <span style={{ font: "500 12px -apple-system, system-ui", color: o.on ? "var(--ink)" : "var(--dim)", whiteSpace: "nowrap" }}>{o.label}</span>
-    </button>
-  );
-}
 
 function Square42({ label, on, off, onClick, children }: { label: string; on?: boolean; off?: boolean; onClick: () => void; children: ReactNode }) {
   return (
