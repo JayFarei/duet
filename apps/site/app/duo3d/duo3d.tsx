@@ -5,7 +5,10 @@ import { Activity, AppWindow, ArrowLeftRight, ArrowRight, Columns2, Compass, Ell
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
 import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
-import { CHANNEL, DUO_PORT, type Sync } from "./shared";
+import { DUO_PORT, channel, type Sync } from "./shared";
+
+// This page's displays, told apart from another tab's.
+const ID = Math.random().toString(36).slice(2);
 
 const HOLD = 2600; // a tour stop, the 3D hinge settling included
 const SWAP = 450; // the interface turns upright this far into the device's turn
@@ -54,7 +57,7 @@ export function Duo3D() {
   const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : "/skeleton";
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
   const url = useSyncExternalStore(() => () => {}, () => {
-    const screens = `${location.origin}/duo3d/screen`;
+    const screens = `${location.origin}/duo3d/screen?id=${ID}`;
     return `${location.protocol}//${location.hostname}:${DUO_PORT}/?hud=0&deg=0&screens=${encodeURIComponent(screens)}`;
   }, () => "");
 
@@ -77,7 +80,7 @@ export function Duo3D() {
   const ch = useRef<BroadcastChannel | null>(null), last = useRef(sync);
   last.current = sync;
   useEffect(() => {
-    const c = ch.current = new BroadcastChannel(CHANNEL);
+    const c = ch.current = new BroadcastChannel(channel(ID));
     c.onmessage = (e) => { if (e.data?.hello) c.postMessage(last.current); };
     return () => c.close();
   }, []);

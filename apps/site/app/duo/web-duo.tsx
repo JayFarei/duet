@@ -1219,7 +1219,7 @@ function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; b
   const wide = unit * 1.36, fn = unit * 1.6;
   return (
     <div data-wd-system style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-      {host && <div style={{ position: "absolute", left: (w - 88) / 2, top: top - 59 - 46, width: 88, height: 30, borderRadius: 99, ...glass, display: "grid", placeItems: "center", font: "500 13px -apple-system, system-ui", color: "var(--ink)" }}>{host}</div>}
+      {host && <div style={{ position: "absolute", left: (w - 160) / 2, top: top - 59 - 46, width: 160, height: 30, padding: "0 12px", boxSizing: "border-box", borderRadius: 99, ...glass, display: "grid", placeItems: "center", font: "500 13px -apple-system, system-ui", color: "var(--ink)" }}><span style={{ ...oneLine, maxWidth: "100%" }}>{shown(host)}</span></div>}
       {bar && <div style={{ position: "absolute", left: bar.x, top: top - 59, width: bar.w, height: 47, borderRadius: 99, ...glass, display: "flex", alignItems: "center", gap: 22, padding: "0 16px", boxSizing: "border-box", color: "var(--ink)" }}>
         <Glyph d="m18 15-6-6-6 6" size={22} style={{ margin: 0, opacity: 0.45 }} /><Glyph d="m6 9 6 6 6-6" size={22} style={{ margin: 0, opacity: 0.45 }} />
         <Glyph d="M20 6 9 17l-5-5" size={24} style={{ margin: "0 0 0 auto" }} />
@@ -1241,8 +1241,12 @@ function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; b
   );
 }
 
+/** Safari's address field shows the host alone, on one line: no port, no www, and an ellipsis when it runs long. */
+const shown = (host: string) => host.replace(/:\d+$/, "").replace(/^www\./, "");
+const oneLine: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center", minWidth: 0 };
+
 function UrlBar({ left, top, width, host, h = BAR.h }: { left: number; top: number; width: number; host: string; h?: number }) {
-  return <div data-wd-system style={{ position: "absolute", left, top, width, height: h, borderRadius: 99, ...glass, display: "flex", alignItems: "center", justifyContent: "center", font: "500 17px -apple-system, system-ui", color: "var(--ink)", pointerEvents: "none" }}>{host}</div>;
+  return <div data-wd-system style={{ position: "absolute", left, top, width, height: h, borderRadius: 99, ...glass, display: "flex", alignItems: "center", padding: "0 20px", boxSizing: "border-box", font: "500 17px -apple-system, system-ui", color: "var(--ink)", pointerEvents: "none" }}><span style={{ ...oneLine, flex: 1 }}>{shown(host)}</span></div>;
 }
 
 /** Safari unfolded (Duo simulator): back and bookmarks, the address field centred, the +/tabs pill, then the clock

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { detect, type Mode, type Signals } from "duet-ui/geometry";
 import { Island, SCREEN, fit, island, scene } from "../duo/web-duo";
-import { CHANNEL, type Sync } from "./shared";
+import { channel, type Sync } from "./shared";
+
+const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 
 // One of the device's displays, as the 2D web Duo draws its screen: the inner one always in the open layout, the
 // outer one always closed, both live through the fold the way iOS holds a session on both. Scaled to duo's panel.
@@ -18,7 +20,7 @@ export function Screen() {
   const frame = useRef<HTMLIFrameElement>(null), sent = useRef("");
 
   useEffect(() => {
-    const ch = new BroadcastChannel(CHANNEL);
+    const ch = new BroadcastChannel(channel(new URLSearchParams(location.search).get("id") ?? ""));
     ch.onmessage = (e) => { if (e.data?.s) setSync(e.data); };
     ch.postMessage({ hello: true });
     const size = () => setView({ w: innerWidth, h: innerHeight });
@@ -87,9 +89,23 @@ export function Screen() {
   const was = useRef(upright), cut = was.current !== upright;
   useEffect(() => { was.current = upright; });
 
+  // The page takes its new size at once and a transform eases it there from the old box, the way iOS moves a
+  // window's snapshot: resizing the frame every animation frame made the page, and Duet in it, lay out again on each,
+  // which jittered. The page lays out once, under the motion.
+  const box = sc?.frame, last = useRef(box);
+  useLayoutEffect(() => {
+    const was = last.current, el = frame.current;
+    last.current = box;
+    if (!box || !was || !el || cut || (was.x === box.x && was.y === box.y && was.w === box.w && was.h === box.h)) return;
+    el.animate([
+      { transform: `translate(${was.x - box.x}px, ${was.y - box.y}px) scale(${was.w / box.w}, ${was.h / box.h})` },
+      { transform: "none" },
+    ], { duration: 520, easing: EASE });
+  }, [box?.x, box?.y, box?.w, box?.h]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!sc || !st || !sync || !view.w) return <div style={{ position: "fixed", inset: 0, background: "#000" }} />;
   const scale = Math.min(view.w / n.w, view.h / n.h);
-  const motion = (props: string[]) => cut ? "none" : props.map((x) => `${x} 520ms cubic-bezier(0.32, 0.72, 0, 1)`).join(", ");
+  const motion = (props: string[]) => cut ? "none" : props.map((x) => `${x} 520ms ${EASE}`).join(", ");
   return (
     <div style={{ position: "fixed", inset: 0, overflow: "hidden", background: "var(--bg)" }}>
       <div style={{ position: "absolute", left: 0, top: 0, width: n.w, height: n.h, transform: `scale(${scale})`, transformOrigin: "0 0" }}>
@@ -100,10 +116,12 @@ export function Screen() {
           {sc.under}
           <div style={{ position: "absolute", left: sc.clip.x, top: sc.clip.y, width: sc.clip.w, height: sc.clip.h, overflow: "hidden", borderRadius: sc.clipR, transition: motion(["left", "top", "width", "height", "border-radius"]) }}>
             <iframe ref={frame} src={sync.src} title={`Duet on the ${display} display`} style={{
-              position: "absolute", left: sc.frame.x, top: sc.frame.y, width: sc.frame.w, height: sc.frame.h, border: 0, display: "block", background: "var(--bg)", transition: motion(["left", "top", "width", "height"]),
+              position: "absolute", left: sc.frame.x, top: sc.frame.y, width: sc.frame.w, height: sc.frame.h, border: 0, display: "block", background: "var(--bg)", transformOrigin: "0 0",
             }} />
           </div>
-          <div key={`${st.app}-${upright}`} style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>{sc.chrome}</div>
+          <div key={`${st.app}-${upright}`} data-chrome style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>{sc.chrome}</div>
+          {/* Safari's own bars and buttons glide to where the new layout puts them, with the page. */}
+          {!cut && <style>{`[data-chrome] * { transition: ${motion(["left", "top", "width", "height", "opacity"])} }`}</style>}
         </div>
         {display === "outer" && <Island live={island(st)} />}
       </div>
