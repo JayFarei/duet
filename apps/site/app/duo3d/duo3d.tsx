@@ -109,7 +109,13 @@ export function Duo3D() {
         <div style={{ font: "800 26px/1 -apple-system, system-ui", letterSpacing: -0.5 }}>Duo 3D, local</div>
         <div style={{ color: "var(--dim)", font: "400 14px/1.4 -apple-system, system-ui", marginTop: 6 }}>doan-labs/duo renders Apple&apos;s model on this machine only; Duet runs live on both displays.</div>
       </header>
-      {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: "min(68vh, 760px)", border: 0, display: "block", background: "transparent" }} />}
+      <div style={{ position: "relative", width: "100%" }}>
+        {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: "min(68vh, 760px)", border: 0, display: "block", background: "transparent" }} />}
+        {/* Over the scene, where a drag has turned it: the camera back in front of the device. */}
+        <button type="button" onClick={front} style={{ ...control, position: "absolute", top: 12, right: 16, display: "flex", alignItems: "center", gap: 6, padding: "0 14px", height: 34, font: "500 13px -apple-system, system-ui", background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
+          <LocateFixed size={16} /> Front view
+        </button>
+      </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", padding: "0 16px" }}>
         <div role="toolbar" aria-label="Device" style={{ ...group, alignItems: "center" }}>
           <Tool label={s.posture === "open" ? "Fold" : "Unfold"} onClick={() => go({ posture: s.posture === "open" ? "closed" : "open" }, false, "flat")}>
@@ -123,7 +129,6 @@ export function Duo3D() {
           {([["flat", "Upright", RectangleVertical], ["nightstand", "Nightstand", Tent], ["elevated", "Elevated", Laptop]] as const).map(([to, label, Icon]) => (
             <Tool key={to} label={label} on={stand === to} onClick={() => pose3(to)}><Icon size={18} /></Tool>
           ))}
-          <Tool label="Front view" onClick={front}><LocateFixed size={18} /></Tool>
           <Rule />
           <Tool label="Home Screen" on={s.app === "home"} onClick={() => go({ app: "home" })}><House size={18} /></Tool>
           <Tool label="Safari" on={s.app === "safari"} onClick={() => go({ app: "safari" })}><Compass size={18} /></Tool>
