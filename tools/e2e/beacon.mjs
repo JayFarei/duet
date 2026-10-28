@@ -6,6 +6,8 @@
 //   POST /cmd    {"op": ...}                driver: queue a device command, answers when the UI-test runner did it
 //   GET  /cmd/next                           runner: long-poll for the next command
 //   POST /cmd/done {"id", "ok", "error"?}    runner: result
+//   POST /la {"on": bool}                    driver: the wanted Live Activity state; GET /la, the host polls it
+//   POST /la/state {"on", "count", "error"}  host: the state it reached; GET /la/state (driver)
 // Every sample is also appended to <out>/samples.jsonl. Usage: node beacon.mjs <port> <outdir>
 import http from "node:http";
 import fs from "node:fs";
@@ -18,6 +20,7 @@ let step = { id: "idle", at: Date.now() };
 const byStep = new Map();
 const queue = [], waiting = new Map(); // commands for the runner, and driver responses held until done
 let runnerPoll = null, cmdId = 0, runnerSeen = 0;
+let la = { on: false }, laState = { on: false, at: 0 };
 const dispatch = () => { if (runnerPoll && queue.length) { const r = runnerPoll; runnerPoll = null; send(r, 200, queue.shift()); } };
 
 const body = (req) => new Promise((ok) => { let b = ""; req.on("data", (c) => (b += c)); req.on("end", () => ok(b)); });
@@ -63,6 +66,10 @@ http.createServer(async (req, res) => {
     waiting.get(r.id)?.(r); waiting.delete(r.id);
     return send(res, 200, { ok: true });
   }
+  if (u.pathname === "/la" && req.method === "POST") { la = JSON.parse((await body(req)) || "{}"); return send(res, 200, la); }
+  if (u.pathname === "/la") return send(res, 200, la);
+  if (u.pathname === "/la/state" && req.method === "POST") { laState = { ...JSON.parse((await body(req)) || "{}"), at: Date.now() }; return send(res, 200, { ok: true }); }
+  if (u.pathname === "/la/state") return send(res, 200, laState);
   if (u.pathname === "/runner") return send(res, 200, { alive: Date.now() - runnerSeen < 5000 });
   if (u.pathname === "/samples") {
     const since = Number(u.searchParams.get("since") ?? 0);

@@ -4,21 +4,31 @@ and folds (tools/e2e/fold/fold.bin), collects the page's Duet state from the bea
 frames from the UI-test runner (closed screen) or the simulator helper (sim.py, unfolded and split view), a screenshot per step and a video contact sheet per transition, and asserts
 tools/e2e/EXPECTED.md on every sample, not only the last. Writes reports/<ts>/{index.html,steps/*.json,shots/*}.
 
+With --catalogue it plays the journeys of catalogue.py instead (CATALOGUE.md, every state and transition in plain
+English), each filmed; --shard i/N plays every Nth of them so tools/e2e/matrix.sh can spread them over several
+simulators, each with its own beacon (--beacon), and --merge joins the shard reports into one.
+
 Needs (run.sh starts them): site on :3140 (served from this worktree), beacon on :3141, the UI-test runner; split view
 and the unfolded native checks need the Claude desktop app's simulator helper (sim.py), reported BLOCKED without it.
-Usage: e2e.py --udid <sim> [--only <scenario>[,<scenario>]] [--md round.md] [--video]
+Usage: e2e.py --udid <sim> [--only <scenario>[,<scenario>]] [--page /path] [--md round.md] [--video]
+       e2e.py --udid <sim> --catalogue [--only j01,j07] [--shard 2/4] [--beacon http://localhost:3152] [--out dir]
+       e2e.py --merge <dir with shard-*/results.json>
 Exit: 0 all PASS, 1 any FAIL, 2 any BLOCKED (a state the run could not reach, or a broken setup).
 """
-import argparse, datetime, html, json, os, signal, subprocess, sys, time, urllib.request
+import argparse, atexit, datetime, html, json, os, signal, subprocess, sys, time, urllib.parse, urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # run with python -I, which leaves the script dir out
 from sim import Sim, SimError  # noqa: E402
+import catalogue  # noqa: E402
+import workbench  # noqa: E402
+from catalogue import TAB, LANDSCAPE_TOP_BARS, PREVIEW, preview_expect, UNFOLDED, UNFOLDED_PREVIEW, SPLIT  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SITE = "http://localhost:3140"
+SITE = f"http://localhost:{os.environ.get('E2E_SITE_PORT', '3140')}"  # run.sh: E2E_SITE_PORT
 BEACON = "http://localhost:3141"
 HOST = "dev.duolab.e2e.host"
 SAFARI = "com.apple.mobilesafari"
+SPRINGBOARD = "com.apple.springboard"
 PREVIEW_SVC = "com.apple.SafariViewService"
 FOLD = os.path.join(HERE, "fold", "fold.bin")
 MIN_S = 2.5     # each step samples at least this long after its action
@@ -27,6 +37,8 @@ MAX_S = 7.0     # but never longer than this
 SETTLE_S = 0.5  # controls must show in the final placement within this of the final signals
 GRACE_S = 0.15  # the old placement may linger this long after the signals first change (one render of the chrome)
 SLIDE_S = 0.15  # once shown in the final placement, slots must stop moving within this (no slow slide)
+SPRING_S = 0.6  # a page change in place (a tap opens a page, a call to action turns "Booked") springs its slots (#101)
+UNPAINTED_S = 0.08  # a sample this long after the page's last frame (requestAnimationFrame) reads a layout nobody sees
 GAP_S = 0.15    # sampling gaps longer than this are reported (the page was throttled)
 ICON_SD = 6.0   # a visible slot icon whose screenshot crop has a luminance stddev under this is not painted
 STATE_TIMEOUT = 30
@@ -34,25 +46,7 @@ STATE_TIMEOUT = 30
 # Rotator orientation per closed-screen angle (fold.bin -deviceOrientation). The page reports landscapeRight as 90.
 ORIENT = {0: "portrait", 90: "landscapeRight", 270: "landscapeLeft", 180: "portraitUpsideDown"}
 CLOSED = {"position": "closed"}
-# Expected per state (EXPECTED.md). Closed Safari tab by angle.
-TAB = {0: ("column", "right"), 90: ("column", "left"), 270: ("column", "right")}
-# Folding into closed landscape (like opening a tab there) gives Safari's 678x340 window with its bars at the top and
-# no column, so the page has no column to draw into: inline on the default side (EXPECTED.md).
-LANDSCAPE_TOP_BARS = {"preview": False, "mode": "inline", "side": "right"}
-# In-app preview: portrait, in the gap of the preview's own column. Turned, the sheet's column gap is ~26pt and there
-# is no least-intrusive place left (an inline strip narrows the page, user: "the left inline strip is wrong"), so Duet
-# hides its controls; the page keeps its full width and the preview's own Done/back/share stay (README). The default
-# and full styles turned put every native button in a top bar and leave the 84pt safe-area inset on the turned side
-# free below it: the controls go there, as a strip (round 4).
-PREVIEW = {0: {"mode": "column", "side": "right", "gap": True}, 90: {"hidden": True}, 270: {"hidden": True}}
-PREVIEW_FULL = {**PREVIEW, 90: {"mode": "strip", "side": "left"}, 270: {"mode": "strip", "side": "right"}}
-def preview_expect(style, angle):
-    return {"preview": True, **(PREVIEW if style == "sheet" else PREVIEW_FULL)[angle]}
-UNFOLDED = {"mode": "inline", "side": "right"}
-UNFOLDED_PREVIEW = {"preview": True, **UNFOLDED}
-# Split view (wide inner display only, two 469x669 panes): the page cannot tell which pane it is in, so the column
-# is drawn on both edges and the native column of whichever pane hides the far copy (EXPECTED.md).
-SPLIT = {"mode": "column", "side": "both"}
+# Expected per state (EXPECTED.md): catalogue.py, shared with the journeys.
 SB_SAFARI = "Safari"              # SpringBoard accessibility identifiers (dock icon, our host's icon, menu item)
 SB_HOST = "DuoE2EHost"
 SB_SPLIT = "com.apple.springboardhome.application-shortcut-item.open-in-split"
@@ -81,13 +75,62 @@ def sh(*a, check=True):
     return subprocess.run(a, capture_output=True, text=True, check=check)
 
 
+def openurl(udid, url):
+    """simctl openurl, retried once: on a busy host it can time out (exit 60) before Safari takes the URL."""
+    for _ in range(2):
+        r = sh("xcrun", "simctl", "openurl", udid, url, check=False)
+        if r.returncode == 0:
+            return
+        time.sleep(2)
+    r.check_returncode()
+
+
 def samples(step, since=0):
     return http("GET", f"/samples?step={step}&since={since}") or []
 
 
+def mine(r, tok):
+    """A sample of this run: its token in the URL, or in the page's storage once a pushState or a link dropped it."""
+    return f"s={tok}" in r["path"] or r.get("s") == tok
+
+
+def address(path):
+    """A sample's path without the harness's own parameters (e2e, s): "/book?c=sauna"."""
+    p, _, q = path.partition("?")
+    q = [kv for kv in q.split("&") if kv and kv.split("=")[0] not in ("e2e", "s")]
+    return p + ("?" + "&".join(q) if q else "")
+
+
+def duet_buttons(r, back=False):
+    """[(label, rect)] of Duet's shown buttons in a sample, an open menu's items included. back: only Duet's back (its
+    slot, or a plain menu item), not a tab of the same name ("Classes" is /book's back and its first tab)."""
+    return [(b["label"], b["rect"]) for n in live_navs(r) for g in (n.get("slots") or []) + (n.get("menus") or []) for b in g.get("buttons") or []
+            if not back or g.get("slot") == "back" or b.get("role") == "menuitem"]
+
+
+def menu_items(r):
+    """Labels of an open Duet menu's items, not its own dismiss X (aria-label "Close", no menu role): mod01-05 read it
+    as the page's close button still shown after the dialog closed."""
+    return [b["label"] for n in live_navs(r) for m in n.get("menus") or [] for b in m.get("buttons") or []
+            if b.get("role") in ("menuitem", "menuitemradio")]
+
+
+def opener(r):
+    """The rect of the button whose menu holds what Duet folded: "…", else the lone selected tab where the band holds
+    one button (its menu lists the tabs, then the rest: closed landscape, the preview under Live Activities)."""
+    more = next((rc for l, rc in duet_buttons(r) if l == "More"), None)
+    if more:
+        return more
+    tabs = [sl for n in shown_navs(r) for sl in n["slots"] if sl["slot"] == "tabs" and len(sl.get("buttons") or []) == 1]
+    return tabs[0]["buttons"][0]["rect"] if tabs else None
+
+
 def key(r):
-    g = r["sig"]
-    return (g["angle"], g["innerWidth"], g["innerHeight"], g["outerWidth"], g["outerHeight"])
+    """The signals a placement answers to. The keyboard is one: kb02-03 judged its 1.1s to go down after the tap as
+    Duet settling late, while the controls came back on the sample the visual viewport grew."""
+    g, vv = r["sig"], r.get("vv") or {}
+    kb = bool(vv.get("h")) and vv["h"] < g["innerHeight"] - 100
+    return (g["angle"], g["innerWidth"], g["innerHeight"], g["outerWidth"], g["outerHeight"], kb)
 
 
 def nav(r):
@@ -98,10 +141,16 @@ def shown_navs(r):
     return [n for n in r.get("navs") or [] if n.get("slots") and not n.get("hidden")]
 
 
+def live_navs(r):
+    """Navs with a visible slot or an open menu (a lone tab morphs into its menu, leaving no slot while it is open)."""
+    return [n for n in r.get("navs") or [] if (n.get("slots") or n.get("menus")) and not n.get("hidden")]
+
+
 def shown_place(r):
-    """(mode, side) when Duet's controls are visible, None when hidden (data-hidden, or no visible slot). Two column
+    """(mode, side) when Duet's controls are visible, None when hidden (data-hidden, or no visible slot and no open
+    menu: a lone tab morphs into its menu, so reaching a folded call to action leaves no slot for ~1.5s). Two column
     copies on opposite edges (split view) are ("column", "both")."""
-    ns = shown_navs(r)
+    ns = live_navs(r)
     if not ns:
         return None
     if len(ns) > 1 and all(n.get("mode") == "column" for n in ns) and len({n.get("side") for n in ns}) > 1:
@@ -123,10 +172,18 @@ def is_split(g):
 class Run:
     def __init__(s, a):
         s.a, s.udid = a, a.udid
-        s.out = os.path.join(HERE, "reports", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+        s.out = os.path.abspath(a.out) if a.out else os.path.join(HERE, "reports", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
         for d in ("steps", "shots"):
             os.makedirs(os.path.join(s.out, d), exist_ok=True)
         s.results, s.angle, s.position, s.page, s.last = [], 0, "closed", None, None
+        s.la_on = False  # a Live Activity is running (the host's music or timer activity, la())
+        s.la_want = {"on": False, "timer": False}  # the Live Activities wanted from the host: "on" music, "timer" the countdown
+        s.film_why, s.recorder = "no display to film", None
+        # A run that dies mid-step (an exception, ^C) must not leave its recorder running: it holds the device.
+        atexit.register(lambda: s.recorder and s.recorder.poll() is None and s.recorder.send_signal(signal.SIGINT))
+        s.page_path = a.page
+        s.films = []  # (scenario, stitched clips) for the report
+        s.journeys = []  # catalogue journeys played (--catalogue): id, title, steps in words, status, film
         s.split = None  # Safari's split view pane, "left" or "right", or None when Safari is full screen
         s.sim = Sim(s.udid) if Sim.available() else None
 
@@ -159,9 +216,15 @@ class Run:
                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         # recordVideo needs a moment before the first frame; wait for it to say so (or give up after 3s).
         end = time.time() + 3
-        while time.time() < end and not (os.path.exists(p) and os.path.getsize(p) > 0):
+        while time.time() < end and proc.poll() is None and not (os.path.exists(p) and os.path.getsize(p) > 0):
             time.sleep(0.1)
+        if proc.poll() is not None:
+            # It exits at once when it cannot record, e.g. "Host recording is already in progress": a recorder an
+            # earlier run left behind (or one killed hard) holds the device until it is rebooted.
+            s.film_why = (proc.stderr.read().decode(errors="replace").strip().splitlines() or ["recordVideo exited"])[-1]
+            return None
         time.sleep(0.3)
+        s.recorder = proc
         return proc, p, time.time() * 1000
 
     def stop_record(s, rec, at=None):
@@ -169,9 +232,14 @@ class Run:
         proc, p, t_rec = rec
         proc.send_signal(signal.SIGINT)
         try:
-            proc.wait(10)
+            proc.wait(15)
         except subprocess.TimeoutExpired:
-            proc.kill()
+            # SIGKILL leaves the device's recorder held ("Host recording is already in progress"); SIGTERM first.
+            proc.terminate()
+            try:
+                proc.wait(5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
         if not os.path.exists(p):
             return None
         return s.contact_sheet(p)
@@ -201,17 +269,26 @@ class Run:
         return sheet if os.path.exists(sheet) and os.path.getsize(sheet) > 0 else None
 
     # ---- one step ---------------------------------------------------------------------------------------------
-    def step(s, sid, kind, tok, action, expect, desc, video=False):
+    def step(s, sid, kind, tok, action, expect, desc, video=False, extra=None, check=None):
+        """One action and its assessment. expect: a dict, or a function of the final sample's signals for a state
+        with two valid windows (catalogue.expect: Safari's closed landscape tab, column or top bars)."""
         s.log(f"[{sid}] {desc}")
         http("POST", "/step", {"id": sid})
         prev = s.last  # the previous step's final placement and signals
-        res = {"id": sid, "kind": kind, "desc": desc, "status": "PASS", "reasons": [], "notes": [], "expect": expect,
-               "prev": {"place": prev["place"], "key": prev["key"]} if prev else None}
-        rec = s.record(sid, s.target_display) if (video or s.a.video) and getattr(s, "target_display", None) else None
+        res = {"id": sid, "kind": kind, "desc": desc, "status": "PASS", "reasons": [], "notes": [],
+               "expect": None if callable(expect) else expect,
+               "prev": {"place": prev["place"], "key": prev["key"]} if prev else None, **(extra or {})}
+        filming = video or s.a.video
+        rec = s.record(sid, getattr(s, "target_display", None) or s.display()) if filming else None
         s.target_display = None
+        if filming and rec is None:
+            res["notes"].append(f"not filmed: {s.film_why}")
         t0 = time.time() * 1000
-        s.why = "no sample from the page"
+        s.why, s.rebase = "no sample from the page", None
         first = action(sid, t0)
+        if first is not None and s.rebase:  # the target was scrolled into view first: judge from the tap, on the scrolled page (kb01-02)
+            t0, prev = s.t_tap, {"place": shown_place(s.rebase), "key": key(s.rebase)}
+            res["prev"] = {"place": prev["place"], "key": prev["key"]}
         if first is None:
             if rec:
                 s.stop_record(rec)
@@ -220,11 +297,15 @@ class Run:
             return res
         s.page = first.get("page")
         allr = s.collect(sid, tok, t0)
+        if callable(expect):
+            expect = res["expect"] = expect(allr[-1]["sig"] if allr else None)
         res["position"] = s.position
-        native = s.native(kind)
+        native = s.native(kind, allr[-1]["sig"]["angle"] if allr else 0)
         shot = s.screenshot(sid)
         s.assess(res, allr, native, expect, t0, kind, prev)
         s.check_icons(res, shot)
+        if check:
+            s.verify(res, allr[-1] if allr else None, check, sid, tok, kind)
         sheet = s.stop_record(rec, t0 + (res.get("t") or {}).get("change", 0)) if rec else None
         if sheet:
             res["frames"] = os.path.relpath(sheet, s.out)
@@ -240,7 +321,7 @@ class Run:
         start = time.time()
         while True:
             time.sleep(0.25)
-            allr = [r for r in samples(sid, t0) if f"s={tok}" in r["path"] and r.get("page") == s.page]
+            allr = [r for r in samples(sid, t0) if mine(r, tok) and r.get("page") == s.page]
             el = time.time() - start
             if el >= MAX_S:
                 break
@@ -254,14 +335,14 @@ class Run:
                     break
         return allr
 
-    def native(s, kind):
+    def native(s, kind, angle=0):
         """Native button frames. Closed: the UI-test runner, in closed screen points. Unfolded: XCUITest frames on the
         inner display do not map (README), so the simulator helper describes the app by pid, in points of its window
         (the pane in split view), which works for either split pane."""
         bundle = PREVIEW_SVC if kind == "preview" else SAFARI
         if s.position != "open":
             r = cmd("elements", bundle=bundle)
-            return (r or {}).get("elements", [])
+            return (r or {}).get("elements", []) + (s.island(angle) if s.la_on else [])
         if not s.sim:
             s.native_why = "simulator helper missing"
             return []
@@ -275,6 +356,25 @@ class Run:
             s.native_why = f"describe failed: {e}"
             return []
         s.native_why = None if out else f"{bundle} (pid {pid}) reported no buttons"
+        return out
+
+    @staticmethod
+    def island(angle):
+        """The Live Activity in the Dynamic Island as a native obstacle, measured live, not assumed: SpringBoard's
+        jindo container for an activity. SpringBoard reports portrait device points (466x678); turned, they map to the
+        page's screen points like its other windows (hidden-windows pill, round 5). None while the island shows no
+        activity (it collapses to the bare sensor housing in closed landscape)."""
+        r = cmd("tree", bundle=SPRINGBOARD)
+        out = []
+        for e in (r or {}).get("elements", []):
+            if not (e["id"].startswith("jindo-container-view") and "activity:" in e["id"]):
+                continue
+            x, y, w, h = e["x"], e["y"], e["w"], e["h"]
+            if angle == 90:
+                x, y, w, h = y, 466 - x - w, h, w
+            elif angle == 270:
+                x, y, w, h = 678 - y - h, x, h, w
+            out.append({"type": 0, "label": "Live Activity", "id": "island", "x": x, "y": y, "w": w, "h": h})
         return out
 
     # ---- assertions -------------------------------------------------------------------------------------------
@@ -306,9 +406,12 @@ class Run:
             pane = "right" if back and back["x"] > g["outerWidth"] / 2 else "left"
             return (g["outerWidth"] - g["innerWidth"] if pane == "left" else 0, 0, pane)
         if kind == "preview":
+            # The page ends on the bottom bar holding Back (sheet, tall full screen); with Back in the top bar (wide full
+            # screen) it starts under the bars, as a tab's does.
             W = 669 if g["outerHeight"] > 700 else INNER_W  # the tall posture's screen is 669 wide
+            low = back and back["y"] > g["outerHeight"] / 2
             return ((W - g["outerWidth"]) / 2 if g["outerWidth"] < W else 0,
-                    (back["y"] - g["innerHeight"]) if back else 0, None)
+                    (back["y"] - g["innerHeight"]) if low else g["outerHeight"] - g["innerHeight"], None)
         return (g["outerWidth"] - g["innerWidth"] if back and back["x"] < 60 and g["outerWidth"] > g["innerWidth"] else 0,
                 g["outerHeight"] - g["innerHeight"] if g["outerWidth"] == g["innerWidth"] else 0, None)
 
@@ -374,6 +477,12 @@ class Run:
             allr = [r for r in allr if r.get("visible") != "hidden"]
             if not allr:
                 res["status"] = "BLOCKED"; bad.append("the page stayed hidden after the action"); return
+        # WebKit can hold rendering while a fold animates, yet run timers and lay out: those samples are layouts the
+        # screen never shows (it keeps the last frame, black in the simulator's unfold). Not judged, like hidden ones.
+        unpainted = {r["rx"] for r in allr if r.get("frameAt") and r["t"] - r["frameAt"] > UNPAINTED_S * 1000}
+        if unpainted:
+            note.append(f"{len(unpainted)} samples with no frame painted for over {UNPAINTED_S * 1000:.0f}ms (rendering held), not judged")
+            allr = [r for r in allr if r["rx"] not in unpainted] or allr[-1:]
         if stale:
             note.append(f"{len(stale)} samples of the hidden layout in the first render after the page was shown again, not judged")
         last = allr[-1]
@@ -400,7 +509,7 @@ class Run:
         # expected one; anywhere else is a flash, however short.
         flashes, cur = [], None
         for i, r in enumerate(timeline):  # hidden samples end a flash (nobody sees the page) but are not one
-            p = None if r.get("visible") == "hidden" or r["rx"] in stale else shown_place(r)
+            p = None if r.get("visible") == "hidden" or r["rx"] in stale or r["rx"] in unpainted else shown_place(r)
             old = prev is not None and p == prev["place"] and (key(r) == prev["key"] or r["rx"] < t_change + GRACE_S * 1000)
             wrong = p is not None and not ok(p) and not old
             if wrong and cur is None:
@@ -457,13 +566,18 @@ class Run:
                 bad.append(f"settled {(t_ok - t_final) / 1000:.2f}s after the final signals (> {SETTLE_S}s)")
             # 5. no slide: once in the final placement under the final signals, slot rects stop moving within SLIDE_S
             # (the same placement before the change, e.g. column/right at 270 then 0, has other rects by design).
+            # A page change in the same placement (other slots or labels) springs from where it happens, for up to SPRING_S.
             if want is not None:
-                t_ok = max(t_ok, t_final)
-                fin = [r for r in allr if r["rx"] >= t_ok]
+                t_ok, lim = max(t_ok, t_final), SLIDE_S
                 rects = lambda r: {x["slot"]: x["rect"] for x in all_slots(r)}
                 end = rects(last)
+                content = lambda r: (sorted(rects(r)), sorted(l for l, _ in duet_buttons(r)))
+                chg = [r for r in allr if r["rx"] >= t_ok and shown_place(r) is not None and content(r) != content(last)]
+                if chg:
+                    t_ok, lim = chg[-1]["rx"], SPRING_S
+                fin = [r for r in allr if r["rx"] >= t_ok]
                 moving = [r for r in fin if any(abs(r2[c] - end[sl][c]) > 2 for sl, r2 in rects(r).items() if sl in end for c in ("x", "y", "w", "h"))]
-                if moving and moving[-1]["rx"] - t_ok > SLIDE_S * 1000:
+                if moving and moving[-1]["rx"] - t_ok > lim * 1000:
                     m = moving[0]
                     bad.append(f"slots slide for {moving[-1]['rx'] - t_ok:.0f}ms after showing (e.g. {rects(m)} -> {end})"[:300])
         # 6. native overlap and the preview gap, on the final sample. Closed: screen points. Unfolded: window points
@@ -525,6 +639,8 @@ class Run:
         # 7. overflow / clipping / content under controls, on the final sample
         sx, W0 = last["scroll"]["x"], last["scroll"]["clientWidth"]
         lo, hi = min(0, -sx), max(W0, W0 - sx)
+        # span.duet-guard straddles the column edge 8pt past the window by design (duet.css, #79): transparent, no
+        # taps, adds no scroll width, so it is not an overflowing block.
         overs = []
         for o in last.get("overflow", []):
             ov = round(max(o["rect"]["x"] + o["rect"]["w"] - hi, lo - o["rect"]["x"]))
@@ -532,7 +648,7 @@ class Run:
                 overs.append({**o, "over": ov})
         for o in [o for o in overs if o["text"]][:4]:
             bad.append(f'clipped text {o["el"][:60]} by {o["over"]}pt')
-        for o in [o for o in overs if not o["text"] and not o["el"].startswith(("div.duet-scroller", "main", "section.stage"))][:3]:
+        for o in [o for o in overs if not o["text"] and not o["el"].startswith(("div.duet-scroller", "main", "section.stage", "span.duet-guard"))][:3]:
             bad.append(f'overflowing block {o["el"][:60]} by {o["over"]}pt')
         if last["scroll"]["scrollWidth"] > W0:
             note.append(f"scrollWidth {last['scroll']['scrollWidth']} > {W0} (column bleed, documented)")
@@ -616,26 +732,32 @@ class Run:
 
     # ---- drivers ----------------------------------------------------------------------------------------------
     def url(s, tok):
-        return f"{SITE}/?e2e=1&s={tok}"
+        """The page, reporting to this run's beacon (one per simulator in a parallel run, matrix.sh)."""
+        return f"{SITE}{s.page_path}?e2e={urllib.parse.quote(BEACON, safe='')}&s={tok}"
+
+    def host(s, *args, fresh=False):
+        """Launches the e2e host app (fresh: quit it first), pointed at this run's beacon (Live.swift)."""
+        return sh("xcrun", "simctl", "launch", *(["--terminate-running-process"] if fresh else []), s.udid, HOST,
+                  "-beacon", BEACON, *args, check=fresh)
 
     def wait(s, sid, tok, cond, t0, timeout=STATE_TIMEOUT, page=None):
         end = time.time() + timeout
         while time.time() < end:
             for r in samples(sid, t0):
-                if f"s={tok}" in r["path"] and (page is None or r.get("page") == page) and cond(r):
+                if mine(r, tok) and (page is None or r.get("page") == page) and cond(r):
                     return r
             time.sleep(0.1)
         return None
 
     def open_tab(s, tok):
         def act(sid, t0):
-            sh("xcrun", "simctl", "openurl", s.udid, s.url(tok))
+            openurl(s.udid, s.url(tok))
             return s.wait(sid, tok, lambda r: not r.get("preview"), t0)
         return act
 
     def open_preview(s, tok, style):
         def act(sid, t0):
-            sh("xcrun", "simctl", "launch", "--terminate-running-process", s.udid, HOST, "-url", s.url(tok), "-style", style)
+            s.host("-url", s.url(tok), "-style", style, fresh=True)
             return s.wait(sid, tok, lambda r: True, t0)
         return act
 
@@ -664,7 +786,7 @@ class Run:
             if not s.fold("closed", 180):
                 return None
             time.sleep(1.5)
-            rs = [r for r in samples(sid, t0) if f"s={tok}" in r["path"] and r.get("page") == page]
+            rs = [r for r in samples(sid, t0) if mine(r, tok) and r.get("page") == page]
             return rs[-1] if rs else None
         s.target_display = 1
         return act
@@ -683,14 +805,62 @@ class Run:
 
     def open_in_safari(s, tok):
         def act(sid, t0):
-            r = cmd("tap", bundle=PREVIEW_SVC, label="Open in Safari")
-            if not r or not r.get("ok"):
-                s.why = f"tap Open in Safari failed: {r}"
+            # A query, not the snapshot behind native(): a turned preview's snapshot leaves out its top-right buttons.
+            # Its frame is in closed screen points, so the simulator helper taps it; the runner's own tap goes
+            # through SpringBoard's portrait points and misses on a turned screen.
+            end, el = time.time() + 5, None
+            while el is None and time.time() < end:
+                els = (cmd("find", bundle=PREVIEW_SVC, label="Open in Safari") or {}).get("elements") or []
+                el = next((e for e in els if e["type"] == 9), None)  # 9: button
+                el or time.sleep(0.3)
+            if el is None:
+                s.why = f"no Open in Safari button in the preview at {s.angle}"
                 return None
+            s.sim.tap(el["x"] + el["w"] / 2, el["y"] + el["h"] / 2, hold=0.12)
             gone = s.page  # the preview's document keeps reporting while it is dismissed: follow the new tab's
             return s.wait(sid, tok, lambda r: r.get("page") != gone and not r.get("preview"), t0)
         s.last = None  # a new document: no old placement to keep
         s.target_display = 1
+        return act
+
+    def la_state(s, since, timeout=15):
+        """Waits for the host to report the wanted Live Activities (s.la_want) after `since` (ms)."""
+        end = time.time() + timeout
+        while time.time() < end:
+            st = http("GET", "/la/state") or {}
+            if st.get("at", 0) >= since and all(bool(st.get(k)) == v for k, v in s.la_want.items()):
+                return st
+            time.sleep(0.2)
+        return None
+
+    def la(s, tok, kind, **want):
+        """Starts or ends the host's music (on=) or timer (timer=) Live Activity (host/Host/Live.swift) with the page in front. In the preview
+        the host is the app in front, so its poll starts the activity under the open sheet. In a Safari tab ActivityKit
+        will not start one from the background: the host comes forward (no URL scheme, which would prompt) and Safari
+        goes back in front, as a user does after starting music elsewhere; the tab is not reloaded. Ending works from
+        the background. Waits for a sample taken after the island settled."""
+        def act(sid, t0):
+            page, since = s.page, time.time() * 1000
+            on = any(want.values())
+            s.la_want.update(want)
+            http("POST", "/la", s.la_want)
+            fwd = on and kind == "tab"
+            if fwd:
+                s.host()
+            st = s.la_state(since)
+            if fwd:
+                sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
+            if st is None:
+                s.why = f"Live Activity not {'started' if on else 'ended'} in 15s: {http('GET', '/la/state')}"
+                return None
+            s.la_on = any(s.la_want.values())
+            time.sleep(1.0)  # the island grows or shrinks, and Safari's buttons move with it
+            done = time.time() * 1000
+            r = s.wait(sid, tok, lambda r: r["rx"] >= done, t0, page=page)
+            if r is None:
+                s.why = "the page stopped reporting after the Live Activity changed"
+            return r
+        s.target_display = s.display()
         return act
 
     # ---- split view (simulator helper; README, Split view) --------------------------------------------------------
@@ -746,7 +916,7 @@ class Run:
                 if pane == "left":
                     if not s.open_in_split(SB_SAFARI):
                         return None
-                    sh("xcrun", "simctl", "launch", s.udid, HOST, check=False)
+                    s.host()
                 else:
                     if not s.open_in_split(SB_HOST):
                         return None
@@ -835,7 +1005,15 @@ class Run:
         return act
 
     def reset(s):
-        """Every scenario starts closed, in portrait, with Safari in front and the host preview gone."""
+        """Every scenario starts closed, in portrait, with Safari in front, the host preview gone and no Live Activity
+        (the host ends it first: an activity outlives its app)."""
+        since = time.time() * 1000
+        s.la_want = {"on": False, "timer": False}
+        http("POST", "/la", s.la_want)
+        if (http("GET", "/la/state") or {}).get("count") and not s.la_state(since, timeout=3):
+            s.host()
+            s.la_state(since)
+        s.la_on = False
         sh("xcrun", "simctl", "terminate", s.udid, HOST, check=False)
         if s.split and s.position == "open" and s.sim:  # leave split view: Safari full screen again
             try:
@@ -922,6 +1100,35 @@ class Run:
         s.step("splitturn-split-fold", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "split view, Safari in the right pane, before folding")
         s.step("splitturn-fold", "tab", t, s.fold_closed(t, 0), {"preview": False, "mode": "column", "side": "right"}, "fold from split view to the closed screen", video=True)
 
+    def scenario_live(s, style):
+        """A music Live Activity in the Dynamic Island (host/Host/Live.swift) on one surface: Safari tab or an in-app
+        preview style. Started and ended at every closed angle and turned with it running, then unfolded and folded
+        with it running. The island is a native obstacle measured from SpringBoard on every closed step (island()),
+        so a control under it or under a button it pushed fails check 6. Every step is filmed; the clips of the
+        scenario are stitched into one film (report)."""
+        tab = style == "tab"
+        kind = "tab" if tab else "preview"
+        t = s.tok(f"live{style}")
+        exp = (lambda a: {"preview": False, "mode": TAB[a][0], "side": TAB[a][1]}) if tab else (lambda a: preview_expect(style, a))
+        name = "Safari tab" if tab else f"preview ({style})"
+        p = f"live-{style}"
+        s.step(f"{p}-open", kind, t, s.open_tab(t) if tab else s.open_preview(t, style), exp(0), f"{name}: open, no Live Activity", video=True)
+        s.step(f"{p}-on-0", kind, t, s.la(t, kind, on=True), exp(0), f"{name}: Live Activity starts at 0", video=True)
+        for a in (90, 270, 0):
+            frm = s.angle
+            s.step(f"{p}-on-{frm}to{a}", kind, t, s.rotate(t, a), exp(a), f"{name} with Live Activity: turn {frm} -> {a}", video=True)
+        s.step(f"{p}-off-0", kind, t, s.la(t, kind, on=False), exp(0), f"{name}: Live Activity ends at 0", video=True)
+        for a in (90, 270):
+            s.step(f"{p}-to{a}", kind, t, s.rotate(t, a), exp(a), f"{name}: turn to {a}", video=True)
+            s.step(f"{p}-on-{a}", kind, t, s.la(t, kind, on=True), exp(a), f"{name}: Live Activity starts at {a}", video=True)
+            s.step(f"{p}-off-{a}", kind, t, s.la(t, kind, on=False), exp(a), f"{name}: Live Activity ends at {a}", video=True)
+        s.step(f"{p}-to0", kind, t, s.rotate(t, 0), exp(0), f"{name}: back to 0", video=True)
+        s.step(f"{p}-on-0b", kind, t, s.la(t, kind, on=True), exp(0), f"{name}: Live Activity starts again", video=True)
+        s.step(f"{p}-on-unfold", kind, t, s.unfold(t, 0, preview=not tab), UNFOLDED_PREVIEW if not tab else {"preview": False, **UNFOLDED},
+               f"{name} with Live Activity: unfold", video=True)
+        s.step(f"{p}-on-fold", kind, t, s.fold_closed(t, 0), exp(0), f"{name} with Live Activity: fold", video=True)
+        s.step(f"{p}-off-end", kind, t, s.la(t, kind, on=False), exp(0), f"{name}: Live Activity ends", video=True)
+
     def scenario_preview_unfolded(s):
         """The in-app preview across the unfold: opened closed then unfolded, turned, folded back, and opened unfolded.
         Unfolded, the sheet is a 653x661 window centred on the wide screen with its bars above and below the page,
@@ -948,8 +1155,8 @@ class Run:
 
     def scenario_dynamic_type(s):
         """PREVIEW.gap variant: the preview's column with the largest accessibility text size. Its buttons are fixed
-        size controls, so the gap should not move; the step proves Duet still fits it (a Live Activity in the island
-        cannot be started on the simulator without an app that owns one, README, Limits)."""
+        size controls, so the gap should not move; the step proves Duet still fits it (the island grown by a Live
+        Activity: the live-* scenarios)."""
         before = sh("xcrun", "simctl", "ui", s.udid, "content_size", check=False).stdout.strip() or "large"
         sh("xcrun", "simctl", "ui", s.udid, "content_size", "accessibility-extra-extra-extra-large", check=False)
         try:
@@ -974,6 +1181,420 @@ class Run:
         finally:
             sh("xcrun", "simctl", "ui", s.udid, "appearance", before, check=False)
 
+    # ---- catalogue journeys (catalogue.py, CATALOGUE.md) ------------------------------------------------------------
+    def setup_state(s, state):
+        """A journey's starting condition, before the page opens: posture and angle (fold.bin), then the music (the
+        host in front starts the Live Activity, then Safari comes back in front). False, with s.why, when not reached."""
+        _, posture, angle, music = state
+        try:  # a page this site does not serve proves nothing about placement: not run, not a FAIL
+            urllib.request.urlopen(SITE + s.page_path, timeout=120).close()
+        except urllib.error.HTTPError as e:
+            s.why = f"page {s.page_path} returns {e.code} on this site"
+            return False
+        except OSError as e:
+            s.why = f"site {SITE} unreachable: {e}"
+            return False
+        if (posture, angle) != ("closed", 0):
+            if not s.fold(posture, angle):
+                return False
+            s.angle = angle
+            time.sleep(1.5)
+        if music:
+            since = time.time() * 1000
+            s.la_want = {"on": True, "timer": False}
+            http("POST", "/la", s.la_want)
+            s.host()
+            st = s.la_state(since)
+            sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
+            if st is None:
+                s.why = f"Live Activity not started in 15s: {http('GET', '/la/state')}"
+                return False
+            s.la_on = True
+            time.sleep(1.0)
+        return True
+
+    def journey_action(s, tok, action, state):
+        """The driver for one catalogue action, from the state it starts in."""
+        surface, posture, angle, _ = state
+        preview, k = surface != "tab", action[0]
+        if k == "open":
+            act = s.open_preview(tok, surface) if preview else s.open_tab(tok)
+            s.target_display = s.display()
+            return act
+        if k == "turn":
+            return s.unfold(tok, action[1], preview) if posture == "open" else s.rotate(tok, action[1])
+        if k == "unfold":
+            return s.unfold(tok, angle, preview)
+        if k == "fold":
+            return s.fold_closed(tok, angle)
+        if k in ("music", "timer"):
+            return s.la(tok, "preview" if preview else "tab", **{"on" if k == "music" else "timer": action[1]})
+        if k == "safari":
+            return s.open_in_safari(tok)
+        raise ValueError(action)
+
+    # ---- interaction suites (catalogue.SUITES, issue #107) --------------------------------------------------------
+    def verify(s, res, r, check, sid, tok, kind):
+        """A suite step's own outcome (catalogue.py, interaction suites), on the step's final sample. A label Duet
+        folded away is looked for in its menu, opened and closed again as a user would."""
+        bad = []
+        if r is None:
+            bad.append("outcome not checked: no sample from the page")
+        else:
+            labels = [l for l, _ in duet_buttons(r)]
+            want = [v for k, v in check.items() if k in ("label", "no_label")]
+            if any(v not in labels for v in want) and opener(r):
+                folded = s.menu_labels(sid, tok, kind, r)
+                if folded is None:
+                    bad.append("could not open Duet's menu to look for " + ", ".join(map(repr, want)))
+                else:
+                    labels += folded
+            for k, v in check.items():
+                if k == "path" and address(r["path"]) != v:
+                    bad.append(f"address is {address(r['path'])}, expected {v}")
+                elif k == "label" and v not in labels:
+                    bad.append(f'Duet does not show "{v}" (it shows {", ".join(map(repr, labels)) or "nothing"})')
+                elif k == "no_label" and v in labels:
+                    bad.append(f'Duet still shows "{v}"')
+                elif k == "keyboard" and any(n.get("keyboard") for n in r.get("navs") or []) != v:
+                    bad.append("Duet did not see the keyboard come up (no data-keyboard)" if v else "Duet still marks the keyboard up (data-keyboard)")
+                elif k == "active" and r.get("active") != v:
+                    bad.append(f"focus is on {r.get('active') or 'nothing'}, expected {v or 'nothing'}")
+                elif k == "dialog" and bool(r.get("dialogs")) != v:
+                    bad.append("no page dialog open" if v else "the page dialog is still open")
+                elif k == "scroll_gt" and not r["scroll"]["y"] > v:
+                    bad.append(f"page scrolled to {r['scroll']['y']}pt, expected more than {v}")
+                elif k == "scroll_lt" and not r["scroll"]["y"] < v:
+                    bad.append(f"page scrolled to {r['scroll']['y']}pt, expected under {v}")
+                elif k == "la" and (http("GET", "/la/state") or {}).get("count", 0) != v:
+                    bad.append(f"Live Activities running: {(http('GET', '/la/state') or {}).get('count', 0)}, expected {v}")
+        if bad:
+            res["reasons"] += bad
+            res["status"] = "FAIL" if res["status"] != "BLOCKED" else res["status"]
+
+    @staticmethod
+    def find(r, name, back=False):
+        """The rect of a control by name in a sample: Duet's buttons first, then the page's targets (aria-label,
+        placeholder or text); an exact name, else one that starts with it. back: Duet's back only."""
+        cands = duet_buttons(r, back) + ([] if back else [(t["name"], t["rect"]) for t in r.get("targets") or []])
+        for ok in (lambda l: l == name, lambda l: l.startswith(name)):
+            for l, rc in cands:
+                if l and ok(l) and rc["w"] > 0 and rc["h"] > 0:
+                    return rc
+        return None
+
+    def reveal(s, sid, tok, kind, r, rc, refind, tries=8):
+        """(sample, rect) with a page target scrolled clear of Safari's bars, as a user would before tapping it: a
+        target below the fold (kb01: /probe's text field at y 697 in a 580pt viewport) gets slow drags of at most 300pt,
+        then is found again. Unchanged when it is already in view; None when it never comes clear (a tap there would
+        land on Safari's bar, nav01-02 at 3 drags)."""
+        def clear(r, rc):
+            vh = (r.get("vv") or {}).get("h") or r["sig"]["innerHeight"]
+            return rc["y"] >= 60 and rc["y"] + rc["h"] <= vh - 100
+        for _ in range(tries):
+            g, vh = r["sig"], (r.get("vv") or {}).get("h") or r["sig"]["innerHeight"]
+            if clear(r, rc):
+                break
+            x0, y0 = s.page_origin(r, kind)
+            d = max(-300, min(300, rc["y"] + rc["h"] / 2 - vh * 0.4))
+            y1 = y0 + g["innerHeight"] * (0.75 if d > 0 else 0.25)
+            s.sim.drag(x0 + g["innerWidth"] * 0.3, y1, x0 + g["innerWidth"] * 0.3, y1 - d, ms=500, steps=12, end_hold_ms=200)
+            r2 = s.rebase = s.still(sid, tok)
+            rc2 = r2 and refind(r2)
+            if rc2 is None:
+                break
+            r, rc = r2, rc2
+        return (r, rc) if clear(r, rc) else (r, None)
+
+    def still(s, sid, tok, quiet=0.4, cap=3.0):
+        """The newest sample once the page has stopped moving (scroll, visual viewport and the targets' rects the same for
+        quiet seconds). A tap while a scroll still decelerates only stops it, so it never reaches the target (nav01-02,
+        kb01-02). The rects see a scroll inside an element too: in Duet's column the page scrolls its own scroller, the
+        window stays at 0 (nav01-02: the link tapped at a mid-scroll 522 that settled at 374)."""
+        t0, end, last, since, r = time.time() * 1000, time.time() + cap, None, time.time(), None
+        while time.time() < end:
+            for x in samples(sid, t0):
+                if mine(x, tok) and x.get("page") == s.page:
+                    r = x
+            if r is not None:
+                key = (r["scroll"]["x"], r["scroll"]["y"], json.dumps(r.get("vv"), sort_keys=True), r["sig"]["innerHeight"],
+                       json.dumps([x["rect"] for x in r.get("targets") or []]))
+                if key != last:
+                    last, since = key, time.time()
+                elif time.time() - since >= quiet:
+                    return r
+            time.sleep(0.1)
+        if r is None:
+            s.why = "the page is not reporting"
+        return r
+
+    def page_origin(s, r, kind):
+        """Page origin in points of the lit display (sim.py taps in those)."""
+        return s.origin_open(r, kind, s.native(kind))[:2] if s.position == "open" else s.origin(r, kind)
+
+    def now_sample(s, sid, tok, t0):
+        r = s.wait(sid, tok, lambda r: True, t0, timeout=5, page=s.page)
+        if r is None:
+            s.why = "the page is not reporting"
+        return r
+
+    def landed(s, sid, tok, t0, page, check, delay=0.4, new_page=False, cond=None):
+        """The first sample after the interaction settled: taken delay s after it, at the expected address if the
+        check names one (a link or Back may load a new document), on a new document after a reload. If the address
+        never comes, the latest sample, so the step is judged (and fails its check) rather than blocked."""
+        done = time.time() * 1000 + delay * 1000
+        want = check.get("path")
+        ok = lambda r: r["rx"] >= done and (cond is None or cond(r)) and (not new_page or r.get("page") != page)
+        r = s.wait(sid, tok, lambda r: ok(r) and (want is None or address(r["path"]) == want), t0, timeout=10,
+                   page=None if want or new_page else page)
+        if r is None:
+            r = s.wait(sid, tok, lambda r: r["rx"] >= done, t0, timeout=5, page=page)
+        if r is None:
+            s.why = "the page stopped reporting after the step"
+        return r
+
+    def menu_labels(s, sid, tok, kind, r):
+        """What Duet's folded menu lists: opens it, reads it, closes it (its "Close" item, else a tap on the page)."""
+        r2 = s.open_menu(sid, tok, kind, r)
+        if r2 is None:
+            return None
+        items = menu_items(r2)
+        close = next((rc for n in shown_navs(r2) for m in n.get("menus") or [] for b in m["buttons"] if b["label"] == "Close" for rc in [b["rect"]]), None)
+        x0, y0 = s.page_origin(r2, kind)
+        rc = close or s.neutral(r2)
+        s.sim.tap(x0 + rc["x"] + rc["w"] / 2, y0 + rc["y"] + rc["h"] / 2, hold=0.12)
+        time.sleep(0.8)
+        return items
+
+    def open_menu(s, sid, tok, kind, r):
+        """Taps the button whose menu holds what Duet folded (opener) and returns a sample with the menu open, or None."""
+        op = opener(r)
+        if op is None:
+            return None
+        x0, y0 = s.page_origin(r, kind)
+        s.sim.tap(x0 + op["x"] + op["w"] / 2, y0 + op["y"] + op["h"] / 2, hold=0.12)
+        time.sleep(0.8)
+        r2 = s.now_sample(sid, tok, time.time() * 1000)
+        return r2 if r2 and menu_items(r2) else None
+
+    def neutral(s, r):
+        """A page point (client px) on no control: the page's own targets, Duet's slots and an open menu avoided. Never
+        the top third: it is under an expanded Live Activity, and a tap there opens its app (la01-03: /book's rows fill
+        mid page, the old last resort at 12% opened Duo e2e host). The page's left margin, outside its rows, before that.
+        Only the visible part of the page: with the keyboard up that is the visual viewport's height from the page top,
+        and half the layout height is on the keyboard (kb02-03: y 309 of 618 with 286 visible landed on its bar). Not
+        from vv.y: WebKit reported offsetTop 112 while rects still mapped to the screen from the page top, and a tap
+        offset by it landed on the text field (rerun4, the field at client y 117 drawn at screen y0 + 117)."""
+        g, vv = r["sig"], r.get("vv") or {}
+        top, h = 0, vv.get("h") or g["innerHeight"]
+        busy = [t["rect"] for t in r.get("targets") or []] + [sl["rect"] for n in r.get("navs") or [] for sl in (n.get("slots") or []) + (n.get("menus") or [])]
+        for fy in (0.5, 0.7, 0.85, 0.6, 0.4, 0.95, 0.35):
+            for fx in (0.15, 0.5, 0.3, 0.015):
+                x, y = g["innerWidth"] * fx, top + h * fy
+                if not any(b["x"] - 8 <= x <= b["x"] + b["w"] + 8 and b["y"] - 8 <= y <= b["y"] + b["h"] + 8 for b in busy):
+                    return {"x": x, "y": y, "w": 0, "h": 0}
+        return {"x": g["innerWidth"] * 0.15, "y": top + h * 0.5, "w": 0, "h": 0}
+
+    def tap_native(s, kind, ident):
+        """Taps a native button by accessibility identifier (never by label: "Book" matches Bookmarks)."""
+        el = next((e for e in s.native(kind, s.angle) if e.get("id") == ident), None)
+        if el is None:
+            s.why = f"no native button {ident}"
+            return False
+        s.sim.tap(el["x"] + el["w"] / 2, el["y"] + el["h"] / 2, hold=0.12)
+        return True
+
+    def to_front(s, kind):
+        """Brings the app under test back in front (Safari, or the host whose preview is open)."""
+        if kind == "preview":
+            s.host()
+        else:
+            sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
+
+    def suite_action(s, tok, action, state, check):
+        """The driver for one suite interaction (a device step goes through journey_action), from the state it starts in."""
+        k = action[0]
+        if k in catalogue.DEVICE_OPS:
+            return s.journey_action(tok, action, state)
+        kind = "tab" if state[0] == "tab" else "preview"
+        s.target_display = s.display()
+
+        def act(sid, t0):
+            if not s.sim:
+                s.why = "simulator helper missing (sim.py, Claude desktop app)"
+                return None
+            page = s.page
+            r = s.now_sample(sid, tok, t0)
+            if r is None:
+                return None
+            land = dict(check=check)
+            if k == "tap":
+                back = action[2:] == ("back",)
+                rc = s.find(r, action[1], back)
+                if rc is None and opener(r):  # folded into "…" or the lone tab's menu: open it, as a user would
+                    r = s.open_menu(sid, tok, kind, r)
+                    rc = r and s.find(r, action[1], back)
+                # Only a page target scrolls: Duet's buttons are fixed in the column, where clear() never holds (mod01-05).
+                if rc is not None and rc not in [b for _, b in duet_buttons(r, back)]:
+                    r, rc = s.reveal(sid, tok, kind, r, rc, lambda r2: s.find(r2, action[1], back))
+                    if rc is None:
+                        s.why = f'"{action[1]}" never scrolled clear of Safari\'s bars'
+                        return None
+                if rc is None:
+                    s.why = f'no control named "{action[1]}" on the page'
+                    return None
+                x0, y0 = s.page_origin(r, kind)
+                s.t_tap = time.time() * 1000
+                s.sim.tap(x0 + rc["x"] + rc["w"] / 2, y0 + rc["y"] + rc["h"] / 2, hold=0.12)
+            elif k == "scroll":  # slow drags of at most 300pt down the page's left part (clear of a column of controls)
+                g, (x0, y0) = r["sig"], s.page_origin(r, kind)
+                x, n = x0 + g["innerWidth"] * 0.3, -(-abs(action[1]) // 300)
+                d = abs(action[1]) / n * (1 if action[1] > 0 else -1)
+                y1 = y0 + g["innerHeight"] * (0.75 if d > 0 else 0.25)
+                for _ in range(n):
+                    s.sim.drag(x, y1, x, y1 - d, ms=500, steps=12, end_hold_ms=200)
+                    time.sleep(0.3)
+                land["delay"] = 1.5  # let any momentum settle
+            elif k == "native":
+                if not s.tap_native(kind, action[1]):
+                    return None
+                land["new_page"] = action[1] == "ReloadButton"
+            elif k == "forward":  # Safari's Forward is a swipe in from the web view's right edge (no Forward button)
+                g, (x0, y0) = r["sig"], s.page_origin(r, kind)
+                y = y0 + g["innerHeight"] / 2
+                # The web view's edge, not the page's: with Safari's column on the right the page ends 84pt short of
+                # it, and a swipe from there is no edge swipe (rerun, 2026-10-28: nav01-04 stayed on /).
+                n = nav(r)
+                right = g["outerWidth"] if n.get("mode") == "column" and n.get("side") == "right" else g["innerWidth"]
+                s.sim.drag(x0 + right - 1, y, x0 + g["innerWidth"] * 0.3, y, ms=350, steps=12, end_hold_ms=50)
+            elif k == "blur":
+                # The keyboard's Done (by frame: it has no identifier), else the visible page off any control (the
+                # open screen's keyboard has no Done in the accessibility tree, and its accessory check mark neither).
+                done = next((e for e in s.native(kind, s.angle) if e.get("label") == "Done"), None)
+                if done:
+                    s.sim.tap(done["x"] + done["w"] / 2, done["y"] + done["h"] / 2, hold=0.12)
+                else:
+                    rc, (x0, y0) = s.neutral(r), s.page_origin(r, kind)
+                    s.sim.tap(x0 + rc["x"], y0 + rc["y"], hold=0.12)
+            elif k == "home":
+                s.sim.button("HOME")
+                time.sleep(2)
+                s.to_front(kind)
+                land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "lock":
+                s.sim.button("LOCK")
+                time.sleep(2)
+                s.sim.button("LOCK")
+                time.sleep(1)
+                lit = s.sim.lit()
+                s.sim.drag(lit["pointWidth"] / 2, lit["pointHeight"] - 3, lit["pointWidth"] / 2, lit["pointHeight"] * 0.3, ms=300, steps=10, end_hold_ms=0)
+                land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "switcher":
+                s.sim.button("HOME")
+                time.sleep(0.15)
+                s.sim.button("HOME")
+                time.sleep(1.5)
+                c = s.sim.switcher_card(HOST if kind == "preview" else SAFARI)
+                if c is None:
+                    s.why = "no card for the app under test in the app switcher"
+                    return None
+                s.sim.tap(*c, hold=0.12)
+                land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "expand":
+                isl = s.island(s.angle)
+                if not isl:
+                    s.why = "no Live Activity in the Dynamic Island"
+                    return None
+                e = isl[0]
+                s.sim.tap(e["x"] + e["w"] / 2, e["y"] + e["h"] / 2, hold=1.0)
+                land["delay"] = 1.0
+            else:
+                raise ValueError(action)
+            return s.landed(sid, tok, t0, page, **land)
+        return act
+
+    def play_suite(s, suite):
+        """One interaction suite: reset, environment (restored after), starting condition, open the page, then each
+        step, filmed and judged against the placement of the state it ends in plus its own check. A blocked step ends
+        the suite."""
+        sid0 = suite["id"]
+        steps, live = catalogue.suite_steps(suite), catalogue.suite_live(suite)
+        title = suite["title"] + (f' ({", ".join(f"{k} {v}" for k, v in suite["env"].items())})' if suite.get("env") else "")
+        rec = {"id": sid0, "title": title, "steps": [], "words": [w for _, _, w, _, _ in steps], "status": "PASS", "film": None, "not_run": 0}
+        s.journeys.append(rec)
+        s.log(f"\n== {sid0}: {title}")
+        s.reset()
+        n, env = len(s.results), suite.get("env") or {}
+        before = {}
+        for k, v in (("appearance", "dark" if env.get("dark") else None), ("content_size", env.get("content_size"))):
+            if v:
+                before[k] = sh("xcrun", "simctl", "ui", s.udid, k, check=False).stdout.strip() or ("light" if k == "appearance" else "large")
+                sh("xcrun", "simctl", "ui", s.udid, k, v, check=False)
+        old_path = s.page_path
+        s.page_path = suite["page"]
+        try:
+            start = suite["start"]
+            if not s.setup_state(start):
+                res = {"id": f"{sid0}-00", "kind": "setup", "desc": f"Set up: {catalogue.state_en(start)}", "status": "BLOCKED",
+                       "reasons": ["state not reached: " + s.why], "notes": [], "journey": sid0}
+                s.results.append(res)
+                rec["steps"].append(res["id"])
+                rec["not_run"] = len(steps)
+                s.log(f"[{res['id']}] {res['desc']}\n  BLOCKED {res['reasons'][0]}")
+            else:
+                t, cur = s.tok(sid0), start
+                for k, (a, nxt, words, exp_en, check) in enumerate(steps, 1):
+                    act = s.journey_action(t, a, cur) if a[0] == "open" else s.suite_action(t, a, cur, check)
+                    res = s.step(f"{sid0}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
+                                 lambda sig, st=nxt, kb=(check or {}).get("keyboard"): catalogue.expect(st, sig, kb), words, video=True,
+                                 extra={"journey": sid0, "expect_en": exp_en, "check": check or None, "state": list(nxt), "live": live[k - 1]}, check=check)
+                    rec["steps"].append(res["id"])
+                    cur = nxt
+                    if res["status"] == "BLOCKED":
+                        rec["not_run"] = len(steps) - k
+                        break
+        finally:
+            s.page_path = old_path
+            for k, v in before.items():
+                sh("xcrun", "simctl", "ui", s.udid, k, v, check=False)
+        got = {r["status"] for r in s.results[n:]}
+        rec["status"] = "FAIL" if "FAIL" in got else "BLOCKED" if "BLOCKED" in got else "PASS"
+        rec["film"] = s.film(sid0, s.results[n:])
+
+    def play(s, i, start, acts):
+        """One journey: reset, set up the starting condition, open the page, apply each transition, every step filmed
+        and judged against catalogue.expect. A blocked step ends the journey (the next state cannot be reached)."""
+        jid = catalogue.jid(i)
+        steps = catalogue.steps_en(start, acts)
+        rec = {"id": jid, "title": f"{catalogue.SURFACE_EN[start[0]]}, opened {catalogue.state_en(start)}", "steps": [],
+               "words": [w for _, _, w, _ in steps], "status": "PASS", "film": None, "not_run": 0}
+        s.journeys.append(rec)
+        s.log(f"\n== {jid}: {rec['title']}")
+        s.reset()
+        n = len(s.results)
+        if not s.setup_state(start):
+            res = {"id": f"{jid}-00", "kind": "setup", "desc": f"Set up: {catalogue.state_en(start)}", "status": "BLOCKED",
+                   "reasons": ["state not reached: " + s.why], "notes": [], "journey": jid}
+            s.results.append(res)
+            rec["steps"].append(res["id"])
+            rec["not_run"] = len(steps)
+            s.log(f"[{res['id']}] {res['desc']}\n  BLOCKED {res['reasons'][0]}")
+        else:
+            t, cur = s.tok(jid), start
+            for k, (a, nxt, words, exp_en) in enumerate(steps, 1):
+                act = s.journey_action(t, a, cur)
+                res = s.step(f"{jid}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
+                             lambda sig, st=nxt: catalogue.expect(st, sig), words, video=True,
+                             extra={"journey": jid, "expect_en": exp_en, "state": list(nxt), "live": int(nxt[3])})
+                rec["steps"].append(res["id"])
+                cur = nxt
+                if res["status"] == "BLOCKED":
+                    rec["not_run"] = len(steps) - k
+                    break
+        got = {r["status"] for r in s.results[n:]}
+        rec["status"] = "FAIL" if "FAIL" in got else "BLOCKED" if "BLOCKED" in got else "PASS"
+        rec["film"] = s.film(jid, s.results[n:])
+
     SCENARIOS = {
         "tab": lambda s: s.scenario_tab(),
         "preview-sheet": lambda s: s.scenario_preview("sheet"),
@@ -990,6 +1611,10 @@ class Run:
         "split-turn": lambda s: s.scenario_split_turn(),
         "split-drag": lambda s: s.scenario_split_drag(),
         "dynamic-type": lambda s: s.scenario_dynamic_type(),
+        "live-tab": lambda s: s.scenario_live("tab"),
+        "live-preview-sheet": lambda s: s.scenario_live("sheet"),
+        "live-preview-default": lambda s: s.scenario_live("default"),
+        "live-preview-full": lambda s: s.scenario_live("full"),
     }
     NEEDS_SIM = {"split", "split-turn", "split-drag", "open-in-safari-unfold"}
     EXPERIMENTAL = {"split-drag"}  # run only when named with --only
@@ -1000,20 +1625,66 @@ class Run:
             s.results.append({"id": "setup", "kind": "setup", "desc": "UI-test runner", "status": "BLOCKED", "reasons": ["UI-test runner not alive"], "notes": []})
         if not os.access(FOLD, os.X_OK):
             s.results.append({"id": "setup", "kind": "setup", "desc": "fold.bin", "status": "BLOCKED", "reasons": [f"{FOLD} missing (fold/build.sh)"], "notes": []})
-        for name, fn in s.SCENARIOS.items():
+        if s.a.catalogue:  # the journeys, then the interaction suites, one index across both for sharding
+            items = [(catalogue.jid(i), lambda i=i, j=j: s.play(i, *j)) for i, j in enumerate(catalogue.journeys())]
+            items += [(su["id"], lambda su=su: s.play_suite(su)) for su in catalogue.SUITES]
+            js = [(n, run) for n, (name, run) in enumerate(items) if not only or name in only]
+            if s.a.shard:  # i/N: every Nth item, from the ith
+                k, m = map(int, s.a.shard.split("/"))
+                js = [x for x in js if x[0] % m == k - 1]
+            for _, run in js:
+                run()
+        for name, fn in ({} if s.a.catalogue else s.SCENARIOS).items():
             if (only and name not in only) or (not only and name in s.EXPERIMENTAL):
                 continue
             if name in s.NEEDS_SIM and not s.sim:
                 s.results.append({"id": name, "kind": "setup", "desc": name, "status": "BLOCKED", "reasons": ["simulator helper missing (sim.py, Claude desktop app)"], "notes": []})
                 continue
             s.reset()
+            n = len(s.results)
             fn(s)
+            s.film(name, s.results[n:])
         s.reset()
         s.report()
         fails = [r for r in s.results if r["status"] == "FAIL"]
         blocked = [r for r in s.results if r["status"] == "BLOCKED"]
         s.log(f"\n{len(s.results)} steps, {len(fails)} failed, {len(blocked)} blocked, report {s.out}/index.html")
         return 1 if fails else 2 if blocked else 0
+
+    def film(s, name, results):
+        """Stitches a scenario's step clips into one film, each captioned with its step, result and first reason, at
+        30fps on a 720x720 canvas (the closed and unfolded displays differ in size). simctl's clips are variable frame
+        rate: the fps filter repeats frames through the gaps, as the screen showed them."""
+        clips = [(r, os.path.join(s.out, r["frames"].replace("-frames.png", ".mp4"))) for r in results if r.get("frames")]
+        clips = [(r, p) for r, p in clips if os.path.exists(p)]
+        if not clips:
+            return None
+        parts, lst = [], os.path.join(s.out, "shots", f"{name}-film.txt")
+        for i, (r, p) in enumerate(clips):
+            cap = f'{r["id"]}  {r["status"]}  {r["desc"]}'
+            why = (r["reasons"] or [""])[0][:90]
+            esc = lambda x: x.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\u2019").replace("%", "\\%")
+            col = {"PASS": "0x2a9d3a", "FAIL": "0xd62828"}.get(r["status"], "0xe09f1f")
+            out = os.path.join(s.out, "shots", f"{name}-part{i:02}.mp4")
+            vf = (f"fps=30,scale=720:600:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:120:color=black,"
+                  f"drawbox=x=0:y=0:w=720:h=12:color={col}:t=fill,"
+                  f"drawtext=text='{esc(cap)}':x=12:y=24:fontsize=20:fontcolor=white,"
+                  f"drawtext=text='{esc(why)}':x=12:y=60:fontsize=16:fontcolor=0xffb4b4")
+            sh("ffmpeg", "-loglevel", "error", "-y", "-i", p, "-vf", vf, "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-preset", "veryfast", out, check=False)
+            if os.path.exists(out):
+                parts.append(out)
+        with open(lst, "w") as fh:
+            fh.write("".join(f"file '{x}'\n" for x in parts))
+        film = os.path.join(s.out, "shots", f"{name}.mp4")
+        sh("ffmpeg", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", film, check=False)
+        for x in parts + [lst]:
+            os.remove(x)
+        if not os.path.exists(film):
+            return None
+        rel = os.path.relpath(film, s.out)
+        if not s.a.catalogue:
+            s.films.append((name, rel))
+        return rel
 
     # ---- report -----------------------------------------------------------------------------------------------
     def report(s):
@@ -1024,17 +1695,41 @@ class Run:
             img = r.get("overlay") or r.get("shot")
             fr = r.get("frames")
             timing = f'settle {r.get("settle_ms", "")}ms, hidden {r.get("hidden_ms", 0)}ms, {r.get("samples_n", "")} samples @ {r.get("sample_ms", "")}ms' if f else ""
-            rows.append(f'<tr class="{r["status"]}"><td><b>{e(r["id"])}</b><br><small>{e(r["desc"])}</small></td><td>{r["status"]}</td>'
+            rows.append(f'<tr class="{r["status"]}" id="{e(r["id"])}"><td><b>{e(r["id"])}</b><br><small>{e(r["desc"])}</small></td><td>{r["status"]}</td>'
                         f'<td>{e(json.dumps(f)) if f else ""}<br><small>{timing}</small></td>'
                         f'<td><ul>{"".join("<li>" + e(x) + "</li>" for x in r["reasons"])}</ul><small>{"<br>".join(e(x) for x in r["notes"])}</small></td>'
                         f'<td>{f"<a href={e(img)}><img src={e(img)} width=200></a>" if img else ""}'
                         f'{f"<br><a href={e(fr)}><img src={e(fr)} width=320></a>" if fr else ""}</td></tr>')
+        by_id = {r["id"]: r for r in s.results}
+        page = f" --page {s.a.page}" if s.a.page != "/" else ""
+        jhtml = []
+        for j in s.journeys:
+            items = []
+            for sid in j["steps"]:
+                r = by_id.get(sid) or {"status": "BLOCKED", "desc": sid, "reasons": ["missing"]}
+                why = f' : {e(r["reasons"][0])}' if r["reasons"] else ""
+                items.append(f'<li><a href="#{e(sid)}">{e(r["desc"])}</a>. <small>Expect: {e(r.get("expect_en", ""))}.</small> '
+                             f'<span class="{r["status"]}"><b>{r["status"]}</b></span>{why}</li>')
+            items += [f'<li><small>not run: {e(w)}</small></li>' for w in j["words"][len(j["words"]) - j["not_run"]:]] if j["not_run"] else []
+            film = f'<video src="{e(j["film"])}" controls muted playsinline width=480></video>' if j.get("film") else ""
+            jhtml.append(f'<section class=j><h2 id="{e(j["id"])}">{e(j["id"])}: {e(j["title"])} <span class="{j["status"]}">{j["status"]}</span></h2>'
+                         f'<ol>{"".join(items)}</ol>{film}<p><small>Replay: <code>tools/e2e/run.sh --catalogue --only {e(j["id"])}{e(page)}</code></small></p></section>')
+        if s.journeys:
+            c = {k: sum(j["status"] == k for j in s.journeys) for k in ("PASS", "FAIL", "BLOCKED", "UNVERIFIED")}
+            index = "".join(f'<a class="{j["status"]}" href="#{e(j["id"])}">{e(j["id"])}</a> ' for j in s.journeys)
+            jhtml.insert(0, f'<p><b>{len(s.journeys)} journeys: {c["PASS"]} pass, {c["FAIL"]} fail, {c["BLOCKED"] + c["UNVERIFIED"]} unverified.</b> '
+                            f'Scenarios in plain English: CATALOGUE.md.</p><p class=idx>{index}</p>')
+        with open(os.path.join(s.out, "results.json"), "w") as fh:
+            json.dump({"results": s.results, "films": s.films, "journeys": s.journeys}, fh)
         with open(os.path.join(s.out, "index.html"), "w") as fh:
             fh.write(f"""<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width"><title>Duo e2e report</title>
 <style>body{{font:14px system-ui;margin:16px;background:#fff;color:#111}}table{{border-collapse:collapse;width:100%}}td{{border-top:1px solid #ddd;padding:8px;vertical-align:top}}
-.PASS td:nth-child(2){{color:#080}}.FAIL td:nth-child(2){{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2){{color:#a60;font-weight:bold}}small{{color:#666}}
+.PASS td:nth-child(2),span.PASS,a.PASS{{color:#080}}.FAIL td:nth-child(2),span.FAIL,a.FAIL{{color:#c00;font-weight:bold}}.BLOCKED td:nth-child(2),span.BLOCKED,a.BLOCKED,.UNVERIFIED td:nth-child(2),span.UNVERIFIED,a.UNVERIFIED{{color:#a60;font-weight:bold}}small{{color:#666}}
+section.j{{border-top:2px solid #ddd;margin-top:24px}}ol li{{margin:4px 0}}.idx a{{display:inline-block;margin:2px 6px 2px 0}}code{{font-size:12px}}
 @media (prefers-color-scheme:dark){{body{{background:#111;color:#eee}}td{{border-color:#333}}}}</style>
 <h1>Duo e2e report</h1><p>{e(s.out)}. Overlay: red = Duet controls, blue = native buttons, green = preview column gap. Frames: 3.2s from 0.3s before the motion onset, one tile per 100ms.</p>
+{"".join(jhtml)}
+{"".join(f'<h2>{e(n)}</h2><video src={e(f)} controls muted playsinline width=480></video>' for n, f in s.films)}
 <table>{"".join(rows)}</table>""")
         if s.a.md:
             lines = ["| step | result | final (angle, inner, mode/side) | settle | reason | screenshot / frames |", "|---|---|---|---|---|---|"]
@@ -1046,18 +1741,82 @@ class Run:
                 lines.append(f'| {r["id"]} | {r["status"]} | {st} | {r.get("settle_ms", "")} | {why.replace("|", "/")} | {" ".join(img)} |')
             with open(s.a.md, "w") as fh:
                 fh.write("\n".join(lines) + "\n")
+        # A report among the others (not a matrix shard, not a scratch dir) refreshes the site's /workbench.
+        root = os.path.dirname(s.out)
+        if os.path.basename(root) == "reports":
+            try:
+                workbench.write(root)
+            except Exception as x:  # the report stands without it
+                print(f"workbench not rebuilt: {x}")
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--udid", required=True)
+    ap.add_argument("--udid")
     ap.add_argument("--only", default="")
     ap.add_argument("--md", default="")
     ap.add_argument("--video", action="store_true", help="record a contact sheet for every step, not only transitions")
+    ap.add_argument("--page", default="/", help="site path every scenario opens, e.g. /confirm")
     ap.add_argument("--rerender", default="", help="re-assess a saved report dir with the current rules")
+    ap.add_argument("--catalogue", action="store_true", help="play the catalogue journeys (CATALOGUE.md), not the scenarios")
+    ap.add_argument("--shard", default="", help="i/N: play every Nth journey, from the ith (matrix.sh)")
+    ap.add_argument("--beacon", default=BEACON, help="this simulator's beacon origin (matrix.sh: one per simulator)")
+    ap.add_argument("--out", default="", help="report dir (default reports/<timestamp>)")
+    ap.add_argument("--merge", default="", help="join <dir>/shard-*/results.json into <dir>/index.html")
     a = ap.parse_args()
+    BEACON = a.beacon
+    if a.merge:
+        # Shard reports keep their files; the merged report points into them (shard-i/shots/...).
+        r = Run.__new__(Run); r.a, r.out, r.results, r.films, r.journeys = a, os.path.abspath(a.merge), [], [], []
+        for d in sorted(x for x in os.listdir(r.out) if x.startswith("shard-") and os.path.isdir(os.path.join(r.out, x))):
+            f = os.path.join(r.out, d, "results.json")
+            if not os.path.exists(f):
+                r.results.append({"id": d, "kind": "setup", "desc": d, "status": "BLOCKED", "reasons": [f"{d} wrote no results.json (see {d}.log)"], "notes": []})
+                continue
+            got = json.load(open(f))
+            for res in got["results"]:
+                for k in ("shot", "overlay", "frames"):
+                    if res.get(k):
+                        res[k] = f"{d}/{res[k]}"
+                r.results.append(res)
+            for j in got["journeys"]:
+                j["film"] = j["film"] and f"{d}/{j['film']}"
+                r.journeys.append(j)
+            r.films += [(n, f"{d}/{x}") for n, x in got["films"]]
+        r.journeys.sort(key=lambda j: j["id"])
+        # Confirm pass (matrix.sh): the red journeys re-run alone on one simulator. A red that repeats alone is FAIL; one
+        # that passes alone is UNVERIFIED (timing under load, not a verdict). A step the harness could not judge
+        # (BLOCKED) is UNVERIFIED too: the contract's three values are PASS, FAIL, UNVERIFIED.
+        cf = os.path.join(r.out, "confirm", "results.json")
+        alone = {x["id"]: x for x in json.load(open(cf))["results"]} if os.path.exists(cf) else {}
+        for res in r.results:
+            if res["status"] == "BLOCKED":
+                res["status"] = "UNVERIFIED"
+            if res["status"] != "FAIL":
+                continue
+            c = alone.get(res["id"])
+            if c and c["status"] == "PASS":
+                res["status"] = "UNVERIFIED"
+                res["reasons"] = ["red under load, passed alone"] + res["reasons"]
+            elif c and c["status"] == "FAIL":
+                res["notes"].append("confirmed: red again re-run alone (confirm/)")
+            else:
+                res["notes"].append("not confirmed alone: " + (f'confirm run {c["status"]}' if c else "no confirm run"))
+            if c and c.get("frames"):
+                res["notes"].append(f'alone: confirm/{c["frames"]}')
+        by = {x["id"]: x["status"] for x in r.results}
+        for j in r.journeys:
+            got = {by.get(i, "UNVERIFIED") for i in j["steps"]}
+            j["status"] = "FAIL" if "FAIL" in got else "UNVERIFIED" if got - {"PASS"} else "PASS"
+        r.a.catalogue = True
+        r.report()
+        st = {x["status"] for x in r.results}
+        print(f"{len(r.journeys)} journeys, {len(r.results)} steps, report {r.out}/index.html")
+        sys.exit(1 if "FAIL" in st else 2 if st - {"PASS"} else 0)
+    if not a.udid:
+        ap.error("--udid is required")
     if a.rerender:
-        r = Run.__new__(Run); r.a, r.out, r.results = a, os.path.abspath(a.rerender), []
+        r = Run.__new__(Run); r.a, r.out, r.results, r.films, r.journeys = a, os.path.abspath(a.rerender), [], [], []
         for f in sorted(os.listdir(os.path.join(r.out, "steps")), key=lambda f: os.path.getmtime(os.path.join(r.out, "steps", f))):
             res = json.load(open(os.path.join(r.out, "steps", f)))
             if res.get("expect") is not None and res.get("samples"):
