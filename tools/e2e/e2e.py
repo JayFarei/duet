@@ -285,7 +285,10 @@ class Run:
             res["notes"].append(f"not filmed: {s.film_why}")
         t0 = time.time() * 1000
         s.why, s.rebase = "no sample from the page", None
-        first = action(sid, t0)
+        try:
+            first = action(sid, t0)
+        except subprocess.CalledProcessError as x:  # a simctl call failed (simulator gone): this step, not the run
+            first, s.why = None, f"{' '.join(x.cmd[:3])} failed ({x.returncode}): {(x.stderr or '').strip()[:200]}"
         if first is not None and s.rebase:  # the target was scrolled into view first: judge from the tap, on the scrolled page (kb01-02)
             t0, prev = s.t_tap, {"place": shown_place(s.rebase), "key": key(s.rebase)}
             res["prev"] = {"place": prev["place"], "key": prev["key"]}
