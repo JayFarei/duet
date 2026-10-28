@@ -97,13 +97,13 @@ Not covered yet:
 
 1. Open /probe in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
 2. Tap the text field (the keyboard comes up). Expect: controls in a column on the right; the text field has focus; the keyboard is up (data-keyboard).
-3. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; nothing has focus; the keyboard is down.
+3. Tap the page outside the field (the keyboard goes down). Expect: controls in a column on the right; the keyboard is down.
 
 ## kb02: Keyboard up and down, Safari tab, unfolded
 
 1. Open /probe in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
 2. Tap the text field (the keyboard comes up). Expect: controls inline on the right; the text field has focus; the keyboard is up (data-keyboard).
-3. Tap the page outside the field (the keyboard goes down). Expect: controls inline on the right; nothing has focus; the keyboard is down.
+3. Tap the page outside the field (the keyboard goes down). Expect: controls inline on the right; the keyboard is down.
 
 ## mod01: A full-screen page dialog opened and closed (#79), Safari tab
 
@@ -112,6 +112,14 @@ Not covered yet:
 3. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the dialog is open; Duet offers "Close".
 4. Turn the phone upright. Expect: controls in a column on the right; the dialog is open.
 5. Tap Duet's "Close". Expect: controls in a column on the right; the dialog is closed; Duet no longer offers "Close".
+
+## mod03: A sheet's scrim runs on under Safari's top bar, Safari tab, unfolded (#136)
+
+1. Open /sheet in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
+2. Tap "Weekend in Lisbon" (a full-screen dialog opens). Expect: controls inline on the right; the dialog is open.
+3. Turn the phone tall, turned right (90). Expect: controls inline on the right; the dialog is open; Safari's top bar takes the page's colour under it.
+4. Turn the phone wide (951x669). Expect: controls inline on the right; the dialog is open.
+5. Tap Duet's "Close". Expect: controls inline on the right; the dialog is closed.
 
 ## la01: Live Activity expanded by a long press, Safari tab
 

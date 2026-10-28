@@ -211,6 +211,7 @@ def steps_en(start, acts):
 #   dialog      a page dialog is open (True) or not (False)
 #   scroll_gt   the page is scrolled down more than this (pt);  scroll_lt: less than this
 #   la          Live Activities running
+#   bar         Safari's top bar takes the colour of the page under it (a sheet's scrim runs on under the bar, #136)
 # env: dark (appearance), content_size (Dynamic Type), set for the suite and restored after it.
 TAB0, PV0 = ("tab", "closed", 0, False), ("sheet", "closed", 0, False)
 CTA = [  # /book: a class row, its call to action toggling Booked, and Duet's back to the list
@@ -271,6 +272,13 @@ SUITES = [
         (("turn", 0), None, {"dialog": True}),
         (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False, "no_label": "Close"}),
     ]},
+    # Safari tints its bar only without the tab bar (the tall layout here); wide, with tabs, it keeps its own colour.
+    {"id": "mod03", "title": "A sheet's scrim runs on under Safari's top bar, Safari tab, unfolded (#136)", "page": "/sheet", "start": ("tab", "open", 0, False), "steps": [
+        (("tap", "Weekend in Lisbon"), "Tap \"Weekend in Lisbon\" (a full-screen dialog opens)", {"dialog": True}),
+        (("turn", 90), None, {"dialog": True, "bar": True}),
+        (("turn", 0), None, {"dialog": True}),
+        (("tap", "Close"), "Tap Duet's \"Close\"", {"dialog": False}),
+    ]},
     {"id": "la01", "title": "Live Activity expanded by a long press, Safari tab", "page": "/book", "start": ("tab", "closed", 0, True), "steps": [
         (("expand",), "Long-press the Live Activity in the Dynamic Island (it expands)", {}),
         (("blur",), "Tap the page (the Live Activity shrinks back)", {}),
@@ -322,7 +330,8 @@ def check_en(c):
                     "active": lambda: "the text field has focus" if v else "nothing has focus",
                     "dialog": lambda: "the dialog is open" if v else "the dialog is closed",
                     "scroll_gt": lambda: f"the page stays scrolled down (more than {v}pt)", "scroll_lt": lambda: f"the page is at the top (under {v}pt)",
-                    "la": lambda: f"{v} Live Activit{'y' if v == 1 else 'ies'} running"}[k]())
+                    "la": lambda: f"{v} Live Activit{'y' if v == 1 else 'ies'} running",
+                    "bar": lambda: "Safari's top bar takes the page's colour under it" if v else "Safari's top bar keeps its own colour"}[k]())
     return out
 
 

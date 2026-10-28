@@ -41,6 +41,7 @@ SPRING_S = 0.6  # a page change in place (a tap opens a page, a call to action t
 UNPAINTED_S = 0.08  # a sample this long after the page's last frame (requestAnimationFrame) reads a layout nobody sees
 GAP_S = 0.15    # sampling gaps longer than this are reported (the page was throttled)
 ICON_SD = 6.0   # a visible slot icon whose screenshot crop has a luminance stddev under this is not painted
+BAR_TOL = 10    # Safari's top bar matches the page under it when no channel differs by more than this (#136)
 STATE_TIMEOUT = 30
 
 # Rotator orientation per closed-screen angle (fold.bin -deviceOrientation). The page reports landscapeRight as 90.
@@ -308,7 +309,7 @@ class Run:
         s.assess(res, allr, native, expect, t0, kind, prev)
         s.check_icons(res, shot)
         if check:
-            s.verify(res, allr[-1] if allr else None, check, sid, tok, kind)
+            s.verify(res, allr[-1] if allr else None, check, sid, tok, kind, shot)
         sheet = s.stop_record(rec, t0 + (res.get("t") or {}).get("change", 0)) if rec else None
         if sheet:
             res["frames"] = os.path.relpath(sheet, s.out)
@@ -735,8 +736,9 @@ class Run:
 
     # ---- drivers ----------------------------------------------------------------------------------------------
     def url(s, tok):
-        """The page, reporting to this run's beacon (one per simulator in a parallel run, matrix.sh)."""
-        return f"{SITE}{s.page_path}?e2e={urllib.parse.quote(BEACON, safe='')}&s={tok}"
+        """The page, reporting to this run's beacon (one per simulator in a parallel run, matrix.sh). A page may carry its own
+        query (a journey's "/sheet?open")."""
+        return f"{SITE}{s.page_path}{'&' if '?' in s.page_path else '?'}e2e={urllib.parse.quote(BEACON, safe='')}&s={tok}"
 
     def host(s, *args, fresh=False):
         """Launches the e2e host app (fresh: quit it first), pointed at this run's beacon (Live.swift)."""
@@ -1237,7 +1239,16 @@ class Run:
         raise ValueError(action)
 
     # ---- interaction suites (catalogue.SUITES, issue #107) --------------------------------------------------------
-    def verify(s, res, r, check, sid, tok, kind):
+    def bar_colour(s, res, shot):
+        """(Safari's top bar, the page under it) colours in the step's screenshot: the bar 5pt from the top, the page 4pt
+        in from the left edge, half way down. Safari 26 paints its bar in the colour of a fixed box at the top edge, but
+        in the page's own colour for one with a backdrop-filter, so a blurred scrim stops at the bar (#136)."""
+        im, box = s.frame(res, shot)
+        bx, by = box({"x": 20, "y": 5, "w": 0, "h": 0})[:2]
+        px = box({"x": 4, "y": 0, "w": 0, "h": 0})[0]
+        return im.getpixel((round(bx), round(by))), im.getpixel((round(px), round(im.height * 0.5)))
+
+    def verify(s, res, r, check, sid, tok, kind, shot=None):
         """A suite step's own outcome (catalogue.py, interaction suites), on the step's final sample. A label Duet
         folded away is looked for in its menu, opened and closed again as a user would."""
         bad = []
@@ -1269,6 +1280,13 @@ class Run:
                     bad.append(f"page scrolled to {r['scroll']['y']}pt, expected more than {v}")
                 elif k == "scroll_lt" and not r["scroll"]["y"] < v:
                     bad.append(f"page scrolled to {r['scroll']['y']}pt, expected under {v}")
+                elif k == "bar":
+                    try:
+                        bar, page = s.bar_colour(res, shot)
+                    except Exception as e:  # noqa: BLE001
+                        bad.append(f"Safari's bar not checked ({e})"); continue
+                    if (max(abs(a - b) for a, b in zip(bar, page)) <= BAR_TOL) != v:
+                        bad.append(f"Safari's top bar is rgb{bar} over a page of rgb{page}" + (", a solid band" if v else ""))
                 elif k == "la" and (http("GET", "/la/state") or {}).get("count", 0) != v:
                     bad.append(f"Live Activities running: {(http('GET', '/la/state') or {}).get('count', 0)}, expected {v}")
         if bad:

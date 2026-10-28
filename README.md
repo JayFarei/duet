@@ -123,6 +123,12 @@ A modal or sheet on the web usually sits on a full-screen scrim: `position: fixe
   ```
 
   The old workaround, making the scrim `position: absolute` in column mode, still works and is no longer needed.
+- **Blur:** keep `backdrop-filter` off the scrim box itself and put it on a `::before`, so Safari's bar takes the dimmed colour on the open screen instead of a solid band (see [Sheet scrim stops at Safari's bar](#sheet-scrim-stops-at-safaris-bar)):
+
+  ```css
+  .sheet-scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.38); }
+  .sheet-scrim::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(8px); }
+  ```
 - **Not covered:** `<dialog>.showModal()` puts its `::backdrop` in the browser's top layer, above any `z-index`, so it still hides the column (checked on the simulator), and the page outside a modal dialog is inert anyway, so Duet's buttons could not take taps. Use a fixed `<div>` scrim (or `dialog.show()` with your own scrim) when you want the column controls. A page box of your own with `z-index: 2147483647` over the middle of the column edge also beats the guard.
 
 Try it on the [site](https://getduet.dev/sheet).
@@ -410,6 +416,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** keeps `.duet-guard` mounted whenever the page is in Safari on a Duo, in every mode, so no frame of a turn, fold or unfold leaves the edge sample point on the scrim. The guard is invisible and takes no taps, so it changes nothing outside the column.
 - **You do:** nothing.
 - **Status:** [#119](https://github.com/JayFarei/duet/issues/119).
+
+### Sheet scrim stops at Safari's bar
+
+- **You see:** on the open Duo, in a tall Safari window (no tab bar), a sheet's blurred scrim dims the page but stops at Safari's top bar, which stays the undimmed page colour, a solid band over the dimmed page.
+- **Cause:** Safari 26 tints its bar with the colour of the fixed box at the top edge's sample point, but skips that tint for a box with a `backdrop-filter` and falls back to the page colour. Measured on the inner screen: blurred scrim, bar rgb(242,242,247) over a dimmed page of rgb(150,150,153); the same scrim without blur, bar rgb(149,149,153). Wide, with the tab bar, Safari never tints its bar, sheet or not. The closed screen's column is not affected.
+- **Duet does:** nothing it can; the scrim is the page's. The e2e `bar` check (journey mod03) compares the bar with the page under the scrim.
+- **You do:** keep the scrim box to its colour and move the blur to a `::before` (absolute, `inset: 0`, `z-index: -1`, `pointer-events: none`). The blur looks the same and the bar dims with the page. See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
+- **Status:** [#136](https://github.com/JayFarei/duet/issues/136).
 
 ### Sideways swipe pans the page into the column
 
