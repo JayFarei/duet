@@ -133,6 +133,11 @@ def key(r):
     return (g["angle"], g["innerWidth"], g["innerHeight"], g["outerWidth"], g["outerHeight"], kb)
 
 
+def view_h(g):
+    """The page's height a drag can use: the visual viewport, short of a keyboard that only shrinks it."""
+    return min(g["innerHeight"], g.get("visualHeight") or g["innerHeight"])
+
+
 def nav(r):
     return (r.get("navs") or [{}])[0]
 
@@ -1449,15 +1454,26 @@ class Run:
                 x0, y0 = s.page_origin(r, kind)
                 s.t_tap = time.time() * 1000
                 s.sim.tap(x0 + rc["x"] + rc["w"] / 2, y0 + rc["y"] + rc["h"] / 2, hold=0.12)
-            elif k == "scroll":  # slow drags of at most 300pt down the page's left part (clear of a column of controls)
+            elif k == "scroll":  # slow drags of at most 300pt (half a keyboard-short view) down the page's left part (clear of a column of controls)
                 g, (x0, y0) = r["sig"], s.page_origin(r, kind)
-                x, n = x0 + g["innerWidth"] * 0.3, -(-abs(action[1]) // 300)
+                x, n = x0 + g["innerWidth"] * 0.3, -(-abs(action[1]) // min(300, int(view_h(g) * 0.5)))
                 d = abs(action[1]) / n * (1 if action[1] > 0 else -1)
-                y1 = y0 + g["innerHeight"] * (0.75 if d > 0 else 0.25)
+                y1 = y0 + view_h(g) * (0.75 if d > 0 else 0.25)
                 for _ in range(n):
                     s.sim.drag(x, y1, x, y1 - d, ms=500, steps=12, end_hold_ms=200)
                     time.sleep(0.3)
                 land["delay"] = 1.5  # let any momentum settle
+            elif k == "fling":  # fast flicks, down then up alternately, each released moving (momentum), #132
+                g, (x0, y0) = r["sig"], s.page_origin(r, kind)
+                x, h = x0 + g["innerWidth"] * 0.3, view_h(g)
+                for i in range(action[1]):
+                    a, b = (0.8, 0.3) if i % 2 == 0 else (0.3, 0.8)
+                    s.sim.drag(x, y0 + h * a, x, y0 + h * b, ms=120, steps=6, end_hold_ms=0)
+                    time.sleep(0.25)
+                land["delay"] = 2.0
+            elif k == "type":
+                s.sim.text(action[1])
+                land["delay"] = 0.5
             elif k == "native":
                 if not s.tap_native(kind, action[1]):
                     return None
