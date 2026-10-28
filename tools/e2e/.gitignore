@@ -4,3 +4,4 @@ host/Host/Info.plist
 reports/
 .venv/
 fold/fold.bin
+host/Activity/Info.plist
