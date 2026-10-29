@@ -199,6 +199,21 @@ test("previewPending: the sheet's unlaid first frame, before its column and inse
   assert.equal(previewPending({ ...unlaid, standalone: true }), false);
   assert.equal(previewPending({ ...unlaid, userAgent: unlaid.userAgent + " CriOS/130.0" }), false);
 });
+// The full screen preview's first frame (~200ms, iOS 27.1, e2e j37/pvl02): the page is the whole closed screen, window
+// and all, inset 0. No tab reads that: its column and bar are always there (#155).
+test("previewPending: the full screen preview's unlaid first frame, either orientation (#155)", () => {
+  const unlaid = { ...PREVIEW, innerWidth: 466, innerHeight: 678, outerWidth: 466, outerHeight: 678, visualHeight: 678, insetBottom: 0 };
+  assert.equal(isPreview(unlaid), false);
+  assert.equal(previewPending(unlaid), true);
+  assert.equal(stable({ flips: [] }, unlaid, undefined, 0).hidden, "pending");
+  const turned = { ...unlaid, innerWidth: 678, innerHeight: 466, outerWidth: 678, outerHeight: 466, visualHeight: 466, screenWidth: 678, screenHeight: 466, angle: 90 };
+  assert.equal(previewPending(turned), true);
+  assert.equal(previewPending({ ...unlaid, standalone: true }), false);
+  assert.equal(previewPending({ ...unlaid, userAgent: unlaid.userAgent + " CriOS/130.0" }), false);
+  // A tab never: its column, its bar.
+  assert.equal(previewPending(TAB), false);
+  assert.equal(previewPending({ ...TAB, insetBottom: 0 }), false);
+});
 test("the sheet's controls stay hidden until its late inset lands, then show as the preview (#143)", () => {
   const d = { flips: [] };
   const first = stable(d, at("in-app preview, page sheet, first sample"), undefined, 0);

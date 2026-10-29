@@ -237,9 +237,19 @@ export const isPreview = (s: Signals) => previewReason(s) !== undefined;
  *  The inset reads 0 until viewport-fit=cover applies, and the sheet's first frames (~70ms, iOS 27.1, e2e pvl01) even
  *  read the whole 466x678 screen as the page inside its 450x670 window, no column; the pre-paint boot reads just those.
  *  The verdicts were a tab's and its controls showed over the preview's share and reload buttons until hydration
- *  (#143). So: the preview with its inset, or a Safari page in the sheet's window, whatever its page reads. */
+ *  (#143). The full screen preview's first frame (~200ms, iOS 27.1, e2e j37/pvl02) reads the whole screen as both
+ *  window and page, no chrome, no column, inset 0 (#155). So: the preview with its inset, or a Safari page in the
+ *  sheet's window whatever its page reads, or a Safari page that is the whole closed screen. */
 export const previewPending = (s: Signals) => !isPreview(s)
-  && (isPreview({ ...s, insetBottom: 34 }) || (!s.standalone && browserOf(s.userAgent) === "safari" && closedSheet(s)));
+  && (isPreview({ ...s, insetBottom: 34 }) || (!s.standalone && browserOf(s.userAgent) === "safari" && (closedSheet(s) || closedWhole(s))));
+/** The page is the whole closed screen, window and all, in either orientation: no Safari tab reads that, its column
+ *  and bar are always there on the closed Duo (previewPending). */
+function closedWhole(s: Signals): boolean {
+  const [w, h] = DUO_SIZES[0], near1 = (a: number, b: number) => Math.abs(a - b) <= 1;
+  return Math.min(s.screenWidth, s.screenHeight) === w && Math.max(s.screenWidth, s.screenHeight) === h
+    && near1(s.outerWidth, s.screenWidth) && near1(s.outerHeight, s.screenHeight)
+    && near1(s.innerWidth, s.outerWidth) && near1(s.innerHeight, s.outerHeight);
+}
 
 /** The in-app preview on the open screen, default, full screen and over full screen styles (iOS 27.1, e2e matrix
  *  2026-10-27; the sheet is UNFOLDED_SHEETS). No column, and no Safari tab has these chrome and inset pairs (a tab
