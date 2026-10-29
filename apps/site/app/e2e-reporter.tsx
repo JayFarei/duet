@@ -24,6 +24,12 @@ let frameAt = 0;
 // delivered it, and to what (mod01-05, a column X tapped after a turn left the visual viewport short).
 const taps: { t: number; type: string; x: number; y: number; target: string; vv: { y: number; h: number } | null }[] = [];
 
+// Duet's layer as the browser is about to paint it, read whenever a render mounts, shows, hides or changes the mode of a
+// nav: a MutationObserver runs its callback in a microtask after React's commit, before the frame. A frame-long
+// misplacement between two 40ms samples is caught every time (#131: the column layer shown one frame before its
+// scroll follow, about scrollY too high). Each sample carries those taken since the last one.
+const prepaint: unknown[] = [];
+
 function rect(el: Element) {
   const r = el.getBoundingClientRect();
   return { x: Math.round(r.left * 10) / 10, y: Math.round(r.top * 10) / 10, w: Math.round(r.width * 10) / 10, h: Math.round(r.height * 10) / 10 };
@@ -154,6 +160,7 @@ function sample(s: string | null) {
     overflow: out.slice(0, 20), overflowCount: out.length, underControls: under.slice(0, 10),
     targets: targets(),
     taps: taps.slice(),
+    prepaint: prepaint.splice(0),
     dialogs: [...document.querySelectorAll("[role=dialog], dialog[open]")].filter(shown).map(rect),
     content: main ? { main: rect(main), children: [...main.children].slice(0, 16).filter(shown).map((c) => ({ el: label(c), rect: rect(c) })) } : null,
   };
@@ -220,11 +227,25 @@ export function E2EReporter() {
       if (taps.length > 8) taps.shift();
     };
     for (const type of ["touchstart", "pointerdown", "click"]) addEventListener(type, touch, { capture: true, passive: true });
+    const isNav = (n: Node) => n instanceof Element && (n.matches("nav.duet") || !!n.querySelector("nav.duet"));
+    const mo = new MutationObserver((records) => {
+      if (!records.some((m) => m.type === "attributes" ? isNav(m.target) && (m.target as Element).matches("nav.duet") : [...m.addedNodes].some(isNav))) return;
+      prepaint.push({
+        t: Date.now(), visible: document.visibilityState, frameAt, sig: readSignals(), y: scrollY,
+        vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop } : null,
+        navs: [...document.querySelectorAll("nav.duet")].map((n) => ({
+          mode: n.getAttribute("data-mode"), side: n.getAttribute("data-side"), hidden: n.getAttribute("data-hidden"), follow: n.hasAttribute("data-follow"),
+          slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((x) => ({ slot: x.getAttribute("data-duet-slot"), rect: rect(x) })),
+        })),
+      });
+      if (prepaint.length > 20) prepaint.shift();
+    });
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-mode", "data-hidden"] });
     const id = setInterval(() => {
       try { fetch(url, { method: "POST", body: JSON.stringify(sample(s)), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
     }, 40);
     return () => {
-      clearInterval(id); cancelAnimationFrame(raf);
+      clearInterval(id); cancelAnimationFrame(raf); mo.disconnect();
       for (const type of ["touchstart", "pointerdown", "click"]) removeEventListener(type, touch, { capture: true });
     };
   }, []);

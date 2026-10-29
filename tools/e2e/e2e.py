@@ -561,6 +561,24 @@ class Run:
             note.append(f"{lagged} samples off screen in the render right after a viewport resize, not judged")
         if offs:
             bad.append(f"off screen in {len(offs)} samples, first at +{offs[0][0]:.0f}ms: {offs[0][1]}")
+        # 2b. the renders between samples: the reporter also reads the layer before the browser paints each render that
+        # mounts, shows, hides or changes the mode of a nav (prepaint, e2e-reporter.tsx), so a misplacement that lasts
+        # one frame is caught every time, not only when a 40ms sample lands on it (#131: the column layer shown a frame
+        # before its scroll follow, about scrollY too high). Page clock to receiver clock through the carrying sample.
+        pre, seen = [], set()
+        for r in allr:
+            for e in r.get("prepaint") or []:
+                rx = e["t"] + r["rx"] - r["t"]
+                if e["t"] in seen or rx < t0 or e.get("visible") == "hidden":
+                    continue
+                seen.add(e["t"])
+                if e.get("frameAt") and e["t"] - e["frameAt"] > UNPAINTED_S * 1000:
+                    continue
+                o = s.offscreen(e, kind)
+                if o:
+                    pre.append((rx - t0, o[0]))
+        if pre:
+            bad.append(f"off screen before paint in {len(pre)} renders, first at +{pre[0][0]:.0f}ms: {pre[0][1]}")
         # 3. final state
         # A visual viewport short with no keyboard (a turn with a page dialog open, #122): Safari draws its bar at its
         # bottom and takes touches from there down, so a column control below it can't be tapped (#140). The in-app
