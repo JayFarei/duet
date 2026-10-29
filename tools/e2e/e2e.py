@@ -657,7 +657,10 @@ class Run:
             # From the first paint: a slow page (?slowjs) shows its server-rendered controls until it hydrates.
             if s.early:
                 note.append(f"{len(s.early)} samples before hydration")
-            for r in [r for r in s.early + allr if r is not last and shown_place(r) is not None and pose(r) == pose(last)]:
+            # The final history entry only: the native frames are its own, and going back moves them (Back rises a row
+            # when Forward appears), so the route before Duet's back is not judged against the one after it.
+            for r in [r for r in s.early + allr if r is not last and r.get("path") == last.get("path")
+                      and shown_place(r) is not None and pose(r) == pose(last)]:
                 x0, y0 = s.origin(r, kind)
                 hit = [(x["slot"], e["label"]) for x in all_slots(r) for e in native if not (e["label"] == "Address" and e["w"] > 200)
                        and min(x["rect"]["x"] + x0 + x["rect"]["w"], e["x"] + e["w"]) - max(x["rect"]["x"] + x0, e["x"]) > 2
