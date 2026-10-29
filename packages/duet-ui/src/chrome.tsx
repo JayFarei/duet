@@ -215,6 +215,9 @@ function viewport(key: string, value: string) {
   for (const meta of metas) if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
+// useLayoutEffect warns during SSR on React 18.
+const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 // Leaving the column, the sideways scroll the layer pinned stays behind: from a split left pane turned into the tall
 // window (inline), the document kept scrollX -84 with nothing to scroll, and Safari then painted the pill's glass but
 // not its unselected tab icons (e2e round 4, splitturn-left-to90). So when the mode leaves the column (not while the
@@ -230,7 +233,11 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     const t = [0, 300, 1000].map((ms) => setTimeout(reset, ms));
     return () => t.forEach(clearTimeout);
   }, [inColumn]);
-  useEffect(() => {
+  // Before paint: the layer is hidden mid-turn (off), and the render that shows it again also turns the follow back
+  // on. As a passive effect that ran a frame after the paint, so the controls showed once at their document
+  // position, about scrollY above where they belong (e2e scr01, a turn or fold on a scrolled page, #131); see the
+  // bridge below for the animation's own frame.
+  useLayout(() => {
     const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
     if (!on || !els.length) return;
     const html = document.documentElement.style, prev = html.touchAction;
@@ -253,6 +260,14 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     };
     const sizes = timeline ? new ResizeObserver(range) : undefined;
     if (sizes) { range(); sizes.observe(root); sizes.observe(document.body); }
+    // A new animation waits for the next frame's animation update, so the frame that shows the layer drew it
+    // unfollowed even with the follow on before paint. A transform holds it in place for that frame; the running
+    // animation overrides it, and it is dropped once the animation has run (#131).
+    let bridge = 0;
+    if (timeline && scrollY) {
+      for (const el of els) el.style.transform = `translateY(${scrollY}px)`;
+      bridge = requestAnimationFrame(() => { bridge = requestAnimationFrame(() => { for (const el of els) el.style.transform = ""; }); });
+    }
     // The layer's positions are document coordinates, from an absolute box at the document's left edge. A page whose
     // <body> (or <html>) is positioned makes that its containing block, which body margins, or the margins that move
     // the page beside a left column (pageInsets), move off the document's edge: measured, and undone with
@@ -296,7 +311,7 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     addEventListener("pageshow", follow);
     addEventListener("pointerdown", tap);
     return () => {
-      html.touchAction = prev; sizes?.disconnect();
+      html.touchAction = prev; sizes?.disconnect(); cancelAnimationFrame(bridge);
       for (const el of els) { el.style.transform = ""; el.style.translate = ""; el.style.removeProperty("--duet-scroll-max"); delete el.dataset.follow; }
       t.forEach(clearTimeout);
       removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pageshow", follow);
@@ -349,9 +364,6 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
 }
 
 // --- rendering ----------------------------------------------------------------------------------
-
-// useLayoutEffect warns during SSR on React 18.
-const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** How long a slot that went away stays mounted while it pops out (duet.css, duet-leave). */
 const LEAVE_MS = 450;
