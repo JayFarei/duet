@@ -1,0 +1,77 @@
+/* The templated column prototype (column-proto.tsx, #169). Colours come from site.css. */
+.cp-desk { min-height: 100dvh; display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
+.cp-device { border-radius: 38px; overflow: hidden; box-shadow: 0 0 0 10px #1c1c1e, 0 0 0 11px rgb(255 255 255 / 0.12), 0 30px 80px rgb(0 0 0 / 0.35); }
+
+.cp-stage { position: relative; overflow: clip; background: var(--bg); color: var(--ink); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.cp-stage[data-real] { position: absolute; left: 0; top: 0; }
+.cp-stage button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+
+/* Safari's own column, drawn when emulating: its tint, the island, and its buttons as flat discs. */
+.cp-safari { position: absolute; top: 0; bottom: 0; z-index: 2; pointer-events: none; }
+.cp-safari::before { content: ""; position: absolute; inset: 0; background: var(--wd-col); z-index: -1; }
+.cp-island { position: absolute; width: 37px; border-radius: 99px; background: #000; }
+.cp-native { position: absolute; width: 49px; height: 49px; border-radius: 99px; background: var(--wd-glass); box-shadow: 0 0 0 0.5px var(--line); opacity: 0.55; }
+.cp-native::after { content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 3px; border-radius: 2px; background: var(--dim); }
+.cp-band { position: absolute; width: 61px; border-radius: 30px; outline: 1px dashed rgb(255 149 0 / 0.55); outline-offset: -1px; }
+
+/* The sidebar sits under the page card; the card slides fully away. */
+.cp-sidebar { position: absolute; left: 0; top: 0; z-index: 0; box-sizing: border-box; padding: 58px 14px 24px; overflow: auto; background: var(--bg); opacity: 0.6; translate: -40px 0; transition: translate var(--cp-slide-ms) var(--cp-slide), opacity 300ms ease; }
+.cp-sidebar[data-open] { opacity: 1; translate: 0 0; }
+.cp-side-title { font: 700 28px/1.1 -apple-system, system-ui; padding: 0 10px 14px; }
+.cp-side-head { font: 600 13px/1 -apple-system, system-ui; color: var(--dim); padding: 22px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cp-stage .cp-side-row { display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-stage .cp-side-row:active, .cp-stage .cp-side-row[data-current] { background: var(--line); }
+
+.cp-card { position: absolute; left: 0; top: 0; z-index: 1; background: var(--bg); transition: translate var(--cp-slide-ms) var(--cp-slide), border-radius 300ms ease, box-shadow 300ms ease; }
+.cp-card[data-open] { border-radius: 28px; box-shadow: 0 0 0 0.5px var(--line), -12px 0 40px rgb(0 0 0 / 0.18); overflow: hidden; }
+.cp-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 18px 0 18px; box-sizing: border-box; }
+
+/* The page. */
+.cp-head { padding: 54px 0 12px; }
+.cp-eyebrow { font: 600 13px/1 -apple-system, system-ui; color: var(--cta); text-transform: uppercase; letter-spacing: 0.05em; }
+.cp-head h1 { margin: 8px 0 6px; font: 700 30px/1.1 -apple-system, system-ui; letter-spacing: -0.01em; }
+.cp-head p { margin: 0; color: var(--dim); font-size: 15px; line-height: 1.4; }
+.cp-card-box { background: var(--card); border-radius: 18px; padding: 6px 14px; margin: 14px 0; }
+.cp-knob { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; font-size: 15px; }
+.cp-knob + .cp-knob { border-top: 0.5px solid var(--line); }
+.cp-seg { display: flex; padding: 2px; border-radius: 9px; background: var(--line); }
+.cp-stage .cp-seg button { min-width: 30px; height: 28px; padding: 0 9px; border-radius: 7px; font-size: 13px; font-weight: 500; }
+.cp-stage .cp-seg button[data-on] { background: var(--card); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
+.cp-product { display: flex; gap: 14px; align-items: center; background: var(--card); border-radius: 18px; padding: 12px; margin: 14px 0; }
+.cp-product-img { width: 64px; height: 64px; border-radius: 12px; background: linear-gradient(135deg, #6b7a4b, #3f4a2b); flex: none; }
+.cp-product-name { font-weight: 600; font-size: 17px; }
+.cp-dim { color: var(--dim); font-size: 14px; margin-top: 2px; }
+.cp-text { font-size: 16px; line-height: 1.5; margin: 0 0 14px; }
+
+/* Safari's bottom bar under the page, drawn when emulating. */
+.cp-bar { position: absolute; left: 0; bottom: 0; z-index: 2; background: var(--wd-col); }
+.cp-bar::after { content: ""; position: absolute; left: 16px; right: 16px; top: 14px; height: 44px; border-radius: 22px; background: var(--wd-glass); box-shadow: 0 0 0 0.5px var(--line); }
+.cp-scrim { position: absolute; inset: 0; z-index: 3; }
+
+/* The template: glass capsules of 49pt buttons on Duo's pitch. */
+[data-cp-col] { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.cp-group { position: absolute; pointer-events: auto; border-radius: 25px; overflow: hidden; background: var(--wd-glass); box-shadow: 0 0 0 0.5px var(--line), 0 6px 20px rgb(0 0 0 / 0.12); -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); transition: left var(--cp-group-ms) var(--cp-group), width var(--cp-group-ms) var(--cp-group), top var(--cp-group-ms) var(--cp-group), height var(--cp-group-ms) var(--cp-group), background 200ms ease; }
+.cp-stage .cp-btn { position: absolute; left: 0; height: 49px; display: grid; place-items: center; transition: width var(--cp-group-ms) var(--cp-group), scale 120ms ease; }
+.cp-stage .cp-btn:active { scale: 0.9; }
+.cp-group[data-primary] { background: var(--cta); color: #fff; box-shadow: 0 6px 20px rgb(0 122 255 / 0.35); }
+.cp-group[data-armed="done"] { background: #34c759; box-shadow: 0 6px 20px rgb(52 199 89 / 0.35); }
+
+/* The checkout: the bag, then the capsule stretches into the page as the island's confirm. */
+.cp-checkout { display: flex; align-items: center; justify-content: flex-end; gap: 10px; width: 100%; height: 100%; padding: 0 14px; box-sizing: border-box; color: #fff; }
+.cp-checkout-icon { display: grid; place-items: center; flex: none; }
+.cp-checkout-label { font: 600 17px/1 -apple-system, system-ui; white-space: nowrap; overflow: hidden; max-width: 0; opacity: 0; filter: blur(6px); transition: max-width var(--cp-group-ms) var(--cp-group), opacity 220ms ease 80ms, filter 260ms ease 80ms; }
+.cp-checkout[data-state="idle"] { justify-content: center; padding: 0; }
+.cp-checkout:not([data-state="idle"]) .cp-checkout-label { max-width: 160px; opacity: 1; filter: none; }
+.cp-checkout:not([data-state="idle"]) { flex-direction: row-reverse; justify-content: center; }
+
+/* The liquid "…" menu: one glass blob animated by Morph, its list centred at the final size. */
+.cp-blob { position: absolute; z-index: 5; overflow: hidden; border-radius: 26px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line), 0 18px 50px rgb(0 0 0 / 0.25); }
+.cp-menu { position: absolute; left: 50%; top: 50%; translate: -50% -50%; box-sizing: border-box; padding: 6px; overflow-y: auto; transform-origin: 50% 50%; }
+.cp-menu-head { height: 26px; padding: 4px 12px 0; font: 600 13px/1 -apple-system, system-ui; color: var(--dim); box-sizing: border-box; }
+.cp-stage .cp-row { display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 12px; border-radius: 14px; font-size: 17px; text-align: left; white-space: nowrap; }
+.cp-stage .cp-row:active { background: var(--line); }
+
+.cp-toast { position: absolute; z-index: 6; translate: -50% 0; padding: 10px 16px; border-radius: 99px; background: var(--ink); color: var(--bg); font: 500 15px/1 -apple-system, system-ui; pointer-events: none; animation: cp-toast 1.6s ease both; }
+@keyframes cp-toast { 0% { opacity: 0; translate: -50% 10px; } 12%, 80% { opacity: 1; translate: -50% 0; } 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) { .cp-card, .cp-sidebar, .cp-group, .cp-btn { transition-duration: 1ms !important; } }

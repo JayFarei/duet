@@ -17,6 +17,9 @@ importers:
 
   apps/site:
     dependencies:
+      '@haptics/react':
+        specifier: 2.1.1
+        version: 2.1.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       duet-ui:
         specifier: workspace:*
         version: link:../../packages/duet-ui
@@ -406,6 +409,15 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@haptics/core@2.1.0':
+    resolution: {integrity: sha512-A7M8wo/OOoSyDKV7UQ4x+J/Pvd+5SnXWznJovExTtCXt2zJq/jZDCj6bThAJZYICnO29U5BWuO3dS65oP2cqnQ==}
+
+  '@haptics/react@2.1.1':
+    resolution: {integrity: sha512-QtvioM2WMN7lyDMZZqCcxshfytYAF3jU3fMU+07uHpAYKlxhVqcaeMawJAgnZa2lPMZmYo6dbMVFLstlbZ1BsQ==}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -1291,6 +1303,14 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@haptics/core@2.1.0': {}
+
+  '@haptics/react@2.1.1(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+    dependencies:
+      '@haptics/core': 2.1.0
+      react: 19.3.0
+      react-dom: 19.3.0(react@19.3.0)
 
   '@img/colour@1.1.0':
     optional: true
