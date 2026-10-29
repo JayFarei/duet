@@ -1,6 +1,6 @@
 {
   "name": "duet-ui",
-  "version": "0.6.0",
+  "version": "0.6.1-rc.1",
   "description": "Native-feeling controls for React web apps on the foldable iPhone: the side strip, Safari's column, split view and Home Screen apps.",
   "license": "MIT",
   "type": "module",

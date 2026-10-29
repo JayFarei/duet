@@ -106,9 +106,10 @@ def address(path):
 
 def duet_buttons(r, back=False):
     """[(label, rect)] of Duet's shown buttons in a sample, an open menu's items included. back: only Duet's back (its
-    slot, or a plain menu item), not a tab of the same name ("Classes" is /book's back and its first tab)."""
+    slot, the template's actions group since 0.6.0, or a plain menu item), not a tab of the same name ("Classes" is
+    /book's back and its first tab)."""
     return [(b["label"], b["rect"]) for n in live_navs(r) for g in (n.get("slots") or []) + (n.get("menus") or []) for b in g.get("buttons") or []
-            if not back or g.get("slot") == "back" or b.get("role") == "menuitem"]
+            if not back or g.get("slot") in ("back", "actions") or b.get("role") == "menuitem"]
 
 
 def menu_items(r):
@@ -618,7 +619,8 @@ class Run:
                 t_ok, lim = max(t_ok, t_final), SLIDE_S
                 rects = lambda r: {x["slot"]: x["rect"] for x in all_slots(r)}
                 end = rects(last)
-                content = lambda r: (sorted(rects(r)), sorted(l for l, _ in duet_buttons(r)))
+                # The primary arming into its pill (or disarming) is a change in place too, with or without a new label (#191).
+                content = lambda r: (sorted(rects(r)), sorted(l for l, _ in duet_buttons(r)), rects(r).get("primary", {}).get("w", 0) > 60)
                 chg = [r for r in allr if r["rx"] >= t_ok and shown_place(r) is not None and content(r) != content(last)]
                 if chg:
                     t_ok, lim = chg[-1]["rx"], SPRING_S
@@ -1591,6 +1593,10 @@ class Run:
                     a, b = (0.8, 0.3) if i % 2 == 0 else (0.3, 0.8)
                     s.sim.drag(x, y0 + h * a, x, y0 + h * b, ms=120, steps=6, end_hold_ms=0)
                     time.sleep(0.25)
+                land["delay"] = 2.0
+            elif k == "drags":  # exact drags in device points, each ((x1, y1), (x2, y2), ms), released moving (#191)
+                for (xa, ya), (xb, yb), ms in action[1]:
+                    s.sim.drag(xa, ya, xb, yb, ms=ms, steps=6, end_hold_ms=0)
                 land["delay"] = 2.0
             elif k == "type":
                 s.sim.text(action[1])

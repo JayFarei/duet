@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1-rc.1
+
+- A primary folded into "…" arms on the first tap (its row takes the tint and reads `confirm`, the list stays open) and runs on the second, like its own capsule. It ran at once. Closing the list disarms it. A folded primary that ran in one tap now takes two; pass `confirm: false` to keep one. New pure export `primaryTap(armed, confirm)` (#191).
+- The armed capsule's accessible name is its `confirm` text ("Cancel booking"), as shown; it kept the plain label.
+- Column controls after a fast flick up then down in a closed Safari tab (#191): not reproduced. The report's own captures show the controls in place in every Safari frame (the one capture without them is the Home Screen), and repeated runs of the exact flick keep them. New e2e suite `scr06` guards it.
+- README: the folded primary, the `z-index: 50` stacking of the controls (an overlay at the same level mounted later covers the inline close), `<DuoCookie>`'s one reload on an unseen device, and the panes example without the removed `back` prop.
+
 ## 0.6.0
 
 The templated column (#181). Breaking: the chrome is rebuilt around one template, the same on every layout.

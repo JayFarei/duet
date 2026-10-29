@@ -41,7 +41,7 @@ export function DuetPanes({ path, at, expanded = false, panes }: DuetPanesProps)
   );
 }
 
-/** Navigation state for <DuetPanes>: `go` focuses a pane, `back` is ready for <Duet back>: it leaves full
+/** Navigation state for <DuetPanes>: `go` focuses a pane, `back` (`{ onPress }` or false) backs a Back action of your own: it leaves full
  *  screen first, then steps back along the path, and is false when that would change nothing on screen.
  *  `expanded`/`toggle` drive the full-screen toggle and `close` closes the focused pane (back to the pair
  *  before it), both ready for <DuetPaneBar>. */
