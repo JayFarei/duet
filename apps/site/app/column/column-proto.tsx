@@ -280,8 +280,8 @@ function Proto() {
   };
 
   // Safari's column is not hit-tested: route a touch there by coordinates, as useColumnLayer does, and give it the
-  // haptic the switch overlay can't. The press acts on pointerdown, but iOS only ticks with user activation, which
-  // the touch end grants and pointerdown doesn't, so the haptic waits for pointerup/touchend (when WebKit sends one).
+  // haptic the switch overlay can't. The press acts on pointerdown, but iOS only ticks inside a user gesture, so the
+  // haptic waits for touchend: WebKit sends the column pointerup first, with activation set but no tick on the device.
   const pressRef = useRef(press);
   pressRef.current = press;
   useEffect(() => {
@@ -304,7 +304,11 @@ function Proto() {
       }
       document.querySelector(".cp-scrim")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     };
-    const up = () => { if (haptic) trigger(haptic as Parameters<typeof trigger>[0]); haptic = undefined; };
+    const up = (e: Event) => {
+      if (e.type === "pointerup" && (e as PointerEvent).pointerType === "touch") return;
+      if (haptic) trigger(haptic as Parameters<typeof trigger>[0]);
+      haptic = undefined;
+    };
     pin();
     addEventListener("pointerdown", down);
     addEventListener("pointerup", up);
@@ -326,7 +330,9 @@ function Proto() {
       const x = (e as PointerEvent).clientX ?? (e as TouchEvent).changedTouches?.[0]?.clientX;
       const t = e.target as Element;
       const ua = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive;
-      setProbe((l) => [`${e.type} x=${Math.round(x ?? -1)} t=${t?.nodeName}${t?.className ? "." + String(t.className).split(" ")[0] : ""} ua=${ua}`, ...(l ?? [])].slice(0, 14));
+      const line = `${e.type} x=${Math.round(x ?? -1)} t=${t?.nodeName}${t?.className ? "." + String(t.className).split(" ")[0] : ""} ua=${ua}`;
+      setProbe((l) => [line, ...(l ?? [])].slice(0, 14));
+      navigator.sendBeacon("/api/lab-trace", JSON.stringify({ probe: line })); // dev: lands in $DUET_TRACE
     };
     const types = ["touchstart", "touchend", "touchcancel", "pointerdown", "pointerup", "pointercancel", "click"];
     for (const t of types) addEventListener(t, log, { capture: true });

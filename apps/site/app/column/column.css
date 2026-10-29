@@ -33,6 +33,9 @@
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
 .cp-stage { position: relative; overflow: clip; background: var(--bg); color: var(--ink); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
 .cp-stage[data-real] { position: absolute; left: 0; top: 0; }
+/* The haptics switch overlay focuses its button on tap (host.focus()), and the group clips that focus ring to a blue
+   line across the capsule. iOS controls show no ring on touch either. */
+.cp-stage button:focus { outline: none; }
 /* On the Duo the stage is an in-document box (Safari's column paints overflow, not fixed boxes) running on under the
    URL bar, as duet-ui's scroller: the document itself never scrolls, only .cp-scroll does. */
 html:has(.cp-stage[data-real]), html:has(.cp-stage[data-real]) > body { height: 100%; margin: 0; overscroll-behavior: none; }
