@@ -279,35 +279,23 @@ function Proto() {
     } else { closeMenu(); say(s.item.label); }
   };
 
-  // Safari's column is not hit-tested: route a touch there by coordinates, as useColumnLayer does, and give it the
-  // haptic the switch overlay can't. iOS ticks only inside a trusted click, and WebKit synthesizes one for a column tap
-  // only when the root is clickable (cursor pointer plus a click listener) and the touch leaves the page unchanged, so
-  // pointerdown just finds the button and the trusted click presses it and ticks.
+  // Safari's column is not hit-tested: route a touch there by coordinates, as useColumnLayer does, and
+  // press on pointerdown. No haptic: iOS 27 buzzes only for a switch the finger itself lands on, and a column tap hits
+  // <html>, never the button's switch overlay. Ticking from code, even in a trusted click, stays silent (#169 trace).
   const pressRef = useRef(press);
   pressRef.current = press;
   useEffect(() => {
     if (!real || f.kind !== "column") return;
-    const html = document.documentElement.style, prev = html.cssText;
+    const html = document.documentElement.style, prev = html.touchAction;
     html.touchAction = "pan-y";
-    html.cursor = "pointer";
-    html.setProperty("-webkit-tap-highlight-color", "transparent");
-    let hit: HTMLButtonElement | undefined;
-    const tap = (e: MouseEvent) => {
-      if (!e.isTrusted || !hit) return;
-      const b = hit; hit = undefined;
-      b.click();
-      if (b.dataset.haptic) trigger(b.dataset.haptic as Parameters<typeof trigger>[0]);
-    };
-    document.documentElement.addEventListener("click", tap);
     const pin = () => { if (Math.round(scrollX) !== 0) scrollTo({ left: 0, top: scrollY, behavior: "instant" }); };
     const down = (e: PointerEvent) => {
-      hit = undefined;
       if (e.clientX < innerWidth) return;
       for (const b of document.querySelectorAll<HTMLButtonElement>("[data-cp-col] button")) {
         const r = b.getBoundingClientRect();
         if (getComputedStyle(b).visibility === "hidden") continue;
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-          hit = b;
+          b.click();
           return;
         }
       }
@@ -317,12 +305,11 @@ function Proto() {
     addEventListener("pointerdown", down);
     addEventListener("scroll", pin, { passive: true });
     return () => {
-      html.cssText = prev;
-      document.documentElement.removeEventListener("click", tap);
+      html.touchAction = prev;
       removeEventListener("pointerdown", down);
       removeEventListener("scroll", pin);
     };
-  }, [real, f.kind, trigger]);
+  }, [real, f.kind]);
 
   // ?probe=1: what a column touch delivers (events, user activation), for the haptics investigation.
   const [probe, setProbe] = useState<string[] | null>(null);
