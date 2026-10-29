@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, Pointer, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
+import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, Lock, MessageSquareShare, MessageSquareText, PanelBottom, Pointer, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
 import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
@@ -59,7 +59,8 @@ function Caption({ where, note, live }: { where: string; note: string; live?: bo
 // displays frame /duo3d/screen, which draws what the 2D web Duo draws on its screen. The fold is duo's: an angle,
 // 0 closed to 180 open, eased there by duo itself.
 /** embed: the landing page's stage, no card, sized to its container and touring on its own while on screen. The
- *  device takes no touches until the reader asks to try it, so a swipe over it still scrolls the page. */
+ *  device takes no touches until the reader asks to try it, so a swipe over it still scrolls the page, and the lock
+ *  under it puts it back that way. */
 export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const [s, setS] = useState<State>(TOUR[0]);
   const [deg, setDeg] = useState(0);
@@ -89,6 +90,8 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   useEffect(send, [deg, pose.roll, pose.pitch]); // eslint-disable-line react-hooks/exhaustive-deps
   // The camera eases back in front of the device, after a drag has orbited it.
   const front = () => duo.current?.contentWindow?.postMessage({ reset: true }, "*");
+  // The landing page's stage locks again the way it started: the device in front, touring, and a swipe over it scrolls.
+  const lock = () => { front(); setManual(false); if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setTour(true); };
   useEffect(() => {
     const hi = (e: MessageEvent) => { if (e.source === duo.current?.contentWindow && (e.data?.live || e.data?.ready)) send(); };
     addEventListener("message", hi);
@@ -244,10 +247,10 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   );
 
   // Rotate, fold and the camera act on the device itself, so they sit right under it. Reset view is always in reach,
-  // since a stray drag or swipe orbits the model.
+  // since a stray drag or swipe orbits the model; on the landing page it also locks the stage, so the page scrolls again.
   const handle = (
     <div style={{ alignSelf: "center", width: list ? "calc(100% - 24px)" : "min(380px, calc(100% - 32px))", margin: list ? "4px 0 6px" : "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
-      {turns}<span style={{ width: 8 }} />{fold}<span style={{ width: 8 }} /><Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>
+      {turns}<span style={{ width: 8 }} />{fold}<span style={{ width: 8 }} />{embed ? <Square42 label="Lock, reset view" onClick={lock}><Lock size={18} /></Square42> : <Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>}
     </div>
   );
 
