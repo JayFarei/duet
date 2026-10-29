@@ -78,7 +78,9 @@ type Frame = {
   kind: "column" | "inline";
   /** The in-app preview's column: one button of room, so only "…". */
   preview?: boolean;
-  sw: number; ph: number; pw: number; insetTop: number;
+  /** ph: the page clear of Safari's chrome (controls and menus stay in it); full: the page box, which runs on under
+   *  Safari's floating URL bar in the column (duet-ui's --duet-inset-bottom), so nothing below the page is blank. */
+  sw: number; ph: number; full: number; pw: number; insetTop: number;
   cx: number; top: number; bottom: number;
   /** The page-side edge the menu buds past: the column's inner edge, or the strip's. */
   edge: number;
@@ -97,11 +99,11 @@ function frameOf(c: Context, la: boolean): Frame {
   const band = columnBand(c);
   if (band) {
     const cx = c.screenWidth - EDGE, top = band.top - (la ? 0 : band.reach);
-    return { kind: "column", preview: c.preview, sw: c.screenWidth, ph: c.height, pw: c.width, insetTop: c.insetTop, cx, top, bottom: band.bottom, edge: c.width,
+    return { kind: "column", preview: c.preview, sw: c.screenWidth, ph: c.height, full: Math.max(c.height, c.screenHeight - c.offsetTop), pw: c.width, insetTop: c.insetTop, cx, top, bottom: band.bottom, edge: c.width,
       ...(!c.preview && { safari: { back: la ? 264.3 : 174, island: la ? 146.3 : 62 } }) };
   }
   const cx = c.width - 8 - C / 2;
-  return { kind: "inline", sw: c.width, ph: c.height, pw: c.width, insetTop: c.insetTop, cx, top: c.insetTop + 20, bottom: c.height - (c.insetBottom ?? 0) - 20, edge: cx - C / 2 - 4 };
+  return { kind: "inline", sw: c.width, ph: c.height, full: c.height, pw: c.width, insetTop: c.insetTop, cx, top: c.insetTop + 20, bottom: c.height - (c.insetBottom ?? 0) - 20, edge: cx - C / 2 - 4 };
 }
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -130,59 +132,73 @@ function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
 }
 
 /** One spring drives the whole morph, so it is a single continuous expansion and retraction, interruptible either
- *  way with its velocity kept. Every edge of the shape follows that one value, each through its own curve: the inner
- *  edge (toward the page) leads, the outer edge follows fast so the shape clears Safari's rail early, and the
- *  height grows late, so it only swells once it is past the rail and never under Safari's buttons. The glass fills
- *  to the menu's card, the capsule's buttons blur out early and the list blurs in late, on the same value. */
-const MORPH_SPRING = { stiffness: 230, damping: 25 };
+ *  way with its velocity kept. iOS's path (60fps captures of the native menu): the capsule swells on the press, then
+ *  grows tall before it grows wide, its column-side edge going almost straight to its place while the page-side
+ *  edge reaches out; the list shows from the start, scaled with the glass and blurred, sharpening late. Closing
+ *  runs the same curves back, so the width goes first and the height last, but the tint and the list leave at once
+ *  (time-based, ~110ms) and what collapses into the button is clear glass. */
+const MORPH_OPEN = { stiffness: 300, damping: 30 }, MORPH_CLOSE = { stiffness: 380, damping: 37 };
+const CLEAR_MS = 110;
+/** Dev: `?slow=N` runs the morph N times slower, to inspect it frame by frame. */
+const SLOW = typeof location === "undefined" ? 1 : Math.max(1, Number(new URLSearchParams(location.search).get("slow")) || 1);
 /** s plus k·s(1-s)²: 0 to 1 with slope 1 at 1 (so a spring's overshoot carries on smoothly), leading for k > 0
  *  (up to 3), lagging for k < 0 (down to -1). */
 const lead = (s: number, k: number) => s + k * s * (1 - s) * (1 - s);
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
-function Morph({ open, from, slots, edge, box, onClosed, children }: { open: boolean; from: Rect; slots: Slot[]; edge: number; box: Rect; onClosed: () => void; children: ReactNode }) {
+function Morph({ open, from, slots, box, onClosed, children }: { open: boolean; from: Rect; slots: Slot[]; box: Rect; onClosed: () => void; children: ReactNode }) {
   const blob = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null);
-  const st = useRef({ s: 0, v: 0, raf: 0, last: 0 });
+  const st = useRef({ s: 0, v: 0, raf: 0, last: 0, clear: 0 });
   const closed = useRef(onClosed);
   closed.current = onClosed;
-  const draw = (s: number) => {
+  /** `clear`: how far the closing fade has run, 0 (none) to 1 (clear glass). */
+  const draw = (s: number, clear: number) => {
     const el = blob.current, fl = fill.current, b = body.current, fc = face.current;
     if (!el || !fl || !b || !fc) return;
     // Toward the page is -x when the menu sits left of the capsule (the column), else +x.
     const left = box.x + box.w / 2 < from.x + from.w / 2;
-    const inner = lead(lead(s, 2.5), 1.2), outer = lead(lead(s, 2.5), 2.5), grow = lead(lead(s, -1), -1);
-    const x0 = left ? from.x : from.x + from.w, x1 = left ? box.x : box.x + box.w; // inner edge
-    const o0 = left ? from.x + from.w : from.x, o1 = left ? box.x + box.w : box.x; // outer edge
-    const xi = mix(x0, x1, inner), xo = mix(o0, o1, outer);
-    const top = mix(from.y, box.y, grow), bottom = mix(from.y + from.h, box.y + box.h, grow);
-    const l = Math.min(xi, xo), w = Math.max(C * 0.8, Math.abs(xo - xi)), h = Math.max(C * 0.8, bottom - top);
-    const r = mix(Math.min(w, h) / 2, 26, clamp01(grow * 1.4));
-    el.style.cssText = `left:${l}px;top:${top}px;width:${w}px;height:${h}px;border-radius:${r}px;box-shadow:0 0 0 0.5px var(--line),0 ${6 + 12 * s}px ${20 + 30 * s}px rgb(0 0 0/${0.12 + 0.13 * clamp01(s)})`;
-    fl.style.opacity = String(clamp01(s * 2.2));
-    const f = clamp01(1 - s / 0.28);
-    fc.style.cssText = `width:${from.w}px;height:${from.h}px;opacity:${f};filter:blur(${(1 - f) * 6}px);scale:${mix(0.85, 1, f)}`;
-    const m = clamp01((s - 0.3) / 0.55), sc = Math.min(w / box.w, 1) * 0.25 + 0.75;
-    // At rest: no filter or scale, so WebKit rasterises the list sharp.
-    b.style.cssText = `width:${box.w}px;height:${box.h}px;opacity:${m}` + (s > 0.999 && s < 1.001 ? "" : `;filter:blur(${(1 - m) * 8}px);scale:${mix(sc, 1, m)}`);
+    const tall = lead(lead(s, 3), 1.5), wide = lead(lead(s, -1), -0.6), outer = lead(lead(s, 3), 3);
+    // The press swell: up to 1.2x, over before the shape leaves the capsule's size.
+    const swell = 1 + 0.2 * Math.sin(Math.PI * clamp01(s / 0.3));
+    const w = Math.max(from.w * swell, mix(from.w, box.w, wide)), h = Math.max(from.h * swell, mix(from.h, box.h, tall));
+    const o = mix(left ? from.x + from.w : from.x, left ? box.x + box.w : box.x, outer) + (left ? 1 : -1) * (w - mix(from.w, box.w, wide)) / 2;
+    const l = left ? o - w : o;
+    const cy = mix(from.y + from.h / 2, box.y + box.h / 2, tall), top = cy - h / 2;
+    const r = mix(Math.min(w, h) / 2, 28, clamp01((wide - 0.15) / 0.6));
+    el.style.cssText = `left:${l}px;top:${top}px;width:${w}px;height:${h}px;border-radius:${r}px`;
+    const keep = 1 - clear;
+    fl.style.opacity = String(clamp01(s * 2.5) * keep);
+    const f = clamp01(1 - s / 0.18);
+    fc.style.cssText = `width:${from.w}px;height:${from.h}px;opacity:${f};filter:blur(${(1 - f) * 4}px)`;
+    // The list rides the glass: one uniform scale from its width, blur clearing late.
+    const m = clamp01((s - 0.04) / 0.2) * keep, sharp = clamp01((s - 0.45) / 0.45), sc = Math.min(1, w / box.w);
+    // At rest: no filter or scale, so WebKit rasterises the list sharp, and only then does it scroll.
+    const rest = s > 0.999 && s < 1.001 && !clear;
+    b.toggleAttribute("data-rest", rest);
+    b.style.cssText = `width:${box.w}px;height:${box.h}px;opacity:${m}` + (rest ? "" : `;filter:blur(${(1 - sharp) * 10}px);scale:${sc}`);
   };
   useLayoutEffect(() => {
-    const k = st.current, target = open ? 1 : 0;
+    const k = st.current, target = open ? 1 : 0, sp = open ? MORPH_OPEN : MORPH_CLOSE;
     cancelAnimationFrame(k.raf);
-    draw(k.s);
+    const t0 = performance.now();
+    if (open) k.clear = 0;
+    draw(k.s, k.clear);
     k.last = 0;
     const tick = (t: number) => {
-      const dt = k.last ? Math.min(0.032, (t - k.last) / 1000) : 1 / 60;
+      const dt = k.last ? Math.min(0.032, (t - k.last) / 1000) / SLOW : 1 / 60 / SLOW;
       k.last = t;
       // Semi-implicit Euler in 4 substeps: stable at 120Hz and 30Hz alike.
       for (let i = 0; i < 4; i++) {
-        const a = -MORPH_SPRING.stiffness * (k.s - target) - MORPH_SPRING.damping * k.v;
+        const a = -sp.stiffness * (k.s - target) - sp.damping * k.v;
         k.v += a * dt / 4;
         k.s += k.v * dt / 4;
       }
-      if (!open && k.s <= 0.002) { k.s = 0; draw(0); closed.current(); return; }
-      if (open && Math.abs(k.s - 1) < 0.0015 && Math.abs(k.v) < 0.02) { k.s = 1; k.v = 0; draw(1); return; }
-      draw(k.s);
+      if (!open) k.clear = Math.max(k.clear, clamp01((t - t0) / (CLEAR_MS * SLOW)));
+      // Settle on both ends alike: the leads multiply s near 0 by up to ~16, so an early cut lands visibly off the capsule.
+      if (!open && Math.abs(k.s) < 0.0015 && Math.abs(k.v) < 0.02) { k.s = 0; k.v = 0; draw(0, 1); closed.current(); return; }
+      if (open && Math.abs(k.s - 1) < 0.0015 && Math.abs(k.v) < 0.02) { k.s = 1; k.v = 0; draw(1, 0); return; }
+      draw(k.s, k.clear);
       k.raf = requestAnimationFrame(tick);
     };
     k.raf = requestAnimationFrame(tick);
@@ -191,10 +207,11 @@ function Morph({ open, from, slots, edge, box, onClosed, children }: { open: boo
   return (
     <div ref={blob} className="cp-blob" style={{ left: from.x, top: from.y, width: from.w, height: from.h, borderRadius: C / 2 }}>
       <div ref={fill} className="cp-fill" style={{ opacity: 0 }} aria-hidden />
+      <i className="cp-rim" aria-hidden />
       <div ref={face} className="cp-face" style={{ width: from.w, height: from.h }} aria-hidden>
         {slots.map((s, i) => <span key={slotKey(s)} style={{ top: i * ITEM }}>{btnIcon(s)}</span>)}
       </div>
-      <div ref={body} className="cp-menu" style={{ width: box.w, height: box.h, opacity: 0 }}>{children}</div>
+      <div ref={body} className="cp-menu" style={{ width: box.w, height: box.h, opacity: 0 }}><div className="cp-list">{children}</div></div>
     </div>
   );
 }
@@ -211,6 +228,10 @@ function Proto() {
   const ctx = useDuet();
   const { trigger } = useHaptics();
   const [k, setK] = useState<Knobs>(DEFAULTS);
+  /** Dev: `?bg=stripes|hstripes|rainbow|white|black|<hex>` lays a test backdrop over the page, under the column's glass and
+   *  Safari's own, to compare the two over the same pixels. */
+  const [bg, setBg] = useState<string | null>(null);
+  useEffect(() => setBg(new URLSearchParams(location.search).get("bg")), []);
   useEffect(() => {
     const q = new URLSearchParams(location.search);
     const sc = q.get("screen");
@@ -326,13 +347,14 @@ function Proto() {
   const vars = { "--cp-slide": SLIDE.easing, "--cp-slide-ms": `${SLIDE.ms}ms`, "--cp-group": GROUP.easing, "--cp-group-ms": `${GROUP.ms}ms` } as CSSProperties;
 
   const stage = (
-    <div className="cp-stage" data-kind={f.kind} data-real={real ? "" : undefined} style={{ ...vars, width: f.sw, height: real ? f.ph : c.screenHeight }}>
+    <div className="cp-stage" data-kind={f.kind} data-real={real ? "" : undefined} style={{ ...vars, width: f.sw, height: real ? f.full : c.screenHeight }}>
       {!real && f.kind === "column" && <SafariColumn f={f} />}
-      {!real && c.screenHeight > f.ph && <div className="cp-bar" style={{ top: f.ph, width: f.pw }} aria-hidden />}
-      <Sidebar width={f.kind === "column" ? f.pw : slide} height={f.ph} open={sidebar} onPick={(t) => { setSidebar(false); say(t); }} />
-      <div className="cp-card" data-open={sidebar ? "" : undefined} style={{ width: f.pw, height: f.ph, translate: sidebar ? `${slide}px 0` : "0 0" }}>
+      <Sidebar width={f.kind === "column" ? f.pw : slide} height={f.full} inset={f.full - f.ph} open={sidebar} onPick={(t) => { setSidebar(false); say(t); }} />
+      <div className="cp-card" data-open={sidebar ? "" : undefined} style={{ width: f.pw, height: f.full, translate: sidebar ? `${slide}px 0` : "0 0" }}>
         <Page k={k} set={set} real={real} f={f} armed={armed} />
       </div>
+      {bg && <div className="cp-testbg" data-bg={bg} style={/^[0-9a-f]{6}$/i.test(bg) ? { background: `#${bg}` } : undefined} aria-hidden />}
+      {!real && f.full > f.ph && <div className="cp-bar" style={{ top: f.ph, width: f.pw, height: f.full - f.ph }} aria-hidden><i className="cp-rim" /></div>}
       {(menu !== "closed" || armed === "armed") && <div className="cp-scrim" onPointerDown={() => { closeMenu(); if (armed === "armed") setArmed("idle"); }} />}
       <div data-cp-col="" hidden={real && !!ctx.hidden}>
         {placed.map((p, gi) => {
@@ -341,6 +363,7 @@ function Proto() {
           return (
             <div key={gi} className="cp-group" data-primary={p.primary ? "" : undefined} data-armed={pill ? armed : undefined}
               data-morphing={p === moreAt && menu !== "closed" ? "" : undefined} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+              <i className="cp-rim" aria-hidden />
               {p.group.map((s, i) => (
                 <button key={slotKey(s)} className="cp-btn" aria-label={btnLabel(s)}
                   data-haptic={s.kind === "primary" && armed === "armed" ? "success" : btnHaptic(s)}
@@ -354,7 +377,7 @@ function Proto() {
         })}
       </div>
       {menu !== "closed" && moreAt && (
-        <Morph open={menu === "open"} from={moreAt.rect} slots={moreAt.group} edge={f.edge} box={menuBox(f, moreAt.rect, list.length + nav.length, nav.length ? 2 : 1)} onClosed={() => setMenu("closed")}>
+        <Morph open={menu === "open"} from={moreAt.rect} slots={moreAt.group} box={menuBox(f, moreAt.rect, list.length + nav.length, nav.length ? 2 : 1)} onClosed={() => setMenu("closed")}>
           {nav.length > 0 && <>
             <div className="cp-menu-head">Menu</div>
             {nav.map((it) => (
@@ -415,10 +438,10 @@ function SafariColumn({ f }: { f: Frame }) {
   );
 }
 
-function Sidebar({ width, height, open, onPick }: { width: number; height: number; open: boolean; onPick: (t: string) => void }) {
+function Sidebar({ width, height, inset, open, onPick }: { width: number; height: number; inset: number; open: boolean; onPick: (t: string) => void }) {
   const recents = ["Duo column template", "Liquid morph timings", "Checkout confirm island", "Space map, hinge corners", "Haptics on iOS 27", "Release notes 0.5.0"];
   return (
-    <nav className="cp-sidebar" data-open={open ? "" : undefined} style={{ width, height }} aria-hidden={!open}>
+    <nav className="cp-sidebar" data-open={open ? "" : undefined} style={{ width, height, paddingBottom: 24 + inset }} aria-hidden={!open}>
       <div className="cp-side-title">Duet</div>
       {NAV.map((it) => <button key={it.id} className="cp-side-row" data-haptic="selection" tabIndex={open ? 0 : -1} onClick={() => onPick(it.label)}>{it.icon}<span>{it.label}</span></button>)}
       <div className="cp-side-head">Recents</div>
@@ -440,7 +463,7 @@ function Seg<T extends string | number | boolean>({ label, value, options, onCha
 
 function Page({ k, set, real, f, armed }: { k: Knobs; set: (p: Partial<Knobs>) => void; real: boolean; f: Frame; armed: string }) {
   return (
-    <div className="cp-scroll" style={{ paddingRight: f.kind === "inline" ? C + 24 : 0 }}>
+    <div className="cp-scroll" style={{ paddingRight: f.kind === "inline" ? C + 24 : 0, paddingBottom: f.full - f.ph }}>
       <header className="cp-head">
         <div className="cp-eyebrow">Prototype · #169</div>
         <h1>Templated column</h1>
