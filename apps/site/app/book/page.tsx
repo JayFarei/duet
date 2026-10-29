@@ -3,7 +3,7 @@ import { BookDemo } from "./book-demo";
 
 export const metadata: Metadata = { title: "Call to action" };
 
-// A per-page call to action: the class page passes a prominent primary (Book · 2 credits) and folds its other
+// A per-page call to action: the class page passes a primary (Book · 2 credits, armed on the first tap) and folds its other
 // actions into "…"; booking changes the label, icon and tint at runtime, and the controls reshape on a spring (#101).
 export default function Page() {
   return <BookDemo />;

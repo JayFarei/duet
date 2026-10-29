@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { ALargeSmall, Bookmark, Library, Newspaper, Search, Share } from "lucide-react";
-import { Duet, DuetPaneBar, DuetPanes, bleed, usePanes, type DuetItem } from "duet-ui";
+import { ALargeSmall, ArrowLeft, Bookmark, Library, Newspaper, Search, Share } from "lucide-react";
+import { Duet, DuetPaneBar, DuetPanes, bleed, usePanes, type DuetItem, type DuetMenuItem } from "duet-ui";
 import { ARTICLES, find, minutes, type Article } from "./articles";
 import { Art } from "./art";
 
-type Tab = "today" | "library" | "saved" | "search";
-const tint = "var(--accent)"; // resolves per theme inside the pill
-const TABS: DuetItem[] = [
-  { id: "today", label: "Today", icon: <Newspaper size={24} />, tint },
-  { id: "library", label: "Library", icon: <Library size={24} />, tint },
-  { id: "saved", label: "Saved", icon: <Bookmark size={24} />, tint },
-];
-const SEARCH: DuetItem = { id: "search", label: "Search", icon: <Search size={24} />, tint };
+// The app's places, opened from the burger.
+const PLACES = [
+  { id: "today", label: "Today", icon: <Newspaper size={22} /> },
+  { id: "library", label: "Library", icon: <Library size={22} /> },
+  { id: "saved", label: "Saved", icon: <Bookmark size={22} /> },
+  { id: "search", label: "Search", icon: <Search size={22} /> },
+] as const satisfies readonly DuetMenuItem[];
+type Tab = (typeof PLACES)[number]["id"];
 const SIZES = [{ px: 17, name: "Small" }, { px: 19, name: "Medium" }, { px: 22, name: "Large" }];
 const SAVED_KEY = "almanac-saved";
 
@@ -43,12 +43,12 @@ export function Almanac() {
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 1600); return () => clearTimeout(t); }, [toast]);
   const say = (text: string) => setToast((t) => ({ text, n: (t?.n ?? 0) + 1 }));
 
-  // A new tab starts the list at its top. The list keeps its own scroll while a story is open, so back needs nothing.
+  // A new place starts the list at its top. The list keeps its own scroll while a story is open, so back needs nothing.
   useLayoutEffect(() => { const el = paneOf(list.current); if (el) el.scrollTop = 0; }, [tab]);
 
   const read = (slug: string) => { setOpen(slug); nav.go("story"); };
   const close = () => { setOpen(null); nav.go("list"); };
-  const select = (id: string) => { setTab(id as Tab); nav.go("list"); };
+  const select = (id: Tab) => { setTab(id); nav.go("list"); };
   const toggleSave = (slug: string) => {
     const on = !saved.includes(slug), next = on ? [...saved, slug] : saved.filter((s) => s !== slug);
     setSaved(next);
@@ -64,20 +64,19 @@ export function Almanac() {
   };
 
   const isSaved = !!article && saved.includes(article.slug);
-  const actions: DuetItem[] = reading ? [
+  const back: DuetItem[] = nav.back ? [{ id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: nav.back.onPress }] : [];
+  const actions: DuetItem[] = reading ? [...back,
     { id: "size", label: "Text size", icon: <ALargeSmall size={23} />, onPress: () => { const n = (size + 1) % SIZES.length; setSize(n); say(`Text size: ${SIZES[n].name}`); } },
     { id: "save", label: isSaved ? "Remove bookmark" : "Bookmark", onPress: () => toggleSave(article.slug),
       icon: <Bookmark size={22} style={isSaved ? { color: "var(--accent)", fill: "currentColor" } : undefined} /> },
     { id: "share", label: "Share", icon: <Share size={21} />, onPress: () => share(article) },
-  ] : [];
+  ] : back;
 
   return (
     <Duet
-      back={nav.back && { label: "Back", ...nav.back }}
+      menu={{ items: PLACES, selected: tab, onSelect: select }}
       actions={actions}
-      tabs={{ items: TABS, selected: tab, onSelect: select, search: SEARCH }}
-      menuStyle="morph"
-      minimizeOnScroll
+      tint="var(--accent)"
     >
       <DuetPanes path={PATH} at={nav.at} expanded={nav.expanded} panes={{
         list: (
@@ -97,7 +96,7 @@ export function Almanac() {
   );
 }
 
-// --- tab pages ----------------------------------------------------------------------------------
+// --- places ----------------------------------------------------------------------------------
 
 type Read = { read: (slug: string) => void };
 

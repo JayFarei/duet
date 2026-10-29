@@ -102,16 +102,17 @@ interface Size { w: number; h: number }
  *  coordinates. */
 interface Scene { clip: Box; clipR?: number; frame: Box; signals: Signals; under?: ReactNode; chrome: ReactNode; mode: Mode; note: string }
 
-// The slots a developer fills with <Duet> props, each in its own temporary colour for the call-out.
+// The slots a developer fills with <Duet> props, each in its own temporary colour for the call-out. A group of
+// actions is "actions", a lone one "action" (template.ts Slot).
 const SLOTS: [slot: string, color: string, label: string][] = [
-  ["tabs", "#ff375f", "tabs"], ["actions", "#0a84ff", "actions"], ["leading", "#64d2ff", "leading"], ["back", "#30d158", "back"], ["close", "#ff453a", "close"],
-  ["search", "#bf5af2", "searchButton"], ["more", "#ffd60a", "overflow"], ["accessory", "#ff9f0a", "accessory"],
+  ["menu", "#ff375f", "menu"], ["actions", "#0a84ff", "actions"], ["primary", "#30d158", "primary"], ["close", "#ff453a", "close"],
+  ["more", "#ffd60a", "overflow"],
 ];
 const CALLOUT = "html[data-wd-slots] [data-duet-slot] { outline: 2.5px solid var(--wd-c); outline-offset: 2px; box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--wd-c) 30%, transparent) !important; }\n"
-  + SLOTS.map(([slot, c]) => `[data-duet-slot="${slot}"] { --wd-c: ${c}; }`).join("\n")
+  + SLOTS.map(([slot, c]) => `[data-duet-slot="${slot}"] { --wd-c: ${c}; }`).join("\n") + '\n[data-duet-slot="action"] { --wd-c: #0a84ff; }'
   // Duet's column rim as the flat band the stage's Safari buttons use (site.css [data-wd-col]): in the stage Chrome
   // drops the rim's mask and lights the whole button. Only here, never on the page itself.
-  + '\n.duet[data-mode="column"] .duet-glass:not(.duet-accessory)::after { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(255 255 255 / 0.2); }';
+  + '\n.duet[data-mode="column"] .duet-glass::after { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(255 255 255 / 0.2); }';
 
 /** What the device tells the page. `screen`: what `screen.*` reports, the window unless given. */
 const sig = (inner: Size, outer: Size, { screen = outer, ...o }: Partial<Signals> & { screen?: Size } = {}): Signals => ({

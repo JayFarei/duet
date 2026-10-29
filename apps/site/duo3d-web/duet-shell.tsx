@@ -4,13 +4,13 @@
 // the site as it is and as it would be with Duet.
 //
 // "With Duet" is the site optimised for it: the page's header links and buttons go to /duo3d/optimize, where a
-// decision model says which Duet control each would be (a tab, the primary button, an action, search), and the
-// strip is built from them, pressing the original element, which is hidden while Duet shows. Until the answer
+// decision model says which Duet control each would be (a place in the menu, the primary button, an action,
+// search, which becomes an action), and the strip is built from them, pressing the original element, which is hidden while Duet shows. Until the answer
 // comes, or where it finds nothing, the strip is Safari's own: Back, Forward, Reload and Share.
 import { useEffect, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import {
-  ArrowRight, Bell, Book, Box, Briefcase, Building, Calendar, CircleHelp, Code, Compass, Download, FileText, Globe,
+  ArrowLeft, ArrowRight, Bell, Book, Box, Briefcase, Building, Calendar, CircleHelp, Code, Compass, Download, FileText, Globe,
   GraduationCap, Heart, House, Image, Layers, LayoutGrid, LogIn, Mail, MapPin, MessageCircle, Newspaper, Phone, Play,
   Rocket, RotateCw, Search, Settings, Share, ShoppingCart, Star, Tag, User, Users,
 } from "lucide-react";
@@ -99,8 +99,8 @@ function build(found: Optimized, list: Candidate[], els: Map<number, HTMLElement
   const props: Partial<DuetProps> = {
     actions: actions.map((c) => item(c, 22)),
     primary: primary && item(primary, 22),
-    searchButton: search && press(els.get(search.id)!),
   };
+  if (search) props.actions = [{ id: "search", label: "Search", icon: <Search size={22} />, onPress: press(els.get(search.id)!) }, ...props.actions!];
   if (tabs.length) {
     // A Home tab where no section is the site's root, as an app's first tab; the selected tab is the section this
     // page is in.
@@ -111,11 +111,13 @@ function build(found: Optimized, list: Candidate[], els: Map<number, HTMLElement
     const best = tabs.filter((c) => c.href && path(c) !== "/" && at.startsWith(path(c))).sort((a, b) => path(b).length - path(a).length)[0];
     const selected = best ? `c${best.id}` : at === "/" ? (items[0].id) : "";
     const tabItems = items.slice(0, 5);
-    props.tabs = { items: tabItems, selected, onSelect: (id) => tabItems.find((t) => t.id === id)?.onPress?.() };
+    props.menu = { items: tabItems, selected, onSelect: (id: string) => tabItems.find((t) => t.id === id)?.onPress?.() };
   }
   return props;
 }
 
+// Back leads the actions on every page, as Safari's own back would.
+const BACK: DuetItem = { id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: () => history.back() };
 const SAFARI: Partial<DuetProps> = {
   actions: [
     { id: "forward", label: "Forward", icon: <ArrowRight size={22} />, onPress: () => history.forward() },
@@ -160,10 +162,11 @@ function Shell() {
     return () => mo.disconnect();
   }, [on]);
   if (!on) return null;
+  const props = optimized ?? SAFARI;
   return (
     <>
     <style>{BESIDE}</style>
-    <Duet key={gen} appearance={appearance} back={{ onPress: () => history.back() }} {...(optimized ?? SAFARI)} />
+    <Duet key={gen} appearance={appearance} {...props} actions={[BACK, ...(props.actions ?? [])]} />
     </>
   );
 }

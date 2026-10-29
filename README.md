@@ -8,7 +8,7 @@ npm i duet-ui
 
 | Strip | Column | Inline |
 | --- | --- | --- |
-| ![Strip: a Home Screen app with the island menu](docs/media/strip.webp) | ![Column: Safari's empty column holds the controls, morph menu](docs/media/column.webp) | ![Inline: unfolded, the strip drags to either side](docs/media/inline-drag.webp) |
+| ![Strip: a Home Screen app with the burger menu](docs/media/strip.webp) | ![Column: Safari's empty column holds the controls, burger and "…"](docs/media/column.webp) | ![Inline: unfolded, the strip drags to either side](docs/media/inline-drag.webp) |
 
 Recorded on the iPhone Duo simulator, framed by [`tools/media`](tools/media).
 
@@ -173,7 +173,7 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 - **Below:** Safari's +/tabs pill, or the bottom edge.
 - **Closed landscape:** Safari moves its back and reader rows and its pill on each side (left column: back slot top 81.5pt, pill top 327pt; right column: 23.5pt and 279pt), and Duet takes the gap between. Measured with a bare island; how Live Activities grow it sideways is not yet known.
 - **What does not fit folds into "…"**: actions from the last, then `primary`. "…" shows whenever something is in it. Items marked `folded` or `destructive` always sit in "…", after the ones that did not fit.
-- **Safari's column buttons are an exclusion zone for menus too.** Native chrome always paints over the page, so z-index can't help. A menu that reaches into the column keeps its top at or below `columnTop` (the reader button's worst-case bottom plus 11pt) and its bottom above Safari's pill, opening flush with the column like Safari's own menus. A morph list too tall for that band opens wholly over the page, beside the column, where it may rise to the top of the page. One too tall even there caps its height and scrolls inside. `plan()` returns `columnTop` and `columnBottom` in `column` mode, and Duet sets `--duet-safe-top-column` on `<html>` for your own popovers (0 outside `column` mode).
+- **Safari's column buttons are an exclusion zone for menus too.** Native chrome always paints over the page, so z-index can't help. A menu that reaches into the column keeps its top at or below `columnTop` (the reader button's worst-case bottom plus 11pt) and its bottom above Safari's pill, opening flush with the column like Safari's own menus. A menu too tall for that band opens wholly over the page, beside the column, where it may rise to the top of the page. One too tall even there caps its height and scrolls inside. Duet sets `--duet-safe-top-column` on `<html>` for your own popovers (0 outside `column` mode).
 
 ## Server rendering and hydration
 
@@ -229,7 +229,7 @@ import { bootScript } from "duet-ui/boot";
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the controls hold only a close button until it is cleared |
 | `appearance` | `"auto" \| "light" \| "dark"` | Light or dark, like `overrideUserInterfaceStyle`. Default `"auto"`: follow the system. `dark` (boolean) still works but is deprecated |
 | `tint` | `string` | Accent for the selected place, the primary button and checked menu rows, like iOS's `tintColor`. Default: system blue |
-| `icons` | `{ size?, tabSize?, weight?, color? }` | How your icons are drawn. See [Theming](#theming) |
+| `icons` | `{ size?, weight?, color? }` | How your icons are drawn. See [Theming](#theming) |
 | `reserve` | `boolean` | Default `true`: the page keeps clear of the controls (`--duet-inset-*`, `<html>` margins). `false` lets it run under them |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
@@ -249,17 +249,17 @@ Deliberately small, like iOS: an accent, an appearance and your icons. The glass
 
 - `tint` colours only what is active: the selected place, the checked menu item, the primary button. Everything else stays ink (black in light, white in dark).
 - `appearance` sets the page theme. Menus follow it. In Safari's column the buttons keep following the system, so they match Safari's own; menus open over the page, so they keep `appearance`.
-- `icons` sizes and weighs your icons, the way the system sizes SF Symbols in a native bar: `size` (round buttons, groups, menus, default 22px), `tabSize` (tab pill, default 24px), `weight` (stroke width of SVG line icons such as Lucide, default 2) and `color` (unselected icons, default ink). SVGs are resized directly; font icons take the size as `font-size`, so give them `font-size: 1em` or leave it unset. The chrome's own glyphs (back, close, "…", search) keep their native sizes.
+- `icons` sizes and weighs your icons, the way the system sizes SF Symbols in a native bar: `size` (round buttons, groups, menus, default 22px), `weight` (stroke width of SVG line icons such as Lucide, default 2) and `color` (unselected icons, default ink). SVGs are resized directly; font icons take the size as `font-size`, so give them `font-size: 1em` or leave it unset. The chrome's own glyphs (burger, close, "…") keep their native sizes.
 
 Every prop writes a CSS custom property on `.duet`, so plain CSS can set the same tokens instead, globally or per appearance. These are stable:
 
 | Token | What it is | Default |
 | --- | --- | --- |
-| `--duet-tint` | Accent: selected tab, active menu item, primary button | `#0088ff` |
+| `--duet-tint` | Accent: selected menu item, primary button | `#0088ff` |
 | `--duet-ink` | Text and icon colour | black / white |
 | `--duet-icon` | Unselected icon colour | `--duet-ink` |
 | `--duet-icon-size` | Icons in round buttons, groups and menus | `22px` |
-| `--duet-tab-icon-size` | Icons in the tab pill | `24px` |
+| `--duet-tab-icon-size` | Unused since 0.6 (no tab pill), kept so older CSS stays valid | `24px` |
 | `--duet-icon-weight` | Stroke width of SVG line icons | `2` |
 | `--duet-badge`, `--duet-badge-neutral`, `--duet-badge-ink` | Badge fills (alert, neutral) and text | red, grey, white |
 | `--duet-solid` | Opaque surface: menus in Safari's column, the badge ring | near white / near black |
@@ -296,7 +296,7 @@ Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wid
 
 ### Lower-level exports
 
-`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `plan`, `columnBand`, `morphBox`, `islandBox`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. `duet-ui/geometry` exports the geometry module alone, without React.
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `pillRect`, `groupHeight` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
 
 `readSignals()` returns the current `Signals` from the window, the same reading the chrome uses (browser only). `watchSignals(cb)` calls `cb` whenever they may have changed, with the triggers and settle polling described in [Which mode](#which-mode), and returns the unsubscribe. Together with `detect` they let a page act on the mode before React mounts:
 
@@ -543,7 +543,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without handling, a Live Activity pushes the preview's close and reader/menu buttons down onto Duet's controls in the gap.
 - **Cause:** Live Activities grow the Dynamic Island (one pushes those buttons about 45pt) while back stays put, and a page can't tell whether any are running.
-- **Duet does:** sizes the gap for the worst case (two activities, `DUO.island`), about 54pt: one button, the selected tab (or "…", or search), centred. Nothing rises into the space the activities can take, so no Duet button sits under a native one.
+- **Duet does:** sizes the gap for the worst case (two activities, `DUO.island`), about 54pt: one button, "…", centred. Nothing rises into the space the activities can take, so no Duet button sits under a native one.
 - **You do:** nothing. Keep the important actions first.
 - **Status:** [#104](https://github.com/JayFarei/duet/issues/104).
 
@@ -714,8 +714,8 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 | App | Shows | Run |
 | --- | --- | --- |
-| [Almanac](examples/almanac) | Reading app on `<DuetPanes>`: the list beside the story unfolded, a pane bar, tabs with search, morph menus, sticky title with `bleed` | `pnpm --filter @duet/example-almanac dev`, port 3101 |
-| [Encore](examples/encore) | Music player: badges, mini player `accessory`, island menus, carousels with `bleed` | `pnpm --filter @duet/example-encore dev`, port 3103 |
+| [Almanac](examples/almanac) | Reading app on `<DuetPanes>`: the list beside the story unfolded, a pane bar, a menu of places, sticky title with `bleed` | `pnpm --filter @duet/example-almanac dev`, port 3101 |
+| [Encore](examples/encore) | Music player: badges, an in-page docked mini player, carousels with `bleed` | `pnpm --filter @duet/example-encore dev`, port 3103 |
 | [Meridian](examples/meridian) | Transit map on Vite: `leading`, a full-screen map with `bleed(false)` | `pnpm --filter @duet/example-meridian dev`, port 3102 |
 
 `pnpm dev` from the root builds the library and starts the site and every example.

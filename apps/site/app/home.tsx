@@ -27,7 +27,7 @@ const SECTIONS: DuetItem[] = [
 
 const quick = (tint?: string) => `import { Duet } from "duet-ui";
 
-<Duet tabs={{ items: TABS, selected: tab, onSelect: setTab }}${tint ? `\n  tint="${tint}"` : ""}>
+<Duet menu={{ items: PLACES, selected: place, onSelect: setPlace }}${tint ? `\n  tint="${tint}"` : ""}>
   <App />
 </Duet>`;
 
@@ -57,14 +57,12 @@ function Site() {
   if (portrait && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
-      tabs={{ items: SECTIONS, selected: tab, onSelect: go }}
+      menu={{ items: SECTIONS, selected: tab, onSelect: go }}
       actions={[
         { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
         { id: "theme", label: theme.dark ? "Light mode" : "Dark mode", icon: theme.dark ? <Sun size={22} /> : <Moon size={22} />, onPress: theme.toggle },
         ...(device === "iphone" ? [{ id: "bars", label: "Top and bottom bars", icon: <PanelBottom size={22} />, onPress: () => setSides(false) }] : []),
       ]}
-      minimizeOnScroll={device === "desktop" ? "always" : true}
-      menuStyle={device === "desktop" ? "morph" : undefined}
       appearance={theme.appearance}
       tint={tint}
     >
@@ -132,7 +130,7 @@ function Page() {
         <Duo embed src="/skeleton" />
       </section>
 
-      <Section id="code" title="Integrate" lede="Wrap your app and pass your tabs. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
+      <Section id="code" title="Integrate" lede="Wrap your app and pass your places. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
         <Integrate />
         <div className="ctas" style={{ justifyContent: "flex-start" }}>
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>

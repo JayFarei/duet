@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { CalendarCheck, Check, ChevronRight, Heart, Home, Search, Share, Ticket, User } from "lucide-react";
+import { ArrowLeft, CalendarCheck, Check, ChevronRight, Heart, Home, Search, Share, Ticket, User } from "lucide-react";
 import { Duet, bleed, type DuetPrimary } from "duet-ui";
 import { WebDuo, useDesktop } from "../duo/web-duo";
 
@@ -31,7 +31,7 @@ export function BookDemo() {
     : <div className={desktop === null ? "ssr-site" : undefined}><Book /></div>;
 }
 
-// The open class lives in the URL (?c=sauna), so the back gesture and Duet's back button walk the same history.
+// The open class lives in the URL (?c=sauna), so the back gesture and Duet's Classes action walk the same history.
 function Book() {
   const [tab, setTab] = useState<Tab>("home");
   const [open, setOpen] = useState<string | null>(null);
@@ -53,20 +53,20 @@ function Book() {
   const isBooked = !!c && booked.has(c.id);
   // The call to action is plain props: label, icon and tint change with the page's state.
   const primary: DuetPrimary | undefined = c && (isBooked
-    ? { id: "booked", label: "Booked", icon: <Check size={22} />, tint: "#34c759", prominent: true, expanded: true, onPress: () => setBooked(toggle(booked, c.id)) }
-    : { id: "book", label: `Book · ${c.credits} credit${c.credits > 1 ? "s" : ""}`, icon: <CalendarCheck size={22} />, prominent: true, onPress: () => setBooked(toggle(booked, c.id)) });
+    ? { id: "booked", label: "Booked", icon: <Check size={22} />, tint: "#34c759", confirm: "Cancel booking", onPress: () => setBooked(toggle(booked, c.id)) }
+    : { id: "book", label: `Book · ${c.credits} credit${c.credits > 1 ? "s" : ""}`, icon: <CalendarCheck size={22} />, onPress: () => setBooked(toggle(booked, c.id)) });
 
   const page = c ? (
     <main key={c.id} style={{ paddingTop: "calc(24px + env(safe-area-inset-top))", paddingBottom: 140, ...bleed(20) }}>
       <div style={{ height: 180, borderRadius: 20, background: "linear-gradient(135deg, #ff9f0a, #ff375f)", marginBottom: 20 }} />
       <h1 style={title}>{c.name}</h1>
       <p style={{ ...dim, marginBottom: 16 }}>{c.when} · {c.credits} credit{c.credits > 1 ? "s" : ""}</p>
-      <p style={dim}>The page passes a prominent primary, so the controls hold one call to action by the thumb. Share and Favourite are folded into “…” even where there is room for them; the tabs join them when the band is tight. {isBooked ? "Booked: tap the green button to cancel." : "Tap the button to book; the label, icon and tint change on a spring."}</p>
+      <p style={dim}>The page passes a primary, so the controls hold one call to action in its own group. The first tap arms it into a labelled pill, the second books. Share and Favourite are folded into “…” even where there is room for them. {isBooked ? "Booked: tap the green button twice to cancel." : "Tap the button twice to book; the label, icon and tint change on a spring."}</p>
     </main>
   ) : (
     <main style={{ paddingTop: "calc(24px + env(safe-area-inset-top))", paddingBottom: 140, ...bleed(20) }}>
       <h1 style={title}>Classes</h1>
-      <p style={{ ...dim, marginBottom: 16 }}>Open a class. This page has tabs and no call to action; the class page adds one.</p>
+      <p style={{ ...dim, marginBottom: 16 }}>Open a class. This page has places in the menu and no call to action; the class page adds one.</p>
       {CLASSES.map((x) => (
         <button key={x.id} style={row} onClick={() => go(x.id)}>
           <span style={{ flex: 1 }}>{x.name}<br /><span style={{ ...dim, fontSize: 13 }}>{x.when}{booked.has(x.id) ? " · Booked" : ""}</span></span>
@@ -77,10 +77,10 @@ function Book() {
   );
   return (
     <Duet<Tab>
-      tabs={{ items: TABS, selected: tab, onSelect: (t) => { setTab(t); if (c) go(null); } }}
-      back={c ? { label: "Classes", onPress: () => history.back() } : undefined}
+      menu={{ items: TABS, selected: tab, onSelect: (t) => { setTab(t); if (c) go(null); } }}
       primary={primary}
       actions={c ? [
+        { id: "back", label: "Classes", icon: <ArrowLeft size={22} />, onPress: () => history.back() },
         { id: "share", label: "Share", icon: <Share size={22} />, folded: true },
         { id: "like", label: liked.has(c.id) ? "Unfavourite" : "Favourite", icon: <Heart size={22} fill={liked.has(c.id) ? "currentColor" : "none"} />, folded: true, onPress: () => setLiked(toggle(liked, c.id)) },
       ] : [{ id: "share", label: "Share", icon: <Share size={22} /> }]}>
