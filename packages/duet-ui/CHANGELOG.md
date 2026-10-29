@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 (Unreleased)
+## 0.5.0-rc.2
 
 - Column mode, on a scrolled page: turning the phone, folding or unfolding no longer, now and then, shows the controls for one frame about the scroll offset above their place. The render that shows the layer again after a turn turned its scroll follow back on after the paint, and a new scroll driven animation only applies from the next frame anyway. The follow now turns on before paint, with an inline transform holding the layer in place until the animation runs (#131).
 - In-app preview, unfolded: the controls no longer flash for a frame over the clock and the Dynamic Island as the full screen preview unfolds. The open screen's first frame lays the page out before its bottom or right inset lands, so it read as a tab or as the preview with no side band, both inline on the right. After a preview's window changes, those readings now hide the controls for up to a second, as on its first load, and a hidden reading no longer holds back the band once it lands. Unfolding the default style preview's passing frame, the closed screen's full width page under a taller bar than a column's, now reads as still moving instead of a tab (#159).
