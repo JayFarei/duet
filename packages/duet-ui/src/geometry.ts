@@ -449,6 +449,10 @@ export function inTransit(s: Signals): boolean {
   // full open window at all: unfolding the closed preview hands it the closed page's 585x876 for ~45ms (e2e RC run,
   // 2026-10-27).
   if (page >= LANDED.page[1][0] && (chrome - bannerOf(s) > LANDED.columnChrome || openWindow(s))) return true;
+  // Nor a page as wide as the closed portrait window under more than a column's bar: Safari lays one out there only
+  // for the full screen preview (chrome 0). Unfolding the default style preview passes through 466x527 in 466x678,
+  // inset 0, for ~40ms (iOS 27.1, e2e unf01-02, #159), and read as a tab it drew the controls inline over the page.
+  if (closed && !landscape && within(page, LANDED.page[0]) && chrome > LANDED.columnChrome) return true;
   // A Duo window, or the preview's sheet (a window a few points inside the closed screen; its inset lands ~100ms late,
   // so sizes alone decide).
   const sheet = short <= w - m && long <= h - m && short >= w - SHEET_SLACK && long >= h - SHEET_SLACK;

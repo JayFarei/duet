@@ -135,6 +135,25 @@ test("unfold from closed landscape: the brief closed portrait window never shows
   const end = stable(d, UNFOLD_FROM_90.at(-1)[1], undefined, 4664 + LAND_HOLD, true);
   assert.deepEqual([end.mode, end.hidden, end.confidence], ["inline", undefined, "settling"]);
 });
+// Unfolding the default style preview from closed portrait (iOS 27.1, e2e unf01-02, #159): the page loses its column
+// and inset in the closed window, then gets the open window before its own width, screen and band.
+const UNFOLD_PREVIEW = [
+  [4341, full({ ...P, innerWidth: 466, innerHeight: 527 })],
+  [4385, full({ outerWidth: 951, outerHeight: 669, innerWidth: 466, innerHeight: 594, insetBottom: 34 })],
+];
+test("unfolding the default preview: the column-less closed page is in transit, hidden until the strip (#159)", () => {
+  const d = { flips: [] };
+  const start = stable(d, full({ ...P, innerWidth: 382, innerHeight: 603, insetBottom: 34 }), undefined, 3812);
+  assert.deepEqual([start.mode, !!start.preview], ["column", true]);
+  for (const [t, s] of UNFOLD_PREVIEW) {
+    assert.equal(inTransit(s), true, `+${t}ms`);
+    assert.equal(stable(d, s, undefined, t, true).hidden, "moving", `+${t}ms`);
+  }
+  const landed = full({ outerWidth: 951, outerHeight: 669, innerWidth: 951, innerHeight: 594, screenWidth: 678, screenHeight: 466, insetBottom: 34, insetRight: 84, angle: 270 });
+  assert.equal(stable(d, landed, undefined, 4427, true).hidden, "moving", "the landing holds LAND_HOLD first");
+  const end = stable(d, landed, undefined, 4427 + LAND_HOLD, true);
+  assert.deepEqual([end.mode, end.side, end.hidden], ["strip", "right", undefined]);
+});
 test("a landing commits at once when the window has settled (no hold outside a settle)", () => {
   const d = { flips: [] };
   stable(d, TURN_90_TO_0[1], undefined, 0, true);
