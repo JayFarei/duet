@@ -289,12 +289,9 @@ function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signa
   };
 }
 const stop = (posture: Posture, app: App, o: Partial<State> = {}): State => ({ posture, turn: 0, upside: false, app, pane: "right", live: false, ...o });
-export const TOUR: State[] = [
-  stop("closed", "home"), stop("closed", "home", { live: true }),
-  stop("open", "home"), stop("open", "home", { turn: 90 }), stop("closed", "home", { turn: 90 }), stop("closed", "home"),
-  stop("closed", "safari"), stop("closed", "safari", { live: true }), stop("open", "safari"),
-  stop("open", "split"), stop("open", "split", { pane: "left" }),
-];
+/** The tour: Safari full screen on the closed display, unfolded into split view with either side focused, and the
+ *  loop folding it closed again. */
+export const TOUR: State[] = [stop("closed", "safari"), stop("open", "split"), stop("open", "split", { pane: "left" })];
 const same = (a: State, b: State) => JSON.stringify(a) === JSON.stringify(b);
 /** The same view, whatever the Live Activities switch says: the phase list follows views, not the switch. */
 export const sameView = (a: State, b: State) => same({ ...a, live: false }, { ...b, live: false });
@@ -302,8 +299,7 @@ export const sameView = (a: State, b: State) => same({ ...a, live: false }, { ..
 export const island = (s: State) => s.live && s.posture === "closed" && !s.turn;
 /** The phase list: each row starts at a tour stop and lasts until the next row's. */
 const PHASES: { group: string; rows: [label: string, at: number][] }[] = [
-  { group: "Home Screen web app", rows: [["Closed", 0], ["Unfolded and turned", 2]] },
-  { group: "Safari", rows: [["Closed tab", 6], ["Unfolded", 8], ["Split view", 9]] },
+  { group: "Safari", rows: [["Full screen", 0], ["Split view", 1]] },
 ];
 /** Apps that exist in one posture only, upright: anywhere else they fall back to a Safari tab. */
 const ONLY: Partial<Record<App, Posture>> = { split: "open" };

@@ -126,7 +126,6 @@ export function SkeletonApp() {
     <Duet
       menu={{ items: [...TABS, { id: "search", label: "Search", icon: <Search size={24} /> }], selected: tab, onSelect: setTab }}
       actions={[{ id: "share", label: "Share", icon: <Share size={22} />, onPress: () => {} }]}
-      primary={{ id: "new", label: "New", icon: <Plus size={22} />, onPress: () => {} }}
       appearance={appearance}
       tint={tint}
     >

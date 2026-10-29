@@ -54,6 +54,8 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const [tour, setTour] = useState(false);
   const [duet, setDuet] = useState(true);
   const [at, setAt] = useState(0);
+  // Each time the tour comes round, "Try it yourself" shakes once: the device is there to play with.
+  const [nudge, setNudge] = useState(0);
   const [more, setMore] = useState(false), [info, setInfo] = useState(false);
   const [onScreen, setOnScreen] = useState(true), [manual, setManual] = useState(false), [box, setBox] = useState({ w: 0, h: 0 });
   const stage = useRef<HTMLDivElement>(null);
@@ -138,7 +140,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   useEffect(() => {
     if (!tour || !onScreen) return;
     let i = at;
-    const t = setInterval(() => { i = (i + 1) % TOUR.length; setAt(i); go({ ...TOUR[i] }, true, "flat"); }, HOLD);
+    const t = setInterval(() => { i = (i + 1) % TOUR.length; setAt(i); go({ ...TOUR[i] }, true, "flat"); if (!i) setNudge((n) => n + 1); }, HOLD);
     return () => clearInterval(t);
   }, [tour, onScreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -282,12 +284,13 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
       {manual ? <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center" }}>{infoButton}</div></div> : (
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {infoButton}
-          <button onClick={() => { setManual(true); setTour(false); }} style={{ ...control, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
+          <button key={nudge} className={nudge ? "duo3d-nudge" : undefined} onClick={() => { setManual(true); setTour(false); }} style={{ ...control, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
             <Pointer size={18} strokeWidth={2.2} />Try it yourself
           </button>
         </div>
       )}
       {about}
+      <style>{NUDGE}</style>
     </div>
   );
 
@@ -310,6 +313,10 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     </div>
   );
 }
+
+/** The nudge on "Try it yourself": a short shake, left out for reduced motion. */
+const NUDGE = `@keyframes duo3d-nudge { 0%, 100% { transform: none } 20%, 60% { transform: translateX(-4px) rotate(-2deg) } 40%, 80% { transform: translateX(4px) rotate(2deg) } }
+@media (prefers-reduced-motion: no-preference) { .duo3d-nudge { animation: duo3d-nudge 0.5s ease-in-out } }`;
 
 interface Opt { id: string; label: string; icon: ReactNode; on: boolean; off?: boolean; pick: () => void; hint?: string }
 interface Section { key: string; title: string; one?: boolean; slots?: number; opts: Opt[] }
