@@ -479,7 +479,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** the preview's gap keeps the Live Activities allowance, so the band Duet may draw in is about 32pt, shorter than a button (49). The button is centred on the band, clear of Page Menu and Back; the pill was clamped to the band's top, which pushed it down past the band's bottom.
 - **Duet does:** keeps the pill inside the band, and on its button when the band can't hold it. A list menu there already opens beside the column.
 - **You do:** nothing.
-- **Status:** [#133](https://github.com/JayFarei/duet/issues/133), 0.5.0-rc. See [In-app preview](#in-app-preview).
+- **Status:** [#133](https://github.com/JayFarei/duet/issues/133), 0.5.0. See [In-app preview](#in-app-preview).
 
 ### Text field focus and the on-screen keyboard
 
@@ -671,7 +671,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** the real device reads outside the ranges measured on the simulator. Safari's bottom bar collapses to 59pt while the page scrolls (the simulator's compact bar is 80), and the keyboard shrinks the layout viewport, not only the visual one (382x411 in 466x678). Both failed the column test, and the wrong verdict was committed once the scroll settled.
 - **Duet does:** counts the collapsed bar as Safari's column, and reads a page shrunk that far with a text field focused as the keyboard (the column stays, `useDuet().keyboard` is true). Signals that move while the user scrolls or types (page height, visual viewport) never take a tab out of the column, settled or not; moving into it still happens, so a wrong `inline` heals.
 - **You do:** nothing.
-- **Status:** [#132](https://github.com/JayFarei/duet/issues/132), 0.5.0-rc.
+- **Status:** [#132](https://github.com/JayFarei/duet/issues/132), 0.5.0.
 
 ### Mode flips back and forth
 
