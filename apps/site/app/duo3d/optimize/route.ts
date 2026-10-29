@@ -1,17 +1,21 @@
 // The "With Duet" preview of any site: the shell sends the page's header links and buttons, and TypeSafe's Jev
 // decision model says which Duet control each would be in a native app (a tab, the primary button, a toolbar action,
 // search, or none) and which icon it takes. Both questions for every candidate go in one request, answered in
-// parallel. Answers are cached per page in memory. Local only: the key is TYPESAFE_KEY in apps/site/.env.local.
+// parallel. Answers are cached per page in memory. The key is TYPESAFE_KEY: apps/site/.env.local locally, the Vercel project's
+// environment in production.
 import { ICONS, ROLES, type Candidate, type Optimized, type Role, type Icon } from "../../../duo3d-web/spec";
 
 const cache = new Map<string, Optimized>();
+const MAX = 40; // a header's links and buttons, with room to spare
 
 export async function POST(req: Request) {
-  if (process.env.NODE_ENV === "production") return new Response("Not found", { status: 404 });
+  // The shell in a page framed by /duo3d/web asks, nothing else: each request spends the key.
+  if (req.headers.get("sec-fetch-site") !== "same-origin") return new Response("Only from this site", { status: 403 });
   const key = process.env.TYPESAFE_KEY;
   if (!key) return Response.json({ error: "TYPESAFE_KEY is not set" }, { status: 503 });
   const { url, title, candidates } = (await req.json()) as { url: string; title: string; candidates: Candidate[] };
   if (!Array.isArray(candidates) || !candidates.length) return Response.json({});
+  if (candidates.length > MAX) return Response.json({ error: `More than ${MAX} candidates` }, { status: 400 });
   const id = url + "\n" + JSON.stringify(candidates);
   const hit = cache.get(id);
   if (hit) return Response.json(hit);

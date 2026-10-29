@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, Lock, MessageSquareShare, MessageSquareText, PanelBottom, Pointer, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
+import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Info, Keyboard, LayoutGrid, Lock, MessageSquareShare, MessageSquareText, PanelBottom, Pointer, RotateCcw, RotateCw, Rotate3d, Square, X } from "lucide-react";
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
 import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
-import { DUO_PORT, channel, type Sync } from "./shared";
+import { createPortal } from "react-dom";
+import { DUO_APP, channel, type Sync } from "./shared";
 
 // This page's displays, told apart from another tab's.
 const ID = Math.random().toString(36).slice(2);
@@ -39,22 +40,6 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
   ["laptop", "Laptop", glyph(<><path d="M3 18h13l3-12" /><path d="M2 19.5h20" strokeWidth={1} /></>)],
 ];
 
-// Every tour stop's caption, as the embed's caption block says it. Stacked unseen under the live one, they keep the
-// block at the tallest one's height, so the page below holds still while the tour runs.
-const CAPTIONS = [...new Map(TOUR.map((st) => {
-  const n = SCREEN[st.posture], [W, H] = st.turn ? [n.h, n.w] : [n.w, n.h];
-  const where = [st.posture === "open" ? "Open" : "Closed", st.app === "home" ? "PWA" : "Safari", st.app === "split" ? "Swap" : "Single"].join(" · ");
-  const note = scene(st, W, H, "localhost", (x) => detect(x).mode).note;
-  return [where + note, [where, note] as const];
-})).values()];
-function Caption({ where, note, live }: { where: string; note: string; live?: boolean }) {
-  return (
-    <span aria-live={live ? "polite" : undefined} aria-hidden={!live || undefined} style={{ gridArea: "1/1", visibility: live ? undefined : "hidden" }}>
-      <b style={{ color: "var(--ink)", fontWeight: 600 }}>{where}.</b> {note}
-    </span>
-  );
-}
-
 // The web Duo's controls on doan-labs/duo's 3D device. duo renders Apple's model and bends its hinge; both of its
 // displays frame /duo3d/screen, which draws what the 2D web Duo draws on its screen. The fold is duo's: an angle,
 // 0 closed to 180 open, eased there by duo itself.
@@ -69,7 +54,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const [tour, setTour] = useState(false);
   const [duet, setDuet] = useState(true);
   const [at, setAt] = useState(0);
-  const [more, setMore] = useState(false);
+  const [more, setMore] = useState(false), [info, setInfo] = useState(false);
   const [onScreen, setOnScreen] = useState(true), [manual, setManual] = useState(false), [box, setBox] = useState({ w: 0, h: 0 });
   const stage = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
@@ -79,7 +64,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
   const url = useSyncExternalStore(() => () => {}, () => {
     const screens = `${location.origin}/duo3d/screen?id=${ID}`;
-    return `${location.protocol}//${location.hostname}:${DUO_PORT}/?hud=0&deg=0&screens=${encodeURIComponent(screens)}`;
+    return `${DUO_APP}?hud=0&deg=0&screens=${encodeURIComponent(screens)}`;
   }, () => "");
 
   // The device turns the short way round, so its roll keeps counting past a full turn.
@@ -157,6 +142,13 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     return () => clearInterval(t);
   }, [tour, onScreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!info) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setInfo(false);
+    addEventListener("keydown", esc);
+    return () => removeEventListener("keydown", esc);
+  }, [info]);
+
   // The fold slider: the hinge follows the thumb, and the posture flips at half way.
   const scrub = (t: number) => {
     setTour(false);
@@ -204,15 +196,24 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const where = sections.slice(0, 3).map((x) => x.opts.find((o) => o.on)?.label).join(" · ");
 
   const list = (embed ? box.w : width) < 700;
-  const header = (
-    <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: list ? "16px 16px 0" : "20px 22px 0" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ font: `700 ${list ? 18 : 21}px/1.15 -apple-system, system-ui`, letterSpacing: -0.4 }}>Duo 3D, local</div>
-        <div aria-live="polite" title={note} style={{ marginTop: 6, maxWidth: 560, height: `${(list ? 4 : 3) * 1.45}em`, overflow: "hidden", display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: list ? 4 : 3, font: `400 ${list ? 12 : 13}px/1.45 -apple-system, system-ui`, color: "var(--dim)" }}>
+  // What the device shows, in words, behind the info button: nothing but the device sits above the controls.
+  const infoButton = <Square42 label="What this shows" on={info} onClick={() => setInfo((i) => !i)}><Info size={18} /></Square42>;
+  const about = info && createPortal(
+    <div role="dialog" aria-modal aria-label="Duo 3D" onClick={() => setInfo(false)} style={{ position: "fixed", inset: 0, zIndex: 100, display: "grid", placeItems: "center", padding: 16, background: "rgb(0 0 0 / 0.3)", backdropFilter: "blur(6px)" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ position: "relative", maxWidth: 440, padding: "18px 56px 20px 20px", borderRadius: 20, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line), 0 18px 50px rgb(0 0 0 / 0.35)" }}>
+        <div style={{ font: "700 18px/1.2 -apple-system, system-ui", letterSpacing: -0.3 }}>Duo 3D</div>
+        <p aria-live="polite" style={{ margin: "8px 0 0", font: "400 14px/1.5 -apple-system, system-ui", color: "var(--dim)" }}>
           <b style={{ color: "var(--ink)", fontWeight: 600 }}>{where}{duet ? "" : ", without Duet"}.</b> {duet ? note : "The same site as a plain mobile site: nothing paints in Safari's column."}
-        </div>
+        </p>
+        <button onClick={() => setInfo(false)} aria-label="Close" style={{ ...control, position: "absolute", top: 12, right: 12, width: 32, height: 32, padding: 0, borderRadius: 16, display: "grid", placeItems: "center", ...lit() }}><X size={16} /></button>
       </div>
-      {!list && <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />}
+    </div>,
+    document.body,
+  );
+  // The page's own buttons float in the device's corner, so the card opens on the device.
+  const corner = (
+    <div style={{ position: "absolute", top: list ? 12 : 16, right: list ? 12 : 16, zIndex: 5, display: "flex", gap: 6 }}>
+      {infoButton}
       <div style={{ position: "relative" }}>
         <Square42 label="More" on={more} onClick={() => setMore((m) => !m)}><Ellipsis size={18} /></Square42>
         {more && (
@@ -224,7 +225,6 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
                 style={{ flex: 1, minWidth: 0, height: 36, border: 0, background: "transparent", color: "var(--ink)", font: "400 15px -apple-system, system-ui", outline: "none" }} />
               <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center", background: "transparent" }}><ArrowRight size={16} /></button>
             </form>
-            {list && <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />}
             <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
           </div>
         )}
@@ -271,7 +271,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     </div>
   );
 
-  // On the landing page: the device, the tour, what it shows, and the controls behind "Try it yourself".
+  // On the landing page: the device, the tour under it, and what it shows and the controls behind info and "Try it yourself".
   if (embed) return (
     <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
       {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
@@ -279,15 +279,15 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
       {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
         style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
       <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
-      <p style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
-        <Caption where={where} note={note} live />
-        {CAPTIONS.map(([w, n]) => <Caption key={w + n} where={w} note={n} />)}
-      </p>
-      {manual ? <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}</div> : (
-        <button onClick={() => { setManual(true); setTour(false); }} style={{ ...control, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
-          <Pointer size={18} strokeWidth={2.2} />Try it yourself
-        </button>
+      {manual ? <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center" }}>{infoButton}</div></div> : (
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {infoButton}
+          <button onClick={() => { setManual(true); setTour(false); }} style={{ ...control, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
+            <Pointer size={18} strokeWidth={2.2} />Try it yourself
+          </button>
+        </div>
       )}
+      {about}
     </div>
   );
 
@@ -295,13 +295,17 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   return (
     <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: list ? 16 : 32, boxSizing: "border-box", background: "var(--bg)" }}>
       <div style={{ position: "relative", width: "100%", maxWidth: 860, display: "flex", flexDirection: "column", borderRadius: list ? 22 : 28, background: "radial-gradient(120% 90% at 50% 35%, color-mix(in srgb, var(--bg), #888 14%), var(--bg))", boxShadow: "0 0 0 0.5px var(--line), 0 30px 80px rgb(0 0 0 / 0.25)" }}>
-        {header}
         <div style={{ position: "relative" }}>
-          {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: list ? "min(44vh, 380px)" : "min(50vh, 500px)", border: 0, display: "block", background: "transparent", colorScheme: "light" }} />}
+          {corner}
+          {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: list ? "min(52vh, 440px)" : "min(58vh, 560px)", border: 0, display: "block", background: "transparent", colorScheme: "light" }} />}
         </div>
         {handle}
         {panel}
         {rows}
+        <div style={{ display: "flex", justifyContent: "center", padding: list ? "0 12px 16px" : "0 14px 20px" }}>
+          <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />
+        </div>
+        {about}
       </div>
     </div>
   );

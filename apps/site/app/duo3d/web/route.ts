@@ -1,12 +1,14 @@
 // Any web page, framed in the 3D Duo's Safari as if it ran Duet: fetched here, so the page is this origin and the
 // displays can emulate Safari's signals into it, with its frame blockers stripped, a <base> so its own links and
-// assets resolve upstream, and duet-shell.tsx (Duet with Back, Forward and Reload) added. Local only: the page's
-// own scripts run on this origin, so its API calls and history routing may fail, as any page framed this way.
+// assets resolve upstream, and duet-shell.tsx (Duet with Back, Forward and Reload) added. The page's own scripts run
+// on this origin, so its API calls and history routing may fail, as any page framed this way.
 const PRIVATE = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.|\[?::1\]?$|.*\.local$|.*\.ts\.net$)/;
 
 export async function GET(req: Request) {
-  // An open proxy anywhere else: never in production.
-  if (process.env.NODE_ENV === "production") return new Response("Not found", { status: 404 });
+  // Only a frame of this site's own pages loads through here, never a top-level visit or another site: otherwise this
+  // origin would be an open proxy, and a place to host any page under its name.
+  if (req.headers.get("sec-fetch-site") !== "same-origin" || req.headers.get("sec-fetch-dest") !== "iframe")
+    return new Response("Only framed by this site", { status: 403 });
   const raw = new URL(req.url).searchParams.get("url") ?? "";
   let url: URL;
   try { url = new URL(/^https?:\/\//.test(raw) ? raw : `https://${raw}`); } catch { return new Response("Bad url", { status: 400 }); }
@@ -47,5 +49,6 @@ export async function GET(req: Request) {
   const out = at < 0 ? head + html : html.replace(/<head[^>]*>/i, (m) => m + head);
   headers.set("content-type", "text/html; charset=utf-8");
   headers.set("cache-control", "no-store");
+  headers.set("x-robots-tag", "noindex");
   return new Response(out, { status: res.status, headers });
 }
