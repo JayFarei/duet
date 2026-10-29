@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@haptics/react": "2.1.1",
     "duet-ui": "workspace:*",
     "lucide-react": "^1.59.0",
     "next": "16.4.2",
