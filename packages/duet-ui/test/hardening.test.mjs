@@ -235,6 +235,31 @@ test("an inset that never lands shows the controls once PREVIEW_RISE is past (#1
   const c = stable(d, first, undefined, PREVIEW_RISE + 10);
   assert.deepEqual([c.mode, c.hidden], ["column", undefined]);
 });
+// Unfolding the full screen preview (iOS 27.1, e2e j38-02): its first frame on the open screen drew the controls
+// inline right for ~40ms, over the clock and island, before the window and its 84pt status band settled. The page reads
+// 951x594 in the 951x669 window there, one of its insets not landed yet: the bottom (reads as a tab) or the right (the
+// preview, no band). Both stay hidden; the laid out frame shows the strip.
+test("unfolding the preview: hidden until its insets land, then the strip (e2e j38-02)", () => {
+  const open = { ...PREVIEW, innerWidth: 951, innerHeight: 594, outerWidth: 951, outerHeight: 669, visualHeight: 594, insetBottom: 34, insetRight: 84 };
+  assert.match(previewReason(open), /unfolded wide/);
+  for (const unlaid of [{ ...open, insetBottom: 0 }, { ...open, insetRight: 0 }]) {
+    assert.ok(previewPending(unlaid));
+    const d = { flips: [] };
+    assert.equal(stable(d, PREVIEW, undefined, 0).preview, true);
+    const c = stable(d, unlaid, undefined, 5000, true);
+    assert.equal(c.hidden, "pending");
+    assert.equal(d.pendingUntil, 5000 + PREVIEW_RISE);
+    const landed = stable(d, open, undefined, 5100, true);
+    assert.deepEqual([landed.mode, landed.side, landed.hidden], ["strip", "right", undefined]);
+    // An inset that never lands shows the controls once PREVIEW_RISE is past.
+    const d2 = { flips: [] };
+    stable(d2, PREVIEW, undefined, 0);
+    stable(d2, unlaid, undefined, 5000, true);
+    assert.equal(stable(d2, unlaid, undefined, 5000 + PREVIEW_RISE + 10).hidden, undefined);
+  }
+  // A tab unfolded is never pending: 126pt of bars.
+  assert.equal(previewPending({ ...open, innerHeight: 543, visualHeight: 543, insetRight: 0 }), false);
+});
 test("a tab is never pending, even with its bar collapsed into the preview's chrome band (59pt, real Duo) (#143)", () => {
   const d = { flips: [] };
   assert.equal(stable(d, TAB, undefined, 0).hidden, undefined);

@@ -593,6 +593,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing. Use `bootScript` so no frame shows them before the first effect.
 - **Status:** [#143](https://github.com/JayFarei/duet/issues/143) (sheet), [#155](https://github.com/JayFarei/duet/issues/155) (full screen), e2e `pvl01` and `pvl02` (a load held 1.5s with `?slowjs`, sampled from the first paint).
 
+### Controls flash over the clock unfolding the in-app preview
+
+- **You see:** without handling, unfolding the full screen in-app preview, Duet's controls show for a frame on the right edge of the open screen, over the clock and the Dynamic Island, before moving into the side band below them.
+- **Cause:** the open screen's first frame lays the page out at 951x594 in the 951x669 window before its insets land: the bottom inset still reads 0 (a tab's reading) or the 84pt right inset that holds the status column is not there yet (no band to put the controls in), so they go inline on the right.
+- **Duet does:** for a second after the preview's window changes, as after its first load, hides the controls (`useDuet().hidden` is `"pending"`) while the window reads as the preview pending its inset, or as the unfolded wide preview with no side band, which every one measured has. They show in the band as soon as it lands, or after that second where they would be.
+- **You do:** nothing.
+- **Status:** [#159](https://github.com/JayFarei/duet/issues/159), e2e `j38-02` and `unf01` (unfold the preview three times, every frame sampled).
+
 ### Menus and popovers under Safari's buttons
 
 - **You see:** without the handling, a menu that reaches into the column is drawn under Safari's back, reader or +/tabs buttons.

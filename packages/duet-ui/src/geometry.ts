@@ -142,7 +142,8 @@ export interface Context {
    *  room for a button and where an inline strip would cover the page (docs/research-notes.md, "Preview placement in
    *  the gap"); the preview's own back and close buttons remain, and Duet's return in portrait or in a tab.
    *  "pending": the first second of a page whose signals would read as the preview once its bottom inset lands
-   *  (previewPending), so the controls never show at a tab's places, over the preview's own buttons (#143). */
+   *  (previewPending), so the controls never show at a tab's places, over the preview's own buttons (#143), and the
+   *  first second of a preview's new window (unfolding it), while its insets land. */
   hidden?: "moving" | "preview" | "pending";
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
@@ -239,9 +240,14 @@ export const isPreview = (s: Signals) => previewReason(s) !== undefined;
  *  The verdicts were a tab's and its controls showed over the preview's share and reload buttons until hydration
  *  (#143). The full screen preview's first frame (~200ms, iOS 27.1, e2e j37/pvl02) reads the whole screen as both
  *  window and page, no chrome, no column, inset 0 (#155). So: the preview with its inset, or a Safari page in the
- *  sheet's window whatever its page reads, or a Safari page that is the whole closed screen. */
-export const previewPending = (s: Signals) => !isPreview(s)
-  && (isPreview({ ...s, insetBottom: 34 }) || (!s.standalone && browserOf(s.userAgent) === "safari" && (closedSheet(s) || closedWhole(s))));
+ *  sheet's window whatever its page reads, or a Safari page that is the whole closed screen. Or the preview read
+ *  but placed wrong: the unfolded wide one before its side band lands (unlaidWide). */
+export const previewPending = (s: Signals) => isPreview(s) ? unlaidWide(s)
+  : isPreview({ ...s, insetBottom: 34 }) || (!s.standalone && browserOf(s.userAgent) === "safari" && (closedSheet(s) || closedWhole(s)));
+/** The unfolded wide preview before its status column's safe-area inset lands: no band on either side, so detect()
+ *  would put the controls inline right, over the clock and island. Unfolding the full screen preview, its first frame
+ *  drew them there for ~40ms (iOS 27.1, e2e j38-02). Every unfolded wide preview measured has the 84pt band. */
+const unlaidWide = (s: Signals) => unfoldedPreview(s) === "wide" && s.insetLeft < STRIP_INSET && s.insetRight < STRIP_INSET;
 /** The page is the whole closed screen, window and all, in either orientation: no Safari tab reads that, its column
  *  and bar are always there on the closed Duo (previewPending). */
 function closedWhole(s: Signals): boolean {
@@ -467,9 +473,9 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   /** Focus left a keyboard that was up while the visual viewport is still short: it counts as up until then
    *  (KEYBOARD_DOWN). */
   kbUntil?: number;
-  /** When the page first read its signals and whether they were a preview pending its inset then (previewPending),
-   *  and until when its controls stay hidden for it (PREVIEW_RISE). */
-  bornAt?: number; bornPending?: boolean; pendingUntil?: number }
+  /** When the page first read its signals, when its controls started hiding for a preview not laid out yet
+   *  (previewPending: at that first reading, or in the first window after a preview's), and until when (PREVIEW_RISE). */
+  bornAt?: number; pendingAt?: number; pendingUntil?: number }
 const FLIP_WINDOW = 2000;
 export const PIN_TTL = 3000;
 /** Longest pin: a loop that keeps resuming doubles the wait up to this. */
@@ -524,13 +530,16 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     }
     s = { ...s, scale: 1 };
   }
-  d.bornAt ??= now; d.bornPending ??= previewPending(s);
+  const pending = previewPending(s);
+  if (d.bornAt === undefined) [d.bornAt, d.pendingAt] = [now, pending ? now : undefined];
   const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`, raw = isPreview(s);
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
   if (d.preview === undefined || !raw || stableKey !== d.previewKey || rising) d.preview = raw;
   d.previewKey = stableKey;
   const preview = d.preview;
+  // A preview's window changing (unfolding it) lays the page out afresh, its insets landing late like a first load's.
+  if (pending && d.last?.preview && stableKey !== d.stableKey) d.pendingAt = now;
   // A loop keeps the window size; a fold or rotation passes through other sizes, so only same-size flips count.
   if (d.key !== key) Object.assign(d, { key, pinned: undefined, ttl: undefined, flips: [] });
   if (d.pinned && now >= d.until!) Object.assign(d, { pinned: undefined, flips: [] });
@@ -553,8 +562,9 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   // never leaves a tab on drift alone, so column to inline is held after the settle too: a real Duo's bar and
   // keyboard read outside every range measured on the simulator (#132), and a wrong inline verdict committed once the
   // scroll settled dropped the controls off the rail for good. Inline to column still moves, so a wrong inline heals.
+  // A context hidden as pending was never shown, so there is nothing to hold: its insets landing moves it.
   const columnHeld = d.last?.mode === "column" && c.mode === "inline" && !d.pinned;
-  if (d.last && c.mode !== d.last.mode && (settling || columnHeld) && stableKey === d.stableKey && !!d.last.preview === preview) {
+  if (d.last && c.mode !== d.last.mode && (settling || columnHeld) && stableKey === d.stableKey && !!d.last.preview === preview && d.pendingUntil === undefined) {
     const { width, height, insetTop, insetBottom, keyboard, visualBottom } = c;
     return { ...d.last, width, height, insetTop, insetBottom, keyboard, visualBottom, confidence: "held" };
   }
@@ -577,11 +587,11 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   const h = `${s.innerWidth}${s.outerWidth > s.outerHeight ? "L" : "P"}`, heights = d.heights ??= {};
   heights[h] = Math.min(heights[h] ?? Infinity, s.innerHeight);
   d.last = { ...c, stableHeight: heights[h] };
-  // A page that would be the preview once its inset lands keeps its controls hidden for its first PREVIEW_RISE ms
-  // instead of showing them at a tab's places (the caller re-reads at pendingUntil). Only a page whose first reading
-  // was pending: a tab loads with 98 or 80pt of chrome, and its bar collapsing into the preview's band on a quick
-  // scroll (59pt, real Duo) must not hide its controls.
-  d.pendingUntil = d.bornPending && !preview && previewPending(s) && now - d.bornAt < PREVIEW_RISE ? d.bornAt + PREVIEW_RISE : undefined;
+  // A preview not laid out yet keeps its controls hidden for PREVIEW_RISE ms instead of showing them at a tab's places
+  // (the caller re-reads at pendingUntil). Only from a first reading that was pending, or a preview's window changing:
+  // a tab loads with 98 or 80pt of chrome, and its bar collapsing into the preview's band on a quick scroll (59pt, real
+  // Duo) must not hide its controls.
+  d.pendingUntil = d.pendingAt !== undefined && pending && now - d.pendingAt < PREVIEW_RISE ? d.pendingAt + PREVIEW_RISE : undefined;
   return d.pendingUntil === undefined ? d.last : { ...d.last, hidden: "pending" };
 }
 

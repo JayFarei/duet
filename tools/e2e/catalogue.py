@@ -279,6 +279,12 @@ SUITES = [
     {"id": "pvl02", "title": "Slow load in the in-app preview (default style): no controls over its Back or Share before hydration (#155)", "page": "/book?slowjs=1500", "start": ("default", "closed", 0, False), "steps": [
         (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),
     ]},
+    # #159: unfolding the full screen preview, its first frame on the open screen lays out before its insets land, and
+    # the controls showed inline right over the clock and island for ~40ms (e2e j38-02). Three unfolds, three chances
+    # at the race; the flash check (6b) judges every sample.
+    {"id": "unf01", "title": "Unfold and fold the in-app preview (default style) three times: no frame over the clock (#159)", "page": "/book", "start": ("default", "closed", 0, False), "steps": [
+        (("unfold",), None, {}), (("fold",), None, {}), (("unfold",), None, {}), (("fold",), None, {}), (("unfold",), None, {}),
+    ]},
     {"id": "nav02", "title": "Link and Safari Back, outer screen on its side", "page": "/", "start": ("tab", "closed", 90, False), "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
         (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
