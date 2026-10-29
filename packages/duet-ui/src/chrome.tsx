@@ -215,6 +215,9 @@ function viewport(key: string, value: string) {
   for (const meta of metas) if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
+// useLayoutEffect warns during SSR on React 18.
+const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 // Leaving the column, the sideways scroll the layer pinned stays behind: from a split left pane turned into the tall
 // window (inline), the document kept scrollX -84 with nothing to scroll, and Safari then painted the pill's glass but
 // not its unselected tab icons (e2e round 4, splitturn-left-to90). So when the mode leaves the column (not while the
@@ -230,7 +233,10 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     const t = [0, 300, 1000].map((ms) => setTimeout(reset, ms));
     return () => t.forEach(clearTimeout);
   }, [inColumn]);
-  useEffect(() => {
+  // Before paint: the layer is hidden mid-turn (off), and the render that shows it again also turns the follow back
+  // on. As a passive effect that ran a frame after the paint, so the controls showed once at their document
+  // position, about scrollY above where they belong (e2e scr01, a turn or fold on a scrolled page, #131).
+  useLayout(() => {
     const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
     if (!on || !els.length) return;
     const html = document.documentElement.style, prev = html.touchAction;
@@ -349,9 +355,6 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
 }
 
 // --- rendering ----------------------------------------------------------------------------------
-
-// useLayoutEffect warns during SSR on React 18.
-const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** How long a slot that went away stays mounted while it pops out (duet.css, duet-leave). */
 const LEAVE_MS = 450;
