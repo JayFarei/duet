@@ -65,5 +65,8 @@
   },
   "homepage": "https://github.com/JayFarei/duet#readme",
   "bugs": "https://github.com/JayFarei/duet/issues",
-  "author": "JayFarei"
+  "author": "JayFarei",
+  "dependencies": {
+    "@samasante/liquid-glass": "^0.1.1"
+  }
 }

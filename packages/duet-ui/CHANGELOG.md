@@ -2,7 +2,7 @@
 
 ## 0.6.1
 
-- The open menu is frosted (`--duet-menu-frost`, blur 24px, saturate 1.8) and tinted (`--duet-menu`), so page text under it blurs out instead of reading through the items (#184).
+- In Chromium the open menu is liquid-glass's material (`@samasante/liquid-glass`, frost 24px, saturate 1.8), so page text under it blurs out instead of reading through the items. Safari keeps the 0.6.0 glass (#184).
 
 ## 0.6.0
 

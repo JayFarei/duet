@@ -8,6 +8,7 @@ import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead,
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
+import { Glass } from "@samasante/liquid-glass";
 import "./duet.css";
 
 export interface DuetItem {
@@ -425,8 +426,10 @@ function Morph({ open, from, slots, box, onClosed, children }: { open: boolean; 
     k.raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(k.raf);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- geometry is fixed while the menu is shown
+  const blink = useBlink();
   return (
-    <div ref={blob} className="duet-blob" role="menu" style={{ left: from.x, top: from.y, width: from.w, height: from.h, borderRadius: TEMPLATE.control / 2 }}>
+    <div ref={blob} className="duet-blob" role="menu" data-lg={blink || undefined} style={{ left: from.x, top: from.y, width: from.w, height: from.h, borderRadius: TEMPLATE.control / 2 }}>
+      {blink && <Glass className="duet-lg" optics={LG_OPTICS} aria-hidden><span /></Glass>}
       <div ref={fill} className="duet-fill" style={{ opacity: 0 }} aria-hidden />
       <i className="duet-rim" aria-hidden />
       <div ref={face} className="duet-face" style={{ width: from.w, height: from.h }} aria-hidden>
@@ -436,6 +439,13 @@ function Morph({ open, from, slots, box, onClosed, children }: { open: boolean; 
     </div>
   );
 }
+
+/* Chromium can bend the live page under the menu (backdrop-filter: url(), Blink only), so there the menu is
+   liquid-glass's material (#184). Safari, and every iOS browser, keeps duet's own glass. */
+const LG_OPTICS = { frost: 24, saturate: 1.8 };
+const isBlink = () => typeof navigator !== "undefined" && ("userAgentData" in navigator
+  || (/\b(?:Chrome|Chromium|Edg)\//.test(navigator.userAgent) && !/iPhone|iPad|iPod|CriOS|EdgiOS/.test(navigator.userAgent)));
+const useBlink = () => useSyncExternalStore(() => () => {}, isBlink, () => false);
 
 type Phase = "open" | "closing" | "closed";
 
