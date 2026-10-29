@@ -695,7 +695,7 @@ index f5a37b7..495bb35 100644
        /* Everything in a layer: StyleX emits layered CSS and unlayered rules
           would beat it regardless of specificity. `reset` is declared first so
 diff --git a/packages/shell/main.ts b/packages/shell/main.ts
-index 489947a..a385078 100644
+index 489947a..bff4598 100644
 --- a/packages/shell/main.ts
 +++ b/packages/shell/main.ts
 @@ -6,7 +6,7 @@ import { USDLoader } from 'three/addons/loaders/USDLoader.js'
@@ -753,7 +753,16 @@ index 489947a..a385078 100644
  renderer.setClearColor(0xf6f6f3, 0)
  renderer.toneMapping = THREE.ACESFilmicToneMapping
  renderer.toneMappingExposure = 1.18
-@@ -181,7 +189,12 @@ controls.update()
+@@ -162,6 +170,8 @@ const controls = new OrbitControls(camera, renderer.domElement)
+ renderer.domElement.style.touchAction = 'pan-y'
+ controls.enableDamping = true
+ controls.enablePan = false
++// No wheel or pinch zoom: a page scroll over the frame read as a zoom.
++controls.enableZoom = false
+ controls.minDistance = 21
+ controls.maxDistance = 65
+ controls.target.set(0, 0, HINGE_Z)
+@@ -181,7 +191,12 @@ controls.update()
  // `phone` turns with the Flip button; `body` inside it gives a little under a
  // finger on a button (packages/shell/buttons.ts) and carries every mesh and panel.
  const phone = new THREE.Group()
@@ -767,7 +776,7 @@ index 489947a..a385078 100644
  const body = new THREE.Group()
  phone.add(body)
  // 0 open, PI closed. Shared by every moving mesh's vertex shader.
-@@ -401,6 +414,12 @@ body.add(ledLight)
+@@ -401,6 +416,12 @@ body.add(ledLight)
  // CSS3DRenderer and drawn over the WebGL canvas. The baked textures show
  // underneath while the hinge moves, when a flat DOM panel can't bend.
  const css = new CSS3DRenderer()
@@ -780,7 +789,7 @@ index 489947a..a385078 100644
  // Hidden until the first frame, with the canvas: see `shown` in the loop below.
  css.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity 0.45s ease'
  document.body.appendChild(css.domElement)
-@@ -427,9 +446,19 @@ const outerLive = live(px(7.73936), px(11.2513))
+@@ -427,9 +448,19 @@ const outerLive = live(px(7.73936), px(11.2513))
  outerLive.position.set(-0.23396 - 7.73936 / 2, 0.27173 - 5.8974 + 11.2513 / 2, OUTER_Z - HINGE_Z - 0.005)
  outerLive.rotation.y = Math.PI
  hinge.add(outerLive)
@@ -801,7 +810,7 @@ index 489947a..a385078 100644
  ])
  
  // The bands around the phone, in pixels: it hangs centred in what they leave.
-@@ -559,17 +588,18 @@ const hud = mountHud(
+@@ -559,17 +590,18 @@ const hud = mountHud(
        saveView({ yaw: targetYaw })
      },
      home: goHome,
@@ -827,7 +836,7 @@ index 489947a..a385078 100644
  controls.addEventListener('start', () => {
    hud.hideHint()
    homing = false
-@@ -589,6 +619,10 @@ let targetAngle = Number(q.get('deg') ?? view().deg ?? 180)
+@@ -589,6 +621,10 @@ let targetAngle = Number(q.get('deg') ?? view().deg ?? 180)
  let angle = targetAngle
  let yaw = Number(q.get('yaw') ?? view().yaw ?? 0)
  let targetYaw = yaw
@@ -838,7 +847,7 @@ index 489947a..a385078 100644
  
  function setAngle(v: number) {
    targetAngle = Math.min(180, Math.max(0, v))
-@@ -613,6 +647,9 @@ const lead = () => follow(targetAngle > HANDOVER)
+@@ -613,6 +649,9 @@ const lead = () => follow(targetAngle > HANDOVER)
  // that arrived during the model load is applied here.
  pose = (m) => {
    if (typeof m.deg === 'number') setAngle(m.deg)
@@ -848,7 +857,7 @@ index 489947a..a385078 100644
    if (typeof m.yaw === 'number') {
      // A page turns the phone to face its reader, which only holds from the front: a new yaw brings the camera home.
      homing ||= m.yaw !== targetYaw
-@@ -745,8 +782,10 @@ renderer.setAnimationLoop((now) => {
+@@ -745,8 +784,10 @@ renderer.setAnimationLoop((now) => {
    const dt = Math.min(now - last, 50)
    const k = 1 - 0.92 ** (dt / 16.7)
    last = now
@@ -861,7 +870,7 @@ index 489947a..a385078 100644
    // Not while the boot screen is up: the phone turns once the OS is on the glass.
    if (hud.spinning() && booted()) targetYaw += 0.004
    hud.angle(angle)
-@@ -758,6 +797,8 @@ renderer.setAnimationLoop((now) => {
+@@ -758,6 +799,8 @@ renderer.setAnimationLoop((now) => {
    bend.value = ((180 - angle) / 180) * Math.PI
    hinge.rotation.y = bend.value
    phone.rotation.y = yaw
@@ -870,7 +879,7 @@ index 489947a..a385078 100644
    // Facing you means facing the eye: a drag orbits the camera, not the phone, and still turns it as you see it.
    setPose(yaw - controls.getAzimuthalAngle(), angle)
    hardware.tick(dt / 1000)
-@@ -784,7 +825,6 @@ renderer.setAnimationLoop((now) => {
+@@ -784,7 +827,6 @@ renderer.setAnimationLoop((now) => {
    controls.update()
    frame()
    hud.orbit(controls.getAzimuthalAngle(), controls.getPolarAngle(), controls.getDistance(), yaw)
@@ -878,7 +887,7 @@ index 489947a..a385078 100644
    if (spotsTo) {
      const spots = hardware.spots()
      const now = JSON.stringify(spots)
-@@ -805,15 +845,21 @@ renderer.setAnimationLoop((now) => {
+@@ -805,15 +847,21 @@ renderer.setAnimationLoop((now) => {
    // last 30° so the mirror is never a pop when the fold begins.
    outerLive.visible = facing(outerLive) && (angle < 1 || (app && angle < FLAT))
    outerLive.element.style.opacity = Math.min(1, (FLAT - angle) / 30).toFixed(3)
@@ -903,7 +912,7 @@ index 489947a..a385078 100644
    updateDisplays(
      { visible: innerLive.visible, active: angle > 40, angle, clip },
      {
-@@ -824,7 +870,7 @@ renderer.setAnimationLoop((now) => {
+@@ -824,7 +872,7 @@ renderer.setAnimationLoop((now) => {
      }
    )
    // Past half way the clip has eaten the whole band, as it has in the shader.
@@ -912,7 +921,7 @@ index 489947a..a385078 100644
    // No depth test either: a turned panel would still take the clicks meant for
    // the frame drawn over it, so it is scenery until it is flat.
    const touch = angle < 1
-@@ -832,6 +878,19 @@ renderer.setAnimationLoop((now) => {
+@@ -832,6 +880,19 @@ renderer.setAnimationLoop((now) => {
      coverTouch = touch
      outerLive.element.style.pointerEvents = touch ? 'auto' : 'none'
    }
