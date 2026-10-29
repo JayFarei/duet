@@ -118,6 +118,15 @@ Not covered yet:
 1. Open /book?slowjs=1500 in the in-app preview, default style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
 2. Tap Duet's tab button (its island opens). Expect: controls in a column on the right in the gap of the preview's own column; Duet's menu is open, clear of every native button.
 
+## unf01: Unfold and fold the in-app preview (default style) three times: no frame over the clock (#159)
+
+1. Open /book in the in-app preview, default style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
+3. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
+4. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
+5. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
+6. Unfold to the inner screen. Expect: controls in a strip in the side inset on the right.
+
 ## nav02: Link and Safari Back, outer screen on its side
 
 1. Open / in a Safari tab, folded, on the outer screen, on its side, landscape right (90), no music. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
