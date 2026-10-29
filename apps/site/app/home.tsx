@@ -57,7 +57,7 @@ function Site() {
   if (portrait && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
-      menu={{ items: SECTIONS, selected: tab, onSelect: go }}
+      menu={{ items: SECTIONS, selected: tab, onSelect: go, burger: false }}
       actions={[
         { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
         { id: "theme", label: theme.dark ? "Light mode" : "Dark mode", icon: theme.dark ? <Sun size={22} /> : <Moon size={22} />, onPress: theme.toggle },
