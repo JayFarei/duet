@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- The open menu is tinted near opaque (`--duet-menu`), so page text under it no longer reads through the items (#184).
+
 ## 0.6.0
 
 The templated column (#181). Breaking: the chrome is rebuilt around one template, the same on every layout.

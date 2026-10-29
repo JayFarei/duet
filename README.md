@@ -699,6 +699,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#181](https://github.com/JayFarei/duet/issues/181), 0.6.0.
 
+### Large text under the open menu
+
+- **You see:** with 0.6.0, page text under the open "…" menu (a big headline) reads through the items and makes them hard to read.
+- **Cause:** Duet's glass is sharp like Safari's capsules, not frosted, and the open menu had no tint of its own in light mode.
+- **Duet does:** tints the open menu near opaque (`--duet-menu`, white 0.92 in light, grey 0.82 in dark). Capsules keep the clear glass.
+- **You do:** nothing. Set `--duet-menu` on `.duet` for a different tint.
+- **Status:** [#184](https://github.com/JayFarei/duet/issues/184), 0.6.1.
+
 ## Limitations
 
 - **Duo detection is a heuristic** from screen and window sizes plus the user agent (see above). It can misfire on devices with matching sizes and miss a Duo whose reported sizes differ.
