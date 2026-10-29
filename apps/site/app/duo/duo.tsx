@@ -15,5 +15,5 @@ export function Duo(props: ComponentProps<typeof WebDuo>) {
     fetch(`${location.protocol}//${location.hostname}:${DUO_PORT}/`, { mode: "no-cors", signal: ctl.signal }).then(() => setThree(true), () => {}).finally(() => clearTimeout(t));
     return () => ctl.abort();
   }, []);
-  return three ? <Duo3D /> : <WebDuo {...props} />;
+  return three ? <Duo3D embed={props.embed} /> : <WebDuo {...props} />;
 }

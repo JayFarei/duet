@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
+import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, MessageSquareShare, MessageSquareText, PanelBottom, Pointer, RotateCcw, RotateCw, Rotate3d, Square } from "lucide-react";
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
 import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
@@ -39,10 +39,28 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
   ["laptop", "Laptop", glyph(<><path d="M3 18h13l3-12" /><path d="M2 19.5h20" strokeWidth={1} /></>)],
 ];
 
+// Every tour stop's caption, as the embed's caption block says it. Stacked unseen under the live one, they keep the
+// block at the tallest one's height, so the page below holds still while the tour runs.
+const CAPTIONS = [...new Map(TOUR.map((st) => {
+  const n = SCREEN[st.posture], [W, H] = st.turn ? [n.h, n.w] : [n.w, n.h];
+  const where = [st.posture === "open" ? "Open" : "Closed", st.app === "home" ? "PWA" : "Safari", st.app === "split" ? "Swap" : "Single"].join(" · ");
+  const note = scene(st, W, H, "localhost", (x) => detect(x).mode).note;
+  return [where + note, [where, note] as const];
+})).values()];
+function Caption({ where, note, live }: { where: string; note: string; live?: boolean }) {
+  return (
+    <span aria-live={live ? "polite" : undefined} aria-hidden={!live || undefined} style={{ gridArea: "1/1", visibility: live ? undefined : "hidden" }}>
+      <b style={{ color: "var(--ink)", fontWeight: 600 }}>{where}.</b> {note}
+    </span>
+  );
+}
+
 // The web Duo's controls on doan-labs/duo's 3D device. duo renders Apple's model and bends its hinge; both of its
 // displays frame /duo3d/screen, which draws what the 2D web Duo draws on its screen. The fold is duo's: an angle,
 // 0 closed to 180 open, eased there by duo itself.
-export function Duo3D() {
+/** embed: the landing page's stage, no card, sized to its container and touring on its own while on screen. The
+ *  device takes no touches until the reader asks to try it, so a swipe over it still scrolls the page. */
+export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const [s, setS] = useState<State>(TOUR[0]);
   const [deg, setDeg] = useState(0);
   const [stand, setStand] = useState<Stand>("flat");
@@ -51,6 +69,8 @@ export function Duo3D() {
   const [duet, setDuet] = useState(true);
   const [at, setAt] = useState(0);
   const [more, setMore] = useState(false);
+  const [onScreen, setOnScreen] = useState(true), [manual, setManual] = useState(false), [box, setBox] = useState({ w: 0, h: 0 });
+  const stage = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
   // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
@@ -116,11 +136,23 @@ export function Duo3D() {
   };
 
   useEffect(() => {
-    if (!tour) return;
+    if (!embed) return;
+    const el = stage.current!;
+    const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, Math.min(el.clientWidth * 0.85, 600, innerHeight * 0.62)) });
+    fit();
+    const ro = new ResizeObserver(fit), io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.25 });
+    ro.observe(el);
+    io.observe(el);
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setTour(true);
+    return () => { ro.disconnect(); io.disconnect(); };
+  }, [embed]);
+
+  useEffect(() => {
+    if (!tour || !onScreen) return;
     let i = at;
     const t = setInterval(() => { i = (i + 1) % TOUR.length; setAt(i); go({ ...TOUR[i] }, true, "flat"); }, HOLD);
     return () => clearInterval(t);
-  }, [tour]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tour, onScreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The fold slider: the hinge follows the thumb, and the posture flips at half way.
   const scrub = (t: number) => {
@@ -168,7 +200,7 @@ export function Duo3D() {
   ));
   const where = sections.slice(0, 3).map((x) => x.opts.find((o) => o.on)?.label).join(" · ");
 
-  const list = width < 700;
+  const list = (embed ? box.w : width) < 700;
   const header = (
     <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: list ? "16px 16px 0" : "20px 22px 0" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -236,13 +268,33 @@ export function Duo3D() {
     </div>
   );
 
+  // On the landing page: the device, the tour, what it shows, and the controls behind "Try it yourself".
+  if (embed) return (
+    <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
+      {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
+          document gets an opaque white backdrop instead of showing the page through. */}
+      {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
+        style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
+      <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
+      <p style={{ margin: 0, maxWidth: 560, display: "grid", textAlign: "center", color: "var(--dim)", font: "400 15px/1.45 -apple-system, system-ui", padding: "0 16px" }}>
+        <Caption where={where} note={note} live />
+        {CAPTIONS.map(([w, n]) => <Caption key={w + n} where={w} note={n} />)}
+      </p>
+      {manual ? <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}</div> : (
+        <button onClick={() => { setManual(true); setTour(false); }} style={{ ...control, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
+          <Pointer size={18} strokeWidth={2.2} />Try it yourself
+        </button>
+      )}
+    </div>
+  );
+
   // A compact card centred on the page, the way it sits on the site's landing page.
   return (
     <div style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: list ? 16 : 32, boxSizing: "border-box", background: "var(--bg)" }}>
       <div style={{ position: "relative", width: "100%", maxWidth: 860, display: "flex", flexDirection: "column", borderRadius: list ? 22 : 28, background: "radial-gradient(120% 90% at 50% 35%, color-mix(in srgb, var(--bg), #888 14%), var(--bg))", boxShadow: "0 0 0 0.5px var(--line), 0 30px 80px rgb(0 0 0 / 0.25)" }}>
         {header}
         <div style={{ position: "relative" }}>
-          {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: list ? "min(44vh, 380px)" : "min(50vh, 500px)", border: 0, display: "block", background: "transparent" }} />}
+          {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: list ? "min(44vh, 380px)" : "min(50vh, 500px)", border: 0, display: "block", background: "transparent", colorScheme: "light" }} />}
         </div>
         {handle}
         {panel}
