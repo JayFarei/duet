@@ -1,5 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "pnpm --filter duet-ui build && next build"
+  "buildCommand": "pnpm --filter duet-ui build && node duo3d-web/build.mjs && next build"
 }

@@ -1,6 +1,6 @@
 // The "With Duet" preview over a corpus of real sites: what the shell reads off each header, what the decision model
 // makes of it, and what Duet ends up showing, in Chromium, Playwright's WebKit and real Safari (safaridriver).
-// Needs the site's dev server with TYPESAFE_KEY (see tools/duo3d/setup.sh).
+// Needs the site's dev server with TYPESAFE_KEY (apps/site/.env.local).
 //
 //   node tools/duo3d/corpus/corpus.mjs [--engines chromium,webkit,safari] [--base http://localhost:3167] [--only farei] [--out dir]
 //
