@@ -703,7 +703,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** with 0.6.0, page text under the open "…" menu (a big headline) reads through the items and makes them hard to read.
 - **Cause:** Duet's glass is sharp like Safari's capsules, not frosted, and the open menu had no tint of its own in light mode.
-- **Duet does:** tints the open menu near opaque (`--duet-menu`, white 0.92 in light, grey 0.82 in dark). Capsules keep the clear glass.
+- **Duet does:** frosts the open menu (`--duet-menu-frost`, blur 24px and saturate 1.8 on its glass) and tints it (`--duet-menu`, white 0.82 in light, grey 0.72 in dark), so text behind blurs out instead of reading through. Capsules keep the clear glass.
 - **You do:** nothing. Set `--duet-menu` on `.duet` for a different tint.
 - **Status:** [#184](https://github.com/JayFarei/duet/issues/184), 0.6.1.
 

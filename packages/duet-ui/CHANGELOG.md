@@ -2,7 +2,7 @@
 
 ## 0.6.1
 
-- The open menu is tinted near opaque (`--duet-menu`), so page text under it no longer reads through the items (#184).
+- The open menu is frosted (`--duet-menu-frost`, blur 24px, saturate 1.8) and tinted (`--duet-menu`), so page text under it blurs out instead of reading through the items (#184).
 
 ## 0.6.0
 
