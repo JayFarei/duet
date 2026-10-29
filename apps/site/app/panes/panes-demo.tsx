@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { Archive, ChevronRight, FileText, Forward, Inbox, Paperclip, Reply, Send, SquarePen, Star, Trash2 } from "lucide-react";
+import { Archive, ArrowLeft, ChevronRight, FileText, Forward, Inbox, Paperclip, Reply, Send, SquarePen, Star, Trash2 } from "lucide-react";
 import { Duet, DuetPaneBar, DuetPanes, bleed, usePanes, type DuetItem } from "duet-ui";
 import { WebDuo, useDesktop } from "../duo/web-duo";
 
@@ -38,8 +38,8 @@ function Mail() {
   ];
   const bar = <DuetPaneBar onClose={nav.close} onToggle={nav.toggle} expanded={nav.expanded} more={more} />;
   return (
-    <Duet back={nav.back} primary={{ id: "compose", label: "New message", icon: <SquarePen size={22} />, onPress: () => nav.go("message") }}
-      actions={[{ id: "archive", label: "Archive", icon: <Archive size={22} /> }, { id: "trash", label: "Delete all", icon: <Trash2 size={22} />, destructive: true }]}>
+    <Duet primary={{ id: "compose", label: "New message", icon: <SquarePen size={22} />, confirm: false, onPress: () => nav.go("message") }}
+      actions={[...(nav.back ? [{ id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: nav.back.onPress }] : []), { id: "archive", label: "Archive", icon: <Archive size={22} /> }, { id: "trash", label: "Delete all", icon: <Trash2 size={22} />, destructive: true }]}>
       <DuetPanes path={PATH} at={nav.at} expanded={nav.expanded} panes={{
         mailboxes: (
           <div style={pad}>

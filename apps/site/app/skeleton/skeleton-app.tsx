@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { Bell, House, Library, Plus, Search, Share } from "lucide-react";
-import { Duet, bleed, column, readSignals, watchSignals, type DuetItem } from "duet-ui";
+import { Duet, bleed, column, readSignals, watchSignals, type DuetMenuItem } from "duet-ui";
 import { useTheme, useTint } from "../theme";
 
 const TABS = [
   { id: "home", label: "Home", icon: <House size={24} /> },
   { id: "library", label: "Library", icon: <Library size={24} /> },
   { id: "alerts", label: "Alerts", icon: <Bell size={24} /> },
-] as const satisfies readonly DuetItem[];
+] as const satisfies readonly DuetMenuItem[];
 
 const CSS = `
 [data-sk] { background: var(--sk); }
@@ -124,10 +124,8 @@ export function SkeletonApp() {
   if (!duet) return <><style>{CSS}</style><Plain tab={tab} onTab={setTab} inset={inset} /></>;
   return (
     <Duet
-      tabs={{ items: TABS, selected: tab, onSelect: setTab, search: { id: "search", label: "Search", icon: <Search size={24} /> } }}
+      menu={{ items: [...TABS, { id: "search", label: "Search", icon: <Search size={24} /> }], selected: tab, onSelect: setTab, burger: false }}
       actions={[{ id: "share", label: "Share", icon: <Share size={22} />, onPress: () => {} }]}
-      primary={{ id: "new", label: "New", icon: <Plus size={22} />, onPress: () => {} }}
-      minimizeOnScroll
       appearance={appearance}
       tint={tint}
     >

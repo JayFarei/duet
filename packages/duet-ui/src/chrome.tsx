@@ -1,82 +1,63 @@
 "use client";
 
-import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
-import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
+import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, controlsShown, isSplit, pageInsets, islandBox, islandFits, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { DUO, columnBand, controlsShown, isSplit, pageInsets, magnet, stable, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
+import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, pillRect, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
-import { GlassSurface } from "./glassyui/glass-surface.tsx";
 import "./duet.css";
 
 export interface DuetItem {
   id: string; label: string; icon: ReactNode; onPress?: () => void;
-  /** Count or short text in a badge on the icon's page-side corner, like a native tab item's badge. */
+  /** Count or short text in a badge on the icon's page-side corner. */
   badge?: number | string;
   /** "alert" (default): red, for things that want attention. "neutral": grey, for plain counts like a balance. */
   badgeTone?: "alert" | "neutral";
-  /** This item's accent when selected (a tab) or as the primary button. Default: the strip's `tint`. */
+  /** This item's accent as the primary. Default: the strip's `tint`. */
   tint?: string;
-  /** Deletes or discards: lives only in "…", last, in red, after a separator (blueprint). */
+  /** Deletes or discards: lives only in "…", last, in red (blueprint). */
   destructive?: boolean;
-  /** Leading or action item that lives in "…" even where the strip has room for it, after the items that folded for
-   *  room. Set it per page to keep a page's call to action alone on the strip. */
+  /** Lives in "…" even where the column has room for it, after the actions that folded for room. */
   folded?: boolean;
 }
-/** The primary action. */
-export interface DuetPrimary extends DuetItem {
-  /** The page's call to action (Book · 2 credits): a tinted button by the thumb. Where the band has no room for it
-   *  and the tabs (or search button) both, it keeps the slot by the thumb and they lead "…". Change label, icon or
-   *  tint as the page changes and it reshapes on a spring. No badge. */
-  prominent?: boolean;
-  /** A prominent primary starts closed, a round tinted button with the label only for assistive tech. Set expanded
-   *  to open it into a pill with the label beside the icon, growing towards the page (e.g. while it books, or for
-   *  a page whose whole point is the action); it opens and closes on the same spring. */
-  expanded?: boolean;
+/** The page's call to action (Pay $48.00), a tinted capsule. The first tap arms it into a pill toward the page that
+ *  says `confirm` (default: the label); the second calls onPress. `confirm: false`: one tap, no arming. */
+export type DuetPrimary = DuetItem & { confirm?: string | false };
+/** A place in the app, listed in the sidebar the burger opens. */
+export interface DuetMenuItem<T extends string = string> {
+  id: T; label: string; icon?: ReactNode;
+  badge?: number | string; badgeTone?: "alert" | "neutral";
 }
-/** A tab: an item whose id is one of the app's tab ids. */
-export type DuetTab<T extends string = string> = DuetItem & { id: T };
 export interface DuetProps<T extends string = string> {
-  /** Back button, top of the strip. */
-  back?: false | { label?: string; onPress: () => void };
-  /** SwiftUI `.topBarLeading`: its own group under back. */
-  leading?: DuetItem[];
-  /** SwiftUI `.primaryAction`: collapses into "…" when it would hit the tab pill. Destructive items always
-   *  go in "…". */
+  /** The app's places: the burger, first in the column, opens them in a sidebar and slides the page aside. The ids are
+   *  typed from `items`: declare them `as const` and `onSelect` gets the union. Each place keeps its own scroll
+   *  position in the inner scroller. In the in-app preview (one button of room), or with `burger: false`, they lead "…"
+   *  under "Menu" instead. */
+  menu?: { items: readonly DuetMenuItem<T>[]; selected?: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; burger?: boolean };
+  /** The page's actions: shown after the burger while they fit, the rest in "…". Destructive and folded items are
+   *  always in "…". */
   actions?: DuetItem[];
-  /** The screen's main action (New chat, Compose), a tinted round button: by the thumb above the tabs where one
-   *  pane shows, at the top under back where two do. */
+  /** The page's call to action: its own tinted capsule while the column has room, else in "…". */
   primary?: DuetPrimary;
-  /** Tab pill at the bottom of the strip. `search` adds a `role: .search` tab as the last item. The ids are typed
-   *  from `items`: declare them `as const` and `onSelect` gets the union, so `setTab` fits without a cast. Each tab
-   *  keeps its own scroll position, and tapping the selected tab scrolls it to the top, like a native tab bar. */
-  tabs?: { items: readonly DuetTab<T>[]; selected: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; search?: DuetTab<T> };
-  /** Searchable without tabs: a round search button at the bottom of the strip. */
-  searchButton?: () => void;
-  /** A sheet or card is open: the strip holds only a close button, where back goes, like an iOS sheet. Every
-   *  other control steps aside until it is cleared. */
+  /** A sheet or card is open: the column holds only a close button, like an iOS sheet. Every other control steps
+   *  aside until it is cleared. */
   close?: false | { label?: string; onPress: () => void };
-  /** `.tabViewBottomAccessory`, e.g. a mini player. */
-  accessory?: ReactNode;
-  /** `.tabBarMinimizeBehavior(.onScrollDown)`. "always": the tabs stay minimized, the selected tab opening the
-   *  full list, e.g. where a pill of icons alone wouldn't say enough, like a desktop table of contents. */
-  minimizeOnScroll?: boolean | "always";
   /** Light or dark, like overrideUserInterfaceStyle. Default "auto": follow the system. Menus follow it too; in
-   *  Safari's column the buttons keep following the system, so they match Safari's own. */
+   *  Safari's column the capsules keep following the system, so they match Safari's own. */
   appearance?: Appearance;
   /** @deprecated Use `appearance`. */
   dark?: boolean;
-  /** Accent for the selected tab, the active menu item and the primary button, like iOS's tintColor. Default:
-   *  the system blue. Same as `--duet-tint` in CSS. */
+  /** Accent for the primary and the selected place, like iOS's tintColor. Default: the system blue. Same as
+   *  `--duet-tint` in CSS. */
   tint?: string;
   /** Size, stroke weight and colour of your icons. Same as the `--duet-icon*` vars in CSS. */
   icons?: DuetIcons;
-  /** How "…" and the minimized tab open their menu. "island" (default): the button stretches sideways into a
-   *  pill of icons, like the Dynamic Island. "morph": the button grows into a labelled list, like a context menu. */
-  menuStyle?: "island" | "morph";
   /** Page content. When given, it scrolls in an inner scroller and the document itself never moves, so
-   *  the chrome (and in Safari the column layer) stays still during momentum scroll and rubber-banding. */
+   *  the chrome (and in Safari the column layer) stays still during momentum scroll and rubber-banding. It is also
+   *  the card the burger slides aside. */
   children?: ReactNode;
   /** Without children, in Safari's column: Duet places the page beside the controls (default `true`). When the
    *  document spans a column on the left (a split pane, or the closed Duo turned left) the page is moved into the
@@ -171,24 +152,6 @@ export function DuoCookie({ rendered, onChange = () => location.reload() }: { re
 }
 const noop = () => () => {};
 
-function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | null>) {
-  const [min, setMin] = useState(false);
-  useEffect(() => {
-    if (!on) return;
-    // Captured, so a scroll inside the page (a pane of <DuetPanes>) counts as well as the scroller's own; each
-    // scrolling element keeps its own last position.
-    const target = scroller.current ?? window, last = new WeakMap<object, number>();
-    const f = (e: Event) => {
-      const el = e.target instanceof Element ? e.target : null, y = el ? el.scrollTop : scrollY, key = el ?? window;
-      const d = y - (last.get(key) ?? 0);
-      if (Math.abs(d) > 8) { setMin(d > 0 && y > 40); last.set(key, y); }
-    };
-    target.addEventListener("scroll", f, { passive: true, capture: true });
-    return () => target.removeEventListener("scroll", f, { capture: true });
-  }, [on, scroller]);
-  return on && min;
-}
-
 /** Safari tab: fixed content is clipped to the page viewport (so is sticky), but in-document content paints
  *  into Safari's column. So the chrome is an absolute layer at the document top, and the inner scroller keeps
  *  the document itself from scrolling, so the layer never moves. Without children the document scrolls, and the
@@ -205,6 +168,8 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
  *  shows only its own column, and a tap there names the side (`tapSide`). A left-hand column (closed landscape,
  *  turned left) works the same way, with the document spanning that column alone. */
 let tapSide: Side = "right";
+/** A column touch that hits no button: closes what is open, like a touch on the page. */
+let columnMiss: (() => void) | null = null;
 /** Without shrink-to-fit=no Safari zooms a split pane out to fit the layer's overflow, which reads as another
  *  window size and flips the mode. It applies even when set late, but must land before the first column paint.
  *  Safari reads the last viewport meta, and frameworks add their own after load (Next.js renders a second one on
@@ -297,11 +262,12 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
       if (e.clientX >= 0 && e.clientX < innerWidth) return; // inside the viewport, normal hit-testing applies
       const el = split ? refs[e.clientX < 0 ? 0 : 1].current : refs[0].current;
       if (split) tapSide = e.clientX < 0 ? "left" : "right";
-      // Skip a button that became an open menu (the menu covers it, and its own slot sits on top) or is leaving.
-      for (const b of el?.querySelectorAll<HTMLButtonElement>(":not([data-unrolled], [data-leaving]) > button") ?? []) {
+      // Skip a capsule that is morphing into its menu (the menu covers it) or leaving.
+      for (const b of el?.querySelectorAll<HTMLButtonElement>(".duet-group:not([data-morphing], [data-leaving]) > button") ?? []) {
         const r = b.getBoundingClientRect();
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) { b.click(); return; }
       }
+      columnMiss?.();
     };
     follow();
     // Safari restores or resets the sideways scroll on load, resize and a back/forward cache restore.
@@ -392,20 +358,95 @@ function Presence({ children }: { children: ReactNode[] }) {
   ));
 }
 
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** "…" grows into its list: one spring drives the shape, the press swell, the tint and the list, open and close,
+ *  interruptible either way with its velocity kept. The capsule hides (data-morphing) and this blob takes its place,
+ *  starting as the capsule (its glass, its icons on .duet-face) and ending as the menu. Driven from rAF on refs, so
+ *  React renders it once per open. */
+function Morph({ open, from, slots, box, onClosed, children }: { open: boolean; from: Rect; slots: ReactNode[]; box: Rect; onClosed: () => void; children: ReactNode }) {
+  const blob = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null);
+  const st = useRef({ s: 0, v: 0, raf: 0, last: 0, clear: 0 });
+  const closed = useRef(onClosed);
+  closed.current = onClosed;
+  /** `clear`: how far the closing fade has run, 0 (none) to 1 (clear glass). */
+  const draw = (s: number, clear: number) => {
+    const el = blob.current, fl = fill.current, b = body.current, fc = face.current;
+    if (!el || !fl || !b || !fc) return;
+    // Toward the page is -x when the menu sits left of the capsule (a right column), else +x.
+    const left = box.x + box.w / 2 < from.x + from.w / 2;
+    const tall = lead(lead(s, 3), 1.5), wide = lead(lead(s, -1), -0.6), outer = lead(lead(s, 3), 3);
+    // The press swell: up to 1.2x, over before the shape leaves the capsule's size.
+    const swell = 1 + 0.2 * Math.sin(Math.PI * clamp01(s / 0.3));
+    const w = Math.max(from.w * swell, mix(from.w, box.w, wide)), h = Math.max(from.h * swell, mix(from.h, box.h, tall));
+    const o = mix(left ? from.x + from.w : from.x, left ? box.x + box.w : box.x, outer) + (left ? 1 : -1) * (w - mix(from.w, box.w, wide)) / 2;
+    const cy = mix(from.y + from.h / 2, box.y + box.h / 2, tall);
+    const r = mix(Math.min(w, h) / 2, 28, clamp01((wide - 0.15) / 0.6));
+    el.style.cssText = `left:${left ? o - w : o}px;top:${cy - h / 2}px;width:${w}px;height:${h}px;border-radius:${r}px`;
+    const keep = 1 - clear;
+    fl.style.opacity = String(clamp01(s * 2.5) * keep);
+    const f = clamp01(1 - s / 0.18);
+    fc.style.cssText = `width:${from.w}px;height:${from.h}px;opacity:${f};filter:blur(${(1 - f) * 4}px)`;
+    // The list rides the glass: one uniform scale from its width, blur clearing late.
+    const m = clamp01((s - 0.04) / 0.2) * keep, sharp = clamp01((s - 0.45) / 0.45), sc = Math.min(1, w / box.w);
+    // At rest: no filter or scale, so WebKit rasterises the list sharp, and only then does it scroll.
+    const rest = s > 0.999 && s < 1.001 && !clear;
+    b.toggleAttribute("data-rest", rest);
+    b.style.cssText = `width:${box.w}px;height:${box.h}px;opacity:${m}` + (rest ? "" : `;filter:blur(${(1 - sharp) * 10}px);scale:${sc}`);
+  };
+  useLayoutEffect(() => {
+    const k = st.current, target = open ? 1 : 0, sp = open ? MORPH_OPEN : MORPH_CLOSE;
+    cancelAnimationFrame(k.raf);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      k.s = target; k.v = 0; draw(target, open ? 0 : 1);
+      if (!open) closed.current();
+      return;
+    }
+    const t0 = performance.now();
+    if (open) k.clear = 0;
+    draw(k.s, k.clear);
+    k.last = 0;
+    const tick = (t: number) => {
+      const dt = k.last ? Math.min(0.032, (t - k.last) / 1000) : 1 / 60;
+      k.last = t;
+      // Semi-implicit Euler in 4 substeps: stable at 120Hz and 30Hz alike.
+      for (let i = 0; i < 4; i++) {
+        k.v += (-sp.stiffness * (k.s - target) - sp.damping * k.v) * dt / 4;
+        k.s += k.v * dt / 4;
+      }
+      if (!open) k.clear = Math.max(k.clear, clamp01((t - t0) / CLEAR_MS));
+      // Settle on both ends alike: the leads multiply s near 0 by up to ~16, so an early cut lands visibly off the capsule.
+      if (!open && Math.abs(k.s) < 0.0015 && Math.abs(k.v) < 0.02) { k.s = 0; k.v = 0; draw(0, 1); closed.current(); return; }
+      if (open && Math.abs(k.s - 1) < 0.0015 && Math.abs(k.v) < 0.02) { k.s = 1; k.v = 0; draw(1, 0); return; }
+      draw(k.s, k.clear);
+      k.raf = requestAnimationFrame(tick);
+    };
+    k.raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(k.raf);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- geometry is fixed while the menu is shown
+  return (
+    <div ref={blob} className="duet-blob" role="menu" style={{ left: from.x, top: from.y, width: from.w, height: from.h, borderRadius: TEMPLATE.control / 2 }}>
+      <div ref={fill} className="duet-fill" style={{ opacity: 0 }} aria-hidden />
+      <i className="duet-rim" aria-hidden />
+      <div ref={face} className="duet-face" style={{ width: from.w, height: from.h }} aria-hidden>
+        {slots.map((icon, i) => <span key={i} style={{ top: i * TEMPLATE.item }}>{icon}</span>)}
+      </div>
+      <div ref={body} className="duet-menu" style={{ width: box.w, height: box.h, opacity: 0 }}><div className="duet-list">{children}</div></div>
+    </div>
+  );
+}
+
+type Phase = "open" | "closing" | "closed";
+
 export function Duet<T extends string = string>(props: DuetProps<T>) {
-  const p = props as unknown as DuetProps; // tab ids are only typed at the boundary
+  const p = props as unknown as DuetProps; // menu ids are only typed at the boundary
   const ctx = useDuet();
   const scroller = useRef<HTMLDivElement>(null);
-  const minimized = useMinimized(!!p.minimizeOnScroll, scroller) || p.minimizeOnScroll === "always";
-  const [menu, setMenuNow] = useState<"more" | "tabs" | null>(null);
-  // The menu that is rolling back into its button; it stays mounted until its animation ends.
-  const [closing, setClosing] = useState<"more" | "tabs" | null>(null);
-  // Index of the tab under the finger while scrubbing the full pill, like Apple News' tab bar.
-  const [scrub, setScrub] = useState<number | null>(null);
-  // A touch on the full pill is a tap until it is held or dragged; only then does the pill swell into a scrub.
-  const press = useRef<{ y0: number; y: number; timer: number } | null>(null);
-  // A tap glides the lens to the new tab as a clear magnifier, without swelling the pill, like Apple News.
-  const [glide, setGlide] = useState(false);
+  // The sidebar stays "closing" while the page slides back, so the card keeps its background and radius.
+  const [sidebar, setSidebar] = useState<Phase>("closed");
+  const [more, setMore] = useState<Phase>("closed");
+  const [armed, setArmed] = useState(false);
   // The first render is the server's guess (ssr) and the window geometry settles over the next second (subscribe):
   // until then the controls jump to where they belong instead of gliding in from the guess.
   const [settled, setSettled] = useState(false);
@@ -420,31 +461,44 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     addEventListener("pageshow", restored);
     return () => { clearTimeout(t); removeEventListener("pageshow", restored); };
   }, []);
-  const glideTimer = useRef(0);
-  useEffect(() => () => { clearTimeout(glideTimer.current); if (press.current) clearTimeout(press.current.timer); }, []);
-  const setMenu = (n: "more" | "tabs" | null) => {
-    if (menu && menu !== n) setClosing(matchMedia("(prefers-reduced-motion: reduce)").matches ? null : menu);
-    if (n && closing === n) setClosing(null);
-    setMenuNow(n);
-  };
+  useEffect(() => {
+    if (sidebar !== "closing") return;
+    const t = setTimeout(() => setSidebar("closed"), SLIDE.ms);
+    return () => clearTimeout(t);
+  }, [sidebar]);
+  const closeMore = () => setMore((m) => (m === "open" ? "closing" : m));
+  const closeSidebar = () => setSidebar((s) => (s === "open" ? "closing" : s));
+  const dismiss = () => { closeMore(); setArmed(false); };
+
   const actions = (p.actions ?? []).filter((a) => !a.destructive && !a.folded), destructive = (p.actions ?? []).filter((a) => a.destructive);
-  const leading = (p.leading ?? []).filter((a) => !a.folded);
-  const folded = [...(p.leading ?? []), ...(p.actions ?? [])].filter((a) => a.folded && !a.destructive);
-  const tabItems = p.tabs ? [...p.tabs.items, ...(p.tabs.search ? [p.tabs.search] : [])] : [];
-  const spec: Spec = p.close
-    ? { back: true, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized, menuExtra: 0 }
-    : {
-        back: !!p.back, leading: leading.length, actions: actions.length, tabs: tabItems.length,
-        searchButton: !p.tabs && !!p.searchButton, accessory: !!p.accessory, minimized,
-        menuExtra: (ctx.mode === "inline" ? 1 : 0) + destructive.length + folded.length, primary: !!p.primary, prominent: !!p.primary?.prominent,
-      };
+  const folded = (p.actions ?? []).filter((a) => a.folded && !a.destructive);
+  const menuItems = p.menu?.items ?? [];
   // Split pane in column mode: the controls are drawn in both of Safari's possible columns (useColumnLayer).
   const split = ctx.mode === "column" && !!ctx.split, column = ctx.screenWidth - ctx.width;
   const sides: Side[] = split ? ["left", "right"] : [ctx.side];
-  const planFor = (side: Side) => plan(side === ctx.side ? ctx : { ...ctx, side }, spec);
-  // The copy whose column opened the menu draws it; the other copy's column is in the other pane.
+  // The copy whose column opened "…" draws its menu; the other copy's column is in the other pane.
   const [menuSide, setMenuSide] = useState<Side>(ctx.side);
   const inner = p.children !== undefined; // the inner scroller, which runs on under Safari's column
+
+  // The template for one side: its groups, where they go, and what "…" lists.
+  const layout = (side: Side) => {
+    const f = frame(side === ctx.side ? ctx : { ...ctx, side });
+    const inline = f.kind === "inline";
+    const burger = !!p.menu && p.menu.burger !== false;
+    const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger ? 1 : 0);
+    const a = template(f, { close: !!p.close, menu: burger, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" }), placed = a.placed;
+    // No burger (the preview): the app's places lead "…" under "Menu".
+    const places = p.menu && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
+    const list: DuetItem[] = [
+      ...actions.slice(a.shown), ...(p.primary && !a.primary ? [p.primary] : []), ...folded,
+      ...(inline ? [{ id: "duet-side", label: `Move controls ${side === "left" ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
+        setMore("closed");
+        if (nav.current) switchSide(nav.current, side === "left" ? "right" : "left");
+      } }] : []),
+      ...destructive,
+    ];
+    return { f, placed, places, list, moreAt: placed.find((g) => g.group.some((s) => s.kind === "more")) };
+  };
 
   const reserve = p.reserve !== false;
   useEffect(() => {
@@ -492,8 +546,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
   }, []);
   // data-duet-close: Duet's close button is on screen, in any mode, so a sheet hides its own X and shows one (#135).
-  // Only when the plan placed it: a band with no room for it leaves the sheet its own X (#142).
-  const closeShown = !!p.close && controlsShown(ctx) && !!planFor(ctx.side).back;
+  // Only when the template placed it: a band with no room for it leaves the sheet its own X (#142).
+  const closeShown = !!p.close && controlsShown(ctx) && layout(ctx.side).placed.length > 0;
   // The pre-paint boot hid the server-rendered controls in a (pending) preview; a client reading (stable() always sets
   // confidence, the server snapshot never does) hides them itself while it must (#143).
   useLayout(() => { if (ctx.confidence) document.documentElement.removeAttribute("data-duet-pending"); }, [!!ctx.confidence]);
@@ -501,19 +555,23 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.toggleAttribute("data-duet-close", closeShown);
     return () => document.documentElement.removeAttribute("data-duet-close");
   }, [closeShown]);
+  // A sheet takes over the column: nothing else stays open under it.
+  useEffect(() => { if (p.close) { setMore("closed"); setArmed(false); closeSidebar(); } }, [!!p.close]);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
   const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column");
+  const open = more !== "closed" || armed;
   useEffect(() => {
-    // Any touch outside the chrome closes an open menu, like a native context menu.
-    if (!menu) return;
+    // Any touch outside the chrome closes "…" and disarms the primary, like a native context menu.
+    if (!open) return;
     const close = (e: PointerEvent) => {
-      if (![nav, nav2].some((n) => n.current?.contains(e.target as Node)) && e.clientX >= 0 && e.clientX < innerWidth) setMenu(null);
+      if (![nav, nav2].some((n) => n.current?.contains(e.target as Node)) && e.clientX >= 0 && e.clientX < innerWidth) dismiss();
     };
+    columnMiss = dismiss;
     addEventListener("pointerdown", close);
-    return () => removeEventListener("pointerdown", close);
-  }, [menu, nav, nav2]); // eslint-disable-line react-hooks/exhaustive-deps -- setMenu only reads menu
-  useSideDrag(ctx.mode === "inline" ? ctx.side : null, nav, () => { setMenu(null); setScrub(null); });
+    return () => { removeEventListener("pointerdown", close); if (columnMiss === dismiss) columnMiss = null; };
+  }, [open, nav, nav2]); // eslint-disable-line react-hooks/exhaustive-deps -- dismiss only sets state
+  useSideDrag(ctx.mode === "inline" ? ctx.side : null, nav, () => { setMore("closed"); setArmed(false); });
 
   // The safe areas only reach the page with viewport-fit=cover. Set on mount, not on import, so a page that only
   // imports DuoCookie keeps its own viewport on other phones.
@@ -525,223 +583,102 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     watch.observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ["content"] });
     return () => watch.disconnect();
   }, []);
-  const selected = p.tabs?.selected;
-  // Each tab keeps its own scroll position in the inner scroller; the selected tab again scrolls to the top.
+  const selected = p.menu?.selected;
+  // Each place keeps its own scroll position in the inner scroller.
   const scrolls = useRef(new Map<string, number>());
   const select = (id: string) => {
     const el = scroller.current;
-    if (id === selected) el?.scrollTo({ top: 0, behavior: "smooth" });
-    else { if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop); p.tabs!.onSelect(id); }
+    closeSidebar(); closeMore();
+    if (id === selected) return;
+    if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop);
+    p.menu!.onSelect(id);
   };
   useLayout(() => { if (scroller.current && selected !== undefined) scroller.current.scrollTop = scrolls.current.get(selected) ?? 0; }, [selected]);
-  const theme = themeVars(p) as CSSProperties;
-  const badge = (a: DuetItem) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge" data-tone={a.badgeTone === "neutral" ? "neutral" : undefined}>{a.badge}</span>;
-  const tint = (a: DuetItem) => a.tint ? { "--duet-tint": a.tint } as CSSProperties : undefined;
-  const item = (a: DuetItem) => <button key={a.id} className="duet-item" aria-label={a.label} onClick={a.onPress}>{a.icon}{badge(a)}</button>;
-  const toggle = (m: "more" | "tabs") => () => { if (split) setMenuSide(tapSide); setMenu(menu === m ? null : m); };
-  const backButton = p.back && <button className="duet-item" aria-label={p.back.label ?? "Back"} onClick={p.back.onPress}><ChevronLeft size={24} strokeWidth={2.2} /></button>;
-  const moreButton = <button className="duet-item" aria-label="More" aria-expanded={menu === "more"} onClick={toggle("more")}><Ellipsis size={22} /></button>;
-  const searchButton = <button className="duet-item" aria-label="Search" onClick={p.searchButton}><Search size={22} /></button>;
-  // Minimized, the selected tab opens the full list, like tapping a minimized native tab bar. In the full
-  // pill a touch selects on release (scrub below); clicks still select for keyboards and routed column taps.
-  const tabButton = (t: DuetItem, min: boolean, i: number) => (
-    <button key={t.id} role="tab" aria-selected={t.id === selected} aria-label={t.label} className="duet-tab"
-      data-on={(scrub === null ? t.id === selected : scrub === i) || undefined}
-      data-tint={t.tint ? "" : undefined} style={{ ...tint(t), "--j": i } as CSSProperties}
-      onClick={(e) => { if (min) toggle("tabs")(); else if (scrub === null && e.detail === 0) glideTo(t.id); }}>{t.icon}{min && badge(t)}</button>
-  );
-  // The lens keeps its glass while it travels or settles, then melts back into the selection.
-  const settle = () => {
-    setGlide(true);
-    clearTimeout(glideTimer.current);
-    glideTimer.current = window.setTimeout(() => setGlide(false), 420);
-  };
-  const glideTo = (id: string) => {
-    if (id !== selected) settle();
-    select(id);
-  };
-  // Scrub: holding or dragging on the full pill swells it and shows labels; a lens follows the finger over the
-  // tabs and the tab under it lights up; lifting selects it. A quick tap just glides the lens to the tab.
-  // Pointer capture keeps the drag even off the pill.
-  const HOLD_MS = 250, SLOP = 8, SWELL = { x: 16, y: 12 };
-  const endPress = () => { if (press.current) clearTimeout(press.current.timer); press.current = null; };
-  const tabAt = (pill: HTMLElement, y: number) => {
-    const tabs = [...pill.querySelectorAll<HTMLElement>(":scope > .duet-tab")];
-    let best = 0;
-    tabs.forEach((b, i) => { const r = b.getBoundingClientRect(); if (y >= r.top) best = i; });
-    return best;
-  };
-  const scrubbing = {
-    onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
-      if (e.button) return;
-      const pill = e.currentTarget;
-      pill.setPointerCapture(e.pointerId);
-      endPress();
-      const timer = window.setTimeout(() => { if (press.current) setScrub(tabAt(pill, press.current.y)); }, HOLD_MS);
-      press.current = { y0: e.clientY, y: e.clientY, timer };
-    },
-    onPointerMove: (e: React.PointerEvent<HTMLElement>) => {
-      if (press.current) press.current.y = e.clientY;
-      if (scrub !== null) setScrub(tabAt(e.currentTarget, e.clientY));
-      else if (press.current && Math.abs(e.clientY - press.current.y0) > SLOP) { clearTimeout(press.current.timer); setScrub(tabAt(e.currentTarget, e.clientY)); }
-    },
-    onPointerUp: (e: React.PointerEvent<HTMLElement>) => {
-      const tapped = press.current && scrub === null;
-      endPress();
-      if (scrub !== null) { const t = tabItems[scrub]; setScrub(null); settle(); if (t) select(t.id); }
-      else if (tapped) { const t = tabItems[tabAt(e.currentTarget, e.clientY)]; if (t) glideTo(t.id); }
-    },
-    onPointerCancel: () => { endPress(); setScrub(null); },
-  };
 
-  // Held, the rail grows for real (wider towards the page, taller upwards), not just scaled, so the labels
-  // have room and clear its round ends, as Apple News and Music do.
-  const swell = (b: CSSProperties & { top: number; left: number; width: number; height: number }, on: boolean, side: Side) => !on ? b
-    : { ...b, top: b.top - SWELL.y, height: b.height + SWELL.y, width: b.width + SWELL.x, left: side === "right" ? b.left - SWELL.x : b.left };
-
-  const lensAt = scrub ?? Math.max(0, tabItems.findIndex((t) => t.id === selected));
-
-  // The call to action's pill is as wide as its icon and label: the row is measured (flex: none, so it keeps its own
-  // width inside the pill), and a new label, a font load or a text size change reshapes the pill on its spring.
-  const [ctaWidth, setCtaWidth] = useState<number>(DUO.control);
-  const ctaSizes = useRef<ResizeObserver | null>(null);
-  const ctaRow = useCallback((el: HTMLElement | null) => {
-    ctaSizes.current?.disconnect(); ctaSizes.current = null;
-    if (!el) return;
-    const measure = () => setCtaWidth(Math.max(DUO.control, el.offsetWidth));
-    measure();
-    if (typeof ResizeObserver !== "undefined") { ctaSizes.current = new ResizeObserver(measure); ctaSizes.current.observe(el); }
-  }, []);
-
-  // Menus only unroll from separate round buttons: "…" and the minimized tab.
-  const anchors = (pl: Plan) => ({ more: pl.more, tabs: pl.tabs?.min ? pl.tabs : undefined });
-  // A menu whose button went away mid-roll (a tab change scrolls to the top and un-minimizes the tab bar)
-  // never fires its animationend; drop it, or its button stays hidden as "unrolled".
-  const gone = anchors(planFor(split ? menuSide : ctx.side));
-  const closingGone = (closing === "tabs" && !gone.tabs) || (closing === "more" && !gone.more);
-  useEffect(() => { if (closingGone) setClosing(null); }, [closingGone]);
-
-  // Island: icons only; the "…" island ends in a close slot where the "…" was, so the button reads as unrolled.
-  // Morph: icon and label rows; a touch outside closes it, so it needs no close row. An island too wide for the
-  // screen morphs (menuAt gives null).
-  // radio: how many leading items are tabs (a radio group); a merged tab menu lists what folded after them.
-  const menuEl = (kind: "more" | "tabs", anchor: Box | undefined | false, items: DuetItem[], radio: number, menuAt: (b: Box, n: number) => CSSProperties | null, morphAt: (b: Box, n: number) => CSSProperties) => {
-    if ((menu !== kind && closing !== kind) || !anchor) return null;
-    const island = p.menuStyle !== "morph" && menuAt(anchor, items.length + (kind === "more" ? 1 : 0));
-    const morph = !island, close = kind === "more" && !morph, rolling = menu !== kind;
-    return (
-      <GlassSurface preset="control" className="duet-glass duet-menu" role="menu" data-style={morph ? "morph" : undefined}
-        style={island || morphAt(anchor, items.length)}
-        data-closing={rolling || undefined} onAnimationEnd={(e) => { if (rolling && (e.animationName === "duet-roll" || e.animationName === "duet-unmorph")) setClosing(null); }}>
-        {items.map((a, i) => (
-          <button key={a.id} role={i < radio ? "menuitemradio" : "menuitem"} aria-checked={i < radio ? a.id === selected : undefined} aria-label={a.label}
-            className="duet-menu-item" data-on={(i < radio && a.id === selected) || undefined} data-destructive={a.destructive || undefined}
-            data-sep={(i > 0 && (i === radio || (a.destructive && !items[i - 1].destructive))) || undefined} data-tint={a.tint ? "" : undefined} style={{ ...tint(a), ...(rolling ? undefined : { animationDelay: `${morph ? 0.06 + 0.025 * i : 0.05 + 0.035 * (items.length - i)}s` }) }}
-            onClick={() => { setMenu(null); if (i < radio) select(a.id); else a.onPress?.(); }}>{a.icon}{morph && <span className="duet-menu-label">{a.label}</span>}{badge(a)}</button>
-        ))}
-        {close && <button className="duet-menu-item" aria-label="Close" onClick={() => setMenu(null)}><X size={20} /></button>}
-      </GlassSurface>
-    );
+  const theme = { ...themeVars(p), "--duet-slide": SLIDE.easing, "--duet-slide-ms": `${SLIDE.ms}ms`, "--duet-group": GROUP.easing, "--duet-group-ms": `${GROUP.ms}ms` } as CSSProperties;
+  const badge = (a: { badge?: number | string; badgeTone?: string }) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge" data-tone={a.badgeTone === "neutral" ? "neutral" : undefined}>{a.badge}</span>;
+  const label = (s: Slot) => s.kind === "menu" ? "Menu" : s.kind === "more" ? "More" : s.kind === "close" ? (p.close && p.close.label) || "Close"
+    : s.kind === "primary" ? p.primary!.label : actions[s.index].label;
+  const icon = (s: Slot) => s.kind === "menu" ? <Menu size={22} /> : s.kind === "more" ? <Ellipsis size={22} /> : s.kind === "close" ? <X size={22} strokeWidth={2.2} />
+    : s.kind === "primary" ? p.primary!.icon : actions[s.index].icon;
+  const press = (s: Slot) => {
+    if (s.kind === "menu") { dismiss(); setSidebar((v) => (v === "open" ? "closing" : "open")); }
+    else if (s.kind === "more") { if (split) setMenuSide(tapSide); setArmed(false); setMore((m) => (m === "open" ? "closing" : "open")); }
+    else if (s.kind === "close") p.close && p.close.onPress();
+    else if (s.kind === "primary") {
+      closeMore();
+      if (armed || p.primary!.confirm === false) { setArmed(false); p.primary!.onPress?.(); } else setArmed(true);
+    } else { dismiss(); actions[s.index].onPress?.(); }
   };
 
   const bar = (side: Side, i: number) => {
-    const pl = planFor(side), left = side === "left", anchor = anchors(pl);
-    // The rail's low slot holds the tabs, the search button or, where it took their place, the call to action.
-    const railCta = !!pl.rail && !pl.tabs && !pl.searchButton && !!pl.primary;
-    const ctaOpen = p.primary?.expanded ? ctaWidth : DUO.control;
-    const at = (b: Box) => ({ top: b.top, left: pl.left, width: DUO.control, height: b.height });
-    // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
-    // as tall as the button, outer edge on the button's, widening towards the page centre only.
-    const menuAt = (b: Box, n: number) => {
-      if (!islandFits(side === ctx.side ? ctx : { ...ctx, side }, pl, n, side)) return null;
-      const { x0, ...box } = islandBox(pl, b, n, side);
-      return { ...box, "--x0": `${x0}px` } as CSSProperties;
-    };
-    // Morph: the button grows into a labelled list, clear of Safari's column buttons (morphBox).
-    const morphAt = (b: Box, n: number) => {
-      const { x0, y0, scroll, ...box } = morphBox(side === ctx.side ? ctx : { ...ctx, side }, pl, b, n);
-      return { ...box, "--x0": `${x0}px`, "--y0": `${y0}px`, ...(scroll && { overflowY: "auto", overscrollBehavior: "contain" }) } as CSSProperties;
-    };
-    const shownLeading = leading.slice(0, leading.length - pl.menu.leading);
-    const shownActions = actions.slice(0, actions.length - pl.menu.actions);
-    // The tabs lead "…" where the call to action took their slot, a radio group as in the merged tab menu.
-    const radio = pl.menu.tabs ? tabItems.length : 0;
-    const more: DuetItem[] = [
-      ...(pl.menu.tabs ? tabItems : []),
-      ...(pl.menu.search && p.searchButton ? [{ id: "duet-search", label: "Search", icon: <Search size={20} />, onPress: p.searchButton }] : []),
-      ...(pl.menu.primary && p.primary ? [p.primary] : []),
-      ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
-      ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length), ...folded,
-      ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
-        // The menu goes at once, without rolling back into "…": its button is about to move, and would stay hidden
-        // as "unrolled" until a roll that no longer lines up with it.
-        setMenuNow(null); setClosing(null); setScrub(null);
-        if (nav.current) switchSide(nav.current, left ? "right" : "left");
-      } }] : []),
-      ...destructive,
-    ];
+    const { f, placed, places, list, moreAt } = layout(side);
+    const pick = (a: DuetItem) => () => { closeMore(); a.onPress?.(); };
+    const drawsMenu = more !== "closed" && moreAt && (!split || side === menuSide);
     return (
       <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
-        <Presence>{[
-          p.close && pl.back && (
-            <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
-              <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>
-            </GlassSurface>
-          ),
-          !p.close && p.back && pl.back && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="back" style={at(pl.back)}>{backButton}</GlassSurface>,
-          !p.close && p.primary && pl.primary && !railCta && (p.primary.prominent ? (
-            // The pill keeps its icon where the round button would be and grows towards the page.
-            <GlassSurface preset="control" className="duet-glass duet-round duet-primary duet-cta" data-duet-slot="primary" data-expanded={p.primary.expanded || undefined}
-              style={{ ...at(pl.primary), width: ctaOpen, left: left ? pl.left : pl.left + DUO.control - ctaOpen, ...tint(p.primary) }}>
-              <button className="duet-item" aria-label={p.primary.label} onClick={p.primary.onPress}>
-                <span className="duet-cta-row" ref={ctaRow}>{p.primary.icon}<span key={p.primary.label} className="duet-cta-label">{p.primary.label}</span></span>
-              </button>
-            </GlassSurface>
-          ) : (
-            <GlassSurface preset="control" className="duet-glass duet-round duet-primary" data-duet-slot="primary" style={{ ...at(pl.primary), ...tint(p.primary) }}>{item(p.primary)}</GlassSurface>
-          )),
-          pl.leading && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="leading" style={at(pl.leading)}>{shownLeading.map(item)}</GlassSurface>,
-          pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>,
-          pl.rail && (
-            // One group for "…" and the bottom item; each still unrolls its own menu from its slot.
-            <GlassSurface preset="control" className="duet-glass duet-group duet-rail" data-duet-slot="rail" style={at(pl.rail)}>
-              {!p.close && more.length > 0 && moreButton}
-              {p.tabs && pl.tabs ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : pl.searchButton ? searchButton
-                : railCta && p.primary && <button className="duet-item duet-rail-cta" aria-label={p.primary.label} onClick={p.primary.onPress} style={tint(p.primary)}>{p.primary.icon}</button>}
-            </GlassSurface>
-          ),
-          !p.close && !pl.rail && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>,
-          p.tabs && pl.tabs && !pl.rail && (
-            <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
-              data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
-              {!pl.tabs.min && (
-                // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
-                // are masked out under the lens (CSS), so only the enlarged copy shows through it.
-                <span className="duet-lens" aria-hidden><span className="duet-lens-view"><span className="duet-lens-col">
-                  {tabItems.map((t, i) => <span key={t.id} className="duet-tab" data-label={t.label} data-on={i === lensAt || undefined} style={tint(t)}>{t.icon}</span>)}
-                </span></span></span>
-              )}
-              {/* Full-pill badges ride above the lens, so it neither clips nor hides them. */}
-              {!pl.tabs.min && <span className="duet-pill-badges" aria-hidden>{tabItems.map((t) => <span key={t.id}>{badge(t)}</span>)}</span>}
-              {pl.tabs.min ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : tabItems.map((t, i) => tabButton(t, false, i))}
-            </GlassSurface>
-          ),
-          pl.searchButton && !pl.rail && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="search" style={at(pl.searchButton)}>{searchButton}</GlassSurface>,
-        ]}</Presence>
-        {(!split || side === menuSide) && menuEl("more", anchor.more, more, radio, menuAt, morphAt)}
-        {p.tabs && (!split || side === menuSide) && menuEl("tabs", anchor.tabs, pl.tabs?.merged ? [...tabItems, ...more] : tabItems, tabItems.length, menuAt, morphAt)}
-        {/* The tab island unrolls across the accessory's row; the accessory steps aside while it is open. */}
-        {p.accessory && pl.accessory && !i && (
-          <GlassSurface preset="control" className="duet-glass duet-accessory" data-duet-slot="accessory" style={pl.accessory}
-            data-covered={menu === "tabs" || undefined}>{p.accessory}</GlassSurface>
+        <Presence>{placed.map((g, gi) => {
+          const pill = g.primary && armed, rect = pill ? pillRect(g.rect, side) : g.rect;
+          return (
+            <div key={gi} className="duet-group" data-duet-slot={g.group.length === 1 ? g.group[0].kind : g.group[0].kind === "menu" ? "menu" : "actions"}
+              data-primary={g.primary || undefined} data-morphing={(g === moreAt && drawsMenu) || undefined}
+              style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...(g.primary && p.primary?.tint ? { "--duet-tint": p.primary.tint } : undefined) } as CSSProperties}>
+              {!g.primary && <i className="duet-rim" aria-hidden />}
+              {g.group.map((s, j) => (
+                <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined}
+                  aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : undefined}
+                  style={{ top: j * TEMPLATE.item, width: rect.w }} onClick={() => press(s)}>
+                  {s.kind === "primary" ? (
+                    <span className="duet-cta" data-armed={pill || undefined}>
+                      <span className="duet-cta-icon">{p.primary!.icon}</span>
+                      <span className="duet-cta-label" aria-hidden={!pill}>{(pill && p.primary!.confirm) || p.primary!.label}</span>
+                    </span>
+                  ) : icon(s)}
+                  {s.kind === "action" && badge(actions[s.index])}
+                </button>
+              ))}
+            </div>
+          );
+        })}</Presence>
+        {drawsMenu && moreAt && (
+          <Morph open={more === "open"} from={moreAt.rect} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, places.length ? 2 : 1)} onClosed={() => setMore("closed")}>
+            {places.length > 0 && <>
+              <div className="duet-menu-head">Menu</div>
+              {places.map((m) => (
+                <button key={m.id} className="duet-row" role="menuitemradio" aria-checked={m.id === selected} onClick={() => select(m.id)}>{m.icon}<span>{m.label}</span>{badge(m)}</button>
+              ))}
+            </>}
+            <div className="duet-menu-head">{f.kind === "column" ? "This page" : "More"}</div>
+            {list.map((a) => (
+              <button key={a.id} className="duet-row" role="menuitem" data-destructive={a.destructive || undefined} onClick={pick(a)}>{a.icon}<span>{a.label}</span>{badge(a)}</button>
+            ))}
+          </Morph>
         )}
       </nav>
     );
   };
 
+  // The burger slides the page aside by the screen's width in the column (the page leaves with its column), and by
+  // up to 40% of it inline, where the page stays in view as a card to tap back to.
+  const slide = ctx.mode === "column" ? ctx.screenWidth : Math.min(340, ctx.width * 0.4);
+  const slid = sidebar !== "closed";
   return (
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
-      {p.children !== undefined && <div ref={scroller} className="duet-scroller">{p.children}</div>}
+      {p.menu && p.menu.burger !== false && (
+        <nav className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
+          style={{ ...theme, width: ctx.mode === "column" ? ctx.width : slide }} inert={sidebar !== "open" || undefined}>
+          <div className="duet-side-head">Menu</div>
+          {menuItems.map((m) => (
+            <button key={m.id} className="duet-side-row" aria-current={m.id === selected ? "page" : undefined} tabIndex={sidebar === "open" ? 0 : -1} onClick={() => select(m.id)}>
+              {m.icon}<span>{m.label}</span>{badge(m)}
+            </button>
+          ))}
+        </nav>
+      )}
+      {p.children !== undefined && (
+        <div ref={scroller} className="duet-scroller" data-slid={slid || undefined} onPointerDownCapture={slid ? closeSidebar : undefined}
+          style={{ ...theme, translate: sidebar === "open" ? `${slide}px 0` : undefined }}>{p.children}</div>
+      )}
       {sides.map(bar)}
       {/* On both viewport edges, so a page's full-screen overlay cannot hide Safari's column (duet.css). Mounted on a Duo in
           Safari whatever the mode: a guard that drops while a turn or fold is in transit leaves the column filled with the

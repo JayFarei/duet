@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ArrowDownToLine, Check, ChevronRight, Disc3, FastForward, Heart, House, LayoutGrid, Library, ListMusic,
+  ArrowDownToLine, ArrowLeft, Check, ChevronRight, Disc3, FastForward, Heart, House, LayoutGrid, Library, ListMusic,
   MicVocal, Music, Pause, Play, Plus, Radio, Search, Share, Shuffle, User, UserRound,
 } from "lucide-react";
-import { Duet, bleed, column, type DuetItem, type DuetTab } from "duet-ui";
+import { Duet, bleed, column, type DuetItem, type DuetMenuItem } from "duet-ui";
 import { ALBUMS, GENRES, MIXES, NEW, STATIONS, album, time, track, type Album, type Track } from "./data";
 import { Art, tone } from "./art";
 import * as audio from "./tone";
@@ -21,7 +21,7 @@ export function Encore() {
   const [seenNew, setSeenNew] = useState(false);
   const [saved, setSaved] = useState<Record<string, "added" | "loved" | "down" | undefined>>({});
 
-  // An album starts at its top, like a native navigation push. Tabs keep their own scroll (Duet).
+  // An album starts at its top, like a native navigation push. Places keep their own scroll (Duet).
   useEffect(() => { if (open) document.querySelector(".duet-scroller")?.scrollTo(0, 0); }, [open]);
   useEffect(() => () => audio.stop(), []);
 
@@ -33,16 +33,18 @@ export function Encore() {
   };
   const select = (id: Tab) => { setTab(id); setOpen(null); if (id === "new") setSeenNew(true); };
 
-  const tabs: DuetTab<Tab>[] = [
-    { id: "home", label: "Home", icon: <House size={24} />, tint: ACCENT },
-    { id: "new", label: "New", icon: <LayoutGrid size={24} />, tint: ACCENT, badge: seenNew ? undefined : NEW.length },
-    { id: "radio", label: "Radio", icon: <Radio size={24} />, tint: ACCENT },
-    { id: "library", label: "Library", icon: <Library size={24} />, tint: ACCENT },
+  const places: DuetMenuItem<Tab>[] = [
+    { id: "home", label: "Home", icon: <House size={22} /> },
+    { id: "new", label: "New", icon: <LayoutGrid size={22} />, badge: seenNew ? undefined : NEW.length },
+    { id: "radio", label: "Radio", icon: <Radio size={22} /> },
+    { id: "library", label: "Library", icon: <Library size={22} /> },
+    { id: "search", label: "Search", icon: <Search size={22} /> },
   ];
   const a = open ? album(open) : null;
   const mark = (k: "added" | "loved" | "down") => a && setSaved((s) => ({ ...s, [`${a.id}:${k}`]: s[`${a.id}:${k}`] ? undefined : k }));
   const has = (k: string) => !!a && !!saved[`${a.id}:${k}`];
   const actions: DuetItem[] = a ? [
+    { id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: () => setOpen(null) },
     { id: "add", label: has("added") ? "In Library" : "Add to Library", icon: has("added") ? <Check size={22} /> : <Plus size={22} />, onPress: () => mark("added") },
     { id: "love", label: "Favourite", icon: <Heart size={21} fill={has("loved") ? "currentColor" : "none"} />, onPress: () => mark("loved") },
     { id: "down", label: "Download", icon: <ArrowDownToLine size={22} />, onPress: () => mark("down") },
@@ -53,30 +55,23 @@ export function Encore() {
   const nav = { open: (id: string) => setOpen(id), play: start, now, playing };
 
   return (
-    <Duet
-      back={!!a && { label: "Back", onPress: () => setOpen(null) }}
-      actions={actions}
-      tabs={{ items: tabs, selected: tab, onSelect: select, search: { id: "search", label: "Search", icon: <Search size={24} />, tint: ACCENT } }}
-      minimizeOnScroll
-      accessory={
-        <div className="mp-wrap">
-          <button className="mp" aria-label={`Now playing: ${t.title}`} onClick={() => setOpen(ta.id)}>
-            <Art hues={ta.hues} style={ta.style} size={30} radius={6} />
-            <span className="mp-text"><span className="mp-title">{t.title}</span><span className="mp-sub">{ta.artist}</span></span>
-          </button>
-          <button className="mp-btn" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>
-            {playing ? <Pause size={22} fill="currentColor" strokeWidth={0} /> : <Play size={22} fill="currentColor" strokeWidth={0} />}
-          </button>
-          <button className="mp-btn" aria-label="Next" onClick={skip}><FastForward size={24} fill="currentColor" strokeWidth={0} /></button>
-        </div>
-      }
-    >
+    <Duet menu={{ items: places, selected: tab, onSelect: select }} actions={actions} tint={ACCENT}>
       {a ? <AlbumView a={a} {...nav} />
         : tab === "home" ? <Home {...nav} />
         : tab === "new" ? <New {...nav} />
         : tab === "radio" ? <RadioView {...nav} />
         : tab === "library" ? <LibraryView {...nav} />
         : <SearchView {...nav} />}
+      <div className="mp-wrap">
+        <button className="mp" aria-label={`Now playing: ${t.title}`} onClick={() => setOpen(ta.id)}>
+          <Art hues={ta.hues} style={ta.style} size={30} radius={6} />
+          <span className="mp-text"><span className="mp-title">{t.title}</span><span className="mp-sub">{ta.artist}</span></span>
+        </button>
+        <button className="mp-btn" aria-label={playing ? "Pause" : "Play"} onClick={toggle}>
+          {playing ? <Pause size={22} fill="currentColor" strokeWidth={0} /> : <Play size={22} fill="currentColor" strokeWidth={0} />}
+        </button>
+        <button className="mp-btn" aria-label="Next" onClick={skip}><FastForward size={24} fill="currentColor" strokeWidth={0} /></button>
+      </div>
     </Duet>
   );
 }
