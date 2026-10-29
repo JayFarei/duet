@@ -276,6 +276,9 @@ SUITES = [
     {"id": "pvl01", "title": "Slow load in the in-app preview (sheet): no controls over its buttons before hydration (#143)", "page": "/book?slowjs=1500", "start": PV0, "steps": [
         (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),
     ]},
+    {"id": "pvl02", "title": "Slow load in the in-app preview (default style): no controls over its Back or Share before hydration (#155)", "page": "/book?slowjs=1500", "start": ("default", "closed", 0, False), "steps": [
+        (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),
+    ]},
     {"id": "nav02", "title": "Link and Safari Back, outer screen on its side", "page": "/", "start": ("tab", "closed", 90, False), "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
         (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
