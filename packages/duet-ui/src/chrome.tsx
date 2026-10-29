@@ -34,8 +34,9 @@ export interface DuetMenuItem<T extends string = string> {
 export interface DuetProps<T extends string = string> {
   /** The app's places: the burger, first in the column, opens them in a sidebar and slides the page aside. The ids are
    *  typed from `items`: declare them `as const` and `onSelect` gets the union. Each place keeps its own scroll
-   *  position in the inner scroller. In the in-app preview (one button of room) they lead "…" under "Menu". */
-  menu?: { items: readonly DuetMenuItem<T>[]; selected?: NoInfer<T>; onSelect: (id: NoInfer<T>) => void };
+   *  position in the inner scroller. In the in-app preview (one button of room), or with `burger: false`, they lead "…"
+   *  under "Menu" instead. */
+  menu?: { items: readonly DuetMenuItem<T>[]; selected?: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; burger?: boolean };
   /** The page's actions: shown after the burger while they fit, the rest in "…". Destructive and folded items are
    *  always in "…". */
   actions?: DuetItem[];
@@ -483,8 +484,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const layout = (side: Side) => {
     const f = frame(side === ctx.side ? ctx : { ...ctx, side });
     const inline = f.kind === "inline";
-    const always = folded.length + destructive.length + (inline ? 1 : 0);
-    const a = template(f, { close: !!p.close, menu: !!p.menu, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" }), placed = a.placed;
+    const burger = !!p.menu && p.menu.burger !== false;
+    const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger ? 1 : 0);
+    const a = template(f, { close: !!p.close, menu: burger, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" }), placed = a.placed;
     // No burger (the preview): the app's places lead "…" under "Menu".
     const places = p.menu && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
     const list: DuetItem[] = [
@@ -662,7 +664,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const slid = sidebar !== "closed";
   return (
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
-      {p.menu && (
+      {p.menu && p.menu.burger !== false && (
         <nav className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
           style={{ ...theme, width: ctx.mode === "column" ? ctx.width : slide }} inert={sidebar !== "open" || undefined}>
           <div className="duet-side-head">Menu</div>

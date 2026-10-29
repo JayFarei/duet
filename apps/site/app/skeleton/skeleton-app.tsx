@@ -124,7 +124,7 @@ export function SkeletonApp() {
   if (!duet) return <><style>{CSS}</style><Plain tab={tab} onTab={setTab} inset={inset} /></>;
   return (
     <Duet
-      menu={{ items: [...TABS, { id: "search", label: "Search", icon: <Search size={24} /> }], selected: tab, onSelect: setTab }}
+      menu={{ items: [...TABS, { id: "search", label: "Search", icon: <Search size={24} /> }], selected: tab, onSelect: setTab, burger: false }}
       actions={[{ id: "share", label: "Share", icon: <Share size={22} />, onPress: () => {} }]}
       appearance={appearance}
       tint={tint}
