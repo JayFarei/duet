@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@haptics/react": "2.1.1",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "duet-ui": "workspace:*",
     "lucide-react": "^1.59.0",
     "next": "16.4.2",

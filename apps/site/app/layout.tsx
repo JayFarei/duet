@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Serif } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./site.css";
 import { bootScript } from "duet-ui/boot";
 import { E2EReporter } from "./e2e-reporter";
@@ -24,8 +26,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("duet-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-lg-theme",t)}catch(e){}` }} />
         <script dangerouslySetInnerHTML={{ __html: e2eEarly }} />
       </head>
-      {/* Duet's pre-paint boot (README, Pre-paint boot), first in <body>. */}
-      <body><script dangerouslySetInnerHTML={{ __html: bootScript }} />{children}<E2EReporter /></body>
+      {/* Duet's pre-paint boot (README, Pre-paint boot), first in <body>; Vercel Web Analytics and Speed Insights last. */}
+      <body><script dangerouslySetInnerHTML={{ __html: bootScript }} />{children}<E2EReporter /><Analytics /><SpeedInsights /></body>
     </html>
   );
 }
