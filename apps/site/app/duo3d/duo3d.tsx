@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Info, Keyboard, LayoutGrid, Lock, LockOpen, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square, X } from "lucide-react";
-import { detect } from "duet-ui/geometry";
-import { SCREEN, scene } from "../duo/web-duo";
+import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, Lock, LockOpen, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square, } from "lucide-react";
 import { ONLY_OPEN, Segmented, TOUR, control, fit, group, hardware, rotate, type State, type Turn } from "./reexports";
-import { createPortal } from "react-dom";
 import { DUO_APP, channel, type Sync } from "./shared";
 
 // This page's displays, told apart from another tab's.
@@ -51,7 +48,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const [stand, setStand] = useState<Stand>("flat");
   const [upright, setUpright] = useState<Turn>(0);
   const [duet, setDuet] = useState(true);
-  const [more, setMore] = useState(false), [info, setInfo] = useState(false);
+  const [more, setMore] = useState(false);
   const [manual, setManual] = useState(false), [box, setBox] = useState({ w: 0, h: 0 });
   const stage = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
@@ -129,12 +126,6 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   }, [embed]);
 
 
-  useEffect(() => {
-    if (!info) return;
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setInfo(false);
-    addEventListener("keydown", esc);
-    return () => removeEventListener("keydown", esc);
-  }, [info]);
 
   // The fold slider: the hinge follows the thumb, and the posture flips at half way.
   const scrub = (t: number) => {
@@ -146,10 +137,6 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const safari = s.app === "safari" || s.app === "split", preview = s.app === "sheet";
   const split = s.app === "split";
 
-  // What the simulation is showing, in words: the same scene the displays draw, asked for its note.
-  const laptop = stand === "elevated";
-  const n = SCREEN[s.posture], [W, H] = upright ? [n.h, n.w] : [n.w, n.h];
-  const note = scene({ ...fit({ ...s, laptop }), turn: upright }, W, H, "localhost", (x) => duet ? detect(x).mode : "inline").note;
 
   // The controls, as data: each section is one question about the simulation, rendered three ways by width.
   const sections: Section[] = [
@@ -179,27 +166,11 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const turns = ([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
     <Square42 key={by} label={label} onClick={() => go(rotate(s, by), "flat")}><Icon size={18} /></Square42>
   ));
-  const where = sections.slice(0, 3).map((x) => x.opts.find((o) => o.on)?.label).join(" · ");
 
   const list = (embed ? box.w : width) < 700;
-  // What the device shows, in words, behind the info button: nothing but the device sits above the controls.
-  const infoButton = <Square42 label="What this shows" on={info} onClick={() => setInfo((i) => !i)}><Info size={18} /></Square42>;
-  const about = info && createPortal(
-    <div role="dialog" aria-modal aria-label="Duo 3D" onClick={() => setInfo(false)} style={{ position: "fixed", inset: 0, zIndex: 100, display: "grid", placeItems: "center", padding: 16, background: "rgb(0 0 0 / 0.3)", backdropFilter: "blur(6px)" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ position: "relative", maxWidth: 440, padding: "18px 56px 20px 20px", borderRadius: 20, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line), 0 18px 50px rgb(0 0 0 / 0.35)" }}>
-        <div style={{ font: "700 18px/1.2 -apple-system, system-ui", letterSpacing: -0.3 }}>Duo 3D</div>
-        <p aria-live="polite" style={{ margin: "8px 0 0", font: "400 14px/1.5 -apple-system, system-ui", color: "var(--dim)" }}>
-          <b style={{ color: "var(--ink)", fontWeight: 600 }}>{where}{duet ? "" : ", without Duet"}.</b> {duet ? note : "The same site as a plain mobile site: nothing paints in Safari's column."}
-        </p>
-        <button onClick={() => setInfo(false)} aria-label="Close" style={{ ...control, position: "absolute", top: 12, right: 12, width: 32, height: 32, padding: 0, borderRadius: 16, display: "grid", placeItems: "center", ...lit() }}><X size={16} /></button>
-      </div>
-    </div>,
-    document.body,
-  );
   // The page's own buttons float in the device's corner, so the card opens on the device.
   const corner = (
     <div style={{ position: "absolute", top: list ? 12 : 16, right: list ? 12 : 16, zIndex: 5, display: "flex", gap: 6 }}>
-      {infoButton}
       <div style={{ position: "relative" }}>
         <Square42 label="More" on={more} onClick={() => setMore((m) => !m)}><Ellipsis size={18} /></Square42>
         {more && (
@@ -256,7 +227,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     </div>
   );
 
-  // On the landing page: the device, its controls under it, and what it shows behind info.
+  // On the landing page: the device, its controls under it.
   if (embed) return (
     <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
       {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
@@ -264,8 +235,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
       {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
         style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
       <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
-        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />{infoButton}</div></div>
-      {about}
+        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>
     </div>
   );
 
@@ -283,7 +253,6 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
         <div style={{ display: "flex", justifyContent: "center", padding: list ? "0 12px 16px" : "0 14px 20px" }}>
           <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />
         </div>
-        {about}
       </div>
     </div>
   );
