@@ -358,6 +358,8 @@ class Run:
         """Native button frames. Closed: the UI-test runner, in closed screen points. Unfolded: XCUITest frames on the
         inner display do not map (README), so the simulator helper describes the app by pid, in points of its window
         (the pane in split view), which works for either split pane."""
+        if kind == "webview":
+            return s.status_column() + (s.island(angle) if s.la_on else []) if s.position != "open" else []
         bundle = PREVIEW_SVC if kind == "preview" else SAFARI
         if s.position != "open":
             r = cmd("elements", bundle=bundle)
@@ -376,6 +378,16 @@ class Run:
             return []
         s.native_why = None if out else f"{bundle} (pid {pid}) reported no buttons"
         return out
+
+    @staticmethod
+    def status_column():
+        """An app's web view over the whole closed screen, upright, has no native buttons of its own: the obstacle is the
+        status column over its right edge (#194). SpringBoard's elements there, in portrait device points (466x678),
+        else the column down to the clock and wifi's bottom (DUO.top, 173.3) when SpringBoard reports none."""
+        r = cmd("tree", bundle=SPRINGBOARD)
+        out = [{"type": 0, "label": e.get("label") or e["id"] or "status", "id": "status", "x": e["x"], "y": e["y"], "w": e["w"], "h": e["h"]}
+               for e in (r or {}).get("elements", []) if e["x"] >= 382 and e["w"] <= 84 and 0 < e["h"] and e["y"] + e["h"] <= 180]
+        return out or [{"type": 0, "label": "Status column", "id": "status", "x": 382, "y": 0, "w": 84, "h": 173.3}]
 
     @staticmethod
     def island(angle):
@@ -1155,6 +1167,15 @@ class Run:
             frm = s.angle
             s.step(f"preview-{style}-{frm}to{a}", "preview", t, s.rotate(t, a), preview_expect(style, a), f"in-app preview ({style}), turn {frm} -> {a}", video=True)
 
+    def scenario_webview(s):
+        """An app's own WKWebView over the whole closed screen (X's link preview, #194): inline right, every control
+        below the status column, with and without a Live Activity in the island."""
+        t = s.tok("webview")
+        exp = {"preview": False, "mode": "inline", "side": "right"}
+        s.step("webview-0", "webview", t, s.open_preview(t, "webview"), exp, "app web view, closed, upright")
+        s.step("webview-on", "webview", t, s.la(t, "webview", on=True), exp, "app web view: Live Activity starts", video=True)
+        s.step("webview-off", "webview", t, s.la(t, "webview", on=False), exp, "app web view: Live Activity ends", video=True)
+
     def scenario_open_safari(s, angle):
         t = s.tok(f"pvos{angle}")
         s.step(f"openinsafari-{angle}-preview", "preview", t, s.open_preview(t, "sheet"), {"preview": True, **PREVIEW[0]}, "in-app preview (sheet) before Open in Safari")
@@ -1537,7 +1558,7 @@ class Run:
 
     def to_front(s, kind):
         """Brings the app under test back in front (Safari, or the host whose preview is open)."""
-        if kind == "preview":
+        if kind in ("preview", "webview"):
             s.host()
         else:
             sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
@@ -1640,7 +1661,7 @@ class Run:
                 time.sleep(0.15)
                 s.sim.button("HOME")
                 time.sleep(1.5)
-                c = s.sim.switcher_card(HOST if kind == "preview" else SAFARI)
+                c = s.sim.switcher_card(HOST if kind in ("preview", "webview") else SAFARI)
                 if c is None:
                     s.why = "no card for the app under test in the app switcher"
                     return None
@@ -1755,6 +1776,7 @@ class Run:
         "preview-sheet": lambda s: s.scenario_preview("sheet"),
         "preview-default": lambda s: s.scenario_preview("default"),
         "preview-full": lambda s: s.scenario_preview("full"),
+        "webview": lambda s: s.scenario_webview(),
         "open-in-safari": lambda s: s.scenario_open_safari(0),
         "open-in-safari-90": lambda s: s.scenario_open_safari(90),
         "open-in-safari-270": lambda s: s.scenario_open_safari(270),

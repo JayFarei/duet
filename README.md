@@ -717,6 +717,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#181](https://github.com/JayFarei/duet/issues/181), 0.6.0.
 
+### An app's own web view (a link opened in X)
+
+- **You see:** on the closed Duo, upright, the burger and "…" sit under the clock, wifi and battery at the top right.
+- **Cause:** some apps (X among them) open links in their own `WKWebView`, edge to edge, not in Safari's in-app preview. The page is the whole 466x678 screen, with no Safari column, no bars and a top inset of 0, so nothing tells the page that the Duo's status column (and Live Activities in the island under it) covers its right edge.
+- **Duet does:** a page that is the whole closed screen, upright, not a Home Screen app, with the controls on the right, keeps them below the status column at its worst (the island with Live Activities, 265pt), where a Home Screen app's strip starts.
+- **You do:** nothing. Moving the controls left drops the allowance, nothing native is there.
+- **Status:** [#194](https://github.com/JayFarei/duet/issues/194).
+
 ## Limitations
 
 - **Duo detection is a heuristic** from screen and window sizes plus the user agent (see above). It can misfire on devices with matching sizes and miss a Duo whose reported sizes differ.

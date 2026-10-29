@@ -400,7 +400,12 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   // On the open screen the sheet has no column of its own: inline right, like a full-width tab, and never hidden.
   const onClosed = Math.min(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][0] + 1 && Math.max(s.outerWidth, s.outerHeight) <= DUO_SIZES[0][1] + 1;
   const away: Side = preview && onClosed ? (landscape && turned === "left" ? "right" : "left") : "right";
-  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side: preferred ?? away, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && onClosed && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(open === "tall" && { clearTop: UNFOLDED_PREVIEW.clear.tall }), ...(split && { split }) };
+  const side = preferred ?? away;
+  // An app's own web view over the whole closed screen, upright (X's link preview: WKWebView, no Safari token, chrome 0,
+  // inset top 0, iOS 27.1): the status column (clock, island, Live Activities) is over the page's right edge, and
+  // nothing native says so. The controls start below it, where a Home Screen app's strip does (#194).
+  const statusOver = duo && !landscape && !s.standalone && side === "right" && closedWhole(s);
+  return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && onClosed && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(open === "tall" && { clearTop: UNFOLDED_PREVIEW.clear.tall }), ...(statusOver && { clearTop: DUO.top + DUO.island }), ...(split && { split }) };
 }
 
 /** Every window a Safari page on the Duo lands in, as measured (docs/research-notes.md): `page` is how much
