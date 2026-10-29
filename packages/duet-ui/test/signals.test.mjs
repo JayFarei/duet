@@ -2,6 +2,7 @@
 import { test, mock } from "node:test";
 import assert from "node:assert/strict";
 
+const observers = new Set();
 const win = new EventTarget(), doc = new EventTarget(), orientation = new EventTarget(), viewport = new EventTarget();
 Object.assign(orientation, { angle: 90 });
 Object.assign(viewport, { height: 368 });
@@ -12,6 +13,7 @@ Object.assign(globalThis, {
   addEventListener: win.addEventListener.bind(win), removeEventListener: win.removeEventListener.bind(win),
   getComputedStyle: () => ({ paddingTop: "0px", paddingBottom: "0px", paddingRight: "0px", paddingLeft: "0px" }),
   matchMedia: () => ({ matches: false }),
+  ResizeObserver: class { constructor(f) { this.f = f; this.on = new Set(); observers.add(this); } observe(el) { this.on.add(el); } disconnect() { this.on.clear(); } },
 });
 Object.defineProperty(globalThis, "screen", { value: { width: 466, height: 678, orientation }, configurable: true });
 Object.defineProperty(globalThis, "navigator", { value: { userAgent: "iPhone Version/27.1 Safari/605.1.15", maxTouchPoints: 5 }, configurable: true });
@@ -83,5 +85,23 @@ test("settling() ends at SETTLE.cap even while sizes keep moving, so a feedback 
   }
   assert.equal(settling(), false, "a loop's own resizes do not restart the settle");
   off();
+  mock.timers.reset();
+});
+
+test("a layout with no resize event is still read: WebKit holds resize back while the window animates", () => {
+  mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+  let n = 0;
+  const off = watchSignals(() => n++);
+  mock.timers.tick(1000);
+  const watching = () => [...observers].filter((o) => o.on.size);
+  assert.equal(watching().length, 1, "the viewport-sized probe is observed");
+  n = 0;
+  Object.assign(globalThis, { innerWidth: 585, innerHeight: 876, outerWidth: 669, outerHeight: 951 });
+  watching()[0].f([]);
+  assert.equal(settling(), true);
+  assert.equal(n, 1, "read at once");
+  mock.timers.tick(SETTLE.cap + SETTLE.quiet);
+  off();
+  assert.equal(watching().length, 0, "unsubscribing disconnects");
   mock.timers.reset();
 });

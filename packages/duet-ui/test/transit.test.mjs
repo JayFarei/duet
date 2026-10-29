@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { DUO, detect, inTransit, isPreview, LAND_HOLD, plan, stable } from "../src/geometry.ts";
+import { DUO, detect, inTransit, isPreview, KEYBOARD_DOWN, LAND_HOLD, plan, stable } from "../src/geometry.ts";
 
 const F = JSON.parse(readFileSync(new URL("./fixtures/states.json", import.meta.url), "utf8"));
 const full = (s) => ({
@@ -73,6 +73,29 @@ test("a negative visual viewport (sheet folded from the open screen) is not a ke
   const c = detect({ ...at("in-app preview, page sheet (real"), visualHeight: -78 });
   assert.deepEqual([c.mode, c.keyboard], ["column", undefined]);
 });
+test("a short visual viewport with no field focused (left by a turn, #122) is not a keyboard", () => {
+  const upright = full({ ...P, innerWidth: 382, innerHeight: 580, visualHeight: 466 });
+  assert.deepEqual([detect({ ...upright, editing: false }).mode, detect({ ...upright, editing: false }).keyboard], ["column", undefined]);
+  assert.equal(detect({ ...upright, editing: true }).keyboard, true);
+  assert.equal(detect(upright).keyboard, true); // emulated signals say nothing about focus
+});
+test("the keyboard going down: still up after focus leaves, until the visual viewport grows back (#126)", () => {
+  // Open screen, wide (e2e kb02-03): focus left at once while the visual viewport was still 286 of 618 (offset 107),
+  // and the inline rail shown then was drawn 107px high for a frame.
+  const open = full({ outerWidth: 951, outerHeight: 669, innerWidth: 951, innerHeight: 618, screenWidth: 951, screenHeight: 669 });
+  const d = { flips: [] };
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: true }, undefined, 0).keyboard, true);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 5000).keyboard, true, "blurred, viewport still short");
+  assert.equal(d.kbUntil, 5000 + KEYBOARD_DOWN);
+  assert.equal(stable(d, { ...open, editing: false }, undefined, 5040).keyboard, undefined, "viewport back");
+  // Capped: a viewport left short with no focus (#122) shows the controls again after KEYBOARD_DOWN.
+  stable(d, { ...open, visualHeight: 286, editing: true }, undefined, 6000);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 6010).keyboard, true);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 6010 + KEYBOARD_DOWN).keyboard, undefined);
+  assert.equal(stable(d, { ...open, visualHeight: 286, editing: false }, undefined, 9000).keyboard, undefined);
+  // Never up, never held (#122).
+  assert.equal(stable({ flips: [] }, { ...open, visualHeight: 286, editing: false }, undefined, 0).keyboard, undefined);
+});
 for (const [i, s] of SPLIT_ENTRY.entries()) test(`split entry, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [i, s] of TURN_90_TO_0.entries()) test(`turn 90 to 0, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
 for (const [i, s] of UNFOLD.entries()) test(`unfold, step ${i}: in transit`, () => assert.equal(inTransit(s), true));
@@ -111,6 +134,25 @@ test("unfold from closed landscape: the brief closed portrait window never shows
   assert.equal(d.landUntil, 4664 + LAND_HOLD, "the caller re-reads when the landing has held");
   const end = stable(d, UNFOLD_FROM_90.at(-1)[1], undefined, 4664 + LAND_HOLD, true);
   assert.deepEqual([end.mode, end.hidden, end.confidence], ["inline", undefined, "settling"]);
+});
+// Unfolding the default style preview from closed portrait (iOS 27.1, e2e unf01-02, #159): the page loses its column
+// and inset in the closed window, then gets the open window before its own width, screen and band.
+const UNFOLD_PREVIEW = [
+  [4341, full({ ...P, innerWidth: 466, innerHeight: 527 })],
+  [4385, full({ outerWidth: 951, outerHeight: 669, innerWidth: 466, innerHeight: 594, insetBottom: 34 })],
+];
+test("unfolding the default preview: the column-less closed page is in transit, hidden until the strip (#159)", () => {
+  const d = { flips: [] };
+  const start = stable(d, full({ ...P, innerWidth: 382, innerHeight: 603, insetBottom: 34 }), undefined, 3812);
+  assert.deepEqual([start.mode, !!start.preview], ["column", true]);
+  for (const [t, s] of UNFOLD_PREVIEW) {
+    assert.equal(inTransit(s), true, `+${t}ms`);
+    assert.equal(stable(d, s, undefined, t, true).hidden, "moving", `+${t}ms`);
+  }
+  const landed = full({ outerWidth: 951, outerHeight: 669, innerWidth: 951, innerHeight: 594, screenWidth: 678, screenHeight: 466, insetBottom: 34, insetRight: 84, angle: 270 });
+  assert.equal(stable(d, landed, undefined, 4427, true).hidden, "moving", "the landing holds LAND_HOLD first");
+  const end = stable(d, landed, undefined, 4427 + LAND_HOLD, true);
+  assert.deepEqual([end.mode, end.side, end.hidden], ["strip", "right", undefined]);
 });
 test("a landing commits at once when the window has settled (no hold outside a settle)", () => {
   const d = { flips: [] };

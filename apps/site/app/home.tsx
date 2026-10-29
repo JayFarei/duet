@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, CodeXml, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
-import { Duet, DuoCookie, column, useDuet, type DuetItem } from "duet-ui";
+import { Duet, column, useDuet, type DuetItem } from "duet-ui";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
 import { ClaudeGlyph, CodexGlyph, GrokGlyph, PiGlyph } from "./agent-glyphs";
-import { WebDuo } from "./duo/web-duo";
+import { Duo } from "./duo/duo";
 import { TINTS, useTheme, useTint } from "./theme";
 
 const REPO = "https://github.com/JayFarei/duet";
@@ -39,18 +39,13 @@ const ISLANDS: [string, string, string, string][] = [
   ["Everywhere else", "Inline", "A slim strip in the page, on the side the reader drags it to.", "inline-drag"],
 ];
 
-/** One page for every screen, navigated by its own Duet controls. On the Duo (told to the server by the duet-duo
- *  cookie) the page is the demo; elsewhere the Duo also plays on a stage. */
-export function Home({ duo }: { duo: boolean }) {
-  return (
-    <>
-      <DuoCookie rendered={duo} />
-      <Site self={duo} />
-    </>
-  );
+/** One page for every screen, navigated by its own Duet controls, with the web Duo playing on a stage. On a Duo too:
+ *  the page is a demo there already, and the stage lets the reader try every other posture on the device (#165). */
+export function Home() {
+  return <Site />;
 }
 
-function Site({ self }: { self: boolean }) {
+function Site() {
   const [tab, setTab] = useState("top");
   // A portrait iPhone gets an iPhone's bars, with a button to try the Duo's side controls on it.
   const { device, width, height } = useDuet();
@@ -74,7 +69,7 @@ function Site({ self }: { self: boolean }) {
       tint={tint}
     >
       {/* On a portrait iPhone the side controls float over the page, which keeps the layout of the bars. */}
-      {portrait ? <div className="float"><Page self={self} /></div> : <Page self={self} />}
+      {portrait ? <div className="float"><Page /></div> : <Page />}
     </Duet>
   );
 }
@@ -118,7 +113,7 @@ function Bars({ tab, setTab, go, onSides, theme }: { tab: string; setTab: (id: s
   );
 }
 
-function Page({ self = false }: { self?: boolean }) {
+function Page() {
   return (
     <main>
       <section id="top" className="hero" style={column(980, 20)}>
@@ -134,16 +129,7 @@ function Page({ self = false }: { self?: boolean }) {
       </section>
 
       <section className="stage">
-        {self ? (
-          <div style={{ boxSizing: "border-box", width: "100%", maxWidth: 980 }}>
-            <div className="card self">
-              <h3 className="tile-h">This page uses Duet.</h3>
-              <p className="tile-p">The controls on the side are Duet. Unfold, turn or split Safari to see them move.</p>
-            </div>
-          </div>
-        ) : <>
-          <WebDuo embed src="/skeleton" />
-        </>}
+        <Duo embed src="/skeleton" />
       </section>
 
       <Section id="code" title="Integrate" lede="Wrap your app and pass your tabs. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
@@ -152,6 +138,7 @@ function Page({ self = false }: { self?: boolean }) {
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
           <a href="/panes" className="pill">Panes example</a>
           <a href="/sheet" className="pill">Sheets example</a>
+          <a href="/book" className="pill">Call to action example</a>
         </div>
       </Section>
 

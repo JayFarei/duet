@@ -122,6 +122,34 @@ class Sim:
                 return int(f[0])
         return None
 
+    def switcher_card(s, bundle):
+        """Centre (lit display points) of the visible part of an app's newest card in the app switcher, or None. The
+        newest card is the rightmost (the app left last); the screen centre is the card before it, often another app
+        (life01-05 picked the e2e host instead of Safari). Cards are SpringBoard elements "card:<bundle>:sceneID:..."."""
+        pid = s.pid("com.apple.SpringBoard")
+        if not pid:
+            return None
+        r = s.call("uiDescribeApplication", timeout=60, pid=pid, keys=["AXLabel", "AXUniqueId", "type", "frame"])
+        scr = (r or {}).get("screen", {})
+        rot, W = (scr.get("display") or {}).get("rotation", 0), scr.get("width", 0)
+        cards = []
+
+        def walk(e):
+            if (e.get("identifier") or "").startswith(f"card:{bundle}:") and e.get("frame"):
+                cards.append(e["frame"])
+            for c in e.get("children") or []:
+                walk(c)
+        for e in (r or {}).get("elements", []):
+            walk(e)
+        if not cards:
+            return None
+        # In lit display points (x1, x2, y1, y2), as springboard_find maps them.
+        lit = [(W - f["y"] - f["height"], W - f["y"], f["x"], f["x"] + f["width"]) if rot == 90 else
+               (f["x"], f["x"] + f["width"], f["y"], f["y"] + f["height"]) for f in cards]
+        x1, x2, y1, y2 = max(lit, key=lambda b: b[0])
+        lw = s.lit()["pointWidth"]
+        return (max(x1, 0) + min(x2, lw)) / 2, (y1 + y2) / 2
+
     def springboard_find(s, identifier):
         """Centre (lit display points) of a SpringBoard element (home icon, context menu item) by accessibility
         identifier, or None. Described through SpringBoard's own pid: uiDescribeAll covers only the frontmost app,
