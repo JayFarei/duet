@@ -927,7 +927,8 @@ export function Phases({ app, at, tour, onPick, onTour, live, onLive, row, style
     );
     const step = (by: number) => onPick(rows[(Math.max(k, 0) + by + rows.length) % rows.length].i);
     return (
-      <div data-wd-phases style={{ display: "grid", justifyItems: "center", gap: 8, padding: "0 16px", width: "100%", maxWidth: 420, boxSizing: "border-box" }}>
+      // minmax(0, 1fr): the label's nowrap width would otherwise size the column past a narrow stage, so it ellipsizes.
+      <div data-wd-phases style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", justifyItems: "center", gap: 8, padding: "0 16px", width: "100%", maxWidth: 420, boxSizing: "border-box" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 4, width: "100%" }}>
           {round(onTour, tour ? "Pause the tour" : "Play the tour", tour ? <Pause size={16} /> : <Play size={16} />)}
           {round(() => step(-1), "Previous", <ChevronLeft size={18} />)}

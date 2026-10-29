@@ -78,7 +78,6 @@ section[id] { scroll-margin-top: 24px; }
 .section { padding: clamp(64px, 10vw, 128px) 0 0; }
 
 .card { background: var(--card); border-radius: 22px; }
-.self { padding: 28px 24px; text-align: center; }
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 @media (max-width: 760px) { .tiles { grid-template-columns: 1fr; } }
 .tile { background: var(--card); border-radius: 26px; padding: 14px 14px 24px; }
@@ -141,6 +140,9 @@ html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
 [data-wd-shine]::before { content: ""; position: absolute; inset: -20%; background: linear-gradient(105deg, transparent 35%, var(--wd-shine) 50%, transparent 65%); animation: wd-sweep 0.7s cubic-bezier(0.4, 0, 0.2, 1) calc(var(--wd-at) + 0.15s) both; }
 @keyframes wd-ring { 0% { opacity: 0; } 15%, 65% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes wd-sweep { from { translate: -120% 0; } to { translate: 120% 0; } }
+/* The tour row under a narrow stage (web-duo.tsx): the app icon gives its room to what is showing, which reads first. */
+[data-wd-phases] { container-type: inline-size; }
+@container (max-width: 380px) { [data-wd-showing] > :first-child { display: none; } }
 /* Integrate's tint picker: small swatches, the picked one ringed like iOS's accent colour setting. */
 .tints { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
 .tints-k { font: 500 13px -apple-system, system-ui; color: var(--dim); margin-right: 4px; }
