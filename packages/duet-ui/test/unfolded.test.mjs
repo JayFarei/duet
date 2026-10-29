@@ -4,7 +4,7 @@
 // button, and inside the window.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detect, plan, DUO } from "../src/geometry.ts";
+import { detect, plan, previewReason, DUO } from "../src/geometry.ts";
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1";
 const sig = (o) => ({
@@ -51,6 +51,32 @@ const STATES = [
     native: [b("Close", 24, 111, 44, 44), b("Address", 298, 121, 73, 20), b("Page Menu", 601, 111, 44, 44), b("Back", 36, 875),
       b("Share", 474, 875, 49, 48), b("Reload", 529, 875), b("Open in Safari", 583, 875, 50, 48)],
   },
+  // The in-app preview filling the open screen, default and full screen styles (e2e matrix 2026-10-27, j26 to j36):
+  // page at window y 75. Wide: every button in the top bar, the status column (clock, island, Live Activities at their
+  // worst: the closed strip's DUO.top + DUO.island) in the right inset, so the controls take the strip below it.
+  {
+    name: "preview wide (951x669, status column on the right)", mode: "strip",
+    s: sig({ innerWidth: 951, innerHeight: 594, outerWidth: 951, outerHeight: 669, screenWidth: 678, screenHeight: 466, angle: 270, insetBottom: 34, insetRight: 84 }),
+    side: "right", origin: [0, 75],
+    native: [b("Close", 16, 24, 44, 44), b("Back", 66, 24, 44, 44), b("Page Menu", 116, 24, 44, 44), b("Address", 439, 34, 73, 20),
+      b("Status column", 867, 0, 84, DUO.top + DUO.island)],
+  },
+  // Tall, turned right (page angle 180): the top bar floats over the page's first 54pt, its Page Menu at the controls' edge.
+  {
+    name: "preview tall, turned right (top bar over the page)",
+    s: sig({ innerWidth: 669, innerHeight: 800, outerWidth: 669, outerHeight: 951, screenWidth: 466, screenHeight: 678, angle: 180, insetTop: 7 }),
+    side: "right", origin: [0, 75],
+    native: [b("Close", 16, 85, 44, 44), b("Address", 298, 95, 73, 20), b("Page Menu", 609, 85, 44, 44), b("Back", 28, 875),
+      b("Share", 482, 875, 49, 48), b("Reload", 537, 875), b("Open in Safari", 591, 875, 50, 48), b("Island", 560, 0, 109, 68 + DUO.island)],
+  },
+  // Tall, turned left (page angle 0): the top bar above the page, the island in its row.
+  {
+    name: "preview tall, turned left (top bar above the page)",
+    s: sig({ innerWidth: 669, innerHeight: 800, outerWidth: 669, outerHeight: 951, screenWidth: 466, screenHeight: 678, angle: 0, insetTop: 7 }),
+    side: "right", origin: [0, 75],
+    native: [b("Close", 16, 24, 44, 44), b("Address", 234, 34, 73, 20), b("Page Menu", 481, 24, 44, 44), b("Back", 28, 875),
+      b("Share", 482, 875, 49, 48), b("Reload", 537, 875), b("Open in Safari", 591, 875, 50, 48), b("Island", 560, 0, 109, 68 + DUO.island)],
+  },
 ];
 
 const SPECS = [];
@@ -64,7 +90,7 @@ const hit = (a, n) => a.x < n.x + n.w && a.x + a.w > n.x && a.y < n.y + n.h && a
 for (const st of STATES) {
   test(`unfolded, ${st.name}: clear of every native button, inside the window`, () => {
     const c = { ...detect(st.s), side: st.side };
-    assert.equal(c.mode, st.s.innerWidth > 600 ? "inline" : "column");
+    assert.equal(c.mode, st.mode ?? (st.s.innerWidth > 600 ? "inline" : "column"));
     if (c.mode === "column") assert.equal(c.split, true);
     for (const spec of SPECS) {
       const pl = plan(c, spec);
@@ -77,3 +103,14 @@ for (const st of STATES) {
     }
   });
 }
+
+test("unfolded preview: told from a Safari tab by chrome and inset alone", () => {
+  const wide = { innerWidth: 951, innerHeight: 594, outerWidth: 951, outerHeight: 669, screenWidth: 678, screenHeight: 466, angle: 270, insetBottom: 34, insetRight: 84 };
+  const tall = { innerWidth: 669, innerHeight: 800, outerWidth: 669, outerHeight: 951, screenWidth: 466, screenHeight: 678, angle: 180, insetTop: 7 };
+  assert.match(previewReason(sig(wide)), /unfolded wide/);
+  assert.match(previewReason(sig(tall)), /unfolded tall/);
+  assert.equal(detect(sig(tall)).preview, true);
+  // A tab unfolded: 126pt of bars, inset 34, in both postures; the wide tab with bars at the top keeps 126 too.
+  assert.equal(previewReason(sig({ ...wide, innerHeight: 543, insetRight: 0 })), undefined);
+  assert.equal(previewReason(sig({ ...tall, innerHeight: 825, insetBottom: 34, insetTop: 0 })), undefined);
+});

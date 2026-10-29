@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { ArrowLeftRight, ChevronLeft, Ellipsis, Search, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, isSplit, pageInsets, islandBox, islandFits, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
+import { DUO, columnBand, controlsShown, isSplit, pageInsets, islandBox, islandFits, magnet, morphBox, plan, stable, type Box, type Context, type Damper, type Plan, type Side, type Signals, type Spec } from "./geometry.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
@@ -20,6 +20,20 @@ export interface DuetItem {
   tint?: string;
   /** Deletes or discards: lives only in "…", last, in red, after a separator (blueprint). */
   destructive?: boolean;
+  /** Leading or action item that lives in "…" even where the strip has room for it, after the items that folded for
+   *  room. Set it per page to keep a page's call to action alone on the strip. */
+  folded?: boolean;
+}
+/** The primary action. */
+export interface DuetPrimary extends DuetItem {
+  /** The page's call to action (Book · 2 credits): a tinted button by the thumb. Where the band has no room for it
+   *  and the tabs (or search button) both, it keeps the slot by the thumb and they lead "…". Change label, icon or
+   *  tint as the page changes and it reshapes on a spring. No badge. */
+  prominent?: boolean;
+  /** A prominent primary starts closed, a round tinted button with the label only for assistive tech. Set expanded
+   *  to open it into a pill with the label beside the icon, growing towards the page (e.g. while it books, or for
+   *  a page whose whole point is the action); it opens and closes on the same spring. */
+  expanded?: boolean;
 }
 /** A tab: an item whose id is one of the app's tab ids. */
 export type DuetTab<T extends string = string> = DuetItem & { id: T };
@@ -33,7 +47,7 @@ export interface DuetProps<T extends string = string> {
   actions?: DuetItem[];
   /** The screen's main action (New chat, Compose), a tinted round button: by the thumb above the tabs where one
    *  pane shows, at the top under back where two do. */
-  primary?: DuetItem;
+  primary?: DuetPrimary;
   /** Tab pill at the bottom of the strip. `search` adds a `role: .search` tab as the last item. The ids are typed
    *  from `items`: declare them `as const` and `onSelect` gets the union, so `setTab` fits without a cast. Each tab
    *  keeps its own scroll position, and tapping the selected tab scrolls it to the top, like a native tab bar. */
@@ -104,7 +118,7 @@ function switchSide(el: HTMLElement, side: Side) {
 
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
-let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined;
+let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined, kbTimer: ReturnType<typeof setTimeout> | undefined, pendingTimer: ReturnType<typeof setTimeout> | undefined;
 // The damper keeps history, so it is fed once per signal change (refresh, from the watcher), never from React's
 // getSnapshot (read), which React may call several times per render.
 function refresh() {
@@ -113,6 +127,10 @@ function refresh() {
   if (damper.pinned && !pinTimer) pinTimer = setTimeout(() => { pinTimer = undefined; listeners.forEach((f) => f()); }, damper.until! - performance.now() + 20);
   // So is a landing after a fold or turn (LAND_HOLD), which no resize may follow.
   if (damper.landUntil !== undefined && !landTimer) landTimer = setTimeout(() => { landTimer = undefined; listeners.forEach((f) => f()); }, damper.landUntil - performance.now() + 10);
+  // And a keyboard held up after focus left it (KEYBOARD_DOWN), if the visual viewport never grows back.
+  if (damper.kbUntil !== undefined && damper.kbUntil > performance.now() && !kbTimer) kbTimer = setTimeout(() => { kbTimer = undefined; listeners.forEach((f) => f()); }, damper.kbUntil - performance.now() + 10);
+  // And controls hidden while a preview's inset is pending (#143), if it never lands.
+  if (damper.pendingUntil !== undefined && !pendingTimer) pendingTimer = setTimeout(() => { pendingTimer = undefined; listeners.forEach((f) => f()); }, damper.pendingUntil - performance.now() + 10);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
 }
@@ -177,8 +195,9 @@ function useMinimized(on: boolean, scroller: React.RefObject<HTMLDivElement | nu
  *  layer rides it on a CSS scroll timeline (duet.css, duet-follow): Safari runs that with the scroll itself, so
  *  it holds through momentum and smooth programmatic scrolls, where a transform set from scroll events lags and
  *  drifts (#55; simulator, 2026-10-26: up to 300pt during scrollIntoView, under 2pt on the timeline).
- *  The keyframe ends at the timeline's scroll range (--duet-scroll-max); a fixed 100000px range drifted ~12pt in
- *  momentum. Browsers without scroll timelines get the transform. Touches there reach the page
+ *  The keyframe ends at the timeline's scroll range (--duet-scroll-max). A constant px range (animation-range
+ *  0px 1000000px) computes exactly but Safari's compositor paints it up to 18pt off in momentum (2026-10-27).
+ *  Browsers without scroll timelines get the transform. Touches there reach the page
  *  but are not hit-tested to our elements, and Safari keeps the touch end (no pointerup, no click), so we route
  *  them by coordinates on pointerdown. Nothing in the column scrolls, so a touch there is always a tap.
  *  Split pane: the column is on the pane's outer edge, which the page cannot see, so the document spans a column
@@ -196,6 +215,9 @@ function viewport(key: string, value: string) {
   for (const meta of metas) if (!meta.content.includes(key)) meta.content += `,${key}=${value}`;
 }
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
+// useLayoutEffect warns during SSR on React 18.
+const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
 // Leaving the column, the sideways scroll the layer pinned stays behind: from a split left pane turned into the tall
 // window (inline), the document kept scrollX -84 with nothing to scroll, and Safari then painted the pill's glass but
 // not its unselected tab icons (e2e round 4, splitturn-left-to90). So when the mode leaves the column (not while the
@@ -211,7 +233,11 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     const t = [0, 300, 1000].map((ms) => setTimeout(reset, ms));
     return () => t.forEach(clearTimeout);
   }, [inColumn]);
-  useEffect(() => {
+  // Before paint: the layer is hidden mid-turn (off), and the render that shows it again also turns the follow back
+  // on. As a passive effect that ran a frame after the paint, so the controls showed once at their document
+  // position, about scrollY above where they belong (e2e scr01, a turn or fold on a scrolled page, #131); see the
+  // bridge below for the animation's own frame.
+  useLayout(() => {
     const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
     if (!on || !els.length) return;
     const html = document.documentElement.style, prev = html.touchAction;
@@ -223,15 +249,25 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     if (!timeline) for (const el of els) delete el.dataset.follow;
     // The keyframe ends at the timeline's own scroll range, which in Safari is scrollHeight - innerHeight: when the
     // URL bar collapses innerHeight grows 18px but clientHeight does not, and scrollHeight - clientHeight drifted
-    // 6pt 1000pt down (simulator, 2026-10-26). Content can outgrow the body (absolute, overflowing), so every
-    // scroll re-measures as well as resizes.
+    // 6pt 1000pt down (simulator, 2026-10-26). The innerHeight half is left to CSS as 100dvh, which follows it
+    // frame by frame: at the page end Safari's toolbar grows back seconds after the last scroll, with no scroll or
+    // window resize until it settles, and a measured range held the controls 17pt up meanwhile (2026-10-27).
+    // Content can outgrow the body (absolute, overflowing), so every scroll re-measures as well as resizes.
     let max = "";
     const range = () => {
-      const m = `${Math.max(0, root.scrollHeight - innerHeight)}px`;
+      const m = `max(0px, ${root.scrollHeight}px - 100dvh)`;
       if (m !== max) { max = m; for (const el of els) el.style.setProperty("--duet-scroll-max", m); }
     };
     const sizes = timeline ? new ResizeObserver(range) : undefined;
     if (sizes) { range(); sizes.observe(root); sizes.observe(document.body); }
+    // A new animation waits for the next frame's animation update, so the frame that shows the layer drew it
+    // unfollowed even with the follow on before paint. A transform holds it in place for that frame; the running
+    // animation overrides it, and it is dropped once the animation has run (#131).
+    let bridge = 0;
+    if (timeline && scrollY) {
+      for (const el of els) el.style.transform = `translateY(${scrollY}px)`;
+      bridge = requestAnimationFrame(() => { bridge = requestAnimationFrame(() => { for (const el of els) el.style.transform = ""; }); });
+    }
     // The layer's positions are document coordinates, from an absolute box at the document's left edge. A page whose
     // <body> (or <html>) is positioned makes that its containing block, which body margins, or the margins that move
     // the page beside a left column (pageInsets), move off the document's edge: measured, and undone with
@@ -261,8 +297,8 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
       if (e.clientX >= 0 && e.clientX < innerWidth) return; // inside the viewport, normal hit-testing applies
       const el = split ? refs[e.clientX < 0 ? 0 : 1].current : refs[0].current;
       if (split) tapSide = e.clientX < 0 ? "left" : "right";
-      // Skip a button that became an open menu: the menu covers it, and its own slot sits on top.
-      for (const b of el?.querySelectorAll<HTMLButtonElement>(":not([data-unrolled]) > button") ?? []) {
+      // Skip a button that became an open menu (the menu covers it, and its own slot sits on top) or is leaving.
+      for (const b of el?.querySelectorAll<HTMLButtonElement>(":not([data-unrolled], [data-leaving]) > button") ?? []) {
         const r = b.getBoundingClientRect();
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) { b.click(); return; }
       }
@@ -275,7 +311,7 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
     addEventListener("pageshow", follow);
     addEventListener("pointerdown", tap);
     return () => {
-      html.touchAction = prev; sizes?.disconnect();
+      html.touchAction = prev; sizes?.disconnect(); cancelAnimationFrame(bridge);
       for (const el of els) { el.style.transform = ""; el.style.translate = ""; el.style.removeProperty("--duet-scroll-max"); delete el.dataset.follow; }
       t.forEach(clearTimeout);
       removeEventListener("scroll", follow); removeEventListener("resize", follow); removeEventListener("pageshow", follow);
@@ -329,8 +365,32 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
 
 // --- rendering ----------------------------------------------------------------------------------
 
-// useLayoutEffect warns during SSR on React 18.
-const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+/** How long a slot that went away stays mounted while it pops out (duet.css, duet-leave). */
+const LEAVE_MS = 450;
+/** Page changes as one motion, like AnimatePresence: slots are positional (a falsy entry is an empty slot), so a slot
+ *  that arrives after mount pops in (data-enter) and one that goes stays in its place while it pops out
+ *  (data-leaving). Moves are the slots' own top/height transitions; React never reorders a node mid-transition. */
+function Presence({ children }: { children: ReactNode[] }) {
+  const last = useRef<ReactNode[]>([]), mounted = useRef(false), entered = useRef(new Set<number>());
+  const [leaving, setLeaving] = useState<ReadonlyMap<number, ReactElement>>(new Map());
+  let next: Map<number, ReactElement> | undefined;
+  children.forEach((el, i) => {
+    const was = last.current[i];
+    if (!el && isValidElement(was) && !leaving.has(i)) (next ??= new Map(leaving)).set(i, cloneElement(was as ReactElement<Record<string, unknown>>, { "data-leaving": "", "aria-hidden": true }));
+    if (el && leaving.has(i)) (next ??= new Map(leaving)).delete(i);
+    if (el && !was && mounted.current) entered.current.add(i); else if (!el) entered.current.delete(i);
+  });
+  if (next) setLeaving(next);
+  useLayout(() => { last.current = children; mounted.current = true; });
+  useEffect(() => {
+    if (!leaving.size) return;
+    const t = setTimeout(() => setLeaving(new Map()), LEAVE_MS);
+    return () => clearTimeout(t);
+  }, [leaving]);
+  return children.map((el, i) => (
+    <Fragment key={i}>{isValidElement(el) && entered.current.has(i) ? cloneElement(el as ReactElement<Record<string, unknown>>, { "data-enter": "" }) : el || leaving.get(i)}</Fragment>
+  ));
+}
 
 export function Duet<T extends string = string>(props: DuetProps<T>) {
   const p = props as unknown as DuetProps; // tab ids are only typed at the boundary
@@ -367,15 +427,16 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     if (n && closing === n) setClosing(null);
     setMenuNow(n);
   };
-  const actions = (p.actions ?? []).filter((a) => !a.destructive), destructive = (p.actions ?? []).filter((a) => a.destructive);
-  const leading = p.leading ?? [];
+  const actions = (p.actions ?? []).filter((a) => !a.destructive && !a.folded), destructive = (p.actions ?? []).filter((a) => a.destructive);
+  const leading = (p.leading ?? []).filter((a) => !a.folded);
+  const folded = [...(p.leading ?? []), ...(p.actions ?? [])].filter((a) => a.folded && !a.destructive);
   const tabItems = p.tabs ? [...p.tabs.items, ...(p.tabs.search ? [p.tabs.search] : [])] : [];
   const spec: Spec = p.close
     ? { back: true, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized, menuExtra: 0 }
     : {
         back: !!p.back, leading: leading.length, actions: actions.length, tabs: tabItems.length,
         searchButton: !p.tabs && !!p.searchButton, accessory: !!p.accessory, minimized,
-        menuExtra: (ctx.mode === "inline" ? 1 : 0) + destructive.length, primary: !!p.primary,
+        menuExtra: (ctx.mode === "inline" ? 1 : 0) + destructive.length + folded.length, primary: !!p.primary, prominent: !!p.primary?.prominent,
       };
   // Split pane in column mode: the controls are drawn in both of Safari's possible columns (useColumnLayer).
   const split = ctx.mode === "column" && !!ctx.split, column = ctx.screenWidth - ctx.width;
@@ -412,7 +473,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     r.setProperty("--duet-inset-top", ctx.mode === "strip" && ctx.standalone ? `${DUO.edgeBlur}px` : "0px");
     // Safari's URL pill floats below the layout viewport (the column holds nothing above the page), so the scroller
     // runs on under it like a document that scrolls, and the last content scrolls clear of it.
-    r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height)}px` : "0px");
+    r.setProperty("--duet-inset-bottom", ctx.mode === "column" ? `${Math.max(0, ctx.screenHeight - ctx.height - ctx.offsetTop)}px` : "0px");
     // Safari's column buttons paint over the page: a popover that reaches into the column keeps its top at or below
     // this (columnBand). Split view takes the lower of the two panes' limits, since nothing tells which pane it is.
     const bands = sides.map((side) => columnBand({ ...ctx, side }));
@@ -425,11 +486,21 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, split, inner, reserve]);
+  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, ctx.offsetTop, split, inner, reserve]);
   useEffect(() => () => {
     const h = document.documentElement;
     h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
   }, []);
+  // data-duet-close: Duet's close button is on screen, in any mode, so a sheet hides its own X and shows one (#135).
+  // Only when the plan placed it: a band with no room for it leaves the sheet its own X (#142).
+  const closeShown = !!p.close && controlsShown(ctx) && !!planFor(ctx.side).back;
+  // The pre-paint boot hid the server-rendered controls in a (pending) preview; a client reading (stable() always sets
+  // confidence, the server snapshot never does) hides them itself while it must (#143).
+  useLayout(() => { if (ctx.confidence) document.documentElement.removeAttribute("data-duet-pending"); }, [!!ctx.confidence]);
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-duet-close", closeShown);
+    return () => document.documentElement.removeAttribute("data-duet-close");
+  }, [closeShown]);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
   const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column");
@@ -530,6 +601,18 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
 
   const lensAt = scrub ?? Math.max(0, tabItems.findIndex((t) => t.id === selected));
 
+  // The call to action's pill is as wide as its icon and label: the row is measured (flex: none, so it keeps its own
+  // width inside the pill), and a new label, a font load or a text size change reshapes the pill on its spring.
+  const [ctaWidth, setCtaWidth] = useState<number>(DUO.control);
+  const ctaSizes = useRef<ResizeObserver | null>(null);
+  const ctaRow = useCallback((el: HTMLElement | null) => {
+    ctaSizes.current?.disconnect(); ctaSizes.current = null;
+    if (!el) return;
+    const measure = () => setCtaWidth(Math.max(DUO.control, el.offsetWidth));
+    measure();
+    if (typeof ResizeObserver !== "undefined") { ctaSizes.current = new ResizeObserver(measure); ctaSizes.current.observe(el); }
+  }, []);
+
   // Menus only unroll from separate round buttons: "…" and the minimized tab.
   const anchors = (pl: Plan) => ({ more: pl.more, tabs: pl.tabs?.min ? pl.tabs : undefined });
   // A menu whose button went away mid-roll (a tab change scrolls to the top and un-minimizes the tab bar)
@@ -563,6 +646,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
 
   const bar = (side: Side, i: number) => {
     const pl = planFor(side), left = side === "left", anchor = anchors(pl);
+    // The rail's low slot holds the tabs, the search button or, where it took their place, the call to action.
+    const railCta = !!pl.rail && !pl.tabs && !pl.searchButton && !!pl.primary;
+    const ctaOpen = p.primary?.expanded ? ctaWidth : DUO.control;
     const at = (b: Box) => ({ top: b.top, left: pl.left, width: DUO.control, height: b.height });
     // A menu is the button that opens it unrolling sideways, like the Dynamic Island: a pill of icon slots
     // as tall as the button, outer edge on the button's, widening towards the page centre only.
@@ -578,11 +664,14 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     };
     const shownLeading = leading.slice(0, leading.length - pl.menu.leading);
     const shownActions = actions.slice(0, actions.length - pl.menu.actions);
+    // The tabs lead "…" where the call to action took their slot, a radio group as in the merged tab menu.
+    const radio = pl.menu.tabs ? tabItems.length : 0;
     const more: DuetItem[] = [
+      ...(pl.menu.tabs ? tabItems : []),
       ...(pl.menu.search && p.searchButton ? [{ id: "duet-search", label: "Search", icon: <Search size={20} />, onPress: p.searchButton }] : []),
       ...(pl.menu.primary && p.primary ? [p.primary] : []),
       ...(pl.menu.back && p.back ? [{ id: "duet-back", label: p.back.label ?? "Back", icon: <ChevronLeft size={20} />, onPress: p.back.onPress }] : []),
-      ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length),
+      ...leading.slice(shownLeading.length), ...actions.slice(shownActions.length), ...folded,
       ...(ctx.mode === "inline" ? [{ id: "duet-side", label: `Move controls ${left ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
         // The menu goes at once, without rolling back into "…": its button is about to move, and would stay hidden
         // as "unrolled" until a roll that no longer lines up with it.
@@ -593,42 +682,53 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     ];
     return (
       <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
-        {p.close && pl.back && (
-          <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
-            <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>
-          </GlassSurface>
-        )}
-        {!p.close && p.back && pl.back && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="back" style={at(pl.back)}>{backButton}</GlassSurface>}
-        {!p.close && p.primary && pl.primary && (
-          <GlassSurface preset="control" className="duet-glass duet-round duet-primary" data-duet-slot="primary" style={{ ...at(pl.primary), ...tint(p.primary) }}>{item(p.primary)}</GlassSurface>
-        )}
-        {pl.leading && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="leading" style={at(pl.leading)}>{shownLeading.map(item)}</GlassSurface>}
-        {pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>}
-        {pl.rail && (
-          // One group for "…" and the bottom item; each still unrolls its own menu from its slot.
-          <GlassSurface preset="control" className="duet-glass duet-group duet-rail" data-duet-slot="rail" style={at(pl.rail)}>
-            {!p.close && more.length > 0 && moreButton}
-            {p.tabs && pl.tabs ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : pl.searchButton && searchButton}
-          </GlassSurface>
-        )}
-        {!p.close && !pl.rail && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>}
-        {p.tabs && pl.tabs && !pl.rail && (
-          <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
-            data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
-            {!pl.tabs.min && (
-              // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
-              // are masked out under the lens (CSS), so only the enlarged copy shows through it.
-              <span className="duet-lens" aria-hidden><span className="duet-lens-view"><span className="duet-lens-col">
-                {tabItems.map((t, i) => <span key={t.id} className="duet-tab" data-label={t.label} data-on={i === lensAt || undefined} style={tint(t)}>{t.icon}</span>)}
-              </span></span></span>
-            )}
-            {/* Full-pill badges ride above the lens, so it neither clips nor hides them. */}
-            {!pl.tabs.min && <span className="duet-pill-badges" aria-hidden>{tabItems.map((t) => <span key={t.id}>{badge(t)}</span>)}</span>}
-            {pl.tabs.min ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : tabItems.map((t, i) => tabButton(t, false, i))}
-          </GlassSurface>
-        )}
-        {pl.searchButton && !pl.rail && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="search" style={at(pl.searchButton)}>{searchButton}</GlassSurface>}
-        {(!split || side === menuSide) && menuEl("more", anchor.more, more, 0, menuAt, morphAt)}
+        <Presence>{[
+          p.close && pl.back && (
+            <GlassSurface preset="control" className="duet-glass duet-round duet-close" data-duet-slot="close" style={at(pl.back)}>
+              <button className="duet-item" aria-label={p.close.label ?? "Close"} onClick={p.close.onPress}><X size={22} strokeWidth={2.2} /></button>
+            </GlassSurface>
+          ),
+          !p.close && p.back && pl.back && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="back" style={at(pl.back)}>{backButton}</GlassSurface>,
+          !p.close && p.primary && pl.primary && !railCta && (p.primary.prominent ? (
+            // The pill keeps its icon where the round button would be and grows towards the page.
+            <GlassSurface preset="control" className="duet-glass duet-round duet-primary duet-cta" data-duet-slot="primary" data-expanded={p.primary.expanded || undefined}
+              style={{ ...at(pl.primary), width: ctaOpen, left: left ? pl.left : pl.left + DUO.control - ctaOpen, ...tint(p.primary) }}>
+              <button className="duet-item" aria-label={p.primary.label} onClick={p.primary.onPress}>
+                <span className="duet-cta-row" ref={ctaRow}>{p.primary.icon}<span key={p.primary.label} className="duet-cta-label">{p.primary.label}</span></span>
+              </button>
+            </GlassSurface>
+          ) : (
+            <GlassSurface preset="control" className="duet-glass duet-round duet-primary" data-duet-slot="primary" style={{ ...at(pl.primary), ...tint(p.primary) }}>{item(p.primary)}</GlassSurface>
+          )),
+          pl.leading && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="leading" style={at(pl.leading)}>{shownLeading.map(item)}</GlassSurface>,
+          pl.actions && <GlassSurface preset="control" className="duet-glass duet-group" data-duet-slot="actions" style={at(pl.actions)}>{shownActions.map(item)}</GlassSurface>,
+          pl.rail && (
+            // One group for "…" and the bottom item; each still unrolls its own menu from its slot.
+            <GlassSurface preset="control" className="duet-glass duet-group duet-rail" data-duet-slot="rail" style={at(pl.rail)}>
+              {!p.close && more.length > 0 && moreButton}
+              {p.tabs && pl.tabs ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : pl.searchButton ? searchButton
+                : railCta && p.primary && <button className="duet-item duet-rail-cta" aria-label={p.primary.label} onClick={p.primary.onPress} style={tint(p.primary)}>{p.primary.icon}</button>}
+            </GlassSurface>
+          ),
+          !p.close && !pl.rail && pl.more && more.length > 0 && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="more" style={at(pl.more)} data-unrolled={menu === "more" || closing === "more" || undefined}>{moreButton}</GlassSurface>,
+          p.tabs && pl.tabs && !pl.rail && (
+            <GlassSurface preset="control" className="duet-glass duet-pill" data-duet-slot="tabs" role="tablist" style={{ ...swell(at(pl.tabs), scrub !== null && !pl.tabs.min, side), "--li": lensAt } as CSSProperties} data-min={pl.tabs.min || undefined}
+              data-scrub={scrub !== null || undefined} data-glide={(glide && scrub === null) || undefined} data-unrolled={menu === "tabs" || closing === "tabs" || undefined} {...(pl.tabs.min ? {} : scrubbing)}>
+              {!pl.tabs.min && (
+                // The lens magnifies a copy of the tab column, slid so it lines up with the real one; the real tabs
+                // are masked out under the lens (CSS), so only the enlarged copy shows through it.
+                <span className="duet-lens" aria-hidden><span className="duet-lens-view"><span className="duet-lens-col">
+                  {tabItems.map((t, i) => <span key={t.id} className="duet-tab" data-label={t.label} data-on={i === lensAt || undefined} style={tint(t)}>{t.icon}</span>)}
+                </span></span></span>
+              )}
+              {/* Full-pill badges ride above the lens, so it neither clips nor hides them. */}
+              {!pl.tabs.min && <span className="duet-pill-badges" aria-hidden>{tabItems.map((t) => <span key={t.id}>{badge(t)}</span>)}</span>}
+              {pl.tabs.min ? tabItems.filter((t) => t.id === selected).map((t) => tabButton(t, true, 0)) : tabItems.map((t, i) => tabButton(t, false, i))}
+            </GlassSurface>
+          ),
+          pl.searchButton && !pl.rail && <GlassSurface preset="control" className="duet-glass duet-round" data-duet-slot="search" style={at(pl.searchButton)}>{searchButton}</GlassSurface>,
+        ]}</Presence>
+        {(!split || side === menuSide) && menuEl("more", anchor.more, more, radio, menuAt, morphAt)}
         {p.tabs && (!split || side === menuSide) && menuEl("tabs", anchor.tabs, pl.tabs?.merged ? [...tabItems, ...more] : tabItems, tabItems.length, menuAt, morphAt)}
         {/* The tab island unrolls across the accessory's row; the accessory steps aside while it is open. */}
         {p.accessory && pl.accessory && !i && (
@@ -643,8 +743,10 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.children !== undefined && <div ref={scroller} className="duet-scroller">{p.children}</div>}
       {sides.map(bar)}
-      {/* On the viewport edge that faces Safari's column, so a page's full-screen overlay cannot hide it (duet.css). */}
-      {ctx.mode === "column" && !emulatedSignals() && sides.map((side) => <span key={side} className="duet-guard" data-side={side} aria-hidden />)}
+      {/* On both viewport edges, so a page's full-screen overlay cannot hide Safari's column (duet.css). Mounted on a Duo in
+          Safari whatever the mode: a guard that drops while a turn or fold is in transit leaves the column filled with the
+          overlay once it is back (#119). */}
+      {ctx.duo && ctx.browser === "safari" && !emulatedSignals() && (["left", "right"] as const).map((side) => <span key={side} className="duet-guard" data-side={side} aria-hidden />)}
     </GlassProvider>
   );
 }

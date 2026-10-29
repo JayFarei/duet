@@ -1,4 +1,4 @@
-export { Duet, DuoCookie, useDuet, type DuetProps, type DuetItem, type DuetTab } from "./chrome.tsx";
+export { Duet, DuoCookie, useDuet, type DuetProps, type DuetItem, type DuetPrimary, type DuetTab } from "./chrome.tsx";
 export { glassTheme, themeVars, type Appearance, type DuetIcons, type DuetTheme } from "./theme.ts";
 export { epoch, readSignals, settling, watchSignals } from "./signals.ts";
 export { bleed, column } from "./layout.ts";

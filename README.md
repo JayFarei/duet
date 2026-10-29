@@ -80,7 +80,7 @@ Duet re-reads the signals on resize, orientation change (including `screen.orien
 | Order | Mode | Conditions (all must hold) | Controls |
 | --- | --- | --- | --- |
 | 1 | `strip` | Running as a Home Screen app (`navigator.standalone` or `display-mode: standalone`) on a Duo (`duo` true), and the left or right safe-area inset is at least 76px (the Duo's strip is 84; an iPhone's landscape sensor inset is 59, an Android cutout 62). The right side wins if both are. Also the in-app Safari preview turned sideways in its default or full style (below): closed screen, 678x466 window, an 84px safe-area inset on the turned side. | In the strip iOS gives the app, beside the page (in the preview, in the inset below its top bar) |
-| 2 | `column` | Not a Home Screen app; not inside an iframe; not the in-app Safari preview turned sideways (below); the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px; portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the page is not zoomed (`visualViewport.scale` 1); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column (or the in-app preview's) its own buttons leave empty, so the page keeps its full width |
+| 2 | `column` | Not a Home Screen app; not inside an iframe; not the in-app Safari preview turned sideways (below); the browser is Safari (below); `outerWidth - innerWidth` is 80 to 88px; `outerHeight - innerHeight` is 68 to 102px (not checked in the in-app preview, whose top bar compacts on scroll); portrait (`innerHeight > innerWidth`), or landscape in a window the size of the closed screen (678x466 within 1px) with `screen.orientation.angle` 90 or 270; the page is not zoomed (`visualViewport.scale` 1); the oscillation guard has not paused column mode; and either the window is a split-view pane (`outerWidth` x `outerHeight` 469x669 within 1px, iOS user agent) or `duo` is true | Painted into the part of Safari's column (or the in-app preview's) its own buttons leave empty, so the page keeps its full width |
 | 3 | `inline` | Everything else: unfolded at full width, landscape of unknown turn, other browsers, in-app web views, the in-app Safari preview unfolded, other phones, desktops | An 84px strip inside the page, on the side the user picks |
 
 "Safari" means the user agent has `Version/x Safari/` and none of the tokens of other iOS browsers and apps (`CriOS`, `FxiOS`, `EdgiOS`, `OPiOS`, `GSA/`, `Ddg/`); an in-app web view drops the `Safari/` token. `useDuet().browser` reports the result: `"safari"`, `"chrome"`, `"firefox"`, `"edge"`, `"webview"` or `"other"`. Other browsers draw their own chrome where Safari has its column, so they always get `inline`.
@@ -89,7 +89,7 @@ There is no fold signal. The mode follows the geometry: folding or unfolding cha
 
 How a new reading is committed:
 
-- **Keyboard.** The keyboard does not change the mode. `useDuet().keyboard` is true while the visual viewport is shorter than the page, and `<Duet>` sets `data-keyboard`; in `column` mode the controls hide until it closes (it covers the lower column).
+- **Keyboard.** The keyboard does not change the mode. `useDuet().keyboard` is true while the visual viewport is shorter than the page, and `<Duet>` sets `data-keyboard`; in `column` and `inline` mode the controls hide until it closes (it covers the lower column, and the inline rail would slide off). It counts only while a text field has focus, and until the viewport grows back once focus leaves.
 - **Zoom.** While the page is zoomed (`visualViewport.scale` not 1, for example Safari zooming out when an input takes focus) the window signature is unreadable, so Duet keeps the last context.
 - **Drift.** While the window is still settling, a mode change at the same window size, page width and turn is held until the sizes stop moving; a change of window size, page width or turn commits at once.
 - **Loops.** A mode that flips twice in 2s at a stable window is pinned for 3s, doubling on each repeat up to 60s.
@@ -111,18 +111,24 @@ A modal or sheet on the web usually sits on a full-screen scrim: `position: fixe
 
 - **What you see:** nothing to handle. While the overlay is open, the controls stay in the column and keep working. Safari's own buttons there are unaffected either way.
 - **Cause:** Safari 26 hit-tests the middle of each viewport edge, 4px in, for a fixed or sticky box (WebKit's `LocalFrameView::fixedContainerEdges`). When one covers that point, Safari paints the box's colour, or plain chrome when the box has a `backdrop-filter`, over everything beyond that edge, Safari's column included. Duet's column layer is in-document content, so it disappears under that fill. Measured on the simulator: a scrim 3px short of the edge still hides the column, 6px short does not, and a scrim of 90% width or 40% height does not.
-- **What Duet does:** in column mode it renders a small fixed guard (`.duet-guard`, 16x64px, transparent, `pointer-events: none`, top `z-index`) straddling that point on each edge that faces a column. Safari's hit test lands on the guard, which is too small to count as a container, so it finds none and keeps painting the column normally. The guard takes no taps and paints nothing.
-- **What you must do:** nothing for visibility. For a native feel, pass `close` to `<Duet>` while the sheet is open, so the controls hold only its close button, and hide the sheet's own X in column mode:
+- **What Duet does:** on a Duo in Safari it renders a small fixed guard (`.duet-guard`, 16x64px, transparent, `pointer-events: none`, top `z-index`) straddling that point on each viewport edge, in every mode, so it is there through folds and turns too. Safari's hit test lands on the guard, which is too small to count as a container, so it finds none and keeps painting the column normally. The guard takes no taps and paints nothing.
+- **What you must do:** nothing for visibility. For a native feel, pass `close` to `<Duet>` while the sheet is open, so the controls hold only its close button, and hide the sheet's own X while Duet shows its close (`<html data-duet-close>`, set in every mode, so the open screen shows one X too):
 
   ```tsx
   <Duet tabs={tabs} close={open ? { label: "Close", onPress: () => setOpen(false) } : undefined}>
   ```
 
   ```css
-  html[data-duet-mode="column"] .sheet-x { display: none; }
+  html[data-duet-close] .sheet-x { display: none; }
   ```
 
   The old workaround, making the scrim `position: absolute` in column mode, still works and is no longer needed.
+- **Blur:** keep `backdrop-filter` off the scrim box itself and put it on a `::before`, so Safari's bar takes the dimmed colour on the open screen instead of a solid band (see [Sheet scrim stops at Safari's bar](#sheet-scrim-stops-at-safaris-bar)):
+
+  ```css
+  .sheet-scrim { position: fixed; inset: 0; background: rgb(0 0 0 / 0.38); }
+  .sheet-scrim::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(8px); }
+  ```
 - **Not covered:** `<dialog>.showModal()` puts its `::backdrop` in the browser's top layer, above any `z-index`, so it still hides the column (checked on the simulator), and the page outside a modal dialog is inert anyway, so Duet's buttons could not take taps. Use a fixed `<div>` scrim (or `dialog.show()` with your own scrim) when you want the column controls. A page box of your own with `z-index: 2147483647` over the middle of the column edge also beats the guard.
 
 Try it on the [site](https://getduet.dev/sheet).
@@ -137,9 +143,9 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 
 ### In-app preview
 
-Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. The gap holds two buttons: "…" and the selected tab (the tab pill minimized); everything else folds into "…". Turned sideways, the preview's layout depends on its style. The sheet keeps a column on the side the Duo is turned to, with a gap of about 26pt, too small for a button: there Duet hides its controls (`useDuet().hidden` is `"preview"`, the controls get `visibility: hidden` and no inset) instead of drawing an inline strip across the page, so the page keeps its full width and the preview's own close, back, share and "Open in Safari" stay usable. The default and full styles move every native button into a top bar (window y 24 to 68) and give the page an 84px safe-area inset on the turned side (left at 90, right at 270) that nothing draws in: Duet uses `strip` there, its controls in that inset from below the top bar to above the home indicator, and the page keeps its width. Turning back to portrait, or opening the page in Safari, brings the column back. A strip across page content was flagged in review and is never used. Duet sets `useDuet().preview` in both. The gap was measured with a bare Dynamic Island; how Live Activities move the preview's buttons is not yet known. Duet takes a Safari window that is not standalone to be the preview when it is either:
+Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. Live Activities push close and reader/menu down (one about 45pt on a real Duo) while back stays put, and a page can't tell, so Duet assumes the worst case (`DUO.island`, two activities, as in a Safari tab): the gap is then about 54pt, room for one button, and none of Duet's buttons can ever sit under the preview's. That button is the selected tab, its menu listing the tabs, then everything else (or "…", or search alone, when the page has no tabs), centred in the gap. Turned sideways, the preview's layout depends on its style. The sheet keeps a column on the side the Duo is turned to, with a gap of about 26pt, too small for a button: there Duet hides its controls (`useDuet().hidden` is `"preview"`, the controls get `visibility: hidden` and no inset) instead of drawing an inline strip across the page, so the page keeps its full width and the preview's own close, back, share and "Open in Safari" stay usable. The default and full styles move every native button into a top bar (window y 24 to 68) and give the page an 84px safe-area inset on the turned side (left at 90, right at 270) that nothing draws in: Duet uses `strip` there, its controls in that inset from below the top bar to above the home indicator, and the page keeps its width. Turning back to portrait, or opening the page in Safari, brings the column back. A strip across page content was flagged in review and is never used. Duet sets `useDuet().preview` in both. Duet takes a Safari window that is not standalone to be the preview when it is either:
 
-- the closed screen's 466x678 window with the column signature, at most 77px of chrome below the page (the preview has 75, a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
+- the closed screen's 466x678 window with the column signature, 44 to 77px of chrome (the preview has 75, down to 46 as its top bar compacts on scroll in the default and full styles; a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
 - a page sheet: a window inside the closed 466x678 screen, in either orientation (450x670 on a real Duo, 662x458 turned) with the column signature and a bottom safe-area inset, or
 - exactly 375x667 at `devicePixelRatio` 3, the size earlier builds gave the preview.
 
@@ -166,7 +172,7 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 - **Above:** the status bar and Dynamic Island, and in Safari its own back and reader buttons at the top of the column. Live Activities grow the island down the strip and push Safari's buttons with it, and a page can't tell, so the band always assumes the worst case measured on device (two activities). That space stays empty even when none are running. A split-view pane on the right sits under the same status column, so it gets the same band as a closed tab, while the left pane uses the full column.
 - **Below:** Safari's +/tabs pill, or the bottom edge.
 - **Closed landscape:** Safari moves its back and reader rows and its pill on each side (left column: back slot top 81.5pt, pill top 327pt; right column: 23.5pt and 279pt), and Duet takes the gap between. Measured with a bare island; how Live Activities grow it sideways is not yet known.
-- **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item.
+- **What does not fit folds into "…"**, in this order: actions, then `leading`, then back. Tabs shrink to the selected one first. "…" always gets a slot: where the band holds only two buttons (a closed Safari tab), `primary` folds too, as the menu's first item, unless it is `prominent`: then the tabs (or search) fold instead, as a radio group leading the menu, and the call to action keeps the slot by the thumb. Items marked `folded` always sit in "…", after the ones that did not fit.
 - **The free middle of Safari's column:** before `leading` or `primary` fold, they may rise into the space the island only takes with Live Activities (up to 91.7pt above the band, in a closed portrait tab and the right split pane), and the stack packs down onto the tabs so it rises as little as it can. Back, actions and "…" never do. With no activity running the item sits clear of Safari's reader button; with two activities the reader can cover part of it.
 - **Safari's column buttons are an exclusion zone for menus too.** Native chrome always paints over the page, so z-index can't help. A menu that reaches into the column keeps its top at or below `columnTop` (the reader button's worst-case bottom plus 11pt) and its bottom above Safari's pill, opening flush with the column like Safari's own menus. A morph list too tall for that band opens wholly over the page, beside the column, where it may rise to the top of the page. One too tall even there caps its height and scrolls inside. `plan()` returns `columnTop` and `columnBottom` in `column` mode, and Duet sets `--duet-safe-top-column` on `<html>` for your own popovers (0 outside `column` mode).
 
@@ -221,7 +227,7 @@ import { bootScript } from "duet-ui/boot";
 | `back` | `false \| { label?, onPress }` | Back button at the top of the strip |
 | `leading` | `DuetItem[]` | Its own group under back, like SwiftUI `.topBarLeading` |
 | `actions` | `DuetItem[]` | Like `.primaryAction`; folds into "…" when it would reach the tabs. Items with `destructive: true` only show in "…", last, in red |
-| `primary` | `DuetItem` | The screen's main action (compose, new), a tinted round button. Narrow: just above the tabs. Wide: under back. Folds into "…" last |
+| `primary` | `DuetPrimary` | The screen's main action (compose, new), a tinted round button. Narrow: just above the tabs. Wide: under back. Folds into "…" last. `prominent: true` makes it the page's call to action, see [Call to action](#call-to-action) |
 | `tabs` | `{ items, selected, onSelect, search? }` | Tab pill at the bottom. `search` is a `DuetTab` added as the last tab. Each tab keeps its scroll position |
 | `searchButton` | `() => void` | A round search button at the bottom, when there are no tabs |
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the strip holds only a close button, where back goes, until it is cleared |
@@ -233,7 +239,7 @@ import { bootScript } from "duet-ui/boot";
 | `icons` | `{ size?, tabSize?, weight?, color? }` | How your icons are drawn. See [Theming](#theming) |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
-`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey, for plain counts like a balance. `tint` overrides the strip's tint for that tab or primary button. `DuetTab<T>` is a `DuetItem` whose `id` is `T`.
+`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey, for plain counts like a balance. `tint` overrides the strip's tint for that tab or primary button. `folded: true` puts a `leading` or action item in "…" even where there is room for it. `DuetTab<T>` is a `DuetItem` whose `id` is `T`. `DuetPrimary` is a `DuetItem` plus `prominent?` and `expanded?`.
 
 ### Theming
 
@@ -274,9 +280,33 @@ Every prop writes a CSS custom property on `.duet`, so plain CSS can set the sam
 
 Both are live on the [site](https://getduet.dev): scroll until the tabs shrink, tap the button, and switch styles in the Menus card.
 
+### Call to action
+
+A page with one thing to do (book, buy, join) passes it as a prominent primary, and folds what else it offers:
+
+```tsx
+<Duet
+  back={{ onPress: () => history.back() }}
+  actions={[
+    { id: "share", label: "Share", icon: <Share />, onPress: share, folded: true },
+    { id: "fav", label: "Favourite", icon: <Heart />, onPress: fav, folded: true },
+  ]}
+  primary={booked
+    ? { id: "cta", label: "Booked", icon: <Check />, tint: "#34c759", prominent: true, expanded: true, onPress: cancel }
+    : { id: "cta", label: `Book · ${credits} credits`, icon: <CalendarCheck />, prominent: true, onPress: book }}
+  tabs={tabs}
+/>
+```
+
+- It starts closed: a tinted round button by the thumb, its label read only by assistive tech. `expanded: true` opens it into a pill with icon and label, growing toward the page, and turning it off closes it on the same spring. Open it when the label carries news (Booked, Booking) or the page is the action. In a tight band (a closed Safari tab) it is always the round button, and it keeps its slot: the tabs fold into "…" instead.
+- Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop. The pill's width springs to the new label, the new label fades in and the tint crossfades.
+- Labels longer than 160px are cut with an ellipsis; keep them to a few words.
+
+Between pages the controls move like a native bar: a control that appears scales up out of a blur, one that goes away shrinks into one and is kept for 450ms so it can, and the rest slide to their new places on the same spring. With reduced motion, controls crossfade in place. The site's [call to action example](https://getduet.dev/book) shows all of it.
+
 ### `useDuet()`
 
-Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split`, `preview` and `keyboard` (when true), `hidden` (`"moving"` or `"preview"` when the controls are not drawn), `confidence`, `width` and `height` (the page viewport), `stableHeight` (the smallest page height seen at this window width and orientation, like CSS `svh`: it does not grow when Safari's URL bar collapses), plus the screen size and insets the placement uses. It works outside `<Duet>`.
+Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split`, `preview` and `keyboard` (when true), `hidden` (`"moving"`, `"preview"` or `"pending"` when the controls are not drawn), `confidence`, `width` and `height` (the page viewport), `stableHeight` (the smallest page height seen at this window width and orientation, like CSS `svh`: it does not grow when Safari's URL bar collapses), plus the screen size and insets the placement uses. It works outside `<Duet>`.
 
 ### Lower-level exports
 
@@ -363,13 +393,37 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing. The rule has zero specificity (`:where()`), so a page's own `overscroll-behavior` still wins, and with it the controls ride the bounce again.
 - **Status:** [#76](https://github.com/JayFarei/duet/issues/76), [PR #80](https://github.com/JayFarei/duet/pull/80), 0.4.0-rc.2.
 
+### Toolbar growing back at the end of the page
+
+- **You see:** in column mode without children, after a flick to the end of the page the controls sit up to 18pt too high for about half a second, then snap back. Smaller 1 to 2pt jitters show while momentum scrolling.
+- **Cause:** the controls ride a CSS scroll timeline whose keyframe ends at the scroll range, `scrollHeight - innerHeight`. At the page end Safari's toolbar grows back after the scroll has stopped, sometimes seconds later, and `innerHeight` steps down (598, 586, 581, 580). Only `visualViewport` fires `resize` meanwhile, with no `scroll` and no window `resize` until it settles, so a range measured in JavaScript goes stale while the timeline's own range follows the live viewport.
+- **Duet does:** writes the range as `max(0px, <scrollHeight>px - 100dvh)`. `100dvh` follows `innerHeight` frame by frame, so CSS keeps the range live and JavaScript only reports `scrollHeight`. Measured on the simulator: a computed offset within 0.3pt of `scrollY` through the regrow (was 18pt), and 0.0pt during smooth `scrollIntoView` jumps.
+- **You do:** nothing. A fast flick toward the top can still paint a single frame (16ms) a few points off, from Safari's compositor sampling the scroll and the animation apart. If a page needs the controls perfectly still, pass `children` to `<Duet>`: the document then never scrolls, and the controls measure 0.0pt.
+- **Status:** [#100](https://github.com/JayFarei/duet/issues/100).
+
 ### Full-screen `position: fixed` overlay or modal backdrop
 
 - **You see:** without the handling, in column mode, while a modal or sheet scrim (`position: fixed; inset: 0`) is open, every Duet control in Safari's column disappears, the close button included, so the user has no way to close the sheet from the column.
 - **Cause:** Safari 26 hit-tests a point 4px in from the middle of each viewport edge for a fixed or sticky box and, when one covers it, paints that box's colour over the inset beyond that edge, Safari's column included, instead of the page's in-document content.
-- **Duet does:** in column mode renders `.duet-guard`, a small invisible fixed box (16x64px, `pointer-events: none`, top `z-index`) on each column edge, so that hit test lands on it and the column keeps showing the controls. Your scrim stays `position: fixed`.
-- **You do:** nothing for a fixed `<div>` scrim. `<dialog>.showModal()` is not covered: its `::backdrop` sits in the top layer, above any `z-index`, so use a fixed `<div>` scrim instead. For one X, in the column, pass `close` to `<Duet>` while the sheet is open and hide the sheet's own X in column mode (`html[data-duet-mode="column"] .sheet-close { display: none; }`). See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
+- **Duet does:** on a Duo in Safari renders `.duet-guard`, a small invisible fixed box (`pointer-events: none`, top `z-index`) on each viewport edge, 240px tall (since [#142](#no-close-for-a-sheet-in-the-in-app-preview)), 16px wide on the left and 300px wide reaching inward on the right (since [#147](#no-close-after-turning-the-in-app-preview-upright)), so that hit test lands on it and the column keeps showing the controls. Your scrim stays `position: fixed`.
+- **You do:** nothing for a fixed `<div>` scrim. `<dialog>.showModal()` is not covered: its `::backdrop` sits in the top layer, above any `z-index`, so use a fixed `<div>` scrim instead. For one X, in the column, pass `close` to `<Duet>` while the sheet is open and hide the sheet's own X while Duet shows its close (`html[data-duet-close] .sheet-x { display: none; }`, see [Sheet X shown twice](#sheet-x-shown-twice)). See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
 - **Status:** [#79](https://github.com/JayFarei/duet/issues/79), [PR #83](https://github.com/JayFarei/duet/pull/83), 0.4.0-rc.2.
+
+### Page dialog open through a turn or fold
+
+- **You see:** without handling, with a full-screen page dialog open in a Safari tab on the closed Duo, turning the phone on its side and back upright leaves Safari's column without Duet's close button, and tapping where it was does nothing.
+- **Cause:** through the turn the page is in transit, not in column mode. A guard rendered only in column mode unmounts for those frames, Safari's edge hit test finds the scrim and fills the column with it, and that fill stays once the column and the guard are back.
+- **Duet does:** keeps `.duet-guard` mounted whenever the page is in Safari on a Duo, in every mode, so no frame of a turn, fold or unfold leaves the edge sample point on the scrim. The guard is invisible and takes no taps, so it changes nothing outside the column.
+- **You do:** nothing.
+- **Status:** [#119](https://github.com/JayFarei/duet/issues/119).
+
+### Sheet scrim stops at Safari's bar
+
+- **You see:** on the open Duo, in a tall Safari window (no tab bar), a sheet's blurred scrim dims the page but stops at Safari's top bar, which stays the undimmed page colour, a solid band over the dimmed page.
+- **Cause:** Safari 26 tints its bar with the colour of the fixed box at the top edge's sample point, but skips that tint for a box with a `backdrop-filter` and falls back to the page colour. Measured on the inner screen: blurred scrim, bar rgb(242,242,247) over a dimmed page of rgb(150,150,153); the same scrim without blur, bar rgb(149,149,153). Wide, with the tab bar, Safari never tints its bar, sheet or not. The closed screen's column is not affected.
+- **Duet does:** nothing it can; the scrim is the page's. The e2e `bar` check (journey mod03) compares the bar with the page under the scrim.
+- **You do:** keep the scrim box to its colour and move the blur to a `::before` (absolute, `inset: 0`, `z-index: -1`, `pointer-events: none`). The blur looks the same and the bar dims with the page. See [Modals and sheets in column mode](#modals-and-sheets-in-column-mode).
+- **Status:** [#136](https://github.com/JayFarei/duet/issues/136).
 
 ### Sideways swipe pans the page into the column
 
@@ -395,6 +449,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing. Check `useDuet().preview` and `hidden` if your page lays out differently there.
 - **Status:** [#66](https://github.com/JayFarei/duet/issues/66), [PR #67](https://github.com/JayFarei/duet/pull/67), [#69](https://github.com/JayFarei/duet/issues/69). See [In-app preview](#in-app-preview).
 
+### In-app preview filling the open screen
+
+- **You see:** a link opened in the in-app preview's default or full screen style on the unfolded Duo put the controls over the clock and Dynamic Island (wide) or on the preview's Page Menu (tall, turned right), and `useDuet().preview` read false.
+- **Cause:** these styles fill the open screen (951x669 or 669x951), unlike the sheet, so neither the closed nor the sheet signature matched. Wide, every native button sits in a 75pt top bar and the status column heads an 84pt inset on the right; tall turned right, the top bar floats over the page's first 54pt.
+- **Duet does:** recognises both windows by their chrome and inset (a tab has 126pt of bars and inset 34). Wide, it takes the right inset as a strip below the status column, with room for two Live Activities. Tall, it stays inline right and starts the controls below the top bar and the island.
+- **You do:** nothing.
+- **Status:** [#108](https://github.com/JayFarei/duet/issues/108). Live Activities on the open screen are assumed to grow the island as on the closed one.
+
 ### Turning or folding mid-transition
 
 - **You see:** without the handling, the controls flash at the wrong edge during a turn, fold, unfold or split move, the page insets jump (up to 296px on a turn, -485px on an unfold), or Safari zooms the page to fit (scale 1.14).
@@ -403,6 +465,22 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing. If your own code reacts to `useDuet()`, ignore readings with `confidence: "moving"`.
 - **Status:** [#68](https://github.com/JayFarei/duet/issues/68), [#69](https://github.com/JayFarei/duet/issues/69), [PR #70](https://github.com/JayFarei/duet/pull/70), 0.4.0-rc.1. See [Which mode](#which-mode).
 
+### Unfolding the in-app preview
+
+- **You see:** without the handling, unfolding from the closed preview turned sideways leaves the closed screen's controls (the strip, or Safari's column) on the open screen for 50 to 130ms before they land inline.
+- **Cause:** WebKit holds `resize` back while the window animates, yet lays the page out every frame: the page took four sizes over ~220ms with no event. One of them, 585x876 in the 669x951 window, is the closed page's 84pt column handed the open window, which reads as Safari's column.
+- **Duet does:** also watches a viewport-sized box with a `ResizeObserver`, which reports every layout, so the window starts settling (controls hidden, `confidence: "moving"`) on the first new size. A column-wide page in the full open window is in transit, never the column: Safari has no column there.
+- **You do:** nothing.
+- **Status:** [#115](https://github.com/JayFarei/duet/issues/115). See [Turning or folding mid-transition](#turning-or-folding-mid-transition).
+
+### Island menu in the closed preview
+
+- **You see:** without the handling, in the in-app preview on the closed screen with no forward history, tapping Duet's tab button opens its pill about 8pt lower than the button, over the preview's own Back button.
+- **Cause:** the preview's gap keeps the Live Activities allowance, so the band Duet may draw in is about 32pt, shorter than a button (49). The button is centred on the band, clear of Page Menu and Back; the pill was clamped to the band's top, which pushed it down past the band's bottom.
+- **Duet does:** keeps the pill inside the band, and on its button when the band can't hold it. A list menu there already opens beside the column.
+- **You do:** nothing.
+- **Status:** [#133](https://github.com/JayFarei/duet/issues/133), 0.5.0. See [In-app preview](#in-app-preview).
+
 ### Text field focus and the on-screen keyboard
 
 - **You see:** without the handling, focusing an input in column mode makes Safari zoom out (to about 0.94), and the keyboard covers the lower column and the controls in it.
@@ -410,6 +488,38 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** from the moment a field (`:read-write:focus`, so inputs, textareas and `contenteditable`) takes focus, clips the column layer out of the document width and hides it, before the zoom and the keyboard. The keyboard never changes the mode. `useDuet().keyboard` is true while it is up, and `<Duet>` sets `data-keyboard`. In column mode the controls come back when focus leaves.
 - **You do:** nothing. Don't rely on Duet's column controls while the user types.
 - **Status:** [#61](https://github.com/JayFarei/duet/issues/61), [PR #63](https://github.com/JayFarei/duet/pull/63).
+
+### Inline controls with the keyboard up
+
+- **You see:** without the handling, on the open screen in a Safari tab, the inline rail slides up as the keyboard rises: "…" goes off the top of the screen and the lower items end up under the keyboard.
+- **Cause:** iOS scrolls the layout viewport up by the keyboard's height (109pt on the open Duo) to keep the field in view, and a fixed rail moves with it.
+- **Duet does:** hides inline controls while `useDuet().keyboard` is true, as in column mode; they come back when the keyboard closes. Strip mode (Home Screen apps) is unchanged.
+- **You do:** nothing. Don't rely on Duet's inline controls while the user types.
+- **Status:** [#123](https://github.com/JayFarei/duet/issues/123).
+
+### A short visual viewport after a turn, read as the keyboard
+
+- **You see:** without the handling, after turning the closed Duo from its side to upright (seen with a page dialog open), Duet's column controls stay hidden for good, as if the keyboard were up.
+- **Cause:** WebKit can leave `visualViewport.height` short after a turn (466 against a 580pt page) until the next resize, with no keyboard.
+- **Duet does:** counts the keyboard as up only while a text field (`:read-write`), a select or an iframe has focus, read through shadow roots, and re-reads on focus changes.
+- **You do:** nothing.
+- **Status:** [#122](https://github.com/JayFarei/duet/issues/122).
+
+### Column controls under Safari's bar after a turn
+
+- **You see:** without the handling, after the same turn leaves the visual viewport short (466 for a 580pt page), tapping Duet's close in Safari's column does nothing and the page dialog stays open.
+- **Cause:** Safari draws its minimized bar at the bottom of the short visual viewport and takes touches from there down. Duet's column band ran to the page bottom, so the close straddled that line (y 439 to 488).
+- **Duet does:** while the visual viewport is short with no keyboard up, reports its bottom as `visualBottom` on the context and moves the column band up to end above it, keeping the band's height by taking the lift from the Live Activities allowance first. A Live Activity may then cover the top button. The bar collapsing mid-scroll lags the visual viewport by under 40pt, short of the threshold, so nothing moves then.
+- **You do:** nothing.
+- **Status:** [#140](https://github.com/JayFarei/duet/issues/140).
+
+### Inline controls as the keyboard goes down
+
+- **You see:** without the handling, on the open screen in a Safari tab, tapping the page outside a focused field draws the inline rail about 107px too high for one frame, with "…" off the top of the screen, before it lands in place.
+- **Cause:** focus leaves first, while iOS still holds the layout viewport scrolled up by the keyboard (visual viewport 286 of 618). With no field focused that short viewport no longer counts as the keyboard (#122), so the rail showed at once.
+- **Duet does:** a keyboard that was up stays up after focus leaves until the visual viewport grows back, for at most 1s, so a viewport left short with no keyboard cannot hide the controls for good.
+- **You do:** nothing.
+- **Status:** [#126](https://github.com/JayFarei/duet/issues/126).
 
 ### Pinch zoom
 
@@ -431,7 +541,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** an empty gap at the top of the strip or column, even when no Live Activity runs.
 - **Cause:** Live Activities grow the Dynamic Island down the strip and push Safari's buttons with it, and a page can't tell whether any are running.
-- **Duet does:** always reserves the worst case measured on device (two activities). `leading` and `primary` may rise into that space before they fold, back, actions and "…" never do. Closed landscape and the in-app preview were measured with a bare island only.
+- **Duet does:** always reserves the worst case measured on device (two activities). `leading` and `primary` may rise into that space before they fold, back, actions and "…" never do. In the in-app preview nothing rises into it. Closed landscape was measured with a bare island only.
 - **You do:** nothing.
 - **Status:** see [Claimable space](#claimable-space).
 
@@ -442,6 +552,62 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** puts "…" and the selected tab (or search) in one two-item rail, as tall as Safari's back + forward pill, centred between Safari's buttons and at least 5pt clear of each. Everything else folds into "…". Where even the rail has no room (closed landscape), the selected tab is the only button and its menu lists the tabs, then what folded. An island menu too wide for the screen opens as a morph instead.
 - **You do:** nothing. Keep the important actions first, they are the last to fold.
 - **Status:** [#97](https://github.com/JayFarei/duet/issues/97).
+
+### In-app preview top bar compacting on scroll
+
+- **You see:** without handling, scrolling a page in the in-app preview (default or full style, closed portrait) moves Duet's controls out of the preview's column into an inline strip across the page.
+- **Cause:** the preview's top bar compacts as the page scrolls: the chrome above the page shrinks from 75 to 46px, below both the preview's old chrome range and the column's.
+- **Duet does:** takes 44 to 77px of chrome as the preview, and in the preview checks only the column's width, so it stays `column` with the controls in place through the scroll.
+- **You do:** nothing.
+- **Status:** [#104](https://github.com/JayFarei/duet/issues/104). See [In-app preview](#in-app-preview).
+
+### In-app preview buttons and Live Activities
+
+- **You see:** without handling, a Live Activity pushes the preview's close and reader/menu buttons down onto Duet's controls in the gap.
+- **Cause:** Live Activities grow the Dynamic Island (one pushes those buttons about 45pt) while back stays put, and a page can't tell whether any are running.
+- **Duet does:** sizes the gap for the worst case (two activities, `DUO.island`), about 54pt: one button, the selected tab (or "…", or search), centred. Nothing rises into the space the activities can take, so no Duet button sits under a native one.
+- **You do:** nothing. Keep the important tabs and actions first, the tab's menu lists them.
+- **Status:** [#104](https://github.com/JayFarei/duet/issues/104).
+
+### Shared with You bar
+
+- **You see:** without handling, a page opened from a link a contact sent in Messages loses the column: the controls drop into the page about a second after load while Safari's own column is still there.
+- **Cause:** Safari heads the page with a "From <name>" bar under the status bar until the user closes it. It adds 40pt to the top chrome (98 to 138 on the closed Duo, also in closed landscape and split panes), which fails the column check. Safari's column buttons don't move, the page starts 40pt lower.
+- **Duet does:** recognises the 40pt bar outside the full open window, keeps column mode and sets `useDuet().offsetTop` to 40, so every control lands where it does without the bar in screen points. `--duet-inset-bottom` stays the URL bar alone. Folding or splitting under the bar still reads as in transit.
+- **You do:** nothing. Unmeasured: the bar at the largest Dynamic Type, in the in-app preview and on scroll.
+- **Status:** [#112](https://github.com/JayFarei/duet/issues/112).
+
+### In-app preview with forward history
+
+- **You see:** without handling, after going back once in the in-app preview, Duet's button covers the preview's Back.
+- **Cause:** with forward history the preview adds a Forward button where Back was and moves Back up a row (its top from 428 to 374pt), so the free gap ends higher.
+- **Duet does:** reads `navigation.canGoForward` (re-read on `currententrychange` and `popstate`) and, in the preview, ends the gap above the raised Back. That gap holds one button with no room left for Live Activities, so with forward history an activity may push the preview's reader/menu button onto Duet's button, never onto Back.
+- **You do:** nothing. The Navigation API only sees same-origin entries: coming back from another site, the preview shows Forward but Duet can't know, and its button may cover Back until the next same-origin navigation.
+- **Status:** [#117](https://github.com/JayFarei/duet/issues/117), [PR #118](https://github.com/JayFarei/duet/pull/118).
+
+### Controls flash over the in-app preview while it loads
+
+- **You see:** without handling, on a slow connection, Duet's controls show for a moment over the in-app preview's share, reload and Safari buttons on the closed screen, then jump into the gap.
+- **Cause:** the preview's bottom inset (34) reads 0 until `viewport-fit=cover` applies, and in the sheet about 100ms later still. The sheet's very first frames, the ones a pre-paint script reads, even report the whole 466x678 screen as the page inside the 450x670 sheet, with no column, and the full screen style's first frame (about 200ms) reports the whole screen as both window and page, with no chrome. Until then its window reads as a Safari tab, so the controls are placed at a tab's places, which are under the preview's buttons, and they stay there until the page hydrates.
+- **Duet does:** when the first reading would be the preview once the inset lands, or the window is the sheet's (inside the closed screen on both sides, which no tab is), or the page is the whole closed screen (no tab is, its column and bar are always there), hides the controls for the page's first second (`useDuet().hidden` is `"pending"`), from the first paint with `bootScript` (`html[data-duet-pending]`). They show as soon as the preview is recognised, or after that second as a tab. A tab's bar collapsing into the same window size on a quick scroll never hides them.
+- **You do:** nothing. Use `bootScript` so no frame shows them before the first effect.
+- **Status:** [#143](https://github.com/JayFarei/duet/issues/143) (sheet), [#155](https://github.com/JayFarei/duet/issues/155) (full screen), e2e `pvl01` and `pvl02` (a load held 1.5s with `?slowjs`, sampled from the first paint).
+
+### Controls flash over the clock unfolding the in-app preview
+
+- **You see:** without handling, unfolding the in-app preview, full screen or default style, Duet's controls show for a frame on the right edge of the open screen, over the clock and the Dynamic Island, before moving into the side band below them.
+- **Cause:** the open screen's first frame lays the page out at 951x594 in the 951x669 window before its insets land: the bottom inset still reads 0 (a tab's reading) or the 84pt right inset that holds the status column is not there yet (no band to put the controls in), so they go inline on the right. Unfolding the default style preview also passes, for about 40ms, through a page as wide as the closed screen (466x527 in 466x678, no insets) under a taller bar than any column's, which read as a tab.
+- **Duet does:** for a second after the preview's window changes, as after its first load, hides the controls (`useDuet().hidden` is `"pending"`) while the window reads as the preview pending its inset, or as the unfolded wide preview with no side band, which every one measured has, and treats the closed screen's full width page under more than a column's bar as still moving (Safari lays one out only for the full screen preview, with no bar). They show in the band as soon as it lands, or after that second where they would be.
+- **You do:** nothing.
+- **Status:** [#159](https://github.com/JayFarei/duet/issues/159), e2e `j38-02` and `unf01` (unfold the preview three times, every frame sampled).
+
+### Controls a scroll too high for a frame after a turn
+
+- **You see:** without handling, on a page scrolled down in Safari's column, turning the phone, folding or unfolding showed the column controls for one frame about the scroll offset above their place, off screen or over the page, before they snapped back.
+- **Cause:** the column layer is laid out in document coordinates and follows the scroll with a scroll driven animation (`data-follow`). Mid-turn the layer is hidden and the follow is off; the render that shows it again turned the follow back on in a passive effect, which React runs after the browser paints, so that first frame drew the layer unfollowed. Turned on before paint, the follow still missed that frame: a new animation waits for the next frame's animation update.
+- **Duet does:** turns the follow on in a layout effect, before the frame that shows the layer, and holds the layer at `translateY(scrollY)` with an inline transform for that frame; the running animation overrides it, and it is dropped two frames later.
+- **You do:** nothing.
+- **Status:** [#131](https://github.com/JayFarei/duet/issues/131), e2e `scr01` (scroll kept across turn, unfold and fold), and every step now checks the layer before paint on each render that shows or moves it.
 
 ### Menus and popovers under Safari's buttons
 
@@ -499,6 +665,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing, but don't set `viewport-fit=contain` or `shrink-to-fit=yes`: Duet only appends absent keys and leaves your values as they are.
 - **Status:** 0.2.0, 0.2.1. See [Viewport meta](#viewport-meta).
 
+### Scrolling or typing on a real Duo drops the controls off the column
+
+- **You see:** without the handling, on a real Duo in a closed Safari tab, scrolling up and down (fast or not), or scrolling and typing with the keyboard up, moves the controls out of Safari's column to the page edge, and they stay there.
+- **Cause:** the real device reads outside the ranges measured on the simulator. Safari's bottom bar collapses to 59pt while the page scrolls (the simulator's compact bar is 80), and the keyboard shrinks the layout viewport, not only the visual one (382x411 in 466x678). Both failed the column test, and the wrong verdict was committed once the scroll settled.
+- **Duet does:** counts the collapsed bar as Safari's column, and reads a page shrunk that far with a text field focused as the keyboard (the column stays, `useDuet().keyboard` is true). Signals that move while the user scrolls or types (page height, visual viewport) never take a tab out of the column, settled or not; moving into it still happens, so a wrong `inline` heals.
+- **You do:** nothing.
+- **Status:** [#132](https://github.com/JayFarei/duet/issues/132), 0.5.0.
+
 ### Mode flips back and forth
 
 - **You see:** without the handling, the controls jump between the column and the page several times a second.
@@ -514,6 +688,46 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** uses the column only in Safari (not Chrome, Firefox, Edge or other apps' browsers), never in an iframe, and gives in-app web views (a user agent without `Safari/`) `inline`. A Duo whose reported sizes differ (display zoom, a future iOS release) gets `inline`, and an iPad or another device with matching sizes may read as a Duo.
 - **You do:** use `useDuet().duo` to switch to a Duo layout, not as proof of the device. Check `useDuet().browser` to tell why a page is `inline`. For server-rendered layouts, see [Server rendering](#server-rendering-and-hydration).
 - **Status:** 0.2.2. See [Is this an iPhone Duo?](#is-this-an-iphone-duo) and [Which mode](#which-mode).
+
+### Call to action in a closed Safari tab
+
+- **You see:** without the handling, a page's main action (Book, Buy) folds into "…" on the closed Duo, while the tabs keep the slot by the thumb.
+- **Cause:** in a closed tab Safari's own buttons leave the band room for two controls, and "…" always takes one.
+- **Duet does:** with `primary.prominent`, gives the thumb slot to the call to action and folds the tabs (or search) into "…" as a radio group at the top of the menu. With forward history and Live Activities, "…" and the call to action share the two-item rail, the call to action as a tinted bubble.
+- **You do:** mark only the page's one main action `prominent`, and keep tabs reachable another way on that page if they matter (back, or the "…" menu).
+- **Status:** [#101](https://github.com/JayFarei/duet/issues/101). See [Call to action](#call-to-action).
+
+### Call to action opens over the page
+
+- **You see:** a call to action that loads as a wide labelled pill reads as an open card over the content, before the user has done anything.
+- **Cause:** the pill grows toward the page to fit its label, so on load it covers part of the page.
+- **Duet does:** starts a prominent primary closed, as the tinted round button, and opens it into the pill only with `expanded: true`, on the same spring as label changes.
+- **You do:** leave it closed by default; set `expanded` for a state worth reading (Booking, Booked), or from the start on a page whose whole point is the action.
+- **Status:** [#101](https://github.com/JayFarei/duet/issues/101). See [Call to action](#call-to-action).
+
+### Sheet X shown twice
+
+- **You see:** on the open screen (or in inline mode) with a sheet open, two close buttons: the sheet's own X and Duet's close in the side controls.
+- **Cause:** the recipe hid the sheet's X with `html[data-duet-mode="column"]`, so it only applied in Safari's column on the closed screen, while Duet shows its `close` button in every mode.
+- **Duet does:** sets `data-duet-close` on `<html>` whenever its close button is on screen, in every mode. Inline and column controls hide with the keyboard up, so the attribute drops then and the sheet's X is the one left. A turn's few hidden frames keep it, so the sheet's X does not flash.
+- **You do:** hide your X with `html[data-duet-close] .sheet-x { display: none; }` instead of the column-mode selector.
+- **Status:** [#135](https://github.com/JayFarei/duet/issues/135).
+
+### No close for a sheet in the in-app preview
+
+- **You see:** in the in-app preview on the closed screen (sheet or full screen), a page sheet opened with `close` has no close button at all: Duet shows none and the sheet's own X is hidden.
+- **Cause:** the gap holds one centred slot (see [In-app preview buttons and Live Activities](#in-app-preview-buttons-and-live-activities)). The close (a lone `back`) was folded into "…", which close mode never draws, while `data-duet-close` still hid the sheet's X.
+- **Duet does:** puts the close itself in that slot, centred in the gap, and sets `data-duet-close` only when the close is placed. Turned sideways, where Duet hides for the preview, the sheet keeps its own X. Turned back upright with the sheet open, WebKit samples the column's edge against the landscape viewport (mid-edge at y 194 of 388) while laying out fixed boxes in the upright one (600 tall), so the edge guard (see [Full-screen `position: fixed` overlay or modal backdrop](#full-screen-position-fixed-overlay-or-modal-backdrop)) missed the sample point, the scrim filled the column for good and the close was neither painted nor tappable. The guard is now 240px tall, covering both midpoints while staying too small to count as an overlay itself.
+- **You do:** nothing, with the `html[data-duet-close]` recipe from [Sheet X shown twice](#sheet-x-shown-twice).
+- **Status:** [#142](https://github.com/JayFarei/duet/issues/142).
+
+### No close after turning the in-app preview upright
+
+- **You see:** now and then, in the in-app preview on the closed screen, with a page sheet open, turning the phone on its side and back upright leaves no close at all: Duet's close is covered by the sheet's scrim and the sheet's own X is hidden.
+- **Cause:** WebKit sometimes keeps laying fixed boxes out against the 578-wide landscape window after the turn, so in the 366-wide upright window the right guard sits at x 570. Safari samples the right edge 4px in from that rect clipped to the document, which the column layer makes 450 wide, so at x 446, which the 16px guard does not cover. The hit test finds the scrim, fills the column with it, and that fill stays.
+- **Duet does:** makes the right guard 300px wide, reaching inward from the edge, so it covers the sample point whether laid out in the window or the stale one. It stays under 0.9 of the narrowest window, so Safari still never takes it for a container.
+- **You do:** nothing.
+- **Status:** [#147](https://github.com/JayFarei/duet/issues/147).
 
 ## Limitations
 
