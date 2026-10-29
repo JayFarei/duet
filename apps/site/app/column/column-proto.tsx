@@ -115,54 +115,68 @@ function menuBox(f: Frame, from: Rect, n: number): Rect {
   return { x, y: Math.min(Math.max(y, Math.max(f.insetTop, 12)), f.ph - 12 - h), w, h };
 }
 
-/** The liquid morph (ChatGPT's "…", frame by frame): the pill swells and brightens, then is gone as a droplet buds
- *  off its page side, swells into a blob with the list blurred inside, and settles into the menu with a slight
- *  overshoot. Closing plays it back. */
-function Morph({ open, from, box, button, onClosed, children }: { open: boolean; from: Rect; box: Rect; button: HTMLElement | null; onClosed: () => void; children: ReactNode }) {
-  const blob = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null);
+/** The liquid morph, ChatGPT's "…" frame by frame (60fps): the capsule itself is the liquid. It brightens and swells
+ *  under the press, pinches and leans toward the page while its buttons blur out top first, drops past the rail as a
+ *  teardrop whose tail points back at the column, swells into a circle with the list blurred inside, and settles into
+ *  the menu on a spring. Closing plays it back into the capsule. The bud and swell are kept on the page side of
+ *  `edge`, so nothing of it sits under Safari's own buttons. */
+function Morph({ open, from, slots, group, edge, box, onClosed, children }: { open: boolean; from: Rect; slots: Slot[]; group: HTMLElement | null; edge: number; box: Rect; onClosed: () => void; children: ReactNode }) {
+  const blob = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null), hi = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const el = blob.current, b = body.current;
-    if (!el || !b) return;
-    const cx = from.x + from.w / 2, cy = from.y + from.h / 2, dir = box.x + box.w / 2 < cx ? -1 : 1;
-    const bx = cx + dir * (from.w / 2 + 4), by = cy + 2; // the bud, just past the button's page-side edge
-    const mx = box.x + box.w / 2, my = box.y + box.h / 2, d = Math.min(box.w, box.h) * 0.62;
-    const sx = bx + (mx - bx) * 0.5, sy = by + (my - by) * 0.5;
-    const r = (x: number, y: number, w: number, h: number) => ({ left: `${x - w / 2}px`, top: `${y - h / 2}px`, width: `${w}px`, height: `${h}px` });
+    const el = blob.current, b = body.current, fc = face.current, h = hi.current;
+    if (!el || !b || !fc || !h) return;
+    const cx = from.x + from.w / 2, cy = from.y + from.h / 2, mx = box.x + box.w / 2, my = box.y + box.h / 2;
+    const dir = mx < cx ? -1 : 1, down = my > cy;
+    const side = (x: number, half: number) => dir < 0 ? Math.min(x, edge - 8 - half) : Math.max(x, edge + 8 + half);
+    // The teardrop (ChatGPT's measures: 1.9 by 1.2 capsule widths, a third of the way to the menu, past the rail).
+    const tw = 86, th = 108, tx = side(cx + (mx - cx) * 0.3, tw / 2), ty = cy + (my - cy) * 0.3;
+    const d = Math.min(box.w, box.h) * 0.78, sx = side(cx + (mx - cx) * 0.75, d / 2), sy = cy + (my - cy) * 0.75;
+    const tail = dir < 0 ? (down ? "55% 14% 55% 55%" : "55% 55% 14% 55%") : (down ? "14% 55% 55% 55%" : "55% 55% 55% 14%");
+    const lean = dir * (down ? -1 : 1) * 10;
+    const r = (x: number, y: number, w: number, hh: number) => ({ left: `${x - w / 2}px`, top: `${y - hh / 2}px`, width: `${w}px`, height: `${hh}px` });
+    const g = group ? getComputedStyle(group) : null, m = getComputedStyle(el);
+    const glass = { backgroundColor: g?.backgroundColor ?? m.backgroundColor, boxShadow: g?.boxShadow ?? m.boxShadow };
+    const card = { backgroundColor: m.backgroundColor, boxShadow: m.boxShadow };
+    const P = 0.28, Q = 0.35, T = 0.41, S = 0.58; // press, pinch, teardrop, swell (of 640ms)
     const frames: Keyframe[] = [
-      { ...r(cx, cy, 24, 24), borderRadius: "50%", opacity: 0, easing: "cubic-bezier(.3,.7,.4,1)" },
-      { ...r(bx, by, 40, 34), borderRadius: dir < 0 ? "62% 38% 42% 58% / 52% 48% 52% 48%" : "38% 62% 58% 42% / 48% 52% 48% 52%", opacity: 1, offset: 0.2, easing: "cubic-bezier(.45,0,.55,1)" },
-      { ...r(sx, sy, d, d * 1.04), borderRadius: "50%", opacity: 1, offset: 0.46, easing: SETTLE.easing },
-      { left: `${box.x}px`, top: `${box.y}px`, width: `${box.w}px`, height: `${box.h}px`, borderRadius: "26px", opacity: 1 },
+      { ...r(cx, cy, from.w, from.h), ...glass, borderRadius: `${C / 2}px`, rotate: "0deg", easing: "cubic-bezier(.2,.8,.3,1)" },
+      { ...r(cx, cy, from.w + 5, from.h + 7), ...glass, borderRadius: `${C / 2 + 2}px`, rotate: "0deg", offset: P, easing: "ease-in" },
+      { ...r(cx + dir * 3, cy + (down ? 4 : -4), from.w * 0.86, from.h * 0.92), ...glass, borderRadius: "48% 48% 50% 50% / 38% 38% 62% 62%", rotate: `${lean}deg`, offset: Q, easing: "linear" },
+      { ...r(tx, ty, tw, th), ...card, borderRadius: tail, rotate: "0deg", offset: T, easing: "cubic-bezier(.3,.6,.4,1)" },
+      { ...r(sx, sy, d, d * 1.04), ...card, borderRadius: "50%", rotate: "0deg", offset: S, easing: SETTLE.easing },
+      { ...r(mx, my, box.w, box.h), ...card, borderRadius: "26px", rotate: "0deg" },
     ];
+    const highlight: Keyframe[] = [{ opacity: 0 }, { opacity: 0.16, offset: P }, { opacity: 0.08, offset: Q }, { opacity: 0, offset: T }];
     const content: Keyframe[] = [
       { opacity: 0, scale: 0.3, filter: "blur(12px)" },
-      { opacity: 0, scale: 0.35, filter: "blur(12px)", offset: 0.2 },
-      { opacity: 0.55, scale: 0.62, filter: "blur(7px)", offset: 0.46, easing: SETTLE.easing },
+      { opacity: 0, scale: 0.36, filter: "blur(12px)", offset: Q },
+      { opacity: 0.35, scale: 0.42, filter: "blur(10px)", offset: T, easing: "cubic-bezier(.3,.6,.4,1)" },
+      { opacity: 0.7, scale: 0.72, filter: "blur(6px)", offset: S, easing: SETTLE.easing },
       { opacity: 1, scale: 1, filter: "blur(0px)" },
     ];
-    const press: Keyframe[] = [
-      { scale: 1, filter: "brightness(1)", opacity: 1 },
-      { scale: 1.18, filter: "brightness(1.4)", opacity: 1, offset: 0.5 },
-      { scale: 0.55, filter: "brightness(1)", opacity: 0 },
-    ];
-    const anims: Animation[] = [];
+    // The capsule's buttons ride the shape and blur out, the top one first.
+    const icons = [...fc.children] as HTMLElement[];
+    const iconFrames = (i: number): Keyframe[] => {
+      const gone = Q + (T - Q) * ((i + 1) / icons.length) * 0.9;
+      return [{ opacity: 1, filter: "blur(0px)" }, { opacity: 1, filter: "blur(0px)", offset: P }, { opacity: 0, filter: "blur(5px)", offset: gone }, { opacity: 0, filter: "blur(5px)" }];
+    };
+    const faceFrames: Keyframe[] = [{ rotate: "0deg", scale: 1 }, { rotate: "0deg", scale: 1.06, offset: P }, { rotate: `${lean}deg`, scale: 0.9, offset: Q }, { rotate: "0deg", scale: 0.9 }];
+    const run = (t: KeyframeAnimationOptions) => [el.animate(frames, t), b.animate(content, t), h.animate(highlight, t), fc.animate(faceFrames, t), ...icons.map((ic, i) => ic.animate(iconFrames(i), t))];
     if (open) {
-      if (button) anims.push(button.animate(press, { duration: 300, easing: "ease-out", fill: "forwards" }));
       // Backwards only: the last frame is the resting style, and a held transform keeps WebKit's blurry raster.
-      const t = { duration: 720, delay: 120, fill: "backwards" as const };
-      anims.push(el.animate(frames, t), b.animate(content, t));
-    } else {
-      const t = { duration: 480, fill: "both" as const, direction: "reverse" as const };
-      const a = el.animate(frames, t);
-      anims.push(a, b.animate(content, t));
-      if (button) anims.push(button.animate(press, { duration: 260, delay: 400, easing: "ease-in", fill: "both", direction: "reverse" }));
-      a.finished.then(() => setTimeout(onClosed, 260), () => {});
+      const anims = run({ duration: 640, fill: "backwards" });
+      return () => { for (const a of anims) a.cancel(); };
     }
-    return () => { if (open) for (const a of anims) a.cancel(); };
+    const anims = run({ duration: 560, fill: "both", direction: "reverse" });
+    anims[0].finished.then(onClosed, () => {});
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- geometry is fixed while the menu is shown
   return (
     <div ref={blob} className="cp-blob" style={{ left: box.x, top: box.y, width: box.w, height: box.h }}>
       <div ref={body} className="cp-menu" style={{ width: box.w, height: box.h }}>{children}</div>
+      <div ref={face} className="cp-face" style={{ width: from.w, height: from.h }} aria-hidden>
+        {slots.map((s, i) => <span key={slotKey(s)} style={{ top: i * ITEM, opacity: 0 }}>{btnIcon(s)}</span>)}
+      </div>
+      <div ref={hi} className="cp-hi" aria-hidden />
     </div>
   );
 }
@@ -207,8 +221,9 @@ function Proto() {
   const placed = place(f, groups);
   const primaryShown = placed.some((p) => p.primary);
   const list = [...items, ...(k.checkout && !primaryShown ? [CHECKOUT] : [])];
-  const moreAt = placed.flatMap((p) => p.group.map((s, i) => ({ s, rect: { x: p.rect.x, y: p.rect.y + i * ITEM, w: C, h: C } }))).find((e) => e.s.kind === "more");
-  const moreBtn = useRef<HTMLButtonElement | null>(null);
+  // The capsule holding "…" is what morphs into the menu.
+  const moreAt = placed.find((p) => p.group.some((s) => s.kind === "more"));
+  const moreGroup = useRef<HTMLDivElement | null>(null);
 
   const closeMenu = () => setMenu((m) => (m === "open" ? "closing" : m));
   const press = (s: Slot) => {
@@ -234,12 +249,14 @@ function Proto() {
       if (e.clientX < innerWidth) return;
       for (const b of document.querySelectorAll<HTMLButtonElement>("[data-cp-col] button")) {
         const r = b.getBoundingClientRect();
+        if (getComputedStyle(b).visibility === "hidden") continue;
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
           if (b.dataset.haptic) trigger(b.dataset.haptic as Parameters<typeof trigger>[0]);
           b.click();
           return;
         }
       }
+      document.querySelector(".cp-scrim")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     };
     pin();
     addEventListener("pointerdown", down);
@@ -274,10 +291,10 @@ function Proto() {
           const pill = p.primary && armed !== "idle", W = 214;
           const rect = pill ? { ...p.rect, x: p.rect.x + C - W, w: W } : p.rect;
           return (
-            <div key={gi} className="cp-group" data-primary={p.primary ? "" : undefined} data-armed={pill ? armed : undefined}
-              style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
+            <div key={gi} ref={p === moreAt ? moreGroup : undefined} className="cp-group" data-primary={p.primary ? "" : undefined} data-armed={pill ? armed : undefined}
+              data-morphing={p === moreAt && menu !== "closed" ? "" : undefined} style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h }}>
               {p.group.map((s, i) => (
-                <button key={slotKey(s)} ref={s.kind === "more" ? moreBtn : undefined} className="cp-btn" aria-label={btnLabel(s)}
+                <button key={slotKey(s)} className="cp-btn" aria-label={btnLabel(s)}
                   data-haptic={s.kind === "primary" && armed === "armed" ? "success" : btnHaptic(s)}
                   aria-expanded={s.kind === "more" ? menu === "open" : s.kind === "burger" ? sidebar : undefined}
                   style={{ top: i * ITEM, width: rect.w }} onClick={() => press(s)}>
@@ -289,7 +306,7 @@ function Proto() {
         })}
       </div>
       {menu !== "closed" && moreAt && (
-        <Morph open={menu === "open"} from={moreAt.rect} box={menuBox(f, moreAt.rect, list.length)} button={moreBtn.current} onClosed={() => setMenu("closed")}>
+        <Morph open={menu === "open"} from={moreAt.rect} slots={moreAt.group} group={moreGroup.current} edge={f.edge} box={menuBox(f, moreAt.rect, list.length)} onClosed={() => setMenu("closed")}>
           <div className="cp-menu-head">{f.kind === "column" ? "This page" : "More"}</div>
           {list.map((it) => (
             <button key={it.id} className="cp-row" data-haptic="selection" onClick={() => { closeMenu(); say(it.label); }}>
