@@ -3,7 +3,8 @@
 // nothing overlaps, and whatever does not fit folds into "…", which is always reachable.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { columnBand, detect, plan, DUO, RAIL, SAFARI } from "../src/geometry.ts";
+import { columnBand, detect, DUO, RAIL, SAFARI } from "../src/geometry.ts";
+import { TEMPLATE, frame, template } from "../src/template.ts";
 
 const sig = (iw, ih, ow, oh, o = {}) => ({
   innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih,
@@ -31,33 +32,28 @@ function band(c) {
   return [c.insetTop + DUO.gap, c.height - Math.max(c.insetBottom, DUO.gap)];
 }
 const SPECS = [];
-for (const back of [false, true]) for (const leading of [0, 3]) for (const actions of [0, 1, 4, 12]) for (const tabs of [0, 3, 9])
-  for (const primary of [false, true]) SPECS.push({ back, leading, actions, tabs, primary, searchButton: !tabs, accessory: false, minimized: false });
+for (const menu of [false, true]) for (const actions of [0, 1, 4, 12]) for (const primary of [false, true]) for (const rest of [false, true])
+  SPECS.push({ menu, actions, primary, rest });
+const bottomOf = (r) => r.y + r.h;
 
 for (const [name, c] of Object.entries(CONTEXTS)) {
-  test(`${name}: every control inside the claimable band, overflow in "…"`, () => {
-    const [top, bottom] = band(c);
+  test(`${name}: every group inside the claimable band, overflow in "…"`, () => {
+    const [top, bottom] = band(c), f = frame(c);
     for (const s of SPECS) {
-      const p = plan(c, s), why = `${JSON.stringify(s)} -> ${JSON.stringify(p)}`;
-      const boxes = [p.back, p.primary, p.leading, p.actions, p.more, p.tabs, p.searchButton].filter(Boolean).sort((a, b) => a.top - b.top);
-      // Leading items and the primary action may rise into the island's reach (the free middle of Safari's column
-      // with a bare island); everything else, "…" included, stays under Safari's reader row.
-      const reach = columnBand(c)?.reach ?? 0;
-      // A rail may reach closer to Safari's buttons than the band's gap, never closer than RAIL.gap.
-      const slack = p.rail ? DUO.gap - RAIL.gap : 0;
-      for (const b of boxes) {
-        const lo = b === p.leading || b === p.primary ? top - reach : top - slack;
-        assert.ok(b.top >= lo - 0.01 && b.top + b.height <= bottom + slack + 0.01, `outside [${lo}, ${bottom}]: ${why}`);
-      }
-      if (p.rail) assert.ok(p.more && (p.tabs || p.searchButton) && p.more.top === p.rail.top, `rail without its slots: ${why}`);
-      for (let i = 1; i < boxes.length; i++) assert.ok(boxes[i].top >= boxes[i - 1].top + boxes[i - 1].height - 0.01, `overlap: ${why}`);
-      const shown = (p.back ? 1 : 0) + (p.leading?.visible ?? 0) + (p.actions?.visible ?? 0);
-      const folded = (p.menu.primary ? 1 : 0) + (p.menu.back ? 1 : 0) + p.menu.leading + p.menu.actions;
-      assert.equal(shown + (p.primary ? 1 : 0) + folded, (s.primary ? 1 : 0) + (s.back ? 1 : 0) + s.leading + s.actions, `lost items: ${why}`);
-      // Folded items sit behind "…", or behind the selected tab where the band holds that one button.
-      if (folded) assert.ok(p.more || p.tabs?.merged, `folded items with no "…": ${why}`);
-      // The primary action folds only when "…" is needed and there is no room for both.
-      if (p.menu.primary) assert.ok(folded + (p.menu.search || p.tabs?.merged || p.rail ? 1 : 0) > 1 && bottom - top < 3 * DUO.control + 2 * DUO.gap, `primary folded needlessly: ${why}`);
+      const t = template(f, s), why = `${JSON.stringify(s)} -> ${JSON.stringify(t.groups)}`;
+      const rects = t.placed.map((g) => g.rect).sort((a, b) => a.y - b.y);
+      // A lone group may reach closer to Safari's buttons than the band's gap, never closer than RAIL.gap.
+      const slack = rects.length === 1 && f.kind === "column" ? DUO.gap - RAIL.gap : 0;
+      for (const r of rects) assert.ok(r.y >= top - slack - 0.01 && bottomOf(r) <= bottom + slack + 0.01, `outside [${top}, ${bottom}]: ${why}`);
+      for (let i = 1; i < rects.length; i++) assert.ok(rects[i].y >= bottomOf(rects[i - 1]) - 0.01, `overlap: ${why}`);
+      const slots = t.groups.flat(), has = (k) => slots.some((x) => x.kind === k);
+      assert.equal(slots.filter((x) => x.kind === "action").length, t.shown, why);
+      // Whatever is not on screen is behind "…".
+      if (t.shown < s.actions || (s.primary && !t.primary) || s.rest) assert.ok(has("more"), `hidden items with no "…": ${why}`);
+      // One button of room keeps "…", which then lists the menu's places too.
+      if (s.menu && bottom - top + 2 * slack >= TEMPLATE.control + TEMPLATE.item) assert.ok(has("menu"), `no burger: ${why}`);
+      // The primary folds only when no arrangement keeps it.
+      if (s.primary && !t.primary) assert.ok(bottom - top < 2 * TEMPLATE.control + DUO.gap + (s.menu ? TEMPLATE.item : 0), `primary folded needlessly: ${why}`);
     }
   });
 }
@@ -73,9 +69,9 @@ test("short visual viewport with no keyboard: the band ends above it, Close stay
   const full = columnBand(detect(sig(382, 580, 466, 678))), col = columnBand(c);
   assert.ok(col.bottom <= 466 - DUO.gap + 0.01, `band ends at ${col.bottom}`);
   assert.ok(Math.abs((col.bottom - col.top) - (full.bottom - full.top)) < 0.01, "band height changed");
-  const p = plan(c, { back: true, leading: 0, actions: 0, tabs: 0, searchButton: false, accessory: false, minimized: false });
-  assert.ok(p.back, "Close dropped");
-  assert.ok(p.back.top >= col.top - 0.01 && p.back.top + p.back.height <= 466 - DUO.gap + 0.01, `Close at ${p.back.top}`);
+  const [close] = template(frame(c), { close: true, actions: 0 }).placed;
+  assert.ok(close, "Close dropped");
+  assert.ok(close.rect.y >= col.top - 0.01 && bottomOf(close.rect) <= 466 - DUO.gap + 0.01, `Close at ${close.rect.y}`);
   // A visual viewport short by less than the band's margin to the pill (the bar collapsing mid-scroll) moves nothing.
   assert.deepEqual(columnBand(detect(sig(382, 580, 466, 678, { visualHeight: 550, editing: false }))), full);
   // The keyboard: the controls hide, the band is left alone.

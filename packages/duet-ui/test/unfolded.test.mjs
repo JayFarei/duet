@@ -4,7 +4,8 @@
 // button, and inside the window.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detect, plan, previewReason, DUO } from "../src/geometry.ts";
+import { detect, previewReason, DUO } from "../src/geometry.ts";
+import { frame, template } from "../src/template.ts";
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1";
 const sig = (o) => ({
@@ -80,11 +81,10 @@ const STATES = [
 ];
 
 const SPECS = [];
-for (const back of [false, true]) for (const leading of [0, 3]) for (const actions of [0, 1, 4, 12]) for (const tabs of [0, 3, 9])
-  for (const primary of [false, true]) SPECS.push({ back, leading, actions, tabs, primary, searchButton: !tabs, accessory: false, minimized: false, menuExtra: 0 });
+for (const close of [false, true]) for (const menu of [false, true]) for (const actions of [0, 1, 4, 12]) for (const primary of [false, true])
+  for (const rest of [false, true]) SPECS.push({ close, menu, actions, primary, rest });
 
-const boxes = (pl) => ["back", "leading", "actions", "more", "primary", "tabs", "searchButton"]
-  .filter((k) => pl[k]).map((k) => ({ slot: k, x: pl.left, y: pl[k].top, w: DUO.control, h: pl[k].height }));
+const boxes = (c, spec) => template(frame(c), spec).placed.map((g) => ({ slot: g.group.map((x) => x.kind).join("+"), ...g.rect }));
 const hit = (a, n) => a.x < n.x + n.w && a.x + a.w > n.x && a.y < n.y + n.h && a.y + a.h > n.y;
 
 for (const st of STATES) {
@@ -93,8 +93,7 @@ for (const st of STATES) {
     assert.equal(c.mode, st.mode ?? (st.s.innerWidth > 600 ? "inline" : "column"));
     if (c.mode === "column") assert.equal(c.split, true);
     for (const spec of SPECS) {
-      const pl = plan(c, spec);
-      for (const r of boxes(pl)) {
+      for (const r of boxes(c, spec)) {
         const w = { ...r, x: r.x + st.origin[0], y: r.y + st.origin[1] };
         const [W, H] = st.bounds ?? [st.s.outerWidth, st.s.outerHeight];
         assert.ok(w.x >= 0 && w.x + w.w <= W && w.y >= 0 && w.y + w.h <= H, `${r.slot} at ${w.x},${w.y} outside the ${W}x${H} window (${JSON.stringify(spec)})`);
