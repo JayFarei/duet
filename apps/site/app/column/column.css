@@ -1,0 +1,137 @@
+/* The templated column prototype (column-proto.tsx, #169). Colours come from site.css. */
+.cp-desk { min-height: 100dvh; display: grid; place-items: center; padding: 16px; box-sizing: border-box; }
+.cp-device { border-radius: 38px; overflow: hidden; box-shadow: 0 0 0 10px #1c1c1e, 0 0 0 11px rgb(255 255 255 / 0.12), 0 30px 80px rgb(0 0 0 / 0.35); }
+
+/* Glass reverse engineered against Safari's own on the Duo sim (?bg= grey ramps, colours, stripes; iOS 27.1). Native
+   glass is not frosted: what is under it stays sharp, tone mapped, and a heavily blurred base sets its level. Per
+   channel, dark is min(sharp, base) and light is max(sharp, base), each a grey line then saturation:
+     dark   sharp 89 to 184, base 32 to 241 (over solids 0 to 32, 128 to 133, 255 to 184; black and white stripes 89, 137)
+     light  sharp 130 to 225, base 133 to 252 (over solids 133 to 252; stripes 192, 225)
+   which lands within about 5 levels on greys and 2 on colours. ::before is the sharp layer; ::after the base, blended
+   over it (darken, lighten), and since it samples ::before its line is pre-divided by the sharp one. Large glass (the
+   menu) is the same in light; in dark it is darker (255 to 122), which --cp-glass-lg lays over. Not matched: native
+   refracts a ~5pt band at the rim (the backdrop bends to follow the outline), and WebKit cannot displace a backdrop
+   (no url() in backdrop-filter; scaled, zoomed or tilted backdrops still sample unbent), so the rim band is only
+   blurred, which reads as the same thickness without the bend.
+   The edge: soft 1pt rims inside top and bottom (.cp-rim, above both layers, or dark's min would drop them), a 0.5pt
+   dark keyline on the sides (all round, fainter, in light). */
+.cp-stage {
+  --cp-glass-lg: transparent; --cp-glass-sharp: contrast(0.2675) brightness(1.3925) saturate(2.1); --cp-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --cp-glass-blend: lighten;
+  --cp-edge: 0 0 0 0.5px rgb(0 0 0 / 0.1), -0.75px 0 0 -0.25px rgb(0 0 0 / 0.22), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.22);
+  --cp-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08);
+  --cp-shadow-control: 0 8px 15px rgb(0 0 0 / 0.02); --cp-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.12);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-lg-theme="light"]) .cp-stage { --cp-glass-lg: rgb(32 32 32 / 0.41); --cp-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --cp-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --cp-glass-blend: darken; --cp-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6); --cp-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --cp-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --cp-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18); } }
+:root[data-lg-theme="dark"] .cp-stage { --cp-glass-lg: rgb(32 32 32 / 0.41); --cp-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --cp-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --cp-glass-blend: darken; --cp-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6); --cp-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --cp-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --cp-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18); }
+/* The host isolates so ::after blends with ::before only. Pseudos need the host's radius. */
+.cp-group, .cp-blob, .cp-bar { isolation: isolate; }
+.cp-group::before, .cp-blob::before, .cp-bar::before, .cp-group::after, .cp-blob::after, .cp-bar::after { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none; }
+.cp-group::before, .cp-blob::before, .cp-bar::before { -webkit-backdrop-filter: var(--cp-glass-sharp); backdrop-filter: var(--cp-glass-sharp); transition: background 200ms ease; }
+.cp-group::after, .cp-blob::after, .cp-bar::after { -webkit-backdrop-filter: var(--cp-glass-base); backdrop-filter: var(--cp-glass-base); mix-blend-mode: var(--cp-glass-blend); }
+.cp-rim { position: absolute; inset: 0; box-sizing: border-box; padding: 5px; border-radius: inherit; box-shadow: var(--cp-rim); pointer-events: none;
+  -webkit-backdrop-filter: blur(2.5px) brightness(1.08); backdrop-filter: blur(2.5px) brightness(1.08);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.cp-stage { position: relative; overflow: clip; background: var(--bg); color: var(--ink); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.cp-stage[data-real] { position: absolute; left: 0; top: 0; }
+/* The haptics switch overlay focuses its button on tap (host.focus()), and the group clips that focus ring to a blue
+   line across the capsule. iOS controls show no ring on touch either. */
+.cp-stage button:focus { outline: none; }
+/* On the Duo the stage is an in-document box (Safari's column paints overflow, not fixed boxes) running on under the
+   URL bar, as duet-ui's scroller: the document itself never scrolls, only .cp-scroll does. */
+html:has(.cp-stage[data-real]), html:has(.cp-stage[data-real]) > body { height: 100%; margin: 0; overscroll-behavior: none; }
+.cp-stage button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; }
+
+/* Safari's own column, drawn when emulating: its tint, the island, and its buttons as flat discs. */
+.cp-safari { position: absolute; top: 0; bottom: 0; z-index: 2; pointer-events: none; }
+.cp-safari::before { content: ""; position: absolute; inset: 0; background: var(--wd-col); z-index: -1; }
+.cp-island { position: absolute; width: 37px; border-radius: 99px; background: #000; }
+.cp-native { position: absolute; width: 49px; height: 49px; border-radius: 99px; background: var(--wd-glass); box-shadow: 0 0 0 0.5px var(--line); opacity: 0.55; }
+.cp-native::after { content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 3px; border-radius: 2px; background: var(--dim); }
+.cp-band { position: absolute; width: 61px; border-radius: 30px; outline: 1px dashed rgb(255 149 0 / 0.55); outline-offset: -1px; }
+
+/* The sidebar sits under the page card; the card slides fully away. */
+.cp-sidebar { position: absolute; left: 0; top: 0; z-index: 0; box-sizing: border-box; padding: 18px 14px 24px; overflow: auto; background: var(--bg); opacity: 0.6; translate: -40px 0; transition: translate var(--cp-slide-ms) var(--cp-slide), opacity 300ms ease; }
+.cp-sidebar[data-open] { opacity: 1; translate: 0 0; }
+.cp-side-title { font: 700 28px/1.1 -apple-system, system-ui; padding: 0 10px 14px; }
+.cp-side-head { font: 600 13px/1 -apple-system, system-ui; color: var(--dim); padding: 22px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.cp-stage .cp-side-row { display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-stage .cp-side-row:active, .cp-stage .cp-side-row[data-current] { background: var(--line); }
+
+.cp-card { position: absolute; left: 0; top: 0; z-index: 1; background: var(--bg); transition: translate var(--cp-slide-ms) var(--cp-slide), border-radius 300ms ease, box-shadow 300ms ease; }
+.cp-card[data-open] { border-radius: 28px; box-shadow: 0 0 0 0.5px var(--line), -12px 0 40px rgb(0 0 0 / 0.18); overflow: hidden; }
+.cp-scroll { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 18px 0 18px; box-sizing: border-box; }
+
+/* The page. */
+.cp-head { padding: 16px 0 10px; }
+.cp-eyebrow { font: 600 13px/1 -apple-system, system-ui; color: var(--cta); text-transform: uppercase; letter-spacing: 0.05em; }
+.cp-head h1 { margin: 8px 0 6px; font: 700 30px/1.1 -apple-system, system-ui; letter-spacing: -0.01em; }
+.cp-head p { margin: 0; color: var(--dim); font-size: 15px; line-height: 1.4; }
+.cp-card-box { background: var(--card); border-radius: 18px; padding: 6px 14px; margin: 14px 0; }
+.cp-knob { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 46px; font-size: 15px; }
+.cp-knob + .cp-knob { border-top: 0.5px solid var(--line); }
+.cp-seg { display: flex; padding: 2px; border-radius: 9px; background: var(--line); }
+.cp-stage .cp-seg button { min-width: 30px; height: 28px; padding: 0 9px; border-radius: 7px; font-size: 13px; font-weight: 500; }
+.cp-stage .cp-seg button[data-on] { background: var(--card); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
+.cp-product { display: flex; gap: 14px; align-items: center; background: var(--card); border-radius: 18px; padding: 12px; margin: 14px 0; }
+.cp-product-img { width: 64px; height: 64px; border-radius: 12px; background: linear-gradient(135deg, #6b7a4b, #3f4a2b); flex: none; }
+.cp-product-name { font-weight: 600; font-size: 17px; }
+.cp-dim { color: var(--dim); font-size: 14px; margin-top: 2px; }
+.cp-text { font-size: 16px; line-height: 1.5; margin: 0 0 14px; }
+
+/* Safari's floating URL pill, drawn when emulating: the page runs on under it (Duo Lab, real device: 24pt in, 598 to 645). */
+.cp-bar { position: absolute; left: 0; z-index: 2; pointer-events: none; }
+.cp-bar::before, .cp-bar::after { inset: auto; left: 24px; right: 24px; top: 18px; height: 47px; border-radius: 24px; }
+.cp-bar::before { box-shadow: var(--cp-edge), var(--cp-shadow-control); }
+.cp-bar > .cp-rim { inset: auto; left: 24px; right: 24px; top: 18px; height: 47px; border-radius: 24px; }
+.cp-scrim { position: absolute; inset: 0; z-index: 3; }
+
+/* Dev backdrops (`?bg=`), over the page and under every glass. */
+.cp-testbg { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.cp-testbg ~ [data-cp-col] .cp-group { z-index: 2; }
+.cp-testbg[data-bg="stripes"] { background: repeating-linear-gradient(90deg, #000 0 8px, #fff 8px 16px); }
+.cp-testbg[data-bg="hstripes"] { background: repeating-linear-gradient(0deg, #000 0 8px, #fff 8px 16px); }
+.cp-testbg[data-bg="rainbow"] { background: linear-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); }
+.cp-testbg[data-bg="white"] { background: #fff; }
+.cp-testbg[data-bg="black"] { background: #000; }
+
+/* The template: glass capsules of 49pt buttons on Duo's pitch. */
+[data-cp-col] { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.cp-group { position: absolute; pointer-events: auto; border-radius: 25px; overflow: hidden; box-shadow: var(--cp-edge), var(--cp-shadow-control); transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left var(--cp-group-ms) var(--cp-group), width var(--cp-group-ms) var(--cp-group), top var(--cp-group-ms) var(--cp-group), height var(--cp-group-ms) var(--cp-group), background 200ms ease; }
+.cp-stage .cp-btn { position: absolute; left: 0; height: 49px; display: grid; place-items: center; transition: width var(--cp-group-ms) var(--cp-group); }
+/* iOS swells glass under the finger, lighter, rather than pressing it in. */
+.cp-group:has(.cp-btn:active) { scale: 1.12; }
+.cp-group:has(.cp-btn:active)::before { background: rgb(255 255 255 / 0.18); }
+.cp-group[data-primary] { background: var(--cta); color: #fff; box-shadow: 0 6px 20px rgb(0 122 255 / 0.35); }
+.cp-group[data-armed="done"] { background: #34c759; box-shadow: 0 6px 20px rgb(52 199 89 / 0.35); }
+.cp-group[data-primary]::before, .cp-group[data-primary]::after, .cp-group[data-armed="done"]::before, .cp-group[data-armed="done"]::after { content: none; }
+.cp-group[data-primary] > .cp-rim, .cp-group[data-armed="done"] > .cp-rim { display: none; }
+
+/* The checkout: the bag, then the capsule stretches into the page as the island's confirm. */
+.cp-checkout { display: flex; align-items: center; justify-content: flex-end; gap: 10px; width: 100%; height: 100%; padding: 0 14px; box-sizing: border-box; color: #fff; }
+.cp-checkout-icon { display: grid; place-items: center; flex: none; }
+.cp-checkout-label { font: 600 17px/1 -apple-system, system-ui; white-space: nowrap; overflow: hidden; max-width: 0; opacity: 0; filter: blur(6px); transition: max-width var(--cp-group-ms) var(--cp-group), opacity 220ms ease 80ms, filter 260ms ease 80ms; }
+.cp-checkout[data-state="idle"] { justify-content: center; padding: 0; }
+.cp-checkout:not([data-state="idle"]) .cp-checkout-label { max-width: 160px; opacity: 1; filter: none; }
+.cp-checkout:not([data-state="idle"]) { flex-direction: row-reverse; justify-content: center; }
+
+/* The liquid "…" menu: the capsule hides and Morph's blob takes its place, starting as the capsule (its glass, its
+   buttons on .cp-face) and ending as the menu (.cp-fill brings the card), its list centred at the final size. */
+.cp-group[data-morphing] { visibility: hidden; }
+.cp-blob { position: absolute; z-index: 5; overflow: hidden; contain: layout; box-shadow: var(--cp-edge), var(--cp-shadow-overlay); }
+.cp-fill { position: absolute; inset: 0; background: var(--cp-glass-lg); pointer-events: none; }
+.cp-face { position: absolute; left: 50%; top: 50%; translate: -50% -50%; pointer-events: none; }
+.cp-face > span { position: absolute; left: 0; width: 100%; height: 49px; display: grid; place-items: center; }
+/* The list scales and blurs on .cp-menu, and scrolls only at rest on .cp-list: a filter or scale on a scroll
+   container inside backdrop-filter glass paints a dark seam in WebKit. */
+.cp-menu { position: absolute; left: 50%; top: 50%; translate: -50% -50%; transform-origin: 50% 50%; pointer-events: none; }
+.cp-menu[data-rest] { pointer-events: auto; }
+.cp-list { width: 100%; height: 100%; box-sizing: border-box; padding: 6px; overflow: hidden; }
+.cp-menu[data-rest] > .cp-list { overflow-y: auto; }
+.cp-menu-head { height: 26px; padding: 4px 12px 0; font: 600 13px/1 -apple-system, system-ui; color: var(--dim); box-sizing: border-box; }
+.cp-stage .cp-row { display: flex; align-items: center; gap: 12px; width: 100%; height: 44px; padding: 0 12px; border-radius: 14px; font-size: 17px; text-align: left; white-space: nowrap; }
+.cp-stage .cp-row:active { background: var(--line); }
+
+.cp-toast { position: absolute; z-index: 6; translate: -50% 0; padding: 10px 16px; border-radius: 99px; background: var(--ink); color: var(--bg); font: 500 15px/1 -apple-system, system-ui; pointer-events: none; animation: cp-toast 1.6s ease both; }
+@keyframes cp-toast { 0% { opacity: 0; translate: -50% 10px; } 12%, 80% { opacity: 1; translate: -50% 0; } 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) { .cp-card, .cp-sidebar, .cp-group, .cp-btn { transition-duration: 1ms !important; } }

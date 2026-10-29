@@ -44,7 +44,7 @@ We are positioning into a region the page does not own, using a fixed guess of S
 - Can we detect Safari's compact/expanded toolbar state (innerHeight changes when the toolbar collapses; does 580 change?)?
 - Is in-document painting into the column a stable WebKit behaviour or an artefact we should not build on? If unstable, the honest fallback is: in Safari, render our controls inside the viewport (a right-edge strip within the 382pt page), and use the real strip only in standalone mode.
 - Better scroll tracking than scroll events (e.g. `position: sticky` tricks, or a `position: fixed` wrapper with an absolute child that overflows; check whether clipping applies to descendants).
-- Can taps be made native (real hit-testing, `:active`) for content outside the layout viewport, or is coordinate routing the ceiling?
+- Can taps be made native (real hit-testing, `:active`) for content outside the layout viewport, or is coordinate routing the ceiling? Answered 2026-10-29 (#169): coordinate routing is the ceiling. A Duo Lab hit lab put a switch in the column eight ways (absolute, fixed, inside an overflow scroller, own compositing layer, iframe, full-width box, svg, zoomed-out viewport at scale 0.8). Every column tap reached the page as trusted touchstart, pointerdown and click, but always targeting `<html>`: WebKit clips hit testing to the web view frame, while painting still spills into the column. So no native `:active`, and no iOS 27 switch haptic for column buttons, since that haptic needs the finger to land on the switch and programmatic switch clicks stay silent.
 
 ## Definition of done
 
