@@ -66,7 +66,7 @@ function Sheets() {
     </div>
   );
   const duet = {
-    tabs: { items: TABS, selected: tab, onSelect: setTab },
+    menu: { items: TABS, selected: tab, onSelect: setTab },
     actions: [{ id: "share", label: "Share", icon: <Share size={22} /> }],
     // The recipe: while the sheet is open, the controls hold only its close button.
     close: open ? { label: "Close", onPress: () => setOpen(null) } : undefined,

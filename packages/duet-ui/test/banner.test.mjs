@@ -6,7 +6,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { columnBand, detect, inTransit, isPreview, plan } from "../src/geometry.ts";
+import { columnBand, detect, inTransit, isPreview } from "../src/geometry.ts";
+import { frame, template } from "../src/template.ts";
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -45,18 +46,15 @@ for (const [name, plainS, sharedS] of PAIRS) test(`${name}: the column holds, ev
   const a = columnBand(plain), b = columnBand(shared);
   assert.equal(b.top + BANNER, a.top);
   assert.equal(b.bottom + BANNER, a.bottom);
-  for (const tabs of [0, 3, 9]) for (const actions of [0, 1, 4]) for (const back of [false, true]) {
-    const spec = { back, leading: 0, actions, tabs, primary: true, searchButton: !tabs, accessory: false, minimized: false };
-    const p = plan(plain, spec), q = plan(shared, spec), at = JSON.stringify(spec);
-    assert.equal(q.columnTop + BANNER, p.columnTop, at);
-    assert.equal(q.columnBottom + BANNER, p.columnBottom, at);
-    assert.equal(q.left, p.left, at);
-    for (const k of ["back", "primary", "actions", "leading", "more", "tabs", "searchButton", "rail"]) {
-      assert.equal(!!q[k], !!p[k], `${k}, ${at}`);
-      if (!p[k]) continue;
-      assert.equal(q[k].top + BANNER, p[k].top, `${k}, ${at}`);
-      assert.ok(q[k].top >= 0 && q[k].top + q[k].height <= shared.height, `${k} inside the page, ${at}`);
-    }
+  for (const actions of [0, 1, 4]) for (const menu of [false, true]) for (const close of [false, true]) {
+    const spec = { menu, actions, primary: true, close };
+    const p = template(frame(plain), spec).placed, q = template(frame(shared), spec).placed, at = JSON.stringify(spec);
+    assert.deepEqual(q.map((g) => g.group), p.map((g) => g.group), at);
+    p.forEach((g, i) => {
+      assert.equal(q[i].rect.x, g.rect.x, at);
+      assert.equal(q[i].rect.y + BANNER, g.rect.y, at);
+      assert.ok(q[i].rect.y >= 0 && q[i].rect.y + q[i].rect.h <= shared.height, `inside the page, ${at}`);
+    });
   }
 });
 

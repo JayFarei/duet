@@ -4,7 +4,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { DUO, detect, inTransit, isPreview, KEYBOARD_DOWN, LAND_HOLD, plan, stable } from "../src/geometry.ts";
+import { frame, template } from "../src/template.ts";
+import { DUO, detect, inTransit, isPreview, KEYBOARD_DOWN, LAND_HOLD, stable } from "../src/geometry.ts";
 
 const F = JSON.parse(readFileSync(new URL("./fixtures/states.json", import.meta.url), "utf8"));
 const full = (s) => ({
@@ -175,12 +176,12 @@ test("full screen preview turned: read as the preview, controls in the 84pt safe
     const c = stable({ flips: [] }, s, undefined, 0);
     const side = s.insetLeft ? "left" : "right";
     assert.deepEqual([c.mode, c.side, c.preview, c.hidden], ["strip", side, true, undefined]);
-    const p = plan(c, { back: false, leading: 0, actions: 2, tabs: 3, searchButton: false, accessory: false, minimized: false });
-    const x0 = p.left, x1 = p.left + DUO.control, band = side === "left" ? [0, 84] : [678 - 84, 678];
-    assert.ok(x0 >= band[0] && x1 <= band[1], `inside the band: ${x0}..${x1}`);
-    const boxes = [p.actions, p.more, p.tabs].filter(Boolean);
-    for (const b of boxes) assert.ok(b.top >= DUO.gap && b.top + b.height <= 391 - 34, `below the bar, above the home indicator: ${b.top}+${b.height}`);
-    assert.equal(p.tabs?.min, false);
+    const p = template(frame(c), { menu: true, actions: 2, primary: true }).placed, band = side === "left" ? [0, 84] : [678 - 84, 678];
+    assert.ok(p.length > 0);
+    for (const { rect: b } of p) {
+      assert.ok(b.x >= band[0] && b.x + b.w <= band[1], `inside the band: ${b.x}..${b.x + b.w}`);
+      assert.ok(b.y >= DUO.gap && b.y + b.h <= 391 - 34, `below the bar, above the home indicator: ${b.y}+${b.h}`);
+    }
   }
   // A turned tab is never taken for it: fresh (126pt chrome, inset 34 after a fold) or with its column (98).
   assert.equal(isPreview(full({ ...L, innerWidth: 678, innerHeight: 340, insetBottom: 34, angle: 90 })), false);

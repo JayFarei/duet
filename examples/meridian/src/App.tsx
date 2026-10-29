@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { Duet, type DuetItem, type DuetTab } from "duet-ui";
-import { ChevronRight, CircleCheck, Layers, LocateFixed, Map as MapIcon, Search, Star, TrainFront, TriangleAlert } from "lucide-react";
+import { Duet, type DuetItem, type DuetMenuItem } from "duet-ui";
+import { ArrowLeft, ChevronRight, CircleCheck, Layers, LocateFixed, Map as MapIcon, Search, Star, TrainFront, TriangleAlert } from "lucide-react";
 import { LINES, STATIONS, alerts, departures, linesAt, station } from "./data";
 import { LineBadge } from "./LineBadge";
 import { MapView, type Layer } from "./MapView";
@@ -31,27 +31,23 @@ export function App() {
   const openStation = (id: string) => { setTab("map"); setSelected(id); };
   const openLine = (id: string) => { setTab("map"); setSelected(null); setFocusLine(id); };
 
-  const tabs: DuetTab<Tab>[] = [
-    { id: "map", label: "Map", icon: <MapIcon size={24} />, tint: ACCENT },
-    { id: "lines", label: "Lines", icon: <TrainFront size={24} />, tint: ACCENT, badge: alerts || undefined },
-    { id: "saved", label: "Saved", icon: <Star size={24} />, tint: ACCENT },
+  const places: DuetMenuItem<Tab>[] = [
+    { id: "map", label: "Map", icon: <MapIcon size={22} /> },
+    { id: "lines", label: "Lines", icon: <TrainFront size={22} />, badge: alerts || undefined },
+    { id: "saved", label: "Saved", icon: <Star size={22} /> },
+    { id: "search", label: "Search", icon: <Search size={22} /> },
   ];
-  const leading: DuetItem[] = tab === "map" ? [
+  const back: DuetItem[] = tab === "map" && selected ? [{ id: "back", label: "Close station", icon: <ArrowLeft size={21} />, onPress: () => setSelected(null) }]
+    : tab === "map" && focusLine ? [{ id: "back", label: "Show all lines", icon: <ArrowLeft size={21} />, onPress: () => setFocusLine(null) }] : [];
+  const tools: DuetItem[] = tab === "map" ? [
     { id: "locate", label: "Locate me", icon: <LocateFixed size={21} />, onPress: () => setLocate((n) => n + 1) },
     { id: "layers", label: "Layers", icon: <Layers size={21} />, onPress: () => {
       const next = layer === "transit" ? "explore" : "transit";
       setLayer(next); setToast(next === "transit" ? "Transit map" : "Explore map");
     } },
   ] : [];
-  const back = tab === "map" && selected ? { label: "Close station", onPress: () => setSelected(null) }
-    : tab === "map" && focusLine ? { label: "Show all lines", onPress: () => setFocusLine(null) } : false;
-
   return (
-    <Duet
-      back={back}
-      leading={leading}
-      tabs={{ items: tabs, selected: tab, onSelect: setTab, search: { id: "search", label: "Search", icon: <Search size={24} />, tint: ACCENT } }}
-    >
+    <Duet menu={{ items: places, selected: tab, onSelect: setTab }} actions={[...back, ...tools]} tint={ACCENT}>
       {tab === "map" && (
         <MapView selected={selected} focusLine={focusLine} layer={layer} locate={locate} toast={toast} saved={saved}
           onStation={setSelected} onToggleSave={toggleSave} onSearch={() => setTab("search")} />

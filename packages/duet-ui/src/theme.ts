@@ -9,7 +9,7 @@ export type Appearance = "auto" | "light" | "dark";
 export interface DuetIcons {
   /** Icons in round buttons, groups and menus. Number is px. Default 22. */
   size?: number | string;
-  /** Icons in the tab pill. Number is px. Default 24. */
+  /** @deprecated Unused since 0.6 (no tab pill), kept so older code still typechecks. */
   tabSize?: number | string;
   /** Stroke width of SVG line icons (Lucide and the like), the way SF Symbols have a weight. Default 2. */
   weight?: number;

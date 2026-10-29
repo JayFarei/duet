@@ -38,10 +38,9 @@ export function ScrollLab() {
           </section>
         ))}
       </main>
-      <Duet<Id> minimizeOnScroll menuStyle="morph"
-        leading={[{ id: "credits", label: "3 credits", icon: <BookOpen size={22} />, badge: 3 }]}
-        actions={[{ id: "share", label: "Share", icon: <Share size={22} /> }]}
-        tabs={{ items: SECTIONS, selected: tab, onSelect: jump }} />
+      <Duet<Id>
+        menu={{ items: SECTIONS, selected: tab, onSelect: jump }}
+        actions={[{ id: "credits", label: "3 credits", icon: <BookOpen size={22} />, badge: 3 }, { id: "share", label: "Share", icon: <Share size={22} /> }]} />
     </>
   );
 }

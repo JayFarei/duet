@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Bookmark, Pause, FastForward, Pencil, Share, Trash2 } from "lucide-react";
-import { Duet, bleed, useDuet, type DuetItem } from "duet-ui";
+import { ArrowLeft, Bell, Bookmark, Pencil, Plus, Share, Trash2 } from "lucide-react";
+import { Duet, bleed, useDuet, type DuetItem, type DuetMenuItem } from "duet-ui";
 import { Feed } from "./feed";
 import { ChatIcon, CodeIcon, HomeIcon, MenuIcon, ProfileIcon, SearchIcon } from "./dev-icons";
 
-// A developer app's nav: solid mono glyphs; only the selected tab takes the one accent colour.
-const TABS: DuetItem[] = [
+// A developer app's places: solid mono glyphs; only the selected one takes the one accent colour.
+const PLACES: DuetMenuItem[] = [
   { id: "0", label: "Home", icon: <HomeIcon /> },
   { id: "1", label: "Chat", icon: <ChatIcon />, badge: 3 },
   { id: "2", label: "Code", icon: <CodeIcon /> },
@@ -22,11 +22,14 @@ const BACKDROPS = ["", "linear-gradient(#7f00ff, #e100ff, #ff4e50)",
 const ICONS = [Bell, Share, Bookmark, Trash2, Pencil];
 const NAMES = ["Alerts", "Share", "Save", "Delete", "Edit"];
 
-type S = Record<"tabs" | "back" | "actions" | "search" | "title" | "leading" | "searchTab" | "accessory" | "minimize" | "list" | "dark" | "feed" | "bg" | "morph", number>;
+// Query keys. menu=N places (tabs=N is the 0.5 name, still read), searchTab=1 adds a Search place, back=1 opens a
+// detail with a Back action first, leading=N more actions before them, actions=N, primary=1, close=1 (a sheet).
+// Keys of removed props (accessory, minimize, search, morph) are ignored, so old capture URLs still load.
+type S = Record<"menu" | "back" | "actions" | "primary" | "close" | "title" | "leading" | "searchTab" | "list" | "dark" | "feed" | "bg", number>;
 function parse(q: string): S {
-  const s = { tabs: 0, back: 0, actions: 0, search: 0, title: 0, leading: 0, searchTab: 0, accessory: 0, minimize: 0, list: 0, dark: 0, feed: 0, bg: 0, morph: 0 };
+  const s = { menu: 0, back: 0, actions: 0, primary: 0, close: 0, title: 0, leading: 0, searchTab: 0, list: 0, dark: 0, feed: 0, bg: 0 };
   for (const kv of q.replace(/^\?/, "").split(/[,&]/)) {
-    const [k, v] = kv.split("=");
+    const [k0, v] = kv.split("="), k = k0 === "tabs" ? "menu" : k0;
     if (k in s) s[k as keyof S] = Number(v) || 0;
   }
   return s;
@@ -70,24 +73,24 @@ html,body{margin:0;background:var(--bg)}
     const I = ICONS[i % 5];
     return { id: `${prefix}${i}`, label: NAMES[i % 5], icon: <I size={22} />, badge: i % 5 === 0 ? 12 : undefined, onPress: () => setTapped(NAMES[i % 5]) };
   };
-  const name = depth ? "Detail" : s.tabs ? TABS[Number(tab)]?.label ?? "Search" : "Root";
+  const name = depth ? "Detail" : s.menu ? PLACES[Number(tab)]?.label ?? "Search" : "Root";
+  const places = [...PLACES.slice(0, s.menu), ...(s.searchTab ? [{ id: "99", label: "Search", icon: <SearchIcon /> }] : [])];
+  const [sheet, setSheet] = useState(false);
+  useEffect(() => { setSheet(s.close > 0); }, [s.close]);
 
   return (
     <div style={{ background: "var(--bg)", color: "var(--ink)", fontFamily: "-apple-system, system-ui" }}>
       <style>{theme}</style>
       <Duet
         dark={s.dark ? s.dark > 0 : undefined}
-        menuStyle={s.morph ? "morph" : undefined}
-        back={depth > 0 && { onPress: () => { setDepth(0); setTapped("Back"); } }}
-        leading={Array.from({ length: s.leading }, (_, i) => action(i + 2, "l"))}
-        actions={Array.from({ length: s.actions }, (_, i) => action(i))}
-        tabs={s.tabs ? {
-          items: TABS.slice(0, s.tabs), selected: tab, onSelect: (id) => { setTab(id); setTapped(`tab ${id}`); },
-          search: s.searchTab ? { id: "99", label: "Search", icon: <SearchIcon /> } : undefined,
-        } : undefined}
-        searchButton={s.search && !s.tabs ? () => setTapped("Search") : undefined}
-        minimizeOnScroll={!!s.minimize}
-        accessory={s.accessory ? <><span style={{ flex: 1 }}>Now Playing</span><Pause size={20} fill="currentColor" /><FastForward size={22} fill="currentColor" /></> : undefined}
+        menu={places.length ? { items: places, selected: tab, onSelect: (id) => { setTab(id); setTapped(`place ${id}`); } } : undefined}
+        actions={[
+          ...(depth > 0 ? [{ id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: () => { setDepth(0); setTapped("Back"); } }] : []),
+          ...Array.from({ length: s.leading }, (_, i) => action(i + 2, "l")),
+          ...Array.from({ length: s.actions }, (_, i) => action(i)),
+        ]}
+        primary={s.primary ? { id: "new", label: "New", icon: <Plus size={22} />, onPress: () => setTapped("New") } : undefined}
+        close={sheet ? { label: "Close", onPress: () => { setSheet(false); setTapped("Close"); } } : undefined}
       >
         {s.title > 0 && <div style={{ position: "sticky", top: 0, zIndex: 1, padding: "calc(12px + var(--duet-inset-top, 0px)) 20px 12px", ...bleed(20), background: "var(--bg)", font: "600 17px -apple-system" }}>
           {name} <span style={{ fontWeight: 400, fontSize: 12, opacity: 0.5 }}>{ctx.mode} {sig}</span>{tapped && <span id="tapped" style={{ fontWeight: 400, opacity: 0.6 }}> · tapped {tapped}</span>}

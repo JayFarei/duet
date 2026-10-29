@@ -94,8 +94,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .field input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font: 17px -apple-system, system-ui; color: var(--ink); }
 .genre { position: relative; border-radius: 12px; aspect-ratio: 16 / 10; overflow: hidden; color: #fff; text-align: left; padding: 12px; display: flex; align-items: flex-end; font: 700 17px -apple-system, system-ui; }
 
-/* Mini player, inside Duet's glass accessory bar */
-.mp-wrap { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; height: 100%; margin: 0 -10px; }
+/* Mini player, docked at the bottom of the page in its own glass bar (Duet 0.6 has no accessory bar) */
+.mp-wrap { position: sticky; z-index: 3; bottom: calc(12px + var(--duet-inset-bottom, 0px) + env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 2px; min-width: 0; height: 52px; box-sizing: border-box; margin: 0 max(12px, var(--duet-inset-left, 0px)) 0 max(12px, var(--duet-inset-right, 0px)); padding: 0 8px 0 12px; border-radius: 999px; background: color-mix(in srgb, var(--card) 80%, transparent); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 0 4px 20px rgb(0 0 0 / 0.12); }
 .mp { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; text-align: left; height: 100%; }
 .mp-text { min-width: 0; display: flex; flex-direction: column; }
 .mp-title { font: 600 15px/1.2 -apple-system, system-ui; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

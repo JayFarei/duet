@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Info, Keyboard, LayoutGrid, Lock, MessageSquareShare, MessageSquareText, PanelBottom, Pointer, RotateCcw, RotateCw, Rotate3d, Square, X } from "lucide-react";
+import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Info, Keyboard, LayoutGrid, Lock, LockOpen, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square, X } from "lucide-react";
 import { detect } from "duet-ui/geometry";
 import { SCREEN, scene } from "../duo/web-duo";
-import { ONLY_OPEN, Phases, Segmented, TOUR, control, fit, group, hardware, rotate, sameView, type State, type Turn } from "./reexports";
+import { ONLY_OPEN, Segmented, TOUR, control, fit, group, hardware, rotate, type State, type Turn } from "./reexports";
 import { createPortal } from "react-dom";
 import { DUO_APP, channel, type Sync } from "./shared";
 
 // This page's displays, told apart from another tab's.
 const ID = Math.random().toString(36).slice(2);
 
-const HOLD = 2600; // a tour stop, the 3D hinge settling included
 const SWAP = 450; // the interface turns upright this far into the device's turn
 
 // Stand poses, the device on a table seen a little from above. Both are landscape with the hinge across: the
@@ -43,7 +42,7 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
 // The web Duo's controls on doan-labs/duo's 3D device. duo renders Apple's model and bends its hinge; both of its
 // displays frame /duo3d/screen, which draws what the 2D web Duo draws on its screen. The fold is duo's: an angle,
 // 0 closed to 180 open, eased there by duo itself.
-/** embed: the landing page's stage, no card, sized to its container and touring on its own while on screen. The
+/** embed: the landing page's stage, no card, sized to its container. The
  *  device takes no touches until the reader asks to try it, so a swipe over it still scrolls the page, and the lock
  *  under it puts it back that way. */
 export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
@@ -51,11 +50,9 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const [deg, setDeg] = useState(0);
   const [stand, setStand] = useState<Stand>("flat");
   const [upright, setUpright] = useState<Turn>(0);
-  const [tour, setTour] = useState(false);
   const [duet, setDuet] = useState(true);
-  const [at, setAt] = useState(0);
   const [more, setMore] = useState(false), [info, setInfo] = useState(false);
-  const [onScreen, setOnScreen] = useState(true), [manual, setManual] = useState(false), [box, setBox] = useState({ w: 0, h: 0 });
+  const [manual, setManual] = useState(false), [box, setBox] = useState({ w: 0, h: 0 });
   const stage = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
   // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
@@ -75,8 +72,8 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   useEffect(send, [deg, pose.roll, pose.pitch]); // eslint-disable-line react-hooks/exhaustive-deps
   // The camera eases back in front of the device, after a drag has orbited it.
   const front = () => duo.current?.contentWindow?.postMessage({ reset: true }, "*");
-  // The landing page's stage locks again the way it started: the device in front, touring, and a swipe over it scrolls.
-  const lock = () => { front(); setManual(false); if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setTour(true); };
+  // The landing page's stage locks again the way it started: the device in front, and a swipe over it scrolls.
+  const lock = () => { front(); setManual(false); };
   useEffect(() => {
     const hi = (e: MessageEvent) => { if (e.source === duo.current?.contentWindow && (e.data?.live || e.data?.ready)) send(); };
     addEventListener("message", hi);
@@ -100,14 +97,12 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     return () => clearTimeout(t);
   }, [s.turn, s.upside]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // An app keeps the stand; a fold, a turn, a tour stop or an app that only runs upright leaves it.
-  const go = (next: Partial<State>, fromTour = false, to: Stand = stand) => {
-    if (!fromTour) setTour(false);
+  // An app keeps the stand; a fold, a turn or an app that only runs upright leaves it.
+  const go = (next: Partial<State>, to: Stand = stand) => {
     const n = { ...s, ...next };
     if (next.app && ONLY_OPEN(n.app)) { Object.assign(n, { posture: "open", turn: 0, upside: false }); to = "flat"; }
     setStand(to);
     const f = fit(n);
-    if (!fromTour) setAt(TOUR.findIndex((t) => sameView(t, f)));
     setS(f);
     setDeg(to !== "flat" ? STANDS[to].deg : f.posture === "open" ? 180 : 0);
   };
@@ -118,9 +113,9 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     if (to === "tent" || to === "laptop") {
       const st = to === "tent" ? "nightstand" : "elevated";
       front();
-      return go({ posture: STANDS[st].posture, turn: 90, upside: false }, false, st);
+      return go({ posture: STANDS[st].posture, turn: 90, upside: false }, st);
     }
-    go({ posture: to, ...(stand !== "flat" && { turn: 0 as Turn, upside: false }) }, false, "flat");
+    go({ posture: to, ...(stand !== "flat" && { turn: 0 as Turn, upside: false }) }, "flat");
   };
 
   useEffect(() => {
@@ -128,19 +123,11 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     const el = stage.current!;
     const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, Math.min(el.clientWidth * 0.85, 600, innerHeight * 0.62)) });
     fit();
-    const ro = new ResizeObserver(fit), io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.25 });
+    const ro = new ResizeObserver(fit);
     ro.observe(el);
-    io.observe(el);
-    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) setTour(true);
-    return () => { ro.disconnect(); io.disconnect(); };
+    return () => { ro.disconnect(); };
   }, [embed]);
 
-  useEffect(() => {
-    if (!tour || !onScreen) return;
-    let i = at;
-    const t = setInterval(() => { i = (i + 1) % TOUR.length; setAt(i); go({ ...TOUR[i] }, true, "flat"); }, HOLD);
-    return () => clearInterval(t);
-  }, [tour, onScreen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!info) return;
@@ -151,7 +138,6 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
 
   // The fold slider: the hinge follows the thumb, and the posture flips at half way.
   const scrub = (t: number) => {
-    setTour(false);
     const d = t * 180, posture = d >= 90 ? "open" : "closed";
     setDeg(d);
     if (posture !== s.posture) setS(fit({ ...s, posture }));
@@ -191,7 +177,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   ];
   const fold = <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ flex: 1, minWidth: 90, accentColor: "var(--accent)" }} />;
   const turns = ([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
-    <Square42 key={by} label={label} onClick={() => go(rotate(s, by), false, "flat")}><Icon size={18} /></Square42>
+    <Square42 key={by} label={label} onClick={() => go(rotate(s, by), "flat")}><Icon size={18} /></Square42>
   ));
   const where = sections.slice(0, 3).map((x) => x.opts.find((o) => o.on)?.label).join(" · ");
 
@@ -225,7 +211,6 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
                 style={{ flex: 1, minWidth: 0, height: 36, border: 0, background: "transparent", color: "var(--ink)", font: "400 15px -apple-system, system-ui", outline: "none" }} />
               <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center", background: "transparent" }}><ArrowRight size={16} /></button>
             </form>
-            <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
           </div>
         )}
       </div>
@@ -250,7 +235,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   // since a stray drag or swipe orbits the model; on the landing page it also locks the stage, so the page scrolls again.
   const handle = (
     <div style={{ alignSelf: "center", width: list ? "calc(100% - 24px)" : "min(380px, calc(100% - 32px))", margin: list ? "4px 0 6px" : "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
-      {turns}<span style={{ width: 8 }} />{fold}<span style={{ width: 8 }} />{embed ? <Square42 label="Lock, reset view" onClick={lock}><Lock size={18} /></Square42> : <Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>}
+      {turns}<span style={{ width: 8 }} />{fold}<span style={{ width: 8 }} />{embed ? <Square42 label={manual ? "Lock, reset view" : "Unlock to drag the device"} on={manual} onClick={() => manual ? lock() : setManual(true)}>{manual ? <LockOpen size={18} /> : <Lock size={18} />}</Square42> : <Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>}
     </div>
   );
 
@@ -271,22 +256,15 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     </div>
   );
 
-  // On the landing page: the device, the tour under it, and what it shows and the controls behind info and "Try it yourself".
+  // On the landing page: the device, its controls under it, and what it shows behind info.
   if (embed) return (
     <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
       {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
           document gets an opaque white backdrop instead of showing the page through. */}
       {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
         style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
-      <Phases app={s.app} at={at} tour={tour} onPick={(i) => go({ ...TOUR[i], live: s.live }, false, "flat")} onTour={() => setTour((t) => !t)} live={s.live} onLive={() => go({ live: !s.live })} row />
-      {manual ? <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center" }}>{infoButton}</div></div> : (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          {infoButton}
-          <button onClick={() => { setManual(true); setTour(false); }} style={{ ...control, display: "inline-flex", alignItems: "center", gap: 8, padding: "0 20px 0 16px", background: "var(--accent)", color: "var(--bg)", fontWeight: 600 }}>
-            <Pointer size={18} strokeWidth={2.2} />Try it yourself
-          </button>
-        </div>
-      )}
+      <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
+        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} />{infoButton}</div></div>
       {about}
     </div>
   );
@@ -310,6 +288,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     </div>
   );
 }
+
 
 interface Opt { id: string; label: string; icon: ReactNode; on: boolean; off?: boolean; pick: () => void; hint?: string }
 interface Section { key: string; title: string; one?: boolean; slots?: number; opts: Opt[] }

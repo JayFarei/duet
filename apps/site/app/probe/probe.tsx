@@ -101,7 +101,7 @@ export function Probe() {
         {/* Room to scroll hard, so the URL bar collapses. */}
         {Array.from({ length: 24 }, (_, i) => <div key={i} style={{ height: 120, margin: "12px 0", borderRadius: 16, background: `hsl(${i * 15} 60% 75%)`, display: "flex", alignItems: "center", padding: "0 16px", color: "#000", fontWeight: 600 }}>Scroll filler {i + 1}</div>)}
       </main>
-      <Duet tabs={{ items: TABS, selected: "probe", onSelect: (id) => { if (id === "home") location.href = "/"; } }} />
+      <Duet menu={{ items: TABS, selected: "probe", onSelect: (id) => { if (id === "home") location.href = "/"; } }} />
     </>
   );
 }
