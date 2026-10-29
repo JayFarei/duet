@@ -280,43 +280,46 @@ function Proto() {
   };
 
   // Safari's column is not hit-tested: route a touch there by coordinates, as useColumnLayer does, and give it the
-  // haptic the switch overlay can't. The press acts on pointerdown, but iOS only ticks inside a user gesture, so the
-  // haptic waits for touchend: WebKit sends the column pointerup first, with activation set but no tick on the device.
+  // haptic the switch overlay can't. iOS ticks only inside a trusted click, and WebKit synthesizes one for a column tap
+  // only when the root is clickable (cursor pointer plus a click listener) and the touch leaves the page unchanged, so
+  // pointerdown just finds the button and the trusted click presses it and ticks.
   const pressRef = useRef(press);
   pressRef.current = press;
   useEffect(() => {
     if (!real || f.kind !== "column") return;
-    const html = document.documentElement.style, prev = html.touchAction;
+    const html = document.documentElement.style, prev = html.cssText;
     html.touchAction = "pan-y";
+    html.cursor = "pointer";
+    html.setProperty("-webkit-tap-highlight-color", "transparent");
+    let hit: HTMLButtonElement | undefined;
+    const tap = (e: MouseEvent) => {
+      if (!e.isTrusted || !hit) return;
+      const b = hit; hit = undefined;
+      b.click();
+      if (b.dataset.haptic) trigger(b.dataset.haptic as Parameters<typeof trigger>[0]);
+    };
+    document.documentElement.addEventListener("click", tap);
     const pin = () => { if (Math.round(scrollX) !== 0) scrollTo({ left: 0, top: scrollY, behavior: "instant" }); };
-    let haptic: string | undefined;
     const down = (e: PointerEvent) => {
-      haptic = undefined;
+      hit = undefined;
       if (e.clientX < innerWidth) return;
       for (const b of document.querySelectorAll<HTMLButtonElement>("[data-cp-col] button")) {
         const r = b.getBoundingClientRect();
         if (getComputedStyle(b).visibility === "hidden") continue;
         if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
-          haptic = b.dataset.haptic;
-          b.click();
+          hit = b;
           return;
         }
       }
       document.querySelector(".cp-scrim")?.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
     };
-    const up = (e: Event) => {
-      if (e.type === "pointerup" && (e as PointerEvent).pointerType === "touch") return;
-      if (haptic) trigger(haptic as Parameters<typeof trigger>[0]);
-      haptic = undefined;
-    };
     pin();
     addEventListener("pointerdown", down);
-    addEventListener("pointerup", up);
-    addEventListener("touchend", up);
     addEventListener("scroll", pin, { passive: true });
     return () => {
-      html.touchAction = prev;
-      removeEventListener("pointerdown", down); removeEventListener("pointerup", up); removeEventListener("touchend", up);
+      html.cssText = prev;
+      document.documentElement.removeEventListener("click", tap);
+      removeEventListener("pointerdown", down);
       removeEventListener("scroll", pin);
     };
   }, [real, f.kind, trigger]);
@@ -330,7 +333,7 @@ function Proto() {
       const x = (e as PointerEvent).clientX ?? (e as TouchEvent).changedTouches?.[0]?.clientX;
       const t = e.target as Element;
       const ua = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation?.isActive;
-      const line = `${e.type} x=${Math.round(x ?? -1)} t=${t?.nodeName}${t?.className ? "." + String(t.className).split(" ")[0] : ""} ua=${ua}`;
+      const line = `${e.type} x=${Math.round(x ?? -1)} t=${t?.nodeName}${t?.className ? "." + String(t.className).split(" ")[0] : ""} ua=${ua} tr=${e.isTrusted}`;
       setProbe((l) => [line, ...(l ?? [])].slice(0, 14));
       navigator.sendBeacon("/api/lab-trace", JSON.stringify({ probe: line })); // dev: lands in $DUET_TRACE
     };
