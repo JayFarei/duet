@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Check, CodeXml, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
 import { Duet, column, useDuet, type DuetItem } from "duet-ui";
+import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
 import { ClaudeGlyph, CodexGlyph, GrokGlyph, PiGlyph } from "./agent-glyphs";
@@ -115,7 +116,7 @@ function Page() {
   return (
     <main>
       <section id="top" className="hero" style={column(980, 20)}>
-        <p className="eyebrow">duet-ui</p>
+        <p className="eyebrow">duet-ui {pkg.version}</p>
         <h1 className="display">
           Native-feeling controls for web apps on the <em>iPhone Duo.</em>
         </h1>

@@ -17,6 +17,7 @@
       "default": "./dist/geometry.js"
     },
     "./styles.css": "./dist/duet.css",
+    "./package.json": "./package.json",
     "./boot": {
       "types": "./dist/boot-script.d.ts",
       "default": "./dist/boot-script.js"

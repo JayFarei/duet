@@ -58,7 +58,7 @@ export function App() {
 }
 ```
 
-Icons are yours, from any library (this example uses `lucide-react`): 21 to 22pt on round buttons match the system. `as const` types the menu ids, so `onSelect` takes `setPlace` without a cast. Each place keeps its own scroll position. Pass the page as `children`: it then scrolls in an inner scroller, which keeps the controls still during momentum scroll and lets the burger slide it aside. Without `children` the document scrolls and the controls follow it (see [Column mode](#column-mode-how-it-works)).
+Icons are yours, from any library (this example uses `lucide-react`): 21 to 22pt on round buttons match the system. `as const` types the menu ids, so `onSelect` takes `setPlace` without a cast. Each place keeps its own scroll position. `menu={{ ..., burger: false }}` drops the burger and lists the places in "…" under "Menu". Pass the page as `children`: it then scrolls in an inner scroller, which keeps the controls still during momentum scroll and lets the burger slide it aside. Without `children` the document scrolls and the controls follow it (see [Column mode](#column-mode-how-it-works)).
 
 On phones and browsers that are not an iPhone Duo in Safari or a Home Screen app, the same code renders the `inline` layout, so you may want to render `<Duet>` only where `useDuet().duo` is true (see [Server rendering](#server-rendering-and-hydration)).
 

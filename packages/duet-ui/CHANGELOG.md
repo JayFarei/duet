@@ -5,6 +5,8 @@
 The templated column (#181). Breaking: the chrome is rebuilt around one template, the same on every layout.
 
 - New `menu={{ items, selected, onSelect }}` (`DuetMenuItem<T>`): the burger heads the controls and opens the app's places in a sidebar, sliding the page (the inner scroller) aside by the screen's width in Safari's column and by min(340, 40% of the page) inline. Without `children` the sidebar comes over the page. Each place keeps its scroll position.
+- `menu.burger: false`: no burger; the places lead "…" under "Menu", as in the preview.
+- `duet-ui/package.json` is exported, so a site can show the installed version.
 - The template: burger, then actions while they fit, then "…" closing the group, the primary in its own group (at the thumb inline). "…" grows into its list on one interruptible spring (open 300/30, close 380/37, list and tint clear in 110ms) and any tap outside closes it. The in-app preview shows only "…", its list led by a "Menu" section, then "This page". Inline, "…" lists "Move controls left/right".
 - `primary` arms on the first tap into a 214pt tinted pill and runs on the second. `DuetPrimary` is now `DuetItem & { confirm?: string | false }`: the pill's label, or `false` to run at once. `prominent` and `expanded` are gone.
 - Glass ported from the column prototype: a sharp backdrop layer, a blended base (darken in light, lighten in dark) and a rim. Column groups follow the system appearance, menus the page's. Largely supersedes the measured strip and inline rim of 44b0719.
