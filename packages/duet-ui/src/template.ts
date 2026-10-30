@@ -92,7 +92,7 @@ export function frame(c: Context): Frame {
 export const extra = (f: Frame) => f.kind === "column" ? 2 * T.gap - 2 * RAIL.gap : 0;
 
 export interface Rect { x: number; y: number; w: number; h: number }
-/** `primary`: the primary's own tinted capsule (in a shared group only its slot is tinted). */
+/** `primary`: the primary's own capsule, placed at the strip's foot (in either form only its button is tinted). */
 export interface Placed { group: Group; rect: Rect; primary: boolean }
 
 /** In the column the stack centres in the band; elsewhere the menu heads the strip and the primary sits at its foot,

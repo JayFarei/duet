@@ -782,6 +782,12 @@ pnpm typecheck && pnpm test && pnpm build
 pnpm test:e2e
 ```
 
+### Primary in its own capsule
+
+**What happens:** where the primary has its own group (the open screen, the in-app preview filling it), a solid tinted circle with a coloured glow stood apart from the glass controls above it, while above "…" on the closed Duo the same button sat in a glass capsule.
+
+**What Duet does:** one look everywhere: a tinted button inside a glass capsule, with the same rim and shadow as the other controls (#213).
+
 ## License
 
 MIT. Not affiliated with Apple.

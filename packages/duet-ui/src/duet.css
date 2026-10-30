@@ -113,12 +113,8 @@
 .duet-group:has(.duet-btn:active)::before { background: var(--duet-lift); }
 .duet-btn[data-destructive] { color: #ff3b30; }
 
-/* The primary: a tinted button in a slot, on its own or sharing a capsule with "…". A tap grows it into its
-   confirmation box (the "…" morph, below). */
-.duet-group[data-primary] { background: var(--duet-tint); color: #fff; box-shadow: 0 6px 20px color-mix(in srgb, var(--duet-tint) 35%, transparent); }
-.duet-group[data-primary]::before, .duet-group[data-primary]::after { content: none; }
-.duet-group[data-primary] > .duet-rim { display: none; }
-.duet-group[data-primary]:has(.duet-btn:active) { scale: 1.05; }
+/* The primary: a tinted button in a glass capsule, on its own or sharing one with "…" (#213). A tap grows the capsule
+   into its confirmation box (the "…" morph, below). */
 .duet-row[data-cta]:not([data-armed]) > svg { color: var(--duet-tint); }
 .duet-cta-icon { display: grid; place-items: center; flex: none; width: 41px; height: 41px; border-radius: 50%; background: var(--duet-tint); color: #fff; font-size: var(--duet-icon-size); }
 .duet-confirm-head { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; box-sizing: border-box; font: 600 17px/1 -apple-system, system-ui, sans-serif; color: var(--duet-ink); white-space: nowrap; }

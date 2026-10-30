@@ -639,8 +639,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
           return (
             <div key={gi} className="duet-group" data-duet-slot={g.group.length === 1 ? g.group[0].kind : g.group[0].kind === "menu" ? "menu" : "actions"}
               data-primary={g.primary || undefined} data-morphing={(g === moreAt && drawsMenu) || (g === askAt && drawsAsk) || undefined}
-              style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...(g === askAt ? tint : undefined) }}>
-              {!g.primary && <i className="duet-rim" aria-hidden />}
+              style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h,  }}>
+              <i className="duet-rim" aria-hidden />
               {g.group.map((s, j) => (
                 <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined}
                   aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : s.kind === "primary" && p.primary!.confirm !== false ? ask === "open" : undefined}

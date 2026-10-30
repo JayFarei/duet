@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The primary in its own group is a tinted button in a glass capsule, like the one above "…", not a solid glowing circle (#213).
 - The primary's tap grows its button into a confirmation box beside the column (icon, `label`, a tinted `confirm` button), on the "…" spring; the button runs it and the box folds back.
 - The primary stays on screen in a slot: where its own group does not fit, it takes the burger's slot above "…", and the places move into the "…" list. It folds into "…" only where one button is all that fits.
 - The "…" list now leads with the page's section ("This page", "More"), the "Menu" section after it: with the list anchored to a capsule low on the screen, the places stay in the same spot on every page, whatever actions that page has.
