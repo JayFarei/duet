@@ -27,7 +27,7 @@ const row: CSSProperties = { display: "flex", alignItems: "center", gap: 12, wid
 
 export function BookDemo() {
   const desktop = useDesktop();
-  return desktop ? <WebDuo src="/book" title="Call to action" intro="Open a class: its page puts Book · 2 credits by the thumb and folds the rest into “…”. Book it and the button reshapes." />
+  return desktop ? <WebDuo src="/book" title="Call to action" intro="Open a class: its page puts Book by the thumb and folds the rest into “…”. Tap Book: the button grows into a confirmation, and booking folds it back as Booked." />
     : <div className={desktop === null ? "ssr-site" : undefined}><Book /></div>;
 }
 
@@ -54,14 +54,14 @@ function Book() {
   // The call to action is plain props: label, icon and tint change with the page's state.
   const primary: DuetPrimary | undefined = c && (isBooked
     ? { id: "booked", label: "Booked", icon: <Check size={22} />, tint: "#34c759", confirm: "Cancel booking", onPress: () => setBooked(toggle(booked, c.id)) }
-    : { id: "book", label: `Book · ${c.credits} credit${c.credits > 1 ? "s" : ""}`, icon: <CalendarCheck size={22} />, onPress: () => setBooked(toggle(booked, c.id)) });
+    : { id: "book", label: "Book", confirm: `Book with ${c.credits} credit${c.credits > 1 ? "s" : ""}`, icon: <CalendarCheck size={22} />, onPress: () => setBooked(toggle(booked, c.id)) });
 
   const page = c ? (
     <main key={c.id} style={{ paddingTop: "calc(24px + env(safe-area-inset-top))", paddingBottom: 140, ...bleed(20) }}>
       <div style={{ height: 180, borderRadius: 20, background: "linear-gradient(135deg, #ff9f0a, #ff375f)", marginBottom: 20 }} />
       <h1 style={title}>{c.name}</h1>
       <p style={{ ...dim, marginBottom: 16 }}>{c.when} · {c.credits} credit{c.credits > 1 ? "s" : ""}</p>
-      <p style={dim}>The page passes a primary, so the controls hold one call to action in its own group. The first tap arms it into a labelled pill, the second books. Share and Favourite are folded into “…” even where there is room for them. {isBooked ? "Booked: tap the green button twice to cancel." : "Tap the button twice to book; the label, icon and tint change on a spring."}</p>
+      <p style={dim}>The page passes a primary, so the controls hold one call to action: its own capsule where there is room, else leading “…” in one capsule, the menu folding into the list. A tap grows it into a confirmation box beside the column; confirming books and the box folds back into the capsule, now Booked. Share and Favourite are folded into “…” even where there is room for them. {isBooked ? "Booked: tap the green button, then Cancel booking, to cancel." : "Tap Book, then Book with credits."}</p>
     </main>
   ) : (
     <main style={{ paddingTop: "calc(24px + env(safe-area-inset-top))", paddingBottom: 140, ...bleed(20) }}>

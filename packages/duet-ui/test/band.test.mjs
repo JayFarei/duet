@@ -50,8 +50,10 @@ for (const [name, c] of Object.entries(CONTEXTS)) {
       assert.equal(slots.filter((x) => x.kind === "action").length, t.shown, why);
       // Whatever is not on screen is behind "…".
       if (t.shown < s.actions || (s.primary && !t.primary) || s.rest) assert.ok(has("more"), `hidden items with no "…": ${why}`);
-      // One button of room keeps "…", which then lists the menu's places too.
-      if (s.menu && bottom - top + 2 * slack >= TEMPLATE.control + TEMPLATE.item) assert.ok(has("menu"), `no burger: ${why}`);
+      // One button of room keeps "…", which then lists the menu's places too. Two keep the burger, unless the primary
+      // leads "…" in one capsule (no room for its own group), the burger folding into the list.
+      const leads = t.groups.some((g) => g.length > 1 && g[0].kind === "primary");
+      if (s.menu && !leads && bottom - top + 2 * slack >= TEMPLATE.control + TEMPLATE.item) assert.ok(has("menu"), `no burger: ${why}`);
       // The primary folds only when no arrangement keeps it.
       if (s.primary && !t.primary) assert.ok(bottom - top < 2 * TEMPLATE.control + DUO.gap + (s.menu ? TEMPLATE.item : 0), `primary folded needlessly: ${why}`);
     }

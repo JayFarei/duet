@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- The primary's tap grows its capsule into a confirmation box beside the column (icon, `label`, a tinted `confirm` button) on the "…" menu's spring; the button runs `onPress` and the box folds back into the capsule in whatever state the page passes next. It replaces the 214pt armed pill. The capsule shows the icon on a tinted disc (#206).
+- Closed column with a menu: the primary leads "…" in one capsule (the burger folding into the list) instead of folding into "…", so the call to action stays visible. `allocate` reports `primary: true` then (#206).
+- Breaking: the pure export `pillRect` is replaced by `confirmBox(frame, from)`.
+- Site: every mailbox in the panes demo opens its own list (#204); the Column notes sheet runs under Safari's address bar to the screen's bottom with a lighter top blur (#205); the book demo shows Book, then "Book with N credits" in the box (#206).
+
 ## 0.6.1
 
 Everything from 0.6.1-rc.1 to 0.6.1-rc.3.

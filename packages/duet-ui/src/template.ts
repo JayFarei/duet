@@ -3,8 +3,8 @@
 import { DUO, RAIL, columnBand, type Context, type Side } from "./geometry.ts";
 
 /** Duo metrics: button, stacked item pitch, gap between groups, strip centre from the edge, menu row, list pad and
- *  header, menu width, and the armed primary's pill width. */
-export const TEMPLATE = { control: DUO.control, item: DUO.groupItem, gap: DUO.gap, edge: DUO.centerFromEdge, row: 44, pad: 6, head: 26, menuWidth: 232, pill: 214 } as const;
+ *  header, and menu width. */
+export const TEMPLATE = { control: DUO.control, item: DUO.groupItem, gap: DUO.gap, edge: DUO.centerFromEdge, row: 44, pad: 6, head: 26, menuWidth: 232 } as const;
 const T = TEMPLATE;
 
 /** A group of n buttons in one capsule. */
@@ -31,7 +31,9 @@ export type Slot = { kind: "menu" } | { kind: "more" } | { kind: "close" } | { k
 export type Group = Slot[];
 
 /** The roomiest arrangement that fits `h`: every action shown, then fewer with "…" closing the group. The primary
- *  keeps its own group while any arrangement leaves room for it, else it joins the "…" list. Most actions shown wins.
+ *  keeps its own group while any arrangement leaves room for it, else (unsplit: the column) it leads one capsule with
+ *  "…", the burger folding into the list (the closed Duo's band holds two buttons), else it joins the "…" list. Most
+ *  actions shown wins.
  *  `split`: a lone menu button breaks ties (inline; in the column a second capsule's gap would push the stack toward
  *  Safari's own buttons). `rest`: the list holds items whatever fits, so "…" always shows. `extra`: what a lone group
  *  may take beyond `h`. */
@@ -48,10 +50,11 @@ export function allocate(h: number, n: number, o: { menu?: boolean; primary?: bo
       const tail = k < n || o.rest || (o.primary && !p.length) ? [M] : [];
       if (o.split && o.menu) add([B, [...it(k), ...tail], ...p], k, bonus + k * 10 + 1);
       add([[...B, ...it(k), ...tail], ...p], k, bonus + k * 10);
+      if (p.length && !o.split) add([[...P, ...it(k), M]], k, 500 + k * 10);
     }
   }
   const fit = tries.filter((t) => height(t.groups) <= h + (t.groups.length === 1 ? o.extra ?? 0 : 0)).sort((a, b) => b.score - a.score)[0];
-  if (fit) return { groups: fit.groups, shown: fit.shown, primary: fit.groups.some((g) => g[0].kind === "primary") };
+  if (fit) return { groups: fit.groups, shown: fit.shown, primary: fit.groups.some((g) => g.some((s) => s.kind === "primary")) };
   return { groups: [[...B, M].slice(-Math.max(1, Math.floor((h + (o.extra ?? 0) - T.control) / T.item) + 1))], shown: 0, primary: false };
 }
 
@@ -89,6 +92,7 @@ export function frame(c: Context): Frame {
 export const extra = (f: Frame) => f.kind === "column" ? 2 * T.gap - 2 * RAIL.gap : 0;
 
 export interface Rect { x: number; y: number; w: number; h: number }
+/** `primary`: the primary's own tinted capsule (not one it leads with "…"). */
 export interface Placed { group: Group; rect: Rect; primary: boolean }
 
 /** In the column the stack centres in the band; elsewhere the menu heads the strip and the primary sits at its foot,
@@ -99,7 +103,7 @@ export function place(f: Frame, groups: Group[]): Placed[] {
   const x = f.cx - T.control / 2;
   let y = f.kind === "column" ? f.top + (f.bottom - f.top - total) / 2 : f.top;
   return groups.map((group, i) => {
-    const primary = group[0]?.kind === "primary";
+    const primary = group.length === 1 && group[0].kind === "primary";
     const top = primary && f.kind === "inline" ? f.bottom - T.control : y;
     y += heights[i] + T.gap;
     return { group, rect: { x, y: top, w: T.control, h: heights[i] }, primary };
@@ -115,12 +119,11 @@ export function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
   return { x, y: Math.min(Math.max(y, Math.max(f.insetTop, 12)), f.ph - 12 - h), w, h };
 }
 
-/** The armed primary: a pill growing from its capsule toward the page. */
-export const pillRect = (r: Rect, side: Side): Rect => ({ ...r, x: side === "right" ? r.x + T.control - T.pill : r.x, w: T.pill });
+/** The primary's confirmation: its capsule grows into this box beside it, its label over a `confirm` button. */
+export const confirmBox = (f: Frame, from: Rect): Rect => menuBox(f, from, 2, 0);
 
-/** What a tap on the primary does: the first arms it (its label turns to `confirm`), the second runs it; `confirm:
- *  false` runs at once. The same rule holds for its own capsule and for its row in "…" when the band has no room
- *  for it (#191). */
+/** What a tap on the primary's row in "…" does (the band has no room for its capsule): the first arms it (its label
+ *  turns to `confirm`), the second runs it; `confirm: false` runs at once (#191). */
 export const primaryTap = (armed: boolean, confirm?: string | false): "arm" | "run" => armed || confirm === false ? "run" : "arm";
 
 /** The whole template for one frame: a sheet's lone close (when the band has room; the preview's gap holds one), the preview's lone "…", the

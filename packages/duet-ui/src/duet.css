@@ -101,7 +101,7 @@
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 /* Groups reshape on GROUP's spring (--duet-group, set by chrome.tsx from template.ts), so a page change, the sidebar
-   or the armed primary reads as one elastic motion. */
+   or the confirmation box reads as one elastic motion. */
 .duet-group {
   border-radius: 25px; overflow: hidden; box-shadow: var(--duet-glass-edge), var(--duet-shadow-control);
   transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left var(--duet-group-ms) var(--duet-group), width var(--duet-group-ms) var(--duet-group),
@@ -113,20 +113,17 @@
 .duet-group:has(.duet-btn:active)::before { background: var(--duet-lift); }
 .duet-btn[data-destructive] { color: #ff3b30; }
 
-/* The primary: a tinted capsule. The first tap arms it into a pill toward the page that says what a second tap does. */
+/* The primary: a tinted capsule, or a tinted disc leading "…" in one capsule where the band holds two buttons. A tap
+   grows it into its confirmation box (the "…" morph, below). */
 .duet-group[data-primary] { background: var(--duet-tint); color: #fff; box-shadow: 0 6px 20px color-mix(in srgb, var(--duet-tint) 35%, transparent); }
 .duet-group[data-primary]::before, .duet-group[data-primary]::after { content: none; }
 .duet-group[data-primary] > .duet-rim { display: none; }
-.duet-cta { display: flex; align-items: center; justify-content: flex-end; gap: 10px; width: 100%; height: 100%; padding: 0 14px; box-sizing: border-box; color: #fff; }
-.duet-cta-icon { display: grid; place-items: center; flex: none; color: #fff; font-size: var(--duet-icon-size); }
-.duet-cta-label {
-  font: 600 17px/1 -apple-system, system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 0; opacity: 0; filter: blur(6px);
-  transition: max-width var(--duet-group-ms) var(--duet-group), opacity 220ms ease 80ms, filter 260ms ease 80ms;
-}
-.duet-cta:not([data-armed]) { justify-content: center; padding: 0; }
-.duet-cta[data-armed] { justify-content: center; }
-.duet-cta[data-armed] .duet-cta-label { max-width: 160px; opacity: 1; filter: none; }
-.duet[data-side="right"] .duet-cta[data-armed] { flex-direction: row-reverse; }
+.duet-cta-icon { display: grid; place-items: center; flex: none; width: 41px; height: 41px; border-radius: 50%; background: var(--duet-tint); color: #fff; font-size: var(--duet-icon-size); }
+.duet-confirm-head { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; box-sizing: border-box; font: 600 17px/1 -apple-system, system-ui, sans-serif; color: var(--duet-ink); white-space: nowrap; }
+.duet-confirm-head > svg { width: var(--duet-icon-size); height: var(--duet-icon-size); flex: none; color: var(--duet-tint); }
+.duet-confirm-head > span { overflow: hidden; text-overflow: ellipsis; }
+.duet .duet-row.duet-confirm { justify-content: center; background: var(--duet-tint); color: #fff; font-weight: 600; border-radius: 22px; }
+.duet .duet-row.duet-confirm:active { background: color-mix(in srgb, var(--duet-tint) 80%, #000); }
 
 /* The "…" morph: the capsule hides and the blob takes its place, starting as the capsule (its glass, its buttons on
    .duet-face) and ending as the menu (.duet-fill brings the tint), its list centred at the final size. chrome.tsx
@@ -392,7 +389,7 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
   .duet-group[data-enter] { animation: duet-appear 0.2s ease-out backwards; }
   .duet-group[data-leaving] { animation: duet-vanish 0.2s ease-in forwards; }
   .duet-group[data-enter] > button, .duet-group[data-leaving] > button { animation: none; }
-  .duet-group, .duet .duet-btn, .duet-cta-label, .duet-sidebar, .duet-scroller { transition: none; }
+  .duet-group, .duet .duet-btn, .duet-sidebar, .duet-scroller { transition: none; }
 }
 @keyframes duet-appear { from { opacity: 0; } }
 @keyframes duet-vanish { to { opacity: 0; } }

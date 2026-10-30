@@ -225,7 +225,7 @@ import { bootScript } from "duet-ui/boot";
 | --- | --- | --- |
 | `menu` | `{ items, selected, onSelect }` | The app's places (`DuetMenuItem[]`). The burger heads the controls and opens them in a sidebar, sliding the page aside. Each place keeps its scroll position |
 | `actions` | `DuetItem[]` | Round buttons under the burger while they fit, the rest in "…". `destructive: true` items only show in "…", last, in red; `folded: true` items only in "…" |
-| `primary` | `DuetPrimary` | The screen's main action, a tinted round button in its own group (at the thumb inline). The first tap arms it into a 214pt labelled pill, the second runs it, see [Call to action](#call-to-action). Folds into "…" when no arrangement keeps it |
+| `primary` | `DuetPrimary` | The screen's main action, a tinted round button in its own group (at the thumb inline). A tap grows it into a confirmation box whose button runs it, see [Call to action](#call-to-action). Leads "…" in one capsule where its own group does not fit, and folds into "…" when even that does not |
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the controls hold only a close button until it is cleared |
 | `appearance` | `"auto" \| "light" \| "dark"` | Light or dark, like `overrideUserInterfaceStyle`. Default `"auto"`: follow the system. `dark` (boolean) still works but is deprecated |
 | `tint` | `string` | Accent for the selected place, the primary button and checked menu rows, like iOS's `tintColor`. Default: system blue |
@@ -233,11 +233,11 @@ import { bootScript } from "duet-ui/boot";
 | `reserve` | `boolean` | Default `true`: the page keeps clear of the controls (`--duet-inset-*`, `<html>` margins). `false` lets it run under them |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
-`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey. `DuetMenuItem<T>` is `{ id: T, label, icon?, badge?, badgeTone? }`. `DuetPrimary` is a `DuetItem` plus `confirm?: string | false`: the armed pill's label (default `label`), or `false` to run on the first tap.
+`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey. `DuetMenuItem<T>` is `{ id: T, label, icon?, badge?, badgeTone? }`. `DuetPrimary` is a `DuetItem` plus `confirm?: string | false`: the confirmation box's button label (default `label`), or `false` to run on the first tap.
 
 ### The template
 
-One template on every layout, the same in Safari's column, the strip, inline and split view: the burger first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time, then the primary. The in-app preview's gap holds one button, so it shows only "…", whose list leads with a "Menu" section (the places), then "This page". "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `menuBox`, `pillRect`) for tests and custom chrome.
+One template on every layout, the same in Safari's column, the strip, inline and split view: the burger first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time; then the primary leads "…" in one capsule (the burger folding into the list, its places under "Menu"), and only then folds into "…" itself. The in-app preview's gap holds one button, so it shows only "…", whose list leads with a "Menu" section (the places), then "This page". "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`) for tests and custom chrome.
 
 ### Theming
 
@@ -281,11 +281,12 @@ A page with one thing to do (book, buy, join) passes it as its primary, and fold
     { id: "share", label: "Share", icon: <Share />, onPress: share, folded: true },
     { id: "fav", label: "Favourite", icon: <Heart />, onPress: fav },
   ]}
-  primary={{ id: "book", label: "Book", confirm: `Book · ${credits} credits`, icon: <CalendarCheck />, onPress: book }}
+  primary={{ id: "book", label: "Book", confirm: `Book with ${credits} credits`, icon: <CalendarCheck />, onPress: book }}
 />
 ```
 
-- The first tap arms it: the round button grows toward the page into a 214pt tinted pill with icon and `confirm` (or `label`). The second tap runs `onPress`. A tap anywhere else disarms it. `confirm: false` runs on the first tap.
+- A tap grows the capsule into a confirmation box beside the column, on the same spring as "…": the icon and `label`, then a tinted button reading `confirm` (or `label`). The button runs `onPress` and the box folds back into the capsule, which now shows whatever the page passes next (a green Booked check, say). A tap anywhere else closes the box. `confirm: false` runs on the first tap, with no box.
+- Where its own group does not fit (the closed column with a menu), the primary leads "…" in one capsule, the burger folding into the list, so the call to action stays on screen.
 - Folded into "…" (no room for its own group), it arms the same way: the first tap tints its row and turns its label to `confirm`, the list stays open, the second tap runs it and closes the list. Closing the list disarms it. See [Folded primary runs at once](#folded-primary-runs-at-once).
 - `tint` on the primary overrides the accent for it alone. Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop.
 
@@ -297,7 +298,7 @@ Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wid
 
 ### Lower-level exports
 
-`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `pillRect`, `groupHeight` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`, `groupHeight` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
 
 `readSignals()` returns the current `Signals` from the window, the same reading the chrome uses (browser only). `watchSignals(cb)` calls `cb` whenever they may have changed, with the triggers and settle polling described in [Which mode](#which-mode), and returns the unsubscribe. Together with `detect` they let a page act on the mode before React mounts:
 
@@ -732,6 +733,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** the tint layer inherits the menu's radius at every frame of the morph.
 - **You do:** nothing.
 - **Status:** [#198](https://github.com/JayFarei/duet/issues/198).
+
+### Call to action hidden in the closed column
+
+- **You see:** without the handling, on the closed Duo in Safari's column with a menu and a primary, there is no call to action: the band holds only the burger and "…", and the primary is a row inside "…". Where it did show, its first tap grew a 214pt pill that read poorly beside the column.
+- **Cause:** the band is 92pt (104 for a lone group), and the burger group plus the primary's own group need 160.7pt, so the allocator folded the primary first.
+- **Duet does:** before folding the primary, tries it leading "…" in one capsule (100.7pt), the burger folding into the list with its places under "Menu". A tap on the primary grows the capsule into a confirmation box (`confirmBox`, beside the column like the "…" menu) holding the icon, `label` and a tinted `confirm` button; the button runs `onPress` and the box folds back into the capsule.
+- **You do:** nothing. Pass the confirmed state as the next `primary` (label, icon, tint) and it shows in the capsule as the box folds.
+- **Status:** [#206](https://github.com/JayFarei/duet/issues/206).
 
 ## Limitations
 
