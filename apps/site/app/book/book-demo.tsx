@@ -31,7 +31,7 @@ export function BookDemo() {
     : <div className={desktop === null ? "ssr-site" : undefined}><Book /></div>;
 }
 
-// The open class lives in the URL (?c=yoga, the list is ?c=list, none opens the sauna), so the back gesture and Duet's Classes action walk the same history.
+// The open class lives in the URL (?c=yoga, the list is ?c=list, none opens the sauna), so the back gesture and Duet's Back action walk the same history.
 function Book() {
   const [tab, setTab] = useState<Tab>("home");
   const [open, setOpen] = useState<string | null>("sauna");
@@ -80,7 +80,7 @@ function Book() {
       menu={{ items: TABS, selected: tab, onSelect: (t) => { setTab(t); if (c) go("list"); } }}
       primary={primary}
       actions={c ? [
-        { id: "back", label: "Classes", icon: <ArrowLeft size={22} />, onPress: () => history.back() },
+        { id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: () => history.back() },
         { id: "share", label: "Share", icon: <Share size={22} />, folded: true },
         { id: "like", label: liked.has(c.id) ? "Unfavourite" : "Favourite", icon: <Heart size={22} fill={liked.has(c.id) ? "currentColor" : "none"} />, folded: true, onPress: () => setLiked(toggle(liked, c.id)) },
       ] : [{ id: "share", label: "Share", icon: <Share size={22} /> }]}>
