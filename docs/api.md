@@ -48,7 +48,8 @@ Every prop writes a CSS custom property on `.duet`, so plain CSS can set the sam
 | `--duet-icon-weight` | Stroke width of SVG line icons | `2` |
 | `--duet-badge`, `--duet-badge-neutral`, `--duet-badge-ink` | Badge fills (alert, neutral) and text | red, grey, white |
 | `--duet-solid` | Opaque surface: menus in Safari's column, the badge ring | near white / near black |
-| `--duet-frost`, `--duet-menu` | Glass veil of controls and of menus | sampled from iOS |
+| `--duet-frost` | Glass veil of controls | sampled from iOS |
+| `--duet-menu` | Tint of the open menu, over its blur | 62% white, or 62% near-black in dark |
 | `--duet-sel`, `--duet-lift` | Selection and press highlight | sampled from iOS |
 
 ```css

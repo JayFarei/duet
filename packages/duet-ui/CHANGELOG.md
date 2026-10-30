@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The open "…" menu is legible by default: the panel blurs what is behind it and `--duet-menu` now defaults to a 62% tint in both themes, not transparent. The rail keeps its clear glass. Override `--duet-menu` to change the tint (#184).
+
 ## 0.7.1
 
 Everything from 0.7.1-rc.1, unchanged.
