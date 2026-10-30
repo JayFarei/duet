@@ -299,7 +299,11 @@ function unfoldedPreview(s: Signals): "wide" | "tall" | undefined {
  *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
 const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
-export const isDuo = (s: Signals) => isIOS(s) !== false && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
+export const isDuo = (s: Signals) => isIOS(s) !== false && !besideColumn(s) && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
+/** An app's web view that stops at the status column on the closed screen, upright (X's sheet: outer 382 of 466, real
+ *  Duo, #243). Nothing past its edge is drawn, so the column is out of reach: the page gets what any other phone gets. */
+const besideColumn = (s: Signals) => browserOf(s.userAgent) === "webview" && !s.standalone && (s.angle ?? 0) === 0
+  && Math.min(s.screenWidth, s.screenHeight) === DUO_SIZES[0][0] && Math.max(s.screenWidth, s.screenHeight) === DUO_SIZES[0][1] && Math.abs(s.outerWidth - (DUO_SIZES[0][0] - 84)) <= 1;
 
 /** iOS has no model in its UA, so the sizes above say Duo; the UA says iPhone. Safari's "Request Desktop Website"
  *  sends a Mac UA, told from a Mac by touch. undefined when the signals carry no UA. */

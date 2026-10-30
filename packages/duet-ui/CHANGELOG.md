@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- X's sheet on the closed Duo, upright: no longer counts as a Duo. Its web view stops at the status column, so the controls could never reach it. `useDuet().duo` is false and `device` is `iphone`, so an app's phone layout applies (#243).
+
 ## 0.7.1
 
 Everything from 0.7.1-rc.1, unchanged.

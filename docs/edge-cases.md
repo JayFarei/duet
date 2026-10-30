@@ -427,9 +427,9 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** in X's sheet on the closed Duo upright, the burger and "…" sit inside the page at its top right, and the status column beside them is empty apart from the clock and wifi. The page's content is also narrower than the sheet.
 - **Cause:** measured on a real Duo, X's web view is 382pt wide (inner 382x422, outer 382x477, screen 466x678, sheet pulled down 382x587). Unlike a Safari tab (outer 466), its frame stops at the column, and a test page's fixed element is clipped at x=382, whatever it does. No page can draw there.
-- **Duet does:** `inline`, as in any window it has no column for: the controls in a strip at the page's right edge, which takes 84pt of the 382pt.
-- **You do:** nothing. A web page can't change this, only X can.
-- **Status:** [#243](https://github.com/JayFarei/duet/issues/243). Reproduced by the `xsheet` e2e scenario, whose host uses this frame closed upright. Other sizes in X's sheet are not measured.
+- **Duet does:** treats the window as not a Duo: `useDuet().duo` is false and `device` is `iphone`, so the page gets what any other phone gets. An app that renders `<Duet>` only where `duo` is true keeps its own navigation; one that always renders it gets `inline`.
+- **You do:** nothing, as long as your app handles phones. Only X can give the page the column.
+- **Status:** [#243](https://github.com/JayFarei/duet/issues/243). Reproduced by the `xsheet` e2e scenario, whose host uses this frame closed upright. Other sizes in X's sheet are not measured, so they still count as a Duo.
 
 ## Square backing behind the open menu
 
