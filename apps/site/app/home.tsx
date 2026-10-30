@@ -42,11 +42,13 @@ const ISLANDS: [string, string, string, string][] = [
 
 /** One page for every screen, navigated by its own Duet controls, with the web Duo playing on a stage. On a Duo too:
  *  the page is a demo there already, and the stage lets the reader try every other posture on the device (#165). */
-export function Home({ downloads }: { downloads: number | null }) {
-  return <Site downloads={downloads} />;
+export type InstallStats = { total: number; daily: number[] };
+
+export function Home({ installs }: { installs: InstallStats | null }) {
+  return <Site installs={installs} />;
 }
 
-function Site({ downloads }: { downloads: number | null }) {
+function Site({ installs }: { installs: InstallStats | null }) {
   const [tab, setTab] = useState("top");
   // A portrait iPhone gets an iPhone's bars, with a button to try the Duo's side controls on it.
   const { device, width, height } = useDuet();
@@ -55,7 +57,7 @@ function Site({ downloads }: { downloads: number | null }) {
   const { tint } = useTint();
   const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
   const portrait = device === "iphone" && height > width;
-  if (portrait && !sides) return <Bars downloads={downloads} tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
+  if (portrait && !sides) return <Bars installs={installs} tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
       menu={{ items: SECTIONS, selected: tab, onSelect: go, burger: false }}
@@ -68,14 +70,14 @@ function Site({ downloads }: { downloads: number | null }) {
       tint={tint}
     >
       {/* On a portrait iPhone the side controls float over the page, which keeps the layout of the bars. */}
-      {portrait ? <div className="float"><Page downloads={downloads} /></div> : <Page downloads={downloads} />}
+      {portrait ? <div className="float"><Page installs={installs} /></div> : <Page installs={installs} />}
     </Duet>
   );
 }
 
 /** The page as an iPhone app would show it: actions in a top bar, sections in a tab bar at the bottom. The document
  *  itself scrolls, so the page runs on under Safari's toolbar. */
-function Bars({ downloads, tab, setTab, go, onSides, theme }: { downloads: number | null; tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void; theme: ReturnType<typeof useTheme> }) {
+function Bars({ installs, tab, setTab, go, onSides, theme }: { installs: InstallStats | null; tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void; theme: ReturnType<typeof useTheme> }) {
   useEffect(() => {
     // Duet leaves its insets on <html> when it steps aside; here nothing floats beside the page.
     const html = document.documentElement;
@@ -93,7 +95,7 @@ function Bars({ downloads, tab, setTab, go, onSides, theme }: { downloads: numbe
   }, [setTab]);
   return (
     <div className="bars">
-      <Page downloads={downloads} />
+      <Page installs={installs} />
       <div className="bar-top">
         <button className="bar-glass bar-try" onClick={onSides}><PanelRight size={18} />Side controls</button>
         <span className="bar-end">
@@ -112,21 +114,20 @@ function Bars({ downloads, tab, setTab, go, onSides, theme }: { downloads: numbe
   );
 }
 
-function Page({ downloads }: { downloads: number | null }) {
+function Page({ installs }: { installs: InstallStats | null }) {
   return (
     <main>
       <section id="top" className="hero" style={column(980, 20)}>
-        <a className="eyebrow" href="https://www.npmjs.com/package/duet-ui" target="_blank" rel="noreferrer">
-          <b>duet-ui</b><span>{pkg.version}</span>
-          {downloads !== null && <span>{downloads.toLocaleString("en-US")} downloads<i> last month</i></span>}
-        </a>
         <h1 className="display">
           Native-feeling controls for web apps on the <em>iPhone Duo.</em>
         </h1>
         <p className="lede">A React library that approximates the Duo&apos;s native side controls.</p>
-        <div className="ctas">
-          <AgentPrompt />
-          <Npm />
+        <div className="actions">
+          <div className="ctas">
+            <AgentPrompt />
+            <Npm />
+          </div>
+          <Stats installs={installs} />
         </div>
       </section>
 
@@ -163,6 +164,35 @@ function Page({ downloads }: { downloads: number | null }) {
 }
 
 /** The OpenMake footer shared with RegTail and OpenTraces: credit on the left, product wordmark on the right. */
+/** The installs line and its faint area, after the OpenTraces hero: relative momentum, so no axes. */
+function Sparkline({ values }: { values: number[] }) {
+  const W = 240, H = 56, PAD = 6;
+  const min = Math.min(...values), span = Math.max(...values) - min || 1;
+  const line = values.length < 2 ? `M0 ${H / 2} L${W} ${H / 2}`
+    : values.map((v, i) => `${i ? "L" : "M"}${((i * W) / (values.length - 1)).toFixed(1)} ${(H - PAD - ((v - min) / span) * (H - 2 * PAD)).toFixed(1)}`).join(" ");
+  return (
+    <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+      <defs><linearGradient id="spark-fade" x1="0" y1="0" x2="0" y2="1"><stop className="spark-fade-top" offset="0" /><stop className="spark-fade-end" offset="1" /></linearGradient></defs>
+      {values.length > 1 && <path className="spark-area" d={`${line} L${W} ${H} L0 ${H} Z`} />}
+      <path className="spark-line" d={line} vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+/** Version and installs mirrored around the sparkline, the width of the buttons above. */
+function Stats({ installs }: { installs: InstallStats | null }) {
+  const total = installs && new Intl.NumberFormat("en-US", { notation: installs.total >= 1000 ? "compact" : "standard", maximumFractionDigits: 1 }).format(installs.total);
+  return (
+    <a className="stats" href="https://www.npmjs.com/package/duet-ui" target="_blank" rel="noreferrer">
+      <span className="stat"><span className="stat-label">Version</span><span className="stat-value">{pkg.version}</span></span>
+      {installs && <>
+        <span className="stat-spark"><Sparkline values={installs.daily} /></span>
+        <span className="stat" title="npm downloads, last 30 days"><span className="stat-label">Installs</span><span className="stat-value">{total}</span></span>
+      </>}
+    </a>
+  );
+}
+
 function Footer() {
   return (
     <footer className="foot" style={column(980, 20)}>
