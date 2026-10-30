@@ -429,7 +429,7 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   // token, chrome 0, inset top 0, iOS 27.1): the status column (clock, island, Live Activities) is over the page's right
   // edge, and nothing native says so. The controls start below it, where a Home Screen app's strip does (#194). Open
   // tall, the status row heads the page and the controls already start below it.
-  // X's current in-app browser is shorter: a full-width web view on the screen's top 61%, its bar and the tweet card
+  // A shorter form, X's in-app browser in early 2026-10: a full-width web view on the screen's top 61%, its bar and the tweet card
   // below (#194, 466x413 closed). Only the width says so, and the short page reads landscape.
   const statusOver = duo && !s.standalone && side === "right"
     && ((!landscape && closedWhole(s)) || openWideWhole(s) || (browser === "webview" && topWebview(s)));

@@ -29,7 +29,7 @@ test("web view, closed, upright, controls on the left: nothing to clear", () => 
   assert.equal(detect(sig(), "left").clearTop, undefined);
 });
 
-// X's in-app browser as of 2026-10 (user's report on #194, e2e host style "xsheet"): the web view is full width on the
+// X's in-app browser early in 2026-10 (user's report on #194; since measured at 382pt wide, #243): the web view is full width on the
 // screen's top 61%, X's bar and the tweet card below it, so the page reads 466x413 and landscape.
 // Measured (e2e xsheet, 2026-10-30): closed upright inner = outer = 466x414, screen 678x466, inset right 84, bottom 0;
 // open wide 951x408, screen still 678x466, angle 270.

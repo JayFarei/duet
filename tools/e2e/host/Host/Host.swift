@@ -61,8 +61,9 @@ final class WebPreview: UIViewController {
   }
 }
 
-// X's in-app browser as of 2026-10: full screen, the WKWebView on its top 61% (413 of the closed screen's 678pt),
-// X's bar (back, site, reload) under it, the tweet card filling the rest.
+// X's in-app browser as of 2026-10, measured on a real Duo closed upright: the WKWebView is 382 of the screen's 466pt,
+// the status column outside it, on its top 70% (477 of 678pt), X's bar (back, site, reload) over its foot, the tweet
+// card filling the rest. Other sizes are not measured: full width.
 final class XSheet: UIViewController {
   let url: URL, web = WKWebView(frame: .zero), bar = UILabel(), card = UIView()
   init(_ url: URL) { self.url = url; super.init(nibName: nil, bundle: nil); modalPresentationStyle = .fullScreen }
@@ -80,10 +81,10 @@ final class XSheet: UIViewController {
     [web, bar, card].forEach(view.addSubview)
   }
   override func viewDidLayoutSubviews() {
-    let b = view.bounds, h = (b.height * 0.61).rounded()
-    web.frame = CGRect(x: 0, y: 0, width: b.width, height: h)
-    bar.frame = CGRect(x: 0, y: h, width: b.width, height: 52)
-    card.frame = CGRect(x: 0, y: h + 60, width: b.width, height: max(0, b.height - h - 60))
+    let b = view.bounds, h = (b.height * 0.70).rounded(), w = b.width == 466 ? 382 : b.width
+    web.frame = CGRect(x: 0, y: 0, width: w, height: h)
+    bar.frame = CGRect(x: 0, y: h - 55, width: w, height: 55)
+    card.frame = CGRect(x: 0, y: h, width: b.width, height: max(0, b.height - h))
   }
 }
 

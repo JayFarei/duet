@@ -418,10 +418,18 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 ## An app's own web view (a link opened in X)
 
 - **You see:** on the closed Duo upright, or the open Duo wide, the burger and "…" sit under the clock, wifi and battery at the top right.
-- **Cause:** some apps (X among them) open links in their own `WKWebView`, not in Safari's in-app preview, from the screen's top edge: edge to edge, or (X since 2026-10) on the top 61% with the app's bar and the post below it (466x413 closed). There is no Safari column, no bar above the page and a top inset of 0, so nothing tells the page that the Duo's status column (and Live Activities in the island under it) covers its right edge.
+- **Cause:** some apps (X among them) open links in their own `WKWebView`, not in Safari's in-app preview, from the screen's top edge: edge to edge, or on the top part with the app's bar and the post below it (466x413 closed). There is no Safari column, no bar above the page and a top inset of 0, so nothing tells the page that the Duo's status column (and Live Activities in the island under it) covers its right edge.
 - **Duet does:** a page that is the whole closed screen upright, or an app's web view as wide as it whatever its height, not a Home Screen app, with the controls on the right, keeps them below the status column at its worst (the island with Live Activities, 265pt), where a Home Screen app's strip starts. The same holds on the open screen, wide (951 wide). Open tall the status row heads the page and the controls already start below it.
 - **You do:** nothing. Moving the controls left drops the allowance, nothing native is there.
 - **Status:** [#194](https://github.com/JayFarei/duet/issues/194).
+
+## X's sheet: a web view that stops before the status column
+
+- **You see:** in X's sheet on the closed Duo upright, the burger and "…" sit inside the page at its top right, and the status column beside them is empty apart from the clock and wifi. The page's content is also narrower than the sheet.
+- **Cause:** measured on a real Duo, X's web view is 382pt wide (inner 382x422, outer 382x477, screen 466x678, sheet pulled down 382x587). Unlike a Safari tab (outer 466), its frame stops at the column, and a test page's fixed element is clipped at x=382, whatever it does. No page can draw there.
+- **Duet does:** `inline`, as in any window it has no column for: the controls in a strip at the page's right edge, which takes 84pt of the 382pt.
+- **You do:** nothing. A web page can't change this, only X can.
+- **Status:** [#243](https://github.com/JayFarei/duet/issues/243). Reproduced by the `xsheet` e2e scenario, whose host uses this frame closed upright. Other sizes in X's sheet are not measured.
 
 ## Square backing behind the open menu
 

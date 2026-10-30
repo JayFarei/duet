@@ -1196,7 +1196,7 @@ class Run:
     def scenario_webview(s, style="webview"):
         """An app's own WKWebView on the closed screen (X's link preview, #194): inline right, every control below the
         status column, with and without a Live Activity in the island. style webview: over the whole screen (X before
-        2026-10); xsheet: on its top 61%, X's bar and the tweet card below it (X since)."""
+        2026-10); xsheet: 382pt wide, out of the status column, on its top 70%, X's bar over its foot and the tweet card below (X since, measured on a real Duo, #243)."""
         n = style
         t = s.tok(n)
         exp = {"preview": False, "mode": "inline", "side": "right"}
