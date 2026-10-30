@@ -36,7 +36,7 @@ section[id] { scroll-margin-top: 24px; }
 .pill-solid { background: var(--ink); color: var(--bg); box-shadow: none; }
 /* "Copy prompt", after the OpenTraces button: a tilted deck of agent glyphs that fans out on hover, and a face that
    flips to "Copied". Ours is a card pill with system blue ink in SF, and the deck springs open the way iOS menus do. */
-.pill-cta { position: relative; overflow: hidden; color: var(--cta); white-space: nowrap; font-weight: 600; padding: 0 22px 0 18px; transition: scale 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.pill-cta { position: relative; overflow: hidden; color: var(--cta); white-space: nowrap; font-weight: 600; transition: scale 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
 .pill-cta:active { scale: 0.96; transition-duration: 0.1s; }
 .cta-face { display: inline-flex; align-items: center; gap: 12px; transition: opacity 0.2s, translate 0.35s cubic-bezier(0.3, 1.3, 0.5, 1); }
 .cta-done { position: absolute; inset: 0; justify-content: center; gap: 7px; opacity: 0; translate: 0 60%; }
@@ -44,21 +44,23 @@ section[id] { scroll-margin-top: 24px; }
 .pill-cta[data-done] .cta-done { opacity: 1; translate: 0 0; }
 /* 4 glyphs of 18px: overlapping 15px apart at rest (63px, centred), 22px apart open (84px), so the deck fans out both ways. It reserves the open width,
    so the label never moves. */
-.cta-deck { position: relative; width: 84px; height: 18px; flex: none; }
-.cta-deck > svg { position: absolute; top: 0; left: calc(10.5px + var(--i) * 15px); width: 18px; height: 18px; rotate: var(--r); transition: left 0.45s cubic-bezier(0.3, 1.4, 0.5, 1), rotate 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); filter: drop-shadow(1.5px 0 0 var(--card)) drop-shadow(-1.5px 0 0 var(--card)) drop-shadow(0 1.5px 0 var(--card)) drop-shadow(0 -1.5px 0 var(--card)); }
+.cta-deck { position: relative; width: 72px; height: 18px; flex: none; }
+.cta-deck > svg { position: absolute; top: 0; left: calc(4.5px + var(--i) * 15px); width: 18px; height: 18px; rotate: var(--r); transition: left 0.45s cubic-bezier(0.3, 1.4, 0.5, 1), rotate 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); filter: drop-shadow(1.5px 0 0 var(--card)) drop-shadow(-1.5px 0 0 var(--card)) drop-shadow(0 1.5px 0 var(--card)) drop-shadow(0 -1.5px 0 var(--card)); }
 .cta-deck > :nth-child(1) { --i: 0; --r: -13deg; z-index: 4; }
 .cta-deck > :nth-child(2) { --i: 1; --r: 8deg; z-index: 3; }
 .cta-deck > :nth-child(3) { --i: 2; --r: -6deg; z-index: 2; }
 .cta-deck > :nth-child(4) { --i: 3; --r: 10deg; z-index: 1; }
-.pill-cta:is(:hover, :focus-visible) .cta-deck > svg { left: calc(var(--i) * 22px); rotate: 0deg; }
+.pill-cta:is(:hover, :focus-visible) .cta-deck > svg { left: calc(var(--i) * 18px); rotate: 0deg; }
 @media (prefers-reduced-motion: reduce) { .pill-cta, .cta-face, .cta-deck > svg { transition: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pill-sm { height: 30px; padding: 0 14px; font-size: 13px; }
 .npm code { font-size: 15px; }
 .npm-hint { font-size: 12px; opacity: 0.75; }
 
-.actions { display: inline-grid; max-width: 100%; margin-top: 30px; }
-.actions .ctas { margin-top: 0; }
+/* One column for the two buttons and the stats, so all their edges line up: the buttons take equal halves, and stack where a half is too narrow to hold one. */
+.actions { display: grid; width: min(100%, 480px); margin: min(30px, 3.5vh) auto 0; }
+.actions .ctas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 0; }
+.actions .pill { justify-content: center; padding: 0 16px; }
 .stats { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr 1.5fr 1fr; margin-top: 12px; border-radius: 20px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); color: inherit; text-decoration: none; transition: box-shadow 0.2s; }
 .stats:hover { box-shadow: 0 0 0 1px var(--dim); }
 .stats:not(:has(.stat-spark)) { grid-auto-columns: 1fr; justify-self: center; width: 120px; }
@@ -71,14 +73,15 @@ section[id] { scroll-margin-top: 24px; }
 .spark-area { fill: url(#spark-fade); }
 .spark-fade-top { stop-color: var(--ink); stop-opacity: 0.14; }
 .spark-fade-end { stop-color: var(--ink); stop-opacity: 0; }
-.display { margin: 0 auto; max-width: 10em; font: 400 clamp(48px, 8vw, 96px)/1 var(--serif), Georgia, serif; letter-spacing: -0.02em; }
+/* The hero scales with the window's height as well as its width, so a short laptop screen still reaches the device. */
+.display { margin: 0 auto; max-width: 10em; font: 400 clamp(48px, min(8vw, 10.5vh), 96px)/1 var(--serif), Georgia, serif; letter-spacing: -0.02em; text-wrap: balance; }
 .display em, .h2 em { font-style: italic; white-space: nowrap; }
 .h2 { margin: 0; font: 400 clamp(42px, 6.6vw, 72px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.015em; }
-.lede { margin: 20px auto 0; max-width: 640px; color: var(--dim); font: 500 clamp(19px, 2.2vw, 24px)/1.35 -apple-system, system-ui; letter-spacing: -0.01em; }
+.lede { margin: 20px auto 0; max-width: 760px; color: var(--dim); font: 500 clamp(19px, min(2.2vw, 3vh), 24px)/1.35 -apple-system, system-ui; letter-spacing: -0.01em; text-wrap: balance; }
 .lede-l { margin-left: 0; margin-bottom: 36px; }
 .ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
 
-.hero { text-align: center; padding: clamp(40px, 9vw, 110px) 0 28px; }
+.hero { --hero-top: clamp(40px, min(9vw, 8vh), 110px); text-align: center; padding: var(--hero-top) 0 20px; }
 .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: clamp(48px, 8vw, 100px); }
 /* The stage centres where the hero's column(980, 20) does (duet-ui layout.ts), so device and title share one axis: --c2 is twice that column's centre. Each side keeps 16px clear of Duet's controls, and the side away from them gives up room to stay on the axis. */
 .stage {
@@ -111,7 +114,7 @@ section[id] { scroll-margin-top: 24px; }
 .foot-mark { display: inline-block; width: 0.65em; height: 0.65em; margin-right: 0.35em; background: currentColor; transition: background 0.15s ease; }
 .foot-om:hover .foot-mark { background: #e63329; }
 /* On the Duo the page runs inside <Duet>: clear the status bar and the controls at the bottom. */
-html[data-duet-mode] .hero { padding-top: calc(clamp(40px, 9vw, 110px) + env(safe-area-inset-top)); }
+html[data-duet-mode] .hero { padding-top: calc(var(--hero-top) + env(safe-area-inset-top)); }
 html[data-duet-mode] .foot { padding-bottom: 140px; }
 
 /* A portrait iPhone (Bars in app/home.tsx): a top bar and a tab bar of glass over a page that scrolls under them. */
