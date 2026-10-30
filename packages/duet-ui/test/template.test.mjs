@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { detect } from "../src/geometry.ts";
-import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, pillRect, primaryTap, spring, template } from "../src/template.ts";
+import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, confirmBox, primaryTap, spring, template } from "../src/template.ts";
 
 const kinds = (groups) => groups.map((g) => g.map((s) => s.kind === "action" ? s.index : s.kind));
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -34,6 +34,24 @@ test("allocate: rest keeps \"…\", inline splits the burger off, nothing to sho
   assert.deepEqual(allocate(1000, 0).groups, []);
 });
 
+test("allocate: no room for the primary's own group, it takes the burger's slot above \"…\"", () => {
+  // The closed Duo's column band (92pt, a lone group 12 more): [burger, …] + [primary] needs 160.7.
+  const a = allocate(92, 3, { menu: true, primary: true, extra: 12 });
+  assert.deepEqual(kinds(a.groups), [["primary", "more"]]);
+  assert.deepEqual([a.shown, a.primary], [0, true]);
+  assert.deepEqual(kinds(allocate(92, 3, { menu: true, primary: true, split: true, extra: 12 }).groups), [["primary", "more"]]);
+  // Room for its own group still wins, and one button of room folds it into "…".
+  assert.deepEqual(kinds(allocate(170, 0, { menu: true, primary: true }).groups), [["menu"], ["primary"]]);
+  const one = allocate(60, 3, { menu: true, primary: true });
+  assert.deepEqual([kinds(one.groups), one.primary], [[["more"]], false]);
+});
+
+test("place: controls stay in the column, the primary's slot is one button in the shared capsule", () => {
+  const col = frame(detect(sig(382, 580, 466, 678)));
+  const t = template(col, { menu: true, actions: 3, primary: true }).placed;
+  assert.deepEqual([t.length, t[0].rect.w, t[0].primary], [1, TEMPLATE.control, false]);
+});
+
 test("template: a sheet's close alone, the open sidebar's burger alone, the preview's \"…\" alone", () => {
   const tab = frame(detect(sig(382, 580, 466, 678)));
   assert.deepEqual(kinds(template(tab, { close: true, menu: true, actions: 3 }).groups), [["close"]]);
@@ -63,10 +81,10 @@ test("menuBox: beside the strip toward the page, inside the page, top or bottom 
   assert.ok(menuBox(f, hi, 40).h <= f.ph - 24);
 });
 
-test("pillRect: the armed primary grows toward the page", () => {
-  const r = { x: 400, y: 0, w: 49, h: 49 };
-  assert.deepEqual(pillRect(r, "right"), { x: 400 + 49 - 214, y: 0, w: 214, h: 49 });
-  assert.deepEqual(pillRect(r, "left"), { ...r, w: 214 });
+test("confirmBox: the primary's box beside the strip toward the page, a label row over its confirm button", () => {
+  const f = frame(detect(sig(382, 580, 466, 678)));
+  const r = { x: f.cx - 24.5, y: 100, w: 49, h: 49 }, b = confirmBox(f, r);
+  assert.deepEqual([b.x + b.w, b.y, b.h], [f.edge - 10, 100, 2 * TEMPLATE.pad + 2 * TEMPLATE.row]);
 });
 
 test("lead and spring: ends fixed, linear() easing settles at 1", () => {

@@ -143,7 +143,7 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 
 ### In-app preview
 
-Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. Live Activities push close and reader/menu down (one about 45pt on a real Duo) while back stays put, and a page can't tell, so Duet assumes the worst case (`DUO.island`, two activities, as in a Safari tab): the gap is then about 54pt, room for one button, and none of Duet's buttons can ever sit under the preview's. That button is "…", centred in the gap, its list holding the places under "Menu", then the page's actions. Turned sideways, the preview's layout depends on its style. The sheet keeps a column on the side the Duo is turned to, with a gap of about 26pt, too small for a button: there Duet hides its controls (`useDuet().hidden` is `"preview"`, the controls get `visibility: hidden` and no inset) instead of drawing an inline strip across the page, so the page keeps its full width and the preview's own close, back, share and "Open in Safari" stay usable. The default and full styles move every native button into a top bar (window y 24 to 68) and give the page an 84px safe-area inset on the turned side (left at 90, right at 270) that nothing draws in: Duet uses `strip` there, its controls in that inset from below the top bar to above the home indicator, and the page keeps its width. Turning back to portrait, or opening the page in Safari, brings the column back. A strip across page content was flagged in review and is never used. Duet sets `useDuet().preview` in both. Duet takes a Safari window that is not standalone to be the preview when it is either:
+Links opened from social and mail apps can open in the in-app Safari preview (`SFSafariViewController`). On the closed Duo the preview has a column like a Safari tab's, holding its own buttons: close and reader/menu at the top, back and a share/reload/Safari pill below. In portrait Duet uses `column` and puts its controls into the free gap between the reader/menu button and the back button (146pt, screen y 282 to 428, the same in the sheet and full screen on the simulator and a real Duo), so the page keeps its full width. Live Activities push close and reader/menu down (one about 45pt on a real Duo) while back stays put, and a page can't tell, so Duet assumes the worst case (`DUO.island`, two activities, as in a Safari tab): the gap is then about 54pt, room for one button, and none of Duet's buttons can ever sit under the preview's. That button is "…", centred in the gap, its list holding the page's actions, then the places under "Menu". Turned sideways, the preview's layout depends on its style. The sheet keeps a column on the side the Duo is turned to, with a gap of about 26pt, too small for a button: there Duet hides its controls (`useDuet().hidden` is `"preview"`, the controls get `visibility: hidden` and no inset) instead of drawing an inline strip across the page, so the page keeps its full width and the preview's own close, back, share and "Open in Safari" stay usable. The default and full styles move every native button into a top bar (window y 24 to 68) and give the page an 84px safe-area inset on the turned side (left at 90, right at 270) that nothing draws in: Duet uses `strip` there, its controls in that inset from below the top bar to above the home indicator, and the page keeps its width. Turning back to portrait, or opening the page in Safari, brings the column back. A strip across page content was flagged in review and is never used. Duet sets `useDuet().preview` in both. Duet takes a Safari window that is not standalone to be the preview when it is either:
 
 - the closed screen's 466x678 window with the column signature, 44 to 77px of chrome (the preview has 75, down to 46 as its top bar compacts on scroll in the default and full styles; a Safari tab 98, or 80 with the compact URL bar) and a bottom safe-area inset (34 in the preview, 0 in a tab), or
 - a page sheet: a window inside the closed 466x678 screen, in either orientation (450x670 on a real Duo, 662x458 turned) with the column signature and a bottom safe-area inset, or
@@ -225,7 +225,7 @@ import { bootScript } from "duet-ui/boot";
 | --- | --- | --- |
 | `menu` | `{ items, selected, onSelect }` | The app's places (`DuetMenuItem[]`). The burger heads the controls and opens them in a sidebar, sliding the page aside. Each place keeps its scroll position |
 | `actions` | `DuetItem[]` | Round buttons under the burger while they fit, the rest in "…". `destructive: true` items only show in "…", last, in red; `folded: true` items only in "…" |
-| `primary` | `DuetPrimary` | The screen's main action, a tinted round button in its own group (at the thumb inline). The first tap arms it into a 214pt labelled pill, the second runs it, see [Call to action](#call-to-action). Folds into "…" when no arrangement keeps it |
+| `primary` | `DuetPrimary` | The screen's main action, always on screen: a tinted button showing its icon, in a slot of the controls. It has its own group under the others (at the thumb inline), or takes the burger's slot above "…" where that does not fit. A tap grows it into a confirmation box whose button runs it, see [Call to action](#call-to-action). Folds into "…" only where one button is all that fits |
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the controls hold only a close button until it is cleared |
 | `appearance` | `"auto" \| "light" \| "dark"` | Light or dark, like `overrideUserInterfaceStyle`. Default `"auto"`: follow the system. `dark` (boolean) still works but is deprecated |
 | `tint` | `string` | Accent for the selected place, the primary button and checked menu rows, like iOS's `tintColor`. Default: system blue |
@@ -233,11 +233,11 @@ import { bootScript } from "duet-ui/boot";
 | `reserve` | `boolean` | Default `true`: the page keeps clear of the controls (`--duet-inset-*`, `<html>` margins). `false` lets it run under them |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
-`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey. `DuetMenuItem<T>` is `{ id: T, label, icon?, badge?, badgeTone? }`. `DuetPrimary` is a `DuetItem` plus `confirm?: string | false`: the armed pill's label (default `label`), or `false` to run on the first tap.
+`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey. `DuetMenuItem<T>` is `{ id: T, label, icon?, badge?, badgeTone? }`. `DuetPrimary` is a `DuetItem` plus `confirm?: string | false`: the confirmation box's button label (default `label`), or `false` to run on the first tap.
 
 ### The template
 
-One template on every layout, the same in Safari's column, the strip, inline and split view: the burger first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time, then the primary. The in-app preview's gap holds one button, so it shows only "…", whose list leads with a "Menu" section (the places), then "This page". "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `menuBox`, `pillRect`) for tests and custom chrome.
+One template on every layout, the same in Safari's column, the strip, inline and split view: the burger first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time; then the primary takes the burger's slot above "…", whose list ends with a "Menu" section (the places), and only where one button is all that fits does it fold into "…" itself. The in-app preview's gap holds one button, so it shows only "…", whose list leads with "This page", then a "Menu" section (the places). "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`) for tests and custom chrome.
 
 ### Theming
 
@@ -281,11 +281,13 @@ A page with one thing to do (book, buy, join) passes it as its primary, and fold
     { id: "share", label: "Share", icon: <Share />, onPress: share, folded: true },
     { id: "fav", label: "Favourite", icon: <Heart />, onPress: fav },
   ]}
-  primary={{ id: "book", label: "Book", confirm: `Book · ${credits} credits`, icon: <CalendarCheck />, onPress: book }}
+  primary={{ id: "book", label: "Book", confirm: `Book with ${credits} credits`, icon: <CalendarCheck />, onPress: book }}
 />
 ```
 
-- The first tap arms it: the round button grows toward the page into a 214pt tinted pill with icon and `confirm` (or `label`). The second tap runs `onPress`. A tap anywhere else disarms it. `confirm: false` runs on the first tap.
+- The primary is a tinted button in a slot of the controls, 49pt like every other, showing its icon. Its `label` is its accessible name and shows when it opens. Controls never leave the column, so nothing sits over the page at rest.
+- A tap grows the button into a confirmation box beside the column, on the same spring as "…": the icon and `label`, then a tinted button reading `confirm` (or `label`). The button runs `onPress` and the box folds back into the button, which now shows whatever the page passes next (a green Booked check, say). A tap anywhere else closes the box. `confirm: false` runs on the first tap, with no box.
+- Where its own group does not fit (the closed column with a menu), it takes the burger's slot, above "…" in one capsule, and the places move to the top of the "…" list. Where one button is all that fits, it folds into "…".
 - Folded into "…" (no room for its own group), it arms the same way: the first tap tints its row and turns its label to `confirm`, the list stays open, the second tap runs it and closes the list. Closing the list disarms it. See [Folded primary runs at once](#folded-primary-runs-at-once).
 - `tint` on the primary overrides the accent for it alone. Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop.
 
@@ -297,7 +299,7 @@ Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wid
 
 ### Lower-level exports
 
-`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `pillRect`, `groupHeight` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`, `groupHeight` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
 
 `readSignals()` returns the current `Signals` from the window, the same reading the chrome uses (browser only). `watchSignals(cb)` calls `cb` whenever they may have changed, with the triggers and settle polling described in [Which mode](#which-mode), and returns the unsubscribe. Together with `detect` they let a page act on the mode before React mounts:
 
@@ -721,7 +723,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** in the in-app preview, or a band that holds a single button, there is no burger, only "…".
 - **Cause:** the burger and "…" need two buttons of room, and every action has to stay reachable.
-- **Duet does:** shows "…" alone; its list starts with a "Menu" section holding the places (checked for the current one), then the page's actions. A sheet's `close` takes that one slot instead.
+- **Duet does:** shows "…" alone; its list starts with the page's actions, then a "Menu" section holding the places (checked for the current one). A sheet's `close` takes that one slot instead.
 - **You do:** nothing.
 - **Status:** [#181](https://github.com/JayFarei/duet/issues/181), 0.6.0.
 
@@ -740,6 +742,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** the tint layer inherits the menu's radius at every frame of the morph.
 - **You do:** nothing.
 - **Status:** [#198](https://github.com/JayFarei/duet/issues/198).
+
+### Call to action hidden in the closed column
+
+- **You see:** without the handling, on the closed Duo in Safari's column with a menu and a primary, there is no call to action: the band holds only the burger and "…", and the primary is a row inside "…", one menu tap away.
+- **Cause:** the band is 92pt (104 for a lone group), and the burger group plus the primary's own group need 160.7pt, so the allocator folded the primary first.
+- **Duet does:** gives the primary the burger's slot before folding it: the 2-slot group becomes the primary above "…", and the "…" list leads with the primary, a tinted row that arms on the first tap and runs on the second, and closes with the places (`allocate`). Either button morphs the whole capsule, as "…" always does: the primary grows it into a confirmation box (`confirmBox`, beside the column like the "…" menu) holding the icon, `label` and a tinted `confirm` button, on the "…" menu's spring; the button runs `onPress` and the box folds back into the capsule.
+- **You do:** nothing. Pass the confirmed state as the next `primary` (label, icon, tint) and it shows in the slot as the box folds.
+- **Status:** [#206](https://github.com/JayFarei/duet/issues/206), [#208](https://github.com/JayFarei/duet/issues/208).
 
 ## Limitations
 
@@ -779,6 +789,14 @@ pnpm install
 pnpm typecheck && pnpm test && pnpm build
 pnpm test:e2e
 ```
+
+### Primary in its own capsule
+
+- **You see:** without the handling, where the primary has its own group (the open screen, the in-app preview filling it), a solid tinted circle with a coloured glow stands apart from the glass controls above it.
+- **Cause:** the own group replaced the capsule's glass with the tint, while the form sharing a capsule with "…" drew a tinted button inside glass.
+- **Duet does:** draws one form everywhere: a tinted button inside a glass capsule, with the same rim and shadow as the other controls.
+- **You do:** nothing.
+- **Status:** [#213](https://github.com/JayFarei/duet/issues/213).
 
 ## License
 
