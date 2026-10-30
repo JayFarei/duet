@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0
+
+- The primary in its own group is a tinted button in a glass capsule, like the one above "…", not a solid glowing circle (#213).
+- The primary's tap grows its button into a confirmation box beside the column (icon, `label`, a tinted `confirm` button), on the "…" spring; the button runs it and the box folds back.
+- The primary stays on screen in a slot: where its own group does not fit, it takes the burger's slot above "…", and the places move into the "…" list. It folds into "…" only where one button is all that fits.
+- The "…" list now leads with the page's section ("This page", "More"), the "Menu" section after it: with the list anchored to a capsule low on the screen, the places stay in the same spot on every page, whatever actions that page has.
+- Breaking: the pure export `pillRect` is replaced by `confirmBox(frame, from)`; the box grows from the whole capsule, and with the primary in the capsule, "…" lists it too.
+- Site: every mailbox in the panes demo opens its own list (#204); the Column notes sheet runs under Safari's address bar to the screen's bottom with a lighter top blur (#205); the book demo opens on a class page, its Book button in the controls, then "Book with N credits" in the box (#206, #208).
+- In-app preview, back from another app: the controls stay in the preview's column. iOS hands the preview back with a taller top bar or a page 52 to 60pt narrower, and the verdict dropped for good, with an inline strip inside the page. A page that was the preview now stays it until its inset goes.
+- e2e: `other` step and journeys life04 to life07, leaving for another app and coming back in each preview style.
+
 ## 0.6.1
 
 Everything from 0.6.1-rc.1 to 0.6.1-rc.3.

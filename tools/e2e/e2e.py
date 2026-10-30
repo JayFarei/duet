@@ -505,6 +505,20 @@ class Run:
                 stale.add(r["rx"])
             elif back is not None:
                 last_hidden = None
+        # Leaving for the background, iOS snapshots the app at other sizes while the page still reads visible (951x669
+        # at 270): the app is on its way out, so only what follows the return is judged.
+        if any(r.get("visible") == "hidden" for r in allr):
+            gone = max(i for i, r in enumerate(allr) if r.get("visible") == "hidden")
+            note.append(f"{gone} samples up to the page's return, not judged")
+            allr = allr[gone + 1:] or allr[-1:]
+            timeline = allr
+        # The page can read visible well before the app is back (life03: from 2750ms, the app in front only at 5000ms),
+        # its first render then still the snapshot's layout. Nobody is looking until to_front returns.
+        front, s.returned = getattr(s, "returned", None), None
+        if front is not None:
+            kept = [r for r in allr if r.get("t", 0) >= front]
+            note.append(f"{len(allr) - len(kept)} samples before the app was back in front, not judged")
+            allr = timeline = kept or allr[-1:]
         hidden = [r for r in allr if r.get("visible") == "hidden"]
         if hidden:
             note.append(f"{len(hidden)} samples while the page was hidden (backgrounded), not judged")
@@ -1665,6 +1679,17 @@ class Run:
                 s.sim.button("HOME")
                 time.sleep(2)
                 s.to_front(kind)
+                s.returned = time.time() * 1000
+                land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
+            elif k == "other":  # through another app and back, the app under test suspended behind it
+                s.sim.button("HOME")
+                time.sleep(1)
+                sh("xcrun", "simctl", "launch", s.udid, "com.apple.Preferences", check=False)
+                time.sleep(3)
+                s.sim.button("HOME")
+                time.sleep(1)
+                s.to_front(kind)
+                s.returned = time.time() * 1000
                 land.update(delay=1.5, cond=lambda r: r.get("visible") == "visible")
             elif k == "lock":
                 s.sim.button("LOCK")
