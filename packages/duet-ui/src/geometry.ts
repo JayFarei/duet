@@ -192,7 +192,16 @@ const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "na
 /** gap.forward: the band's bottom once the preview has forward history: going back gives it a Forward button and
  *  moves its Back up a row (simulator iOS 27.1, e2e ctl02, #117). That gap has room for one button and none for the
  *  Live Activities allowance. */
-const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [44, 77], sheetInset: 4, gap: { top: 282, bottom: 428, forward: 374 } } as const;
+const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [44, 77], column: 84, sheetInset: 4, gap: { top: 282, bottom: 428, forward: 374 } } as const;
+/** The width to lay the page out at when iOS left it narrower than its window, else undefined. Back from another app
+ *  the preview's page can stay 52pt short of its column for good (e2e life04, iOS 27.1: layout 314 in the sheet's 450
+ *  window, whose column leaves 366), a blank band beside it. Closed and upright only, where the column is known. */
+export function staleLayoutWidth(s: Signals, c: Context, layoutWidth: number): number | undefined {
+  const [w, h] = DUO_SIZES[0];
+  if (!c.preview || c.mode !== "column" || s.outerWidth > s.outerHeight || s.outerWidth > w + 1 || s.outerHeight > h + 1) return;
+  const width = s.outerWidth - PREVIEW.column;
+  return layoutWidth < width - 1 ? width : undefined;
+}
 /** Why the signals read as the in-app preview, for probes and logs; undefined when they do not. */
 export function previewReason(s: Signals): string | undefined {
   if (s.standalone || browserOf(s.userAgent) !== "safari") return;

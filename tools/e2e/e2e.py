@@ -38,6 +38,7 @@ SETTLE_S = 0.5  # controls must show in the final placement within this of the f
 GRACE_S = 0.15  # the old placement may linger this long after the signals first change (one render of the chrome)
 SLIDE_S = 0.15  # once shown in the final placement, slots must stop moving within this (no slow slide)
 SPRING_S = 0.6  # a page change in place (a tap opens a page, a call to action turns "Booked") springs its slots (#101)
+PREVIEW_COLUMN = 84   # the in-app preview's own column: its page reaches the window less this
 UNPAINTED_S = 0.08  # a sample this long after the page's last frame (requestAnimationFrame) reads a layout nobody sees
 GAP_S = 0.15    # sampling gaps longer than this are reported (the page was throttled)
 ICON_SD = 6.0   # a visible slot icon whose screenshot crop has a luminance stddev under this is not painted
@@ -624,6 +625,8 @@ class Run:
                     bad.append(f'{x["slot"]} reaches y {x["rect"]["y"] + x["rect"]["h"]:.0f}, under Safari\'s bar from the {vh:.0f}pt visual viewport\'s bottom')
         if "preview" in expect and last.get("preview") != expect["preview"]:
             bad.append(f'preview detected={last.get("preview")}, expected {expect["preview"]}')
+        if expect.get("mode") == "column" and expect.get("preview") and g["outerWidth"] < g["outerHeight"] and last["scroll"]["clientWidth"] < g["outerWidth"] - PREVIEW_COLUMN - 1:
+            bad.append(f'page laid out {last["scroll"]["clientWidth"]}pt wide, a blank band before the preview\'s {PREVIEW_COLUMN}pt column in its {g["outerWidth"]}pt window')
         fp = shown_place(last)
         if not ok(fp):
             bad.append(f'final {"hidden" if fp is None else "/".join(map(str, fp))}, expected {"hidden" if want is None else "/".join(map(str, want)) if isinstance(want, tuple) else want}')

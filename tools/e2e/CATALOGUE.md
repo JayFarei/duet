@@ -314,6 +314,15 @@ Not covered yet:
 1. Open /book in the in-app preview, over full screen style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
 2. Press Home, open another app, press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
 
+## life08: Another app with the sheet preview open, then turned and unfolded: the page's viewport comes back (#225)
+
+1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Press Home, open another app, press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
+3. Turn the phone on its side, landscape right (90). Expect: controls hidden, the page keeps its full width, the preview's own buttons untouched.
+4. Turn the phone upright. Expect: controls in a column on the right in the gap of the preview's own column.
+5. Unfold to the inner screen. Expect: controls inline on the right.
+6. Fold to the outer screen. Expect: controls in a column on the right in the gap of the preview's own column.
+
 ## set01: In-app preview, over full screen style, turned and unfolded
 
 1. Open /book in the in-app preview, over full screen style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.

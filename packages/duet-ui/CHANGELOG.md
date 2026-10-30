@@ -13,7 +13,9 @@
 - Breaking: the pure export `pillRect` is replaced by `confirmBox(frame, from)`; the box grows from the whole capsule, and with the primary in the capsule, "…" lists it too.
 - Site: every mailbox in the panes demo opens its own list (#204); the Column notes sheet runs under Safari's address bar to the screen's bottom with a lighter top blur (#205); the book demo opens on a class page, its Book button in the controls, then "Book with N credits" in the box (#206, #208).
 - In-app preview, back from another app: the controls stay in the preview's column. iOS hands the preview back with a taller top bar or a page 52 to 60pt narrower, and the verdict dropped for good, with an inline strip inside the page. A page that was the preview now stays it until its inset goes.
+- In-app preview, back from another app: the page fills to the column again. iOS could leave it 52pt narrower for good, with a blank band, headlines wrapping and text cut short; Duet holds the real width in the viewport meta until the window changes (#225).
 - e2e: `other` step and journeys life04 to life07, leaving for another app and coming back in each preview style.
+- e2e: a preview's page laid out narrower than its window less the column fails the step.
 
 ## 0.6.1
 

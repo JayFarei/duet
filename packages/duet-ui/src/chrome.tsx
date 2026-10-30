@@ -3,7 +3,7 @@
 import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, controlsShown, isSplit, pageInsets, magnet, stable, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
+import { DUO, columnBand, controlsShown, isSplit, pageInsets, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
 import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
@@ -98,6 +98,26 @@ function switchSide(el: HTMLElement, side: Side) {
   requestAnimationFrame(() => requestAnimationFrame(() => { if (el.dataset.drag === "switch") delete el.dataset.drag; }));
 }
 
+// iOS can leave the preview's page narrower than its window (staleLayoutWidth), and only an explicit viewport width
+// lays it out again: reflows, scrolls, a scale nudge and a fresh meta did nothing, and device-width falls back to the
+// short width (Duo Lab, iOS 27.1). So the width is held until the window changes, then the page's own meta comes back.
+let heldWidth: { size: string; metas: Map<HTMLMetaElement, string> } | undefined;
+function holdLayoutWidth(s: Signals, c: Context) {
+  const size = `${s.outerWidth}x${s.outerHeight}`;
+  if (heldWidth && (heldWidth.size !== size || !c.preview)) {
+    for (const [meta, content] of heldWidth.metas) meta.content = content;
+    heldWidth = undefined;
+  }
+  if (heldWidth || settling() || emulatedSignals()) return;
+  const width = staleLayoutWidth(s, c, document.documentElement.clientWidth);
+  if (!width) return;
+  heldWidth = { size, metas: new Map() };
+  for (const meta of document.querySelectorAll<HTMLMetaElement>("meta[name=viewport]")) {
+    heldWidth.metas.set(meta, meta.content);
+    meta.content = meta.content.replace("width=device-width", `width=${width}`);
+  }
+}
+
 let snap: Context | null = null, snapKey = "";
 const damper: Damper = { flips: [] };
 let pinTimer: ReturnType<typeof setTimeout> | undefined, landTimer: ReturnType<typeof setTimeout> | undefined, kbTimer: ReturnType<typeof setTimeout> | undefined, pendingTimer: ReturnType<typeof setTimeout> | undefined;
@@ -113,6 +133,7 @@ function refresh() {
   if (damper.kbUntil !== undefined && damper.kbUntil > performance.now() && !kbTimer) kbTimer = setTimeout(() => { kbTimer = undefined; listeners.forEach((f) => f()); }, damper.kbUntil - performance.now() + 10);
   // And controls hidden while a preview's inset is pending (#143), if it never lands.
   if (damper.pendingUntil !== undefined && !pendingTimer) pendingTimer = setTimeout(() => { pendingTimer = undefined; listeners.forEach((f) => f()); }, damper.pendingUntil - performance.now() + 10);
+  holdLayoutWidth(s, c);
   const k = JSON.stringify(c);
   if (k !== snapKey) [snapKey, snap] = [k, c];
 }

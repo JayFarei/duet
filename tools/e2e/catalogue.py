@@ -415,6 +415,9 @@ SUITES = [
         (("other",), "Press Home, open another app, press Home, then open the app again", {}),
     ]} for n, style in enumerate(("sheet", "default", "full", "over"), 4)
 ] + [
+    {"id": "life08", "title": "Another app with the sheet preview open, then turned and unfolded: the page's viewport comes back (#225)", "page": "/book", "start": ("sheet", "closed", 0, False), "steps": [
+        (("other",), "Press Home, open another app, press Home, then open the app again", {}), (("turn", 90), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
+    ]},
     {"id": "set01", "title": "In-app preview, over full screen style, turned and unfolded", "page": "/book", "start": ("over", "closed", 0, False), "steps": [
         (("turn", 90), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
     ]},
