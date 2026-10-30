@@ -294,6 +294,26 @@ Not covered yet:
 1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
 2. Press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
 
+## life04: Another app with the in-app preview open, sheet style
+
+1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Press Home, open another app, press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
+
+## life05: Another app with the in-app preview open, default style
+
+1. Open /book in the in-app preview, default style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Press Home, open another app, press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
+
+## life06: Another app with the in-app preview open, full style
+
+1. Open /book in the in-app preview, full screen style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Press Home, open another app, press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
+
+## life07: Another app with the in-app preview open, over style
+
+1. Open /book in the in-app preview, over full screen style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
+2. Press Home, open another app, press Home, then open the app again. Expect: controls in a column on the right in the gap of the preview's own column.
+
 ## set01: In-app preview, over full screen style, turned and unfolded
 
 1. Open /book in the in-app preview, over full screen style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.

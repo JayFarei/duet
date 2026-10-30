@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- In-app preview, back from another app: the controls stay in the preview's column. iOS hands the preview back with a taller top bar or a page 52 to 60pt narrower, and the verdict dropped for good, with an inline strip inside the page. A page that was the preview now stays it until its inset goes.
+- e2e: `other` step and journeys life04 to life07, leaving for another app and coming back in each preview style.
+
 ## 0.6.1
 
 Everything from 0.6.1-rc.1 to 0.6.1-rc.3.

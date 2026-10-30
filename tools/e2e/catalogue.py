@@ -410,6 +410,11 @@ SUITES = [
     {"id": "life03", "title": "Home with the in-app preview open", "page": "/book", "start": PV0, "steps": [
         (("home",), "Press Home, then open the app again", {}),
     ]},
+] + [
+    {"id": f"life{n:02}", "title": f"Another app with the in-app preview open, {style} style", "page": "/book", "start": (style, "closed", 0, False), "steps": [
+        (("other",), "Press Home, open another app, press Home, then open the app again", {}),
+    ]} for n, style in enumerate(("sheet", "default", "full", "over"), 4)
+] + [
     {"id": "set01", "title": "In-app preview, over full screen style, turned and unfolded", "page": "/book", "start": ("over", "closed", 0, False), "steps": [
         (("turn", 90), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
     ]},
@@ -437,6 +442,7 @@ def check_en(c):
                     "scroll_gt": lambda: f"the page stays scrolled down (more than {v}pt)", "scroll_lt": lambda: f"the page is at the top (under {v}pt)",
                     "menu": lambda: "Duet's menu is open, clear of every native button" if v else "Duet's menu is closed",
                     "la": lambda: f"{v} Live Activit{'y' if v == 1 else 'ies'} running",
+                    "preview": lambda: "Duet still reads the page as the in-app preview" if v else "Duet reads the page as a tab",
                     "bar": lambda: "Safari's top bar takes the page's colour under it" if v else "Safari's top bar keeps its own colour"}[k]())
     return out
 
