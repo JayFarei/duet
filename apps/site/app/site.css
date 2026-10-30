@@ -87,7 +87,16 @@ section[id] { scroll-margin-top: 24px; }
 
 .code { margin: 16px 0 0; padding: 18px 20px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
 
-.foot { margin-top: clamp(72px, 10vw, 128px); padding: 20px 0 calc(40px + env(safe-area-inset-bottom)); border-top: 0.5px solid var(--line); color: var(--dim); font-size: 13px; text-align: center; }
+.foot { margin-top: clamp(72px, 10vw, 128px); padding: 20px 0 calc(40px + env(safe-area-inset-bottom)); border-top: 0.5px solid var(--line); color: var(--dim); font-size: 13px; line-height: 1.5; }
+.foot p { margin: 8px 0 0; }
+.foot a { color: var(--ink); text-decoration: none; }
+.foot a:hover { text-decoration: underline; }
+.foot-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.foot-row p { margin: 0; }
+.foot-brand { color: var(--ink); font: 400 22px/1 var(--serif), Georgia, serif; }
+/* The OpenMake square, as on RegTail and farei.me: red on hover. */
+.foot-mark { display: inline-block; width: 0.65em; height: 0.65em; margin-right: 0.35em; background: currentColor; transition: background 0.15s ease; }
+.foot-om:hover .foot-mark { background: #e63329; }
 /* On the Duo the page runs inside <Duet>: clear the status bar and the controls at the bottom. */
 html[data-duet-mode] .hero { padding-top: calc(clamp(40px, 9vw, 110px) + env(safe-area-inset-top)); }
 html[data-duet-mode] .foot { padding-bottom: 140px; }

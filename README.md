@@ -543,6 +543,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#104](https://github.com/JayFarei/duet/issues/104). See [In-app preview](#in-app-preview).
 
+### In-app preview after visiting another app
+
+- **You see:** without handling, leaving an in-app preview for another app and coming back moves Duet's controls out of the preview's column into a strip inside the page, next to the preview's own buttons, and they stay there.
+- **Cause:** leaving, iOS snapshots the app at other sizes while the page still reads visible, then hands the preview back changed: a taller top bar for a while (382x548, 130pt of chrome), or the page 52 to 60pt narrower until something lays it out again (314x600 in the sheet's 450x670, 322x603 in the full 466x678). Both fail the preview's checks. Measured on the simulator (iOS 27.1); the timing varies between runs.
+- **Duet does:** remembers that the page was the preview, and keeps that verdict through both changes until its bottom inset goes (a tab's is 0, as after Open in Safari). The controls stay in the preview's column and stay shown, and the menu opens from the page's real edge.
+- **You do:** nothing. The narrower page itself is iOS's: Duet doesn't resize it, so a blank band can remain between the page and the column until iOS lays it out again.
+- **Status:** [#211](https://github.com/JayFarei/duet/issues/211). See [In-app preview](#in-app-preview).
+
 ### In-app preview buttons and Live Activities
 
 - **You see:** without handling, a Live Activity pushes the preview's close and reader/menu buttons down onto Duet's controls in the gap.

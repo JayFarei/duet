@@ -115,3 +115,81 @@ test("forward history outside the preview changes nothing: a tab's column has it
   assert.equal(b.forward, undefined);
   assert.deepEqual(b, a);
 });
+
+// Leaving through Home, iOS snapshots the app at other sizes (951x669 at 270) and hands the preview back with the top
+// bar's 130pt of chrome for a moment (e2e life06, iOS 27.1: 382x548 in 466x678, inset 34). Measured for 220ms; hidden
+// or on a slower phone it outlasts PREVIEW_RISE, and the controls dropped to an inline strip for good, beside the
+// preview's own column.
+test("back from another app: a late 130pt top bar keeps the preview's column, whatever it lasts", () => {
+  const d = { flips: [] }, O = { insetBottom: 34 };
+  const run = (t, s, angle = 0, epoch = 0) => stable(d, { ...s, angle }, undefined, t, false, epoch);
+  assert.equal(run(0, sig(382, 603, 466, 678, O)).mode, "column");
+  run(2000, sig(951, 615, 951, 669, O), 270);
+  run(2100, sig(382, 603, 466, 678, O));
+  const late = run(4000, sig(382, 548, 466, 678, O));
+  assert.equal(late.mode, "column"); assert.ok(late.preview);
+  const home = run(5000, sig(382, 603, 466, 678, O));
+  assert.equal(home.mode, "column"); assert.ok(home.preview);
+});
+
+test("back from another app: the snapshot lands straight on the late top bar, the preview's column still", () => {
+  const d = { flips: [] };
+  const run = (t, s, angle = 0) => stable(d, { ...s, angle }, undefined, t);
+  run(0, sig(382, 603, 466, 678));
+  run(2000, sig(951, 615, 951, 669), 270);
+  assert.deepEqual([run(2100, sig(382, 548, 466, 678)).mode, run(4000, sig(382, 548, 466, 678)).mode, run(5000, sig(382, 603, 466, 678)).mode], ["column", "column", "column"]);
+  assert.ok(d.preview);
+});
+
+test("a preview handed to a tab (inset 0) forgets it was one: a later inset does not read as the preview", () => {
+  const d = { flips: [] };
+  assert.ok(stable(d, sig(382, 603, 466, 678), undefined, 0).preview);
+  assert.ok(!stable(d, sig(382, 580, 466, 678, { insetBottom: 0 }), undefined, 5000).preview);
+  assert.ok(!stable(d, sig(382, 548, 466, 678), undefined, 9000).preview);
+});
+
+// The sheet can come back from the snapshot with its page 52pt narrower, and stay so (e2e life03, iOS 27.1: 314x600 in
+// 450x670). The verdict dropped a second later, and the controls went inline, inside the page.
+test("back from another app: the sheet's page left narrower keeps the preview's column, and the menu opens from its edge", () => {
+  const d = { flips: [] };
+  const run = (t, s, angle = 0, epoch = 0) => stable(d, { ...s, angle }, undefined, t, false, epoch);
+  const c0 = run(0, sig(366, 600, 450, 670));
+  assert.deepEqual([c0.mode, !!c0.preview], ["column", true]);
+  run(2000, sig(935, 591, 951, 669), 270);
+  for (const t of [2100, 3000, 5000]) {
+    const c = run(t, sig(314, 600, 450, 670), 0, 1);
+    assert.deepEqual([c.mode, !!c.preview, c.side, c.width, c.screenWidth], ["column", true, "right", 314, 450]);
+    const f = frame(c);
+    assert.equal(f.cx, frame(c0).cx);
+    assert.equal(f.edge, 314);
+  }
+});
+
+test("back from another app: the full style's page left narrower keeps the preview's column too", () => {
+  const d = { flips: [] };
+  stable(d, sig(382, 603, 466, 678), undefined, 0);
+  const c = stable(d, sig(322, 603, 466, 678), undefined, 3000);
+  assert.deepEqual([c.mode, !!c.preview, c.width], ["column", true, 322]);
+});
+
+test("a page narrower than the column that never was the preview is not one", () => {
+  const d = { flips: [] };
+  assert.ok(!stable(d, sig(314, 600, 450, 670), undefined, 0).preview);
+});
+
+test("back from another app: the page left narrower or under the late bar shows its controls while the window settles", () => {
+  for (const [p, h] of [[314, 600], [382, 548]]) {
+    const w = p === 314 ? [450, 670] : [466, 678], d = { flips: [] };
+    assert.ok(stable(d, sig(w[0] - 84, h === 548 ? 603 : 600, ...w), undefined, 0).preview);
+    for (const t of [2000, 2400, 3500, 6000]) {
+      const c = stable(d, { ...sig(p, h, ...w), angle: 0 }, undefined, t, true, 1);
+      assert.deepEqual([c.mode, !!c.preview, c.hidden], ["column", true, undefined]);
+    }
+  }
+});
+
+test("a preview still turning stays in transit: a sideways page in the upright sheet hides", () => {
+  const d = { flips: [] };
+  stable(d, sig(366, 600, 450, 670), undefined, 0);
+  assert.equal(stable(d, { ...sig(600, 366, 450, 670), angle: 0 }, undefined, 100, true).hidden, "moving");
+});

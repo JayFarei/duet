@@ -398,7 +398,7 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   // The keyboard leaves Safari's column in place (only the visual viewport shrinks), so it does not change the mode.
   const split = isSplit(s);
   const column = allowColumn && !!columnSide && !s.standalone && !s.framed && browser === "safari" && (!preview || !landscape)
-    && (preview ? columnWidth(s) : hasColumn(s)) && (s.scale ?? 1) === 1;
+    && (preview ? s.outerWidth - s.innerWidth >= SAFARI_COLUMN.width[0] : hasColumn(s)) && (s.scale ?? 1) === 1;
   // Safari's page viewport starts at screen top and ends above its address bar (382x580 of 466x678).
   if (column && split) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: "right", offsetTop: bannerOf(s), screenWidth: s.outerWidth, screenHeight: s.outerHeight, split: true };
   if (column && duo) return { ...base, mode: "column", layout: layoutOf(s.innerWidth), side: columnSide!, offsetTop: bannerOf(s), screenWidth: s.outerWidth, screenHeight: s.outerHeight, ...(preview && { preview }), ...(preview && s.canGoForward && { forward: true }) };
@@ -486,6 +486,8 @@ export interface Damper { mode?: Mode; flips: number[]; key?: string; pinned?: s
   heights?: Record<string, number>;
   /** Sticky in-app preview verdict, and the window it was taken in. */
   preview?: boolean; previewKey?: string; previewAt?: number;
+  /** The page has read as the preview, and no tab's inset since. */
+  wasPreview?: boolean;
   /** Last context returned, the stable signals it was committed under, and its window (outer size). */
   last?: Context; stableKey?: string; lastKey?: string;
   /** A fold or turn was caught halfway, and the landing (its stable signals, first seen at landAt) must hold until
@@ -551,9 +553,23 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     }
     s = { ...s, scale: 1 };
   }
-  const pending = previewPending(s);
+  const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`;
+  // Leaving for another app, iOS snapshots the page at other sizes and hands the preview back changed (e2e life03-06,
+  // iOS 27.1): a taller top bar for a while (382x548, chrome 130), and the page sometimes 52 to 60pt narrower until
+  // it is laid out again (314x600 in the sheet's 450x670, 322x603 in 466x678). Either dropped the verdict for good, and an inline strip
+  // sat inside the page, beside the preview's own column. A page that was the preview stays it through both, until
+  // its inset goes: a tab's is 0 (Open in Safari).
+  if (s.insetBottom < 20) d.wasPreview = false;
+  const raw = isPreview(s) || (!!d.wasPreview && isPreview({ ...s, innerHeight: s.outerHeight - PREVIEW.chrome[1], innerWidth: Math.max(s.innerWidth, s.outerWidth - SAFARI_COLUMN.width[1]) }));
+  if (raw) d.wasPreview = true;
+  // Handed back so, the page is laid out, however long it stays: not in transit, nor a preview still to land. Each read
+  // that way hid the controls for up to ~3s (e2e life04). Closed only, and upright: unfolding or turning a preview
+  // passes through pages that would normalise the same.
+  const [cw, ch] = DUO_SIZES[0];
+  const handedBack = raw && !isPreview(s) && (s.innerWidth > s.innerHeight) === (s.outerWidth > s.outerHeight)
+    && Math.min(s.outerWidth, s.outerHeight) <= cw + 1 && Math.max(s.outerWidth, s.outerHeight) <= ch + 1;
+  const pending = !handedBack && previewPending(s);
   if (d.bornAt === undefined) [d.bornAt, d.pendingAt] = [now, pending ? now : undefined];
-  const stableKey = `${key} ${s.innerWidth} ${s.angle ?? 0} ${s.standalone} ${!!s.framed} ${epoch}`, raw = isPreview(s);
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
   if (d.preview === undefined || !raw || stableKey !== d.previewKey || rising) d.preview = raw;
@@ -569,7 +585,7 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   // last context's geometry stays whole: mixing its screenWidth with the half-turned width made the page's insets
   // jump mid-turn (84, 0, 212, 296px on a left column turn, -485px on an unfold; final review, 2026-10-27).
   const moving = () => ({ ...(d.last ?? c), keyboard: c.keyboard, hidden: "moving" as const, confidence: "moving" as const });
-  if (settling && inTransit(s)) {
+  if (settling && !handedBack && inTransit(s)) {
     Object.assign(d, { moving: true, landKey: undefined, landUntil: undefined });
     return moving();
   }
