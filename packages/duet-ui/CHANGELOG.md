@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+Everything from 0.6.1-rc.1 to 0.6.1-rc.3.
+
 ## 0.6.1-rc.3
 
 - X's current in-app browser (a web view on the screen's top 61%, X's bar and the post below it, 466x413 closed): the controls no longer sit under the status column's clock, wifi and battery. rc.2 matched only a web view filling the whole screen. Any app web view as wide as the screen, closed upright or open wide, now gets `clearTop` below the status column, whatever its height (#194).
