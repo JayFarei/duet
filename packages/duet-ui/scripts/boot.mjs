@@ -13,7 +13,7 @@ export async function bundle() {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const code = await bundle();
-  const doc = "/** Inline before the page paints (README, Pre-paint boot). */\n";
+  const doc = "/** Inline before the page paints (docs/server-rendering.md, Pre-paint boot). */\n";
   writeFileSync(new URL("../dist/boot-script.js", import.meta.url), `${doc}export const bootScript = ${JSON.stringify(code)};\n`);
   writeFileSync(new URL("../dist/boot-script.d.ts", import.meta.url), `${doc}export declare const bootScript: string;\n`);
   console.log(`boot-script.js: ${code.length} bytes`);

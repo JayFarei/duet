@@ -6,7 +6,7 @@ Universal invariants, every state and every transition:
 - Transitions settle to the final placement within ~0.5s, with no slow drift, no flash in the wrong place.
 - On a Duo in Safari, Duet's invisible edge guards cover the points Safari samples, 4px in from the left and right of the fixed-layout rect clipped to the document, at mid-height (README "Full-screen `position: fixed` overlay or modal backdrop", #147), in the final sample and through any stretch of 0.5s; a lag of a frame or two mid-turn is noted, and samples with the keyboard up are skipped (#151).
 
-Per state (README "Placement" table is the spec):
+Per state (docs/how-duet-decides.md "Which mode" table is the spec):
 - Closed, Safari tab, portrait: column, right.
 - Closed, Safari tab, landscape angle 90: column, left. angle 270: column, right.
 - Closed, in-app preview (SFSafariViewController sheet), all rotations: USER DECISION (2026-10-26): Duet's controls go INTO THE EMPTY GAP of the preview's own right column, between the preview's reader/menu button and its back button (in portrait roughly the band between the 2nd and 3rd native buttons, ~140pt tall on the real Duo; measure it per rotation). Compact controls (e.g. collapse to a single pill or the "…" menu plus selected tab) that fit the gap without touching any native button. The page keeps its full width (no inline strip), and nothing is clipped. Update the README "In-app preview" section and the spec accordingly. In rotations where no usable gap exists, fall back to the least intrusive option and document it.

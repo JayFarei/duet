@@ -1,7 +1,7 @@
 """Touch, hinge and accessibility on the Duo simulator through the Claude desktop app's simulator helper
 (claude-ios-sim, built on facebook/idb). It is the only driver found that reaches the unfolded inner display: XCUITest
 synthesized touches and SimulatorKit's legacy Indigo HID (targets 0x32..0x35) do not, while the helper negotiates
-CoreSimulator's dtuhid transport, which routes a touch to the lit display (README, Split view).
+CoreSimulator's dtuhid transport, which routes a touch to the lit display (docs/how-duet-decides.md, Split view).
 
 Protocol (from the app's own client): each request is a frame of a little-endian u32 payload length, one type byte
 (74, 'J' = JSON) and the JSON {"id", "op", ...}; replies are frames of the same shape, {"id", "ok", "result"|"error"}.

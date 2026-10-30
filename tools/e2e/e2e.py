@@ -1008,7 +1008,7 @@ class Run:
         s.target_display = s.display()
         return act
 
-    # ---- split view (simulator helper; README, Split view) --------------------------------------------------------
+    # ---- split view (simulator helper; docs/how-duet-decides.md, Split view) --------------------------------------------------------
     def sb_tap(s, ident, hold=0.0, tries=6, page=False):
         """Taps (or long-presses) a SpringBoard element found by accessibility identifier. page: an app icon, which may
         be on another Home Screen page (HOME lands on whichever page was last shown, the widgets page included), so a
