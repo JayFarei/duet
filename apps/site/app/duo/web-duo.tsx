@@ -236,7 +236,8 @@ function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals
         : "Turned sideways, Safari keeps its column on the camera's side and moves its buttons. Duet follows them into the gap between.",
     };
   }
-  const page = less({ w: W, h: H - OPEN_BAR }), signals = vis(sig(page, full, { screen: safariScreen(page) }), OPEN_BAR + drop);
+  // The home indicator keeps a 34pt bottom inset under the page (real sim: Duet's band ends at 635, not 658).
+  const page = less({ w: W, h: H - OPEN_BAR }), signals = vis(sig(page, full, { insetBottom: 34, screen: safariScreen(page) }), OPEN_BAR + drop);
   return {
     clip: screen, frame: { x: 0, y: OPEN_BAR + drop, ...page }, signals, mode: modeOf(signals),
     chrome: <><OpenSafari w={W} host={host} forward={s.forward} />{drop > 0 && <SharedBar left={0} top={OPEN_BAR} width={W} h={drop} />}</>,
@@ -267,11 +268,12 @@ function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signa
     };
   }
   // Closed: window-relative tops of the column's buttons (close, page menu, back, the pill), clear of the camera
-  // turned. Upright close follows Live Activities as Safari's buttons do (how far is not yet measured).
+  // turned (real sim: close 174, back 428 upright). Live Activities do not push them, unlike a tab's column; the
+  // island then holds the column's top and the clock would sit on close, so it is left out (inferred, not measured).
   const col: Side = portrait || s.turn > 0 ? "right" : "left", angle = portrait ? 0 : s.turn > 0 ? 270 : 90;
   const win = portrait ? { x: 8, y: 4, w: 450, h: 670 } : { x: 8, y: 4, w: 662, h: 458 };
   const page = portrait ? { w: 366, h: 600 } : { w: 578, h: 388 }, band = win.h - page.h, colW = win.w - page.w, pageX = col === "left" ? colW : 0;
-  const close = portrait ? DUO.top + push - win.y : col === "left" ? 78 : 28;
+  const close = portrait ? 174 : col === "left" ? 78 : 28;
   const at = { close, back: close + (portrait ? 254 : 134), pill: close + (portrait ? 314 : 194) };
   const address = portrait ? { x: 26, w: 330 } : col === "left" ? { x: 86, w: 482 } : { x: 94, w: 482 };
   const signals = vis(sig(page, win, { insetBottom: 34, screen: safariScreen(page), angle }), win.y + band), mode = modeOf(signals);
@@ -281,7 +283,7 @@ function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signa
     frame: mode === "column" ? { x: 0, y: band, w: win.w, h: page.h } : { x: pageX, y: band, ...page },
     chrome: sheet(win, <>
       <PreviewBand width={win.w} h={band} host={host} address={address} />
-      <PreviewColumn x={col === "left" ? 0 : page.w} top={band} h={win.h} col={col} clock={portrait ? 84 + push - win.y : undefined} at={at} over={mode === "column"} />
+      <PreviewColumn x={col === "left" ? 0 : page.w} top={band} h={win.h} col={col} clock={portrait && !push ? 84 - win.y : undefined} at={at} over={mode === "column"} />
     </>),
     note: portrait
       ? "A link from Messages opens in a page sheet with its own column, like a tab's with different buttons. Duet paints its controls into the free gap between its menu and back buttons."
