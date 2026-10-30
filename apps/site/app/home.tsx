@@ -154,8 +154,22 @@ function Page() {
         </div>
       </Section>
 
-      <footer className="foot" style={column(980, 20)}>MIT licensed. Not affiliated with Apple.</footer>
+      <Footer />
     </main>
+  );
+}
+
+/** The OpenMake footer shared with RegTail and OpenTraces: credit on the left, product wordmark on the right. */
+function Footer() {
+  return (
+    <footer className="foot" style={column(980, 20)}>
+      <div className="foot-row">
+        <p>©2026 Duet · Built by <a href="https://openmake.ai" target="_blank" rel="noreferrer" className="foot-om"><span className="foot-mark" aria-hidden />OpenMake</a></p>
+        <span className="foot-brand">Duet</span>
+      </div>
+      <p>Made by <a href="https://github.com/JayFarei" target="_blank" rel="noreferrer">Gabriele Farei</a> · <a href="https://farei.me/posts" target="_blank" rel="noreferrer">Blog</a></p>
+      <p>MIT licensed. Not affiliated with Apple.</p>
+    </footer>
   );
 }
 
