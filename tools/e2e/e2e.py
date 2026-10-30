@@ -1200,7 +1200,7 @@ class Run:
         n = style
         t = s.tok(n)
         # xsheet stops at the status column closed upright, so it is not a Duo there (#243) and the site drops Duet.
-        exp = {"preview": False} if style == "xsheet" else {"preview": False, "mode": "inline", "side": "right"}
+        exp = {"preview": False, "hidden": True} if style == "xsheet" else {"preview": False, "mode": "inline", "side": "right"}
         what = "app web view" if style == "webview" else "X-style web view sheet"
         s.step(f"{n}-0", "webview", t, s.open_preview(t, style), exp, f"{what}, closed, upright")
         s.step(f"{n}-on", "webview", t, s.la(t, "webview", on=True), exp, f"{what}: Live Activity starts", video=True)
