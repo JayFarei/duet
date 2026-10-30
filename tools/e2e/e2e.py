@@ -318,6 +318,7 @@ class Run:
         if callable(expect):
             expect = res["expect"] = expect(allr[-1]["sig"] if allr else None)
         res["position"] = s.position
+        s.wide = bool(allr) and allr[-1]["sig"]["outerWidth"] > 900
         native = s.native(kind, allr[-1]["sig"]["angle"] if allr else 0)
         shot = s.screenshot(sid)
         s.assess(res, allr, native, expect, t0, kind, prev)
@@ -359,7 +360,9 @@ class Run:
         inner display do not map (README), so the simulator helper describes the app by pid, in points of its window
         (the pane in split view), which works for either split pane."""
         if kind == "webview":
-            return s.status_column() + (s.island(angle) if s.la_on else []) if s.position != "open" else []
+            if s.position == "open":  # wide (951x669): the status column heads the right edge; tall: a row above the page
+                return [{"type": 0, "label": "Status column", "id": "status", "x": 867, "y": 0, "w": 84, "h": 173.3}] if getattr(s, "wide", False) else []
+            return (s.status_column() if angle == 0 else []) + (s.island(angle) if s.la_on else [])
         bundle = PREVIEW_SVC if kind == "preview" else SAFARI
         if s.position != "open":
             r = cmd("elements", bundle=bundle)
@@ -1175,6 +1178,13 @@ class Run:
         s.step("webview-0", "webview", t, s.open_preview(t, "webview"), exp, "app web view, closed, upright")
         s.step("webview-on", "webview", t, s.la(t, "webview", on=True), exp, "app web view: Live Activity starts", video=True)
         s.step("webview-off", "webview", t, s.la(t, "webview", on=False), exp, "app web view: Live Activity ends", video=True)
+        any_ = {"preview": False}
+        s.step("webview-90", "webview", t, s.rotate(t, 90), any_, "app web view, closed, turn to 90", video=True)
+        s.step("webview-270", "webview", t, s.rotate(t, 270), any_, "app web view, closed, turn to 270", video=True)
+        s.step("webview-back0", "webview", t, s.rotate(t, 0), exp, "app web view, closed, back upright", video=True)
+        s.step("webview-open", "webview", t, s.unfold(t, 0), any_, "app web view, unfold wide", video=True)
+        s.step("webview-open-tall", "webview", t, s.unfold(t, 90), any_, "app web view, unfolded tall", video=True)
+        s.step("webview-fold", "webview", t, s.fold_closed(t, 0), exp, "app web view, fold back closed upright", video=True)
 
     def scenario_open_safari(s, angle):
         t = s.tok(f"pvos{angle}")

@@ -37,3 +37,20 @@ test("Home Screen app and turned web view: unchanged", () => {
   assert.equal(detect(sig({ standalone: true })).clearTop, undefined);
   assert.equal(detect(sig({ innerWidth: 678, innerHeight: 466, outerWidth: 678, outerHeight: 466, screenWidth: 678, screenHeight: 466, angle: 90 })).clearTop, undefined);
 });
+
+// Unfolded, measured the same way (2026-10-30): wide, inner = outer = 951x669 at angle 270, inset bottom 34, no side
+// inset, the status column heading the right edge; tall, 669x951 with the status row above the controls.
+const open = (o = {}) => sig({ innerWidth: 951, innerHeight: 669, outerWidth: 951, outerHeight: 669, visualHeight: 669, screenWidth: 951, screenHeight: 669, angle: 270, ...o });
+
+test("web view, open wide: inline right, clear of the status column", () => {
+  const c = detect(open());
+  assert.deepEqual([c.mode, c.side, c.clearTop], ["inline", "right", DUO.top + DUO.island]);
+  const column = { ...STATUS, x: 951 - 84 };
+  for (const spec of SPECS) for (const g of template(frame(c), spec).placed)
+    assert.ok(!hit(g.rect, column), `${g.group.map((x) => x.kind).join("+")} at ${g.rect.x},${g.rect.y} under the status column (${JSON.stringify(spec)})`);
+});
+
+test("open: a Safari tab (chrome 126) and the tall web view are unchanged", () => {
+  assert.equal(detect(open({ userAgent: X + " Safari/604.1", innerHeight: 543, visualHeight: 543 })).clearTop, undefined);
+  assert.equal(detect(open({ innerWidth: 669, innerHeight: 951, outerWidth: 669, outerHeight: 951, visualHeight: 951, screenWidth: 669, screenHeight: 951, angle: 0 })).clearTop, undefined);
+});
