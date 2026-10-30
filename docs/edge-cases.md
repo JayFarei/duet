@@ -367,6 +367,22 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** hide your X with `html[data-duet-close] .sheet-x { display: none; }` instead of the column-mode selector.
 - **Status:** [#135](https://github.com/JayFarei/duet/issues/135).
 
+## Sheet X returns during a fade-out
+
+- **You see:** a sheet that fades out shows its own X again for the length of the fade.
+- **Cause:** `data-duet-close` drops as soon as the `close` prop goes undefined, and the recipe's selector stops matching while the sheet is still on screen.
+- **Duet does:** nothing, the attribute follows the prop.
+- **You do:** keep passing `close` until the fade ends, or keep your X hidden for the whole fade yourself.
+- **Status:** [#245](https://github.com/JayFarei/duet/issues/245).
+
+## Open menu is see-through
+
+- **You see:** on a busy page, logos, buttons or large text behind the open "…" menu stay sharp and collide with its rows.
+- **Cause:** the menu's glass did not blur and `--duet-menu` defaulted to transparent.
+- **Duet does:** the open menu blurs the page behind it and tints it 62% in both themes. The rail keeps its clear glass.
+- **You do:** nothing. To change the tint, set `--duet-menu`.
+- **Status:** [#184](https://github.com/JayFarei/duet/issues/184).
+
 ## No close for a sheet in the in-app preview
 
 - **You see:** in the in-app preview on the closed screen (sheet or full screen), a page sheet opened with `close` has no close button at all: Duet shows none and the sheet's own X is hidden.

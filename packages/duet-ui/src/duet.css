@@ -12,7 +12,7 @@
      --duet-icon-weight     stroke width of SVG line icons (2)
      --duet-badge, --duet-badge-neutral, --duet-badge-ink   badge fills (alert, neutral) and text
      --duet-solid           opaque surface: the sidebar, the badge's ring
-     --duet-frost, --duet-menu   tint of capsules and of the open menu, over the glass
+     --duet-frost, --duet-menu   tint of capsules, and of the open menu over its blur
      --duet-sel, --duet-lift     selection and press highlight
      --duet-dim             menu headers
    Icons size and weigh your own SVGs and font glyphs (font-size: 1em); the system glyphs keep theirs.
@@ -30,7 +30,7 @@
   --duet-frost: transparent;
   --duet-lift: rgb(255 255 255 / 0.18);
   --duet-sel: rgb(60 60 67 / 0.18);
-  --duet-menu: transparent;
+  --duet-menu: rgb(255 255 255 / 0.62);
   --duet-ink: #000; --duet-dim: rgb(60 60 67 / 0.6);
   --duet-tint: #0088ff;
   --duet-icon-size: 22px; --duet-tab-icon-size: 24px; --duet-icon-weight: 2;
@@ -48,7 +48,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-lg-theme="light"]) .duet {
     --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
-    --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
+    --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-menu: rgb(28 28 30 / 0.62); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
     --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
     --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18);
@@ -56,7 +56,7 @@
 }
 [data-lg-theme="dark"] .duet {
   --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
-  --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
+  --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-menu: rgb(28 28 30 / 0.62); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
   --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
   --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
   --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18);
@@ -66,7 +66,7 @@
 @media (prefers-color-scheme: light) {
   .duet[data-mode="column"] .duet-group {
     --duet-ink: #000;
-    --duet-glass-sharp: contrast(0.2675) brightness(1.3925) saturate(2.1); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
+    --duet-menu: rgb(255 255 255 / 0.62); --duet-glass-sharp: contrast(0.2675) brightness(1.3925) saturate(2.1); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
     --duet-glass-edge: 0 0 0 0.5px rgb(0 0 0 / 0.1), -0.75px 0 0 -0.25px rgb(0 0 0 / 0.22), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.22);
     --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08);
   }
@@ -74,7 +74,7 @@
 @media (prefers-color-scheme: dark) {
   .duet[data-mode="column"] .duet-group {
     --duet-ink: #fff;
-    --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
+    --duet-menu: rgb(28 28 30 / 0.62); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
     --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
   }
@@ -130,7 +130,8 @@
 .duet-blob { z-index: 51; overflow: hidden; contain: layout; box-shadow: var(--duet-glass-edge), var(--duet-shadow-overlay); }
 /* Own radius: WebKit skips the blob's rounded overflow clip once the glass beside it composites (backdrop-filter),
    so an unrounded fill showed as a square behind the menu in dark mode. */
-.duet-fill { position: absolute; inset: 0; border-radius: inherit; background: var(--duet-glass-lg); pointer-events: none; }
+/* Frost: only the open menu has this fill, so the rail keeps its clear glass and the page behind stays off the rows (#184). */
+.duet-fill { position: absolute; inset: 0; border-radius: inherit; background: var(--duet-glass-lg); pointer-events: none; -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
 .duet-fill::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--duet-menu); }
 .duet-face { position: absolute; left: 50%; top: 50%; translate: -50% -50%; pointer-events: none; }
 .duet-face > span { position: absolute; left: 0; width: 100%; height: 49px; display: grid; place-items: center; }
