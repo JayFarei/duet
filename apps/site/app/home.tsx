@@ -42,11 +42,11 @@ const ISLANDS: [string, string, string, string][] = [
 
 /** One page for every screen, navigated by its own Duet controls, with the web Duo playing on a stage. On a Duo too:
  *  the page is a demo there already, and the stage lets the reader try every other posture on the device (#165). */
-export function Home() {
-  return <Site />;
+export function Home({ downloads }: { downloads: number | null }) {
+  return <Site downloads={downloads} />;
 }
 
-function Site() {
+function Site({ downloads }: { downloads: number | null }) {
   const [tab, setTab] = useState("top");
   // A portrait iPhone gets an iPhone's bars, with a button to try the Duo's side controls on it.
   const { device, width, height } = useDuet();
@@ -55,7 +55,7 @@ function Site() {
   const { tint } = useTint();
   const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
   const portrait = device === "iphone" && height > width;
-  if (portrait && !sides) return <Bars tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
+  if (portrait && !sides) return <Bars downloads={downloads} tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
       menu={{ items: SECTIONS, selected: tab, onSelect: go, burger: false }}
@@ -68,14 +68,14 @@ function Site() {
       tint={tint}
     >
       {/* On a portrait iPhone the side controls float over the page, which keeps the layout of the bars. */}
-      {portrait ? <div className="float"><Page /></div> : <Page />}
+      {portrait ? <div className="float"><Page downloads={downloads} /></div> : <Page downloads={downloads} />}
     </Duet>
   );
 }
 
 /** The page as an iPhone app would show it: actions in a top bar, sections in a tab bar at the bottom. The document
  *  itself scrolls, so the page runs on under Safari's toolbar. */
-function Bars({ tab, setTab, go, onSides, theme }: { tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void; theme: ReturnType<typeof useTheme> }) {
+function Bars({ downloads, tab, setTab, go, onSides, theme }: { downloads: number | null; tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void; theme: ReturnType<typeof useTheme> }) {
   useEffect(() => {
     // Duet leaves its insets on <html> when it steps aside; here nothing floats beside the page.
     const html = document.documentElement;
@@ -93,7 +93,7 @@ function Bars({ tab, setTab, go, onSides, theme }: { tab: string; setTab: (id: s
   }, [setTab]);
   return (
     <div className="bars">
-      <Page />
+      <Page downloads={downloads} />
       <div className="bar-top">
         <button className="bar-glass bar-try" onClick={onSides}><PanelRight size={18} />Side controls</button>
         <span className="bar-end">
@@ -112,11 +112,14 @@ function Bars({ tab, setTab, go, onSides, theme }: { tab: string; setTab: (id: s
   );
 }
 
-function Page() {
+function Page({ downloads }: { downloads: number | null }) {
   return (
     <main>
       <section id="top" className="hero" style={column(980, 20)}>
-        <p className="eyebrow">duet-ui {pkg.version}</p>
+        <a className="eyebrow" href="https://www.npmjs.com/package/duet-ui" target="_blank" rel="noreferrer">
+          <b>duet-ui</b><span>{pkg.version}</span>
+          {downloads !== null && <span>{downloads.toLocaleString("en-US")} downloads<i> last month</i></span>}
+        </a>
         <h1 className="display">
           Native-feeling controls for web apps on the <em>iPhone Duo.</em>
         </h1>
