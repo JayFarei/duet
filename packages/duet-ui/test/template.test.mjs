@@ -34,15 +34,26 @@ test("allocate: rest keeps \"…\", inline splits the burger off, nothing to sho
   assert.deepEqual(allocate(1000, 0).groups, []);
 });
 
-test("allocate: no room for the primary's own group, unsplit it leads one capsule with \"…\", the burger folding", () => {
+test("allocate: no room for the primary's own group, it sits beside the stack, the burger kept", () => {
   // The closed Duo's column band (92pt, a lone group 12 more): [burger, …] + [primary] needs 160.7.
   const a = allocate(92, 3, { menu: true, primary: true, extra: 12 });
-  assert.deepEqual(kinds(a.groups), [["primary", "more"]]);
-  assert.deepEqual([a.shown, a.primary], [0, true]);
-  // Inline (split) keeps the burger and folds the primary into "…" instead.
-  assert.equal(allocate(92, 3, { menu: true, primary: true, split: true, extra: 12 }).primary, false);
+  assert.deepEqual(kinds(a.groups), [["menu", "more"], ["primary"]]);
+  assert.deepEqual([a.shown, a.primary, a.beside], [0, true, true]);
+  assert.equal(allocate(92, 3, { menu: true, primary: true, split: true, extra: 12 }).beside, true);
   // Room for its own group still wins.
-  assert.deepEqual(kinds(allocate(170, 0, { menu: true, primary: true }).groups), [["menu"], ["primary"]]);
+  const own = allocate(170, 0, { menu: true, primary: true });
+  assert.deepEqual([kinds(own.groups), own.beside], [[["menu"], ["primary"]], undefined]);
+});
+
+test("place: the primary's pill reaches toward the page, beside the stack where it has no room in it", () => {
+  const col = frame(detect(sig(382, 580, 466, 678)));
+  const t = template(col, { menu: true, actions: 3, primary: true, pill: 60 }).placed;
+  const stack = t[0].rect, p = t.at(-1).rect;
+  assert.equal(p.w, TEMPLATE.control + 60);
+  // A right column: the page is to the left, so the pill ends left of the stack, level with its middle.
+  assert.equal(col.side, "right");
+  assert.ok(p.x + p.w <= stack.x, `${p.x + p.w} > ${stack.x}`);
+  assert.ok(Math.abs(p.y + p.h / 2 - (stack.y + stack.h / 2)) < 0.01);
 });
 
 test("template: a sheet's close alone, the open sidebar's burger alone, the preview's \"…\" alone", () => {

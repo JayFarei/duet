@@ -23,9 +23,9 @@ export interface DuetItem {
   /** Lives in "…" even where the column has room for it, after the actions that folded for room. */
   folded?: boolean;
 }
-/** The page's call to action (Pay $48.00), a tinted capsule. A tap grows it into a box beside the column, its label
- *  over a `confirm` button (default: the label) that calls onPress and collapses the box back into the capsule.
- *  `confirm: false`: one tap, no box. */
+/** The page's call to action (Pay $48.00), a tinted capsule with its icon and label that reaches out of the controls
+ *  toward the page. A tap grows it into a box beside the column, its label over a `confirm` button (default: the
+ *  label) that calls onPress and collapses the box back into the capsule. `confirm: false`: one tap, no box. */
 export type DuetPrimary = DuetItem & { confirm?: string | false };
 /** A place in the app, listed in the sidebar the burger opens. */
 export interface DuetMenuItem<T extends string = string> {
@@ -183,6 +183,18 @@ function viewport(key: string, value: string) {
 if (typeof document !== "undefined") viewport("shrink-to-fit", "no");
 // useLayoutEffect warns during SSR on React 18.
 const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** How far the primary's capsule reaches past a button for its label (duet.css .duet-cta-label): the text, its end
+ *  padding, at most PILL_MAX, past which the label ellipses. The server and the first render guess from the length,
+ *  so hydration matches; a layout effect measures it before paint. */
+const PILL_MAX = 168, PILL_FONT = "600 16px -apple-system, system-ui, sans-serif";
+let measure: CanvasRenderingContext2D | null | undefined;
+const pillFor = (label: string, exact: boolean) => {
+  if (exact) measure ??= document.createElement("canvas").getContext("2d");
+  if (measure) measure.font = PILL_FONT;
+  const w = exact && measure ? measure.measureText(label).width : label.length * 9;
+  return Math.min(PILL_MAX, Math.ceil(w) + 18);
+};
 
 // Leaving the column, the sideways scroll the layer pinned stays behind: from a split left pane turned into the tall
 // window (inline), the document kept scrollX -84 with nothing to scroll, and Safari then painted the pill's glass but
@@ -483,6 +495,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   // The copy whose column opened "…" draws its menu; the other copy's column is in the other pane.
   const [menuSide, setMenuSide] = useState<Side>(ctx.side);
   const inner = p.children !== undefined; // the inner scroller, which runs on under Safari's column
+  const plabel = p.primary?.label ?? "";
+  const [pill, setPill] = useState(() => pillFor(plabel, false));
+  useLayout(() => setPill(pillFor(plabel, true)), [plabel]);
 
   // The template for one side: its groups, where they go, and what "…" lists.
   const layout = (side: Side) => {
@@ -490,7 +505,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const inline = f.kind === "inline";
     const burger = !!p.menu && p.menu.burger !== false;
     const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger ? 1 : 0);
-    const a = template(f, { close: !!p.close, menu: burger, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" }), placed = a.placed;
+    const a = template(f, { close: !!p.close, menu: burger, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed", pill }), placed = a.placed;
     // No burger (the preview): the app's places lead "…" under "Menu".
     const places = p.menu && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
     const list: DuetItem[] = [
@@ -607,7 +622,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const label = (s: Slot) => s.kind === "menu" ? "Menu" : s.kind === "more" ? "More" : s.kind === "close" ? (p.close && p.close.label) || "Close"
     : s.kind === "primary" ? p.primary!.label : actions[s.index].label;
   const icon = (s: Slot) => s.kind === "menu" ? <Menu size={22} /> : s.kind === "more" ? <Ellipsis size={22} /> : s.kind === "close" ? <X size={22} strokeWidth={2.2} />
-    : s.kind === "primary" ? <span className="duet-cta-icon" style={p.primary!.tint ? { "--duet-tint": p.primary!.tint } as CSSProperties : undefined}>{p.primary!.icon}</span> : actions[s.index].icon;
+    : s.kind === "primary" ? <><span className="duet-cta-icon" style={p.primary!.tint ? { "--duet-tint": p.primary!.tint } as CSSProperties : undefined}>{p.primary!.icon}</span><span className="duet-cta-label">{p.primary!.label}</span></> : actions[s.index].icon;
   const press = (s: Slot) => {
     if (s.kind === "menu") { dismiss(); setSidebar((v) => (v === "open" ? "closing" : "open")); }
     else if (s.kind === "more") { if (split) setMenuSide(tapSide); setArmed(false); closeAsk(); setMore((m) => (m === "open" ? "closing" : "open")); }
@@ -671,7 +686,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
           </Morph>
         )}
         {drawsAsk && askAt && (
-          <Morph open={ask === "open"} from={askAt.rect} slots={askAt.group.map(icon)} box={confirmBox(f, askAt.rect)} onClosed={() => setAsk("closed")} role="dialog" label={p.primary!.label}>
+          <Morph open={ask === "open"} from={askAt.rect} slots={askAt.group.map((s) => <span className="duet-cta-face">{icon(s)}</span>)} box={confirmBox(f, askAt.rect)} onClosed={() => setAsk("closed")} role="dialog" label={p.primary!.label}>
             <div className="duet-confirm-head" style={tint}>{p.primary!.icon}<span>{p.primary!.label}</span></div>
             <button className="duet-row duet-confirm" style={tint} onClick={() => { setAsk("closing"); p.primary!.onPress?.(); }}>
               <span>{p.primary!.confirm || p.primary!.label}</span>

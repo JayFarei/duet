@@ -113,11 +113,18 @@
 .duet-group:has(.duet-btn:active)::before { background: var(--duet-lift); }
 .duet-btn[data-destructive] { color: #ff3b30; }
 
-/* The primary: a tinted capsule, or a tinted disc leading "…" in one capsule where the band holds two buttons. A tap
-   grows it into its confirmation box (the "…" morph, below). */
+/* The primary: a tinted capsule reaching out of the controls toward the page, its icon at the column's end and its
+   label past it (beside the stack where the band holds two buttons). A tap grows it into its confirmation box (the
+   "…" morph, below). */
 .duet-group[data-primary] { background: var(--duet-tint); color: #fff; box-shadow: 0 6px 20px color-mix(in srgb, var(--duet-tint) 35%, transparent); }
 .duet-group[data-primary]::before, .duet-group[data-primary]::after { content: none; }
 .duet-group[data-primary] > .duet-rim { display: none; }
+.duet .duet-group[data-primary] .duet-btn, .duet-cta-face { justify-content: flex-start; gap: 2px; padding: 0 4px; box-sizing: border-box; }
+.duet[data-side="right"] .duet-group[data-primary] .duet-btn, .duet[data-side="right"] .duet-cta-face { flex-direction: row-reverse; }
+.duet-cta-face { display: flex; align-items: center; width: 100%; height: 49px; }
+.duet-group[data-primary]:has(.duet-btn:active) { scale: 1.05; }
+.duet-cta-label { flex: 1; min-width: 0; padding: 0 12px 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; font: 600 16px/1 -apple-system, system-ui, sans-serif; color: #fff; }
+.duet[data-side="right"] .duet-cta-label { padding: 0 4px 0 12px; }
 .duet-cta-icon { display: grid; place-items: center; flex: none; width: 41px; height: 41px; border-radius: 50%; background: var(--duet-tint); color: #fff; font-size: var(--duet-icon-size); }
 .duet-confirm-head { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; box-sizing: border-box; font: 600 17px/1 -apple-system, system-ui, sans-serif; color: var(--duet-ink); white-space: nowrap; }
 .duet-confirm-head > svg { width: var(--duet-icon-size); height: var(--duet-icon-size); flex: none; color: var(--duet-tint); }

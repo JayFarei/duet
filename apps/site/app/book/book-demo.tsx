@@ -27,24 +27,24 @@ const row: CSSProperties = { display: "flex", alignItems: "center", gap: 12, wid
 
 export function BookDemo() {
   const desktop = useDesktop();
-  return desktop ? <WebDuo src="/book" title="Call to action" intro="Open a class: its page puts Book by the thumb and folds the rest into “…”. Tap Book: the button grows into a confirmation, and booking folds it back as Booked." />
+  return desktop ? <WebDuo src="/book" title="Call to action" intro="A class page's call to action is part of the controls: a tinted Book pill reaching out of them toward the page. Tap it: it grows into a confirmation, and booking folds it back as Booked." />
     : <div className={desktop === null ? "ssr-site" : undefined}><Book /></div>;
 }
 
-// The open class lives in the URL (?c=sauna), so the back gesture and Duet's Classes action walk the same history.
+// The open class lives in the URL (?c=yoga, the list is ?c=list, none opens the sauna), so the back gesture and Duet's Classes action walk the same history.
 function Book() {
   const [tab, setTab] = useState<Tab>("home");
-  const [open, setOpen] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>("sauna");
   const [booked, setBooked] = useState<ReadonlySet<string>>(new Set());
   const [liked, setLiked] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => {
-    const sync = () => setOpen(new URLSearchParams(location.search).get("c"));
+    const sync = () => setOpen(new URLSearchParams(location.search).get("c") ?? "sauna");
     sync();
     addEventListener("popstate", sync);
     return () => removeEventListener("popstate", sync);
   }, []);
-  const go = (id: string | null) => {
-    history.pushState(null, "", id ? `?c=${id}` : location.pathname);
+  const go = (id: string) => {
+    history.pushState(null, "", `?c=${id}`);
     setOpen(id);
   };
   const toggle = (set: ReadonlySet<string>, id: string) => { const n = new Set(set); if (!n.delete(id)) n.add(id); return n; };
@@ -61,7 +61,7 @@ function Book() {
       <div style={{ height: 180, borderRadius: 20, background: "linear-gradient(135deg, #ff9f0a, #ff375f)", marginBottom: 20 }} />
       <h1 style={title}>{c.name}</h1>
       <p style={{ ...dim, marginBottom: 16 }}>{c.when} · {c.credits} credit{c.credits > 1 ? "s" : ""}</p>
-      <p style={dim}>The page passes a primary, so the controls hold one call to action: its own capsule where there is room, else leading “…” in one capsule, the menu folding into the list. A tap grows it into a confirmation box beside the column; confirming books and the box folds back into the capsule, now Booked. Share and Favourite are folded into “…” even where there is room for them. {isBooked ? "Booked: tap the green button, then Cancel booking, to cancel." : "Tap Book, then Book with credits."}</p>
+      <p style={dim}>The page passes a primary, so the controls hold one call to action, always on screen: a tinted pill with its label, reaching out of the controls toward the page, under the others where there is room, else beside them. A tap grows it into a confirmation box beside the column; confirming books and the box folds back into the pill, now Booked. Share and Favourite are folded into “…” even where there is room for them. {isBooked ? "Booked: tap the green button, then Cancel booking, to cancel." : "Tap Book, then Book with credits."}</p>
     </main>
   ) : (
     <main style={{ paddingTop: "calc(24px + env(safe-area-inset-top))", paddingBottom: 140, ...bleed(20) }}>
@@ -77,7 +77,7 @@ function Book() {
   );
   return (
     <Duet<Tab>
-      menu={{ items: TABS, selected: tab, onSelect: (t) => { setTab(t); if (c) go(null); } }}
+      menu={{ items: TABS, selected: tab, onSelect: (t) => { setTab(t); if (c) go("list"); } }}
       primary={primary}
       actions={c ? [
         { id: "back", label: "Classes", icon: <ArrowLeft size={22} />, onPress: () => history.back() },
