@@ -41,10 +41,9 @@ for (const [name, c] of Object.entries(CONTEXTS)) {
     const [top, bottom] = band(c), f = frame(c);
     for (const s of SPECS) {
       const t = template(f, s), why = `${JSON.stringify(s)} -> ${JSON.stringify(t.groups)}`;
-      // A primary beside the stack sits level with it, toward the page, clear of the column's stack.
-      const stack = t.beside ? t.placed.slice(0, -1) : t.placed;
-      if (t.beside) { const p = t.placed.at(-1).rect, x = stack[0].rect.x; assert.ok(f.side === "right" ? p.x + p.w <= x : p.x >= x + TEMPLATE.control, `beside overlaps: ${why}`); }
-      const rects = t.placed.map((g) => g.rect).sort((a, b) => a.y - b.y).filter((r) => !t.beside || r !== t.placed.at(-1).rect);
+      const rects = t.placed.map((g) => g.rect).sort((a, b) => a.y - b.y);
+      // Every control stays in the column's strip, one button wide.
+      for (const r of rects) assert.equal(r.w, TEMPLATE.control, why);
       // A lone group may reach closer to Safari's buttons than the band's gap, never closer than RAIL.gap.
       const slack = rects.length === 1 && f.kind === "column" ? DUO.gap - RAIL.gap : 0;
       for (const r of rects) assert.ok(r.y >= top - slack - 0.01 && bottomOf(r) <= bottom + slack + 0.01, `outside [${top}, ${bottom}]: ${why}`);
@@ -53,10 +52,12 @@ for (const [name, c] of Object.entries(CONTEXTS)) {
       assert.equal(slots.filter((x) => x.kind === "action").length, t.shown, why);
       // Whatever is not on screen is behind "…".
       if (t.shown < s.actions || (s.primary && !t.primary) || s.rest) assert.ok(has("more"), `hidden items with no "…": ${why}`);
-      // One button of room keeps "…", which then lists the menu's places too. Two keep the burger.
-      if (s.menu && bottom - top + 2 * slack >= TEMPLATE.control + TEMPLATE.item) assert.ok(has("menu"), `no burger: ${why}`);
-      // The primary folds only when no arrangement keeps it.
-      if (s.primary && !t.primary) assert.ok(bottom - top < 2 * TEMPLATE.control + DUO.gap + (s.menu ? TEMPLATE.item : 0), `primary folded needlessly: ${why}`);
+      // One button of room keeps "…", which then lists the menu's places too. Two keep the burger, or the primary in its slot.
+      if (s.menu && bottom - top + 2 * slack >= TEMPLATE.control + TEMPLATE.item) assert.ok(has("menu") || has("primary"), `no burger: ${why}`);
+      // A burger gone from the screen leaves its places behind "…".
+      if (s.menu && !has("menu") && slots.length) assert.ok(has("more"), `places unreachable: ${why}`);
+      // The primary folds only when one button is all that fits.
+      if (s.primary && !t.primary) assert.ok(bottom - top + 2 * slack < TEMPLATE.control + TEMPLATE.item, `primary folded needlessly: ${why}`);
     }
   });
 }

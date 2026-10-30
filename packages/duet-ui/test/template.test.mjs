@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { detect } from "../src/geometry.ts";
-import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, confirmBox, primaryTap, spring, template } from "../src/template.ts";
+import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, confirmBox, primaryTap, slotRect, spring, template } from "../src/template.ts";
 
 const kinds = (groups) => groups.map((g) => g.map((s) => s.kind === "action" ? s.index : s.kind));
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -34,26 +34,24 @@ test("allocate: rest keeps \"…\", inline splits the burger off, nothing to sho
   assert.deepEqual(allocate(1000, 0).groups, []);
 });
 
-test("allocate: no room for the primary's own group, it sits beside the stack, the burger kept", () => {
+test("allocate: no room for the primary's own group, it takes the burger's slot above \"…\"", () => {
   // The closed Duo's column band (92pt, a lone group 12 more): [burger, …] + [primary] needs 160.7.
   const a = allocate(92, 3, { menu: true, primary: true, extra: 12 });
-  assert.deepEqual(kinds(a.groups), [["menu", "more"], ["primary"]]);
-  assert.deepEqual([a.shown, a.primary, a.beside], [0, true, true]);
-  assert.equal(allocate(92, 3, { menu: true, primary: true, split: true, extra: 12 }).beside, true);
-  // Room for its own group still wins.
-  const own = allocate(170, 0, { menu: true, primary: true });
-  assert.deepEqual([kinds(own.groups), own.beside], [[["menu"], ["primary"]], undefined]);
+  assert.deepEqual(kinds(a.groups), [["primary", "more"]]);
+  assert.deepEqual([a.shown, a.primary], [0, true]);
+  assert.deepEqual(kinds(allocate(92, 3, { menu: true, primary: true, split: true, extra: 12 }).groups), [["primary", "more"]]);
+  // Room for its own group still wins, and one button of room folds it into "…".
+  assert.deepEqual(kinds(allocate(170, 0, { menu: true, primary: true }).groups), [["menu"], ["primary"]]);
+  const one = allocate(60, 3, { menu: true, primary: true });
+  assert.deepEqual([kinds(one.groups), one.primary], [[["more"]], false]);
 });
 
-test("place: the primary's pill reaches toward the page, beside the stack where it has no room in it", () => {
+test("place: controls stay in the column, the primary's slot is one button in the shared capsule", () => {
   const col = frame(detect(sig(382, 580, 466, 678)));
-  const t = template(col, { menu: true, actions: 3, primary: true, pill: 60 }).placed;
-  const stack = t[0].rect, p = t.at(-1).rect;
-  assert.equal(p.w, TEMPLATE.control + 60);
-  // A right column: the page is to the left, so the pill ends left of the stack, level with its middle.
-  assert.equal(col.side, "right");
-  assert.ok(p.x + p.w <= stack.x, `${p.x + p.w} > ${stack.x}`);
-  assert.ok(Math.abs(p.y + p.h / 2 - (stack.y + stack.h / 2)) < 0.01);
+  const t = template(col, { menu: true, actions: 3, primary: true }).placed;
+  assert.deepEqual([t.length, t[0].rect.w, t[0].primary], [1, TEMPLATE.control, false]);
+  assert.deepEqual(slotRect(t[0], "primary"), { ...t[0].rect, h: TEMPLATE.control });
+  assert.equal(slotRect(t[0], "more").y, t[0].rect.y + TEMPLATE.item);
 });
 
 test("template: a sheet's close alone, the open sidebar's burger alone, the preview's \"…\" alone", () => {

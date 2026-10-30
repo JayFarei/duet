@@ -27,7 +27,7 @@ const row: CSSProperties = { display: "flex", alignItems: "center", gap: 12, wid
 
 export function BookDemo() {
   const desktop = useDesktop();
-  return desktop ? <WebDuo src="/book" title="Call to action" intro="A class page's call to action is part of the controls: a tinted Book pill reaching out of them toward the page. Tap it: it grows into a confirmation, and booking folds it back as Booked." />
+  return desktop ? <WebDuo src="/book" title="Call to action" intro="A class page's call to action is a control: a tinted button in the controls, in the burger's slot on the closed Duo. Tap it: it grows into a confirmation, and booking folds it back as Booked." />
     : <div className={desktop === null ? "ssr-site" : undefined}><Book /></div>;
 }
 
@@ -61,7 +61,7 @@ function Book() {
       <div style={{ height: 180, borderRadius: 20, background: "linear-gradient(135deg, #ff9f0a, #ff375f)", marginBottom: 20 }} />
       <h1 style={title}>{c.name}</h1>
       <p style={{ ...dim, marginBottom: 16 }}>{c.when} · {c.credits} credit{c.credits > 1 ? "s" : ""}</p>
-      <p style={dim}>The page passes a primary, so the controls hold one call to action, always on screen: a tinted pill with its label, reaching out of the controls toward the page, under the others where there is room, else beside them. A tap grows it into a confirmation box beside the column; confirming books and the box folds back into the pill, now Booked. Share and Favourite are folded into “…” even where there is room for them. {isBooked ? "Booked: tap the green button, then Cancel booking, to cancel." : "Tap Book, then Book with credits."}</p>
+      <p style={dim}>The page passes a primary, so the controls hold one call to action, always on screen: a tinted button in its own group under the others where there is room, else in the burger's slot above “…”, which then lists the places. A tap grows it into a confirmation box beside the column; confirming books and the box folds back into the button, now Booked. Share and Favourite are folded into “…” even where there is room for them. {isBooked ? "Booked: tap the green button, then Cancel booking, to cancel." : "Tap Book, then Book with credits."}</p>
     </main>
   ) : (
     <main style={{ paddingTop: "calc(24px + env(safe-area-inset-top))", paddingBottom: 140, ...bleed(20) }}>
