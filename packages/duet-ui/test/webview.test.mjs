@@ -29,8 +29,27 @@ test("web view, closed, upright, controls on the left: nothing to clear", () => 
   assert.equal(detect(sig(), "left").clearTop, undefined);
 });
 
-test("web view short of the screen (a sheet, a bar above it): unchanged", () => {
-  assert.equal(detect(sig({ innerHeight: 600, outerHeight: 600 })).clearTop, undefined);
+// X's in-app browser as of 2026-10 (user's report on #194, e2e host style "xsheet"): the web view is full width on the
+// screen's top 61%, X's bar and the tweet card below it, so the page reads 466x413 and landscape.
+// Measured (e2e xsheet, 2026-10-30): closed upright inner = outer = 466x414, screen 678x466, inset right 84, bottom 0;
+// open wide 951x408, screen still 678x466, angle 270.
+test("X sheet, closed, upright: full width, short, still clear of the status column", () => {
+  const c = detect(sig({ innerHeight: 414, outerHeight: 414, visualHeight: 414, screenWidth: 678, screenHeight: 466, insetRight: 84, insetBottom: 0 }));
+  assert.deepEqual([c.mode, c.side, c.clearTop], ["inline", "right", DUO.top + DUO.island]);
+  for (const spec of SPECS) for (const g of template(frame(c), spec).placed)
+    assert.ok(!hit(g.rect, STATUS), `${g.group.map((x) => x.kind).join("+")} at ${g.rect.x},${g.rect.y} under the status column (${JSON.stringify(spec)})`);
+});
+
+test("X sheet, open wide: clear of the status column", () => {
+  const c = detect(open({ innerHeight: 408, outerHeight: 408, visualHeight: 408, screenWidth: 678, screenHeight: 466, insetRight: 84, insetBottom: 0 }));
+  assert.equal(c.clearTop, DUO.top + DUO.island);
+  const column = { ...STATUS, x: 951 - 84 };
+  for (const spec of SPECS) for (const g of template(frame(c), spec).placed)
+    assert.ok(!hit(g.rect, column), `${g.group.map((x) => x.kind).join("+")} at ${g.rect.x},${g.rect.y} under the status column (${JSON.stringify(spec)})`);
+});
+
+test("web view narrower than the screen: unchanged", () => {
+  assert.equal(detect(sig({ innerWidth: 382, outerWidth: 382 })).clearTop, undefined);
 });
 
 test("Home Screen app and turned web view: unchanged", () => {

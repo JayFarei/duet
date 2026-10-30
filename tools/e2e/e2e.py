@@ -917,9 +917,14 @@ class Run:
         s.target_display = 1
         return act
 
-    def unfold(s, tok, angle=0, preview=False):
+    def unfold(s, tok, angle=0, preview=False, short=False):
         # On the inner display "portrait" (0) is the wide 951x669 window, a quarter turn is the tall 669x951 one.
+        # short: a page shorter than its window (the X sheet's web view, its screen stuck at the closed 678x466), told
+        # by its width alone.
         wide = angle in (0, 180)
+        if short:
+            return s.turn(tok, "open", angle, lambda r: abs(r["sig"]["innerWidth"] - (951 if wide else 669)) <= 2,
+                          f"unfolded, {'951' if wide else '669'} wide")
         if preview:  # the preview's sheet unfolded: a window of its own (653x661 wide), larger than the closed screen
             return s.turn(tok, "open", angle, lambda r: min(r["sig"]["outerWidth"], r["sig"]["outerHeight"]) > 500,
                           f"unfolded preview sheet ({'wide' if wide else 'tall'})", after=True)
@@ -1170,21 +1175,24 @@ class Run:
             frm = s.angle
             s.step(f"preview-{style}-{frm}to{a}", "preview", t, s.rotate(t, a), preview_expect(style, a), f"in-app preview ({style}), turn {frm} -> {a}", video=True)
 
-    def scenario_webview(s):
-        """An app's own WKWebView over the whole closed screen (X's link preview, #194): inline right, every control
-        below the status column, with and without a Live Activity in the island."""
-        t = s.tok("webview")
+    def scenario_webview(s, style="webview"):
+        """An app's own WKWebView on the closed screen (X's link preview, #194): inline right, every control below the
+        status column, with and without a Live Activity in the island. style webview: over the whole screen (X before
+        2026-10); xsheet: on its top 61%, X's bar and the tweet card below it (X since)."""
+        n = style
+        t = s.tok(n)
         exp = {"preview": False, "mode": "inline", "side": "right"}
-        s.step("webview-0", "webview", t, s.open_preview(t, "webview"), exp, "app web view, closed, upright")
-        s.step("webview-on", "webview", t, s.la(t, "webview", on=True), exp, "app web view: Live Activity starts", video=True)
-        s.step("webview-off", "webview", t, s.la(t, "webview", on=False), exp, "app web view: Live Activity ends", video=True)
+        what = "app web view" if style == "webview" else "X-style web view sheet"
+        s.step(f"{n}-0", "webview", t, s.open_preview(t, style), exp, f"{what}, closed, upright")
+        s.step(f"{n}-on", "webview", t, s.la(t, "webview", on=True), exp, f"{what}: Live Activity starts", video=True)
+        s.step(f"{n}-off", "webview", t, s.la(t, "webview", on=False), exp, f"{what}: Live Activity ends", video=True)
         any_ = {"preview": False}
-        s.step("webview-90", "webview", t, s.rotate(t, 90), any_, "app web view, closed, turn to 90", video=True)
-        s.step("webview-270", "webview", t, s.rotate(t, 270), any_, "app web view, closed, turn to 270", video=True)
-        s.step("webview-back0", "webview", t, s.rotate(t, 0), exp, "app web view, closed, back upright", video=True)
-        s.step("webview-open", "webview", t, s.unfold(t, 0), any_, "app web view, unfold wide", video=True)
-        s.step("webview-open-tall", "webview", t, s.unfold(t, 90), any_, "app web view, unfolded tall", video=True)
-        s.step("webview-fold", "webview", t, s.fold_closed(t, 0), exp, "app web view, fold back closed upright", video=True)
+        s.step(f"{n}-90", "webview", t, s.rotate(t, 90), any_, f"{what}, closed, turn to 90", video=True)
+        s.step(f"{n}-270", "webview", t, s.rotate(t, 270), any_, f"{what}, closed, turn to 270", video=True)
+        s.step(f"{n}-back0", "webview", t, s.rotate(t, 0), exp, f"{what}, closed, back upright", video=True)
+        s.step(f"{n}-open", "webview", t, s.unfold(t, 0, short=style == "xsheet"), any_, f"{what}, unfold wide", video=True)
+        s.step(f"{n}-open-tall", "webview", t, s.unfold(t, 90, short=style == "xsheet"), any_, f"{what}, unfolded tall", video=True)
+        s.step(f"{n}-fold", "webview", t, s.fold_closed(t, 0), exp, f"{what}, fold back closed upright", video=True)
 
     def scenario_open_safari(s, angle):
         t = s.tok(f"pvos{angle}")
@@ -1787,6 +1795,7 @@ class Run:
         "preview-default": lambda s: s.scenario_preview("default"),
         "preview-full": lambda s: s.scenario_preview("full"),
         "webview": lambda s: s.scenario_webview(),
+        "xsheet": lambda s: s.scenario_webview("xsheet"),
         "open-in-safari": lambda s: s.scenario_open_safari(0),
         "open-in-safari-90": lambda s: s.scenario_open_safari(90),
         "open-in-safari-270": lambda s: s.scenario_open_safari(270),
