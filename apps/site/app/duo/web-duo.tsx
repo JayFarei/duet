@@ -620,7 +620,7 @@ export function WebDuo({ src: first, sources, title = "Duet", intro = "This is t
     const fit = () => {
       if (!embed) return setView({ w: innerWidth, h: innerHeight });
       const w = stage.current?.clientWidth ?? innerWidth;
-      setView({ w, h: Math.max(260, Math.min(w * 0.85, 600, innerHeight * 0.62)) });
+      setView({ w, h: Math.max(260, Math.min(w * 0.85, 600, Math.max(420, innerHeight * 0.5))) });
     };
     fit();
     const raf = requestAnimationFrame(() => setMeasured(true));
