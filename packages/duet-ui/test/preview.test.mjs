@@ -5,7 +5,7 @@
 // Cancel and Page Menu down (one: ~45pt, device, 2026-10-27), assumed DUO.island at worst; Back stays.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { detect, stable, DUO, PREVIEW_RISE } from "../src/geometry.ts";
+import { detect, stable, staleLayoutWidth, DUO, PREVIEW_RISE } from "../src/geometry.ts";
 import { frame, template } from "../src/template.ts";
 
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.0 Mobile/15E148 Safari/604.1";
@@ -192,4 +192,15 @@ test("a preview still turning stays in transit: a sideways page in the upright s
   const d = { flips: [] };
   stable(d, sig(366, 600, 450, 670), undefined, 0);
   assert.equal(stable(d, { ...sig(600, 366, 450, 670), angle: 0 }, undefined, 100, true).hidden, "moving");
+});
+
+test("a preview's page left short of its column reads as stale, closed and upright only (#225)", () => {
+  const c = { mode: "column", preview: true }, sheet = { outerWidth: 450, outerHeight: 670 }, full = { outerWidth: 466, outerHeight: 678 };
+  assert.equal(staleLayoutWidth(sheet, c, 314), 366);
+  assert.equal(staleLayoutWidth(full, c, 322), 382);
+  assert.equal(staleLayoutWidth(sheet, c, 366), undefined);
+  assert.equal(staleLayoutWidth(sheet, { ...c, preview: false }, 314), undefined);
+  assert.equal(staleLayoutWidth(sheet, { ...c, mode: "inline" }, 314), undefined);
+  assert.equal(staleLayoutWidth({ outerWidth: 670, outerHeight: 450 }, c, 314), undefined);
+  assert.equal(staleLayoutWidth({ outerWidth: 653, outerHeight: 869 }, c, 314), undefined);
 });
