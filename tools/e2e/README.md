@@ -6,7 +6,7 @@ Automated placement checks for Duet on the iPhone Duo simulator: Safari tab in e
 
 ```sh
 tools/e2e/run.sh                                   # whole matrix on "Duo Lab"
-tools/e2e/run.sh --only tab,fold                   # scenarios: tab, preview-sheet, preview-default, preview-full, open-in-safari, open-in-safari-90, open-in-safari-270, fold, dark, preview-unfolded, open-in-safari-unfold, split, split-turn, dynamic-type, live-tab, live-preview-sheet, live-preview-default, live-preview-full
+tools/e2e/run.sh --only tab,fold                   # scenarios: tab, preview-sheet, preview-default, preview-full, webview, open-in-safari, open-in-safari-90, open-in-safari-270, fold, dark, preview-unfolded, open-in-safari-unfold, split, split-turn, dynamic-type, live-tab, live-preview-sheet, live-preview-default, live-preview-full
 tools/e2e/run.sh --md /path/round.md               # also write a markdown table
 DUO_UDID=<udid> tools/e2e/run.sh                   # another Duo simulator
 tools/e2e/.venv/bin/python -I tools/e2e/e2e.py --udid <udid> --rerender tools/e2e/reports/<ts>   # re-assess a saved run with current rules

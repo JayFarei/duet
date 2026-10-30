@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1-rc.2
+
+- An app's own web view (a link opened in X), on the closed Duo upright and on the open Duo wide: the controls no longer sit under the status column's clock, wifi and battery. The page is the whole 466x678 screen with no chrome and a top inset of 0, which read as a plain full-width page, inline right at the top. Such a page now gets `clearTop` below the status column at its worst (the island with Live Activities, 265pt), like a Home Screen app's strip. Open wide (951x669, window = screen) the status column heads the right edge the same way and gets the same `clearTop`. Open tall the status row heads the page and the controls already start below it; turned closed, no status bar shows (#194).
+
 ## 0.6.1-rc.1
 
 - A primary folded into "…" arms on the first tap (its row takes the tint and reads `confirm`, the list stays open) and runs on the second, like its own capsule. It ran at once. Closing the list disarms it. A folded primary that ran in one tap now takes two; pass `confirm: false` to keep one. New pure export `primaryTap(armed, confirm)` (#191).

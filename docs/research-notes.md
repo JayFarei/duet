@@ -321,3 +321,20 @@ Reported from a real Duo by RegTail on duet-ui 0.4.1; traced on Duo Lab (iOS 27.
 - The old preview rule (chrome 73 to 77) failed below 73 and the column rule (68 to 102) below 68: the page went tab-band column under the preview's buttons, then inline. Now the preview takes 44 to 77, and in the preview column checks the width only. A tab has inset 0 and 80 or 98 of chrome, so it stays apart.
 - Live Activities: one pushes close and reader/menu down about 45pt (real Duo, sheet screenshot); back does not move. Two are taken to push `DUO.island` (91.7) as in a tab, so the worst-case gap is 282 + 91.7 to 428, ~54pt. The band is that gap less `DUO.gap` each side (32pt) with no `reach`, and the one control (the merged tab, "…" or search) is centred in the gap, ~2.6pt clear each side.
 - After the fix the merged tab holds screen y 376.3 through the whole scroll (page 301.3 + 75 at rest, 330.3 + 46 compacted), `column` and `preview` on every frame.
+
+## An app's own web view (#194, 2026-10-29)
+
+Reported from X on a real Duo: getduet.dev opened from a post draws the controls under the status column. X opens links in its own `WKWebView`, not SFSafariViewController. Reproduced on Duo Lab (iOS 27.1) with the e2e host's `webview` style, a `WKWebView` presented full screen.
+
+| Signal | Value |
+| --- | --- |
+| inner / outer / screen | 466x678 / 466x678 / 466x678, 3x, angle 0 |
+| chrome, column | 0, 0 |
+| inset top / bottom | 0 / 34 |
+| user agent | no `Safari/` token, so `browserOf` reads `webview` |
+
+- detect() read this as a plain full-width page: inline right at `insetTop + DUO.gap` (11pt), under the clock (screen y ~33 to 48) and wifi, which run down to `DUO.top` (173.3), and Live Activities to `DUO.top + DUO.island` (265). It now sets `clearTop` to 265 there (closed, upright, not standalone, controls right, page = whole screen: `closedWhole`).
+- Open wide: inner = outer = 951x669, angle 270, inset bottom 34, no side inset. The status column heads the right edge (x 867 on), so the controls sat under the clock and wifi as closed. Same `clearTop` (`openWideWhole`); the preview's wide page starts at the same screen y, below a 75pt bar.
+- Open tall: 669x951, the status row is above the page; the controls already start below it, unchanged.
+- Closed turned 90 or 270: no status bar shows, controls unchanged.
+- An app built with an SDK older than iOS 27 runs letterboxed at 375x667 on the closed Duo, not Duo-native, so the host must be built with Xcode 27.1 to see this.
