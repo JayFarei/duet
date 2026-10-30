@@ -119,7 +119,7 @@
 .duet-group[data-primary]::before, .duet-group[data-primary]::after { content: none; }
 .duet-group[data-primary] > .duet-rim { display: none; }
 .duet-group[data-primary]:has(.duet-btn:active) { scale: 1.05; }
-.duet-btn[data-morphing] { visibility: hidden; }
+.duet-row[data-cta]:not([data-armed]) > svg { color: var(--duet-tint); }
 .duet-cta-icon { display: grid; place-items: center; flex: none; width: 41px; height: 41px; border-radius: 50%; background: var(--duet-tint); color: #fff; font-size: var(--duet-icon-size); }
 .duet-confirm-head { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 12px; box-sizing: border-box; font: 600 17px/1 -apple-system, system-ui, sans-serif; color: var(--duet-ink); white-space: nowrap; }
 .duet-confirm-head > svg { width: var(--duet-icon-size); height: var(--duet-icon-size); flex: none; color: var(--duet-tint); }

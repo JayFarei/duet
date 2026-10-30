@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { detect } from "../src/geometry.ts";
-import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, confirmBox, primaryTap, slotRect, spring, template } from "../src/template.ts";
+import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, confirmBox, primaryTap, spring, template } from "../src/template.ts";
 
 const kinds = (groups) => groups.map((g) => g.map((s) => s.kind === "action" ? s.index : s.kind));
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -50,8 +50,6 @@ test("place: controls stay in the column, the primary's slot is one button in th
   const col = frame(detect(sig(382, 580, 466, 678)));
   const t = template(col, { menu: true, actions: 3, primary: true }).placed;
   assert.deepEqual([t.length, t[0].rect.w, t[0].primary], [1, TEMPLATE.control, false]);
-  assert.deepEqual(slotRect(t[0], "primary"), { ...t[0].rect, h: TEMPLATE.control });
-  assert.equal(slotRect(t[0], "more").y, t[0].rect.y + TEMPLATE.item);
 });
 
 test("template: a sheet's close alone, the open sidebar's burger alone, the preview's \"…\" alone", () => {

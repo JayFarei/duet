@@ -4,7 +4,7 @@ import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, use
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, columnBand, controlsShown, isSplit, pageInsets, magnet, stable, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
-import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, primaryTap, slotRect, template, type Rect, type Slot } from "./template.ts";
+import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
@@ -448,7 +448,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const [sidebar, setSidebar] = useState<Phase>("closed");
   const [more, setMore] = useState<Phase>("closed");
   const [armed, setArmed] = useState(false);
-  // The primary's confirmation box, grown from its capsule like "…" grows into its list.
+  // The primary's confirmation box, its whole capsule growing like "…" grows into its list.
   const [ask, setAsk] = useState<Phase>("closed");
   // The first render is the server's guess (ssr) and the window geometry settles over the next second (subscribe):
   // until then the controls jump to where they belong instead of gliding in from the guess.
@@ -493,15 +493,17 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const a = template(f, { close: !!p.close, menu: burger, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" }), placed = a.placed;
     // No burger (the preview): the app's places lead "…" under "Menu".
     const places = p.menu && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
+    const askAt = placed.find((g) => g.group.some((s) => s.kind === "primary")), moreAt = placed.find((g) => g.group.some((s) => s.kind === "more"));
+    // Sharing a capsule with "…", the primary is in the capsule that turns into the list, so the list leads with it.
     const list: DuetItem[] = [
-      ...actions.slice(a.shown), ...(p.primary && !a.primary ? [p.primary] : []), ...folded,
+      ...(askAt && askAt === moreAt ? [p.primary!] : []), ...actions.slice(a.shown), ...(p.primary && !a.primary ? [p.primary] : []), ...folded,
       ...(inline ? [{ id: "duet-side", label: `Move controls ${side === "left" ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
         setMore("closed");
         if (nav.current) switchSide(nav.current, side === "left" ? "right" : "left");
       } }] : []),
       ...destructive,
     ];
-    return { f, placed, places, list, moreAt: placed.find((g) => g.group.some((s) => s.kind === "more")), askAt: placed.find((g) => g.group.some((s) => s.kind === "primary")) };
+    return { f, placed, places, list, moreAt, askAt };
   };
 
   const reserve = p.reserve !== false;
@@ -636,11 +638,11 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
           const rect = g.rect;
           return (
             <div key={gi} className="duet-group" data-duet-slot={g.group.length === 1 ? g.group[0].kind : g.group[0].kind === "menu" ? "menu" : "actions"}
-              data-primary={g.primary || undefined} data-morphing={(g === moreAt && drawsMenu) || (g === askAt && g.primary && drawsAsk) || undefined}
+              data-primary={g.primary || undefined} data-morphing={(g === moreAt && drawsMenu) || (g === askAt && drawsAsk) || undefined}
               style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h, ...(g === askAt ? tint : undefined) }}>
               {!g.primary && <i className="duet-rim" aria-hidden />}
               {g.group.map((s, j) => (
-                <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined} data-morphing={(s.kind === "primary" && drawsAsk) || undefined}
+                <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined}
                   aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : s.kind === "primary" && p.primary!.confirm !== false ? ask === "open" : undefined}
                   style={{ top: j * TEMPLATE.item, width: rect.w }} onClick={() => press(s)}>
                   {icon(s)}
@@ -662,8 +664,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
             {list.map((a) => {
               const arm = a === p.primary && armed;
               return (
-                <button key={a.id} className="duet-row" role="menuitem" data-destructive={a.destructive || undefined} data-armed={arm || undefined}
-                  style={arm && p.primary!.tint ? { "--duet-tint": p.primary!.tint } as CSSProperties : undefined} onClick={pick(a)}>
+                <button key={a.id} className="duet-row" role="menuitem" data-destructive={a.destructive || undefined} data-armed={arm || undefined} data-cta={a === p.primary || undefined}
+                  style={a === p.primary ? tint : undefined} onClick={pick(a)}>
                   {a.icon}<span>{(arm && p.primary!.confirm) || a.label}</span>{badge(a)}
                 </button>
               );
@@ -671,7 +673,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
           </Morph>
         )}
         {drawsAsk && askAt && (
-          <Morph open={ask === "open"} from={slotRect(askAt, "primary")} slots={[icon({ kind: "primary" })]} box={confirmBox(f, slotRect(askAt, "primary"))} onClosed={() => setAsk("closed")} role="dialog" label={p.primary!.label}>
+          <Morph open={ask === "open"} from={askAt.rect} slots={askAt.group.map(icon)} box={confirmBox(f, askAt.rect)} onClosed={() => setAsk("closed")} role="dialog" label={p.primary!.label}>
             <div className="duet-confirm-head" style={tint}>{p.primary!.icon}<span>{p.primary!.label}</span></div>
             <button className="duet-row duet-confirm" style={tint} onClick={() => { setAsk("closing"); p.primary!.onPress?.(); }}>
               <span>{p.primary!.confirm || p.primary!.label}</span>

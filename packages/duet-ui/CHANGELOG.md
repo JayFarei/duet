@@ -4,7 +4,7 @@
 
 - The primary's tap grows its button into a confirmation box beside the column (icon, `label`, a tinted `confirm` button), on the "…" spring; the button runs it and the box folds back.
 - The primary stays on screen in a slot: where its own group does not fit, it takes the burger's slot above "…", and the places move to the top of the "…" list. It folds into "…" only where one button is all that fits.
-- Breaking: the pure export `pillRect` is replaced by `confirmBox(frame, from)`; `slotRect(placed, kind)` is new.
+- Breaking: the pure export `pillRect` is replaced by `confirmBox(frame, from)`; the box grows from the whole capsule, and with the primary in the capsule, "…" lists it too.
 - Site: every mailbox in the panes demo opens its own list (#204); the Column notes sheet runs under Safari's address bar to the screen's bottom with a lighter top blur (#205); the book demo opens on a class page, its Book button in the controls, then "Book with N credits" in the box (#206, #208).
 
 ## 0.6.1

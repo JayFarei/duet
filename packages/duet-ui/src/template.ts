@@ -32,7 +32,7 @@ export type Group = Slot[];
 
 /** The roomiest arrangement that fits `h`: every action shown, then fewer with "…" closing the group. The primary
  *  keeps its own group while any arrangement leaves room for it, else it takes the burger's slot above "…", whose list
- *  then leads with the places (the closed Duo's band holds two buttons), and joins the "…" list only where one button
+ *  then leads with the places and the primary (the closed Duo's band holds two buttons), and joins the "…" list only where one button
  *  is all that fits. Most actions shown wins.
  *  `split`: a lone menu button breaks ties (inline; in the column a second capsule's gap would push the stack toward
  *  Safari's own buttons). `rest`: the list holds items whatever fits, so "…" always shows. `extra`: what a lone group
@@ -110,9 +110,6 @@ export function place(f: Frame, groups: Group[]): Placed[] {
   });
 }
 
-/** The primary's slot in its group: where its confirmation grows from. */
-export const slotRect = (g: Placed, kind: Slot["kind"]): Rect => ({ ...g.rect, y: g.rect.y + g.group.findIndex((s) => s.kind === kind) * T.item, h: T.control });
-
 /** The "…" list: beside the column (or strip), aligned to the button's top, or its bottom when the button is in the
  *  page's lower half, kept 12pt inside the page. `heads`: section headers. A list taller than the page scrolls. */
 export function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
@@ -122,10 +119,10 @@ export function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
   return { x, y: Math.min(Math.max(y, Math.max(f.insetTop, 12)), f.ph - 12 - h), w, h };
 }
 
-/** The primary's confirmation: its slot grows into this box beside it, its label over a `confirm` button. */
+/** The primary's confirmation: its whole capsule grows into this box beside it, its label over a `confirm` button. */
 export const confirmBox = (f: Frame, from: Rect): Rect => menuBox(f, from, 2, 0);
 
-/** What a tap on the primary's row in "…" does (the band has no room for its capsule): the first arms it (its label
+/** What a tap on the primary's row in "…" does: the first arms it (its label
  *  turns to `confirm`), the second runs it; `confirm: false` runs at once (#191). */
 export const primaryTap = (armed: boolean, confirm?: string | false): "arm" | "run" => armed || confirm === false ? "run" : "arm";
 

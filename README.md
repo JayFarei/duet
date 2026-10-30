@@ -739,7 +739,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, on the closed Duo in Safari's column with a menu and a primary, there is no call to action: the band holds only the burger and "…", and the primary is a row inside "…", one menu tap away.
 - **Cause:** the band is 92pt (104 for a lone group), and the burger group plus the primary's own group need 160.7pt, so the allocator folded the primary first.
-- **Duet does:** gives the primary the burger's slot before folding it: the 2-slot group becomes the primary above "…", and "…" leads with the places (`allocate`). A tap grows the slot into a confirmation box (`confirmBox`, beside the column like the "…" menu) holding the icon, `label` and a tinted `confirm` button, on the "…" menu's spring; the button runs `onPress` and the box folds back into the slot.
+- **Duet does:** gives the primary the burger's slot before folding it: the 2-slot group becomes the primary above "…", and "…" leads with the places, then the primary as a tinted row that arms on the first tap and runs on the second (`allocate`). Either button morphs the whole capsule, as "…" always does: the primary grows it into a confirmation box (`confirmBox`, beside the column like the "…" menu) holding the icon, `label` and a tinted `confirm` button, on the "…" menu's spring; the button runs `onPress` and the box folds back into the capsule.
 - **You do:** nothing. Pass the confirmed state as the next `primary` (label, icon, tint) and it shows in the slot as the box folds.
 - **Status:** [#206](https://github.com/JayFarei/duet/issues/206), [#208](https://github.com/JayFarei/duet/issues/208).
 
