@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0
 
 - The primary in its own group is a tinted button in a glass capsule, like the one above "…", not a solid glowing circle (#213).
 - The primary's tap grows its button into a confirmation box beside the column (icon, `label`, a tinted `confirm` button), on the "…" spring; the button runs it and the box folds back.
