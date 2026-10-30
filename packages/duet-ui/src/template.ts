@@ -32,7 +32,7 @@ export type Group = Slot[];
 
 /** The roomiest arrangement that fits `h`: every action shown, then fewer with "…" closing the group. The primary
  *  keeps its own group while any arrangement leaves room for it, else it takes the burger's slot above "…", whose list
- *  then leads with the places and the primary (the closed Duo's band holds two buttons), and joins the "…" list only where one button
+ *  then holds the primary and the places (the closed Duo's band holds two buttons), and joins the "…" list only where one button
  *  is all that fits. Most actions shown wins.
  *  `split`: a lone menu button breaks ties (inline; in the column a second capsule's gap would push the stack toward
  *  Safari's own buttons). `rest`: the list holds items whatever fits, so "…" always shows. `extra`: what a lone group

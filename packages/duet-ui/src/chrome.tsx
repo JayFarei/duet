@@ -491,7 +491,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const burger = !!p.menu && p.menu.burger !== false;
     const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger ? 1 : 0);
     const a = template(f, { close: !!p.close, menu: burger, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" }), placed = a.placed;
-    // No burger (the preview): the app's places lead "…" under "Menu".
+    // No burger (the preview): the app's places close "…" under "Menu".
     const places = p.menu && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
     const askAt = placed.find((g) => g.group.some((s) => s.kind === "primary")), moreAt = placed.find((g) => g.group.some((s) => s.kind === "more"));
     // Sharing a capsule with "…", the primary is in the capsule that turns into the list, so the list leads with it.
@@ -654,12 +654,6 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
         })}</Presence>
         {drawsMenu && moreAt && (
           <Morph open={more === "open"} from={moreAt.rect} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, places.length ? 2 : 1)} onClosed={() => setMore("closed")}>
-            {places.length > 0 && <>
-              <div className="duet-menu-head">Menu</div>
-              {places.map((m) => (
-                <button key={m.id} className="duet-row" role="menuitemradio" aria-checked={m.id === selected} onClick={() => select(m.id)}>{m.icon}<span>{m.label}</span>{badge(m)}</button>
-              ))}
-            </>}
             <div className="duet-menu-head">{f.kind === "column" ? "This page" : "More"}</div>
             {list.map((a) => {
               const arm = a === p.primary && armed;
@@ -670,6 +664,12 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
                 </button>
               );
             })}
+            {places.length > 0 && <>
+              <div className="duet-menu-head">Menu</div>
+              {places.map((m) => (
+                <button key={m.id} className="duet-row" role="menuitemradio" aria-checked={m.id === selected} onClick={() => select(m.id)}>{m.icon}<span>{m.label}</span>{badge(m)}</button>
+              ))}
+            </>}
           </Morph>
         )}
         {drawsAsk && askAt && (
