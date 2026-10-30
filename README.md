@@ -720,10 +720,18 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 ### An app's own web view (a link opened in X)
 
 - **You see:** on the closed Duo upright, or the open Duo wide, the burger and "…" sit under the clock, wifi and battery at the top right.
-- **Cause:** some apps (X among them) open links in their own `WKWebView`, edge to edge, not in Safari's in-app preview. The page is the whole 466x678 screen, with no Safari column, no bars and a top inset of 0, so nothing tells the page that the Duo's status column (and Live Activities in the island under it) covers its right edge.
-- **Duet does:** a page that is the whole closed screen, upright, not a Home Screen app, with the controls on the right, keeps them below the status column at its worst (the island with Live Activities, 265pt), where a Home Screen app's strip starts. The same holds for a page that is the whole open screen, wide (951x669). Open tall the status row heads the page and the controls already start below it.
+- **Cause:** some apps (X among them) open links in their own `WKWebView`, not in Safari's in-app preview, from the screen's top edge: edge to edge, or (X since 2026-10) on the top 61% with the app's bar and the post below it (466x413 closed). There is no Safari column, no bar above the page and a top inset of 0, so nothing tells the page that the Duo's status column (and Live Activities in the island under it) covers its right edge.
+- **Duet does:** a page that is the whole closed screen upright, or an app's web view as wide as it whatever its height, not a Home Screen app, with the controls on the right, keeps them below the status column at its worst (the island with Live Activities, 265pt), where a Home Screen app's strip starts. The same holds on the open screen, wide (951 wide). Open tall the status row heads the page and the controls already start below it.
 - **You do:** nothing. Moving the controls left drops the allowance, nothing native is there.
 - **Status:** [#194](https://github.com/JayFarei/duet/issues/194).
+
+### Square backing behind the open menu
+
+- **You see:** in dark mode, a dark square behind the rounded "…" menu, its corners poking out (most visible bottom left).
+- **Cause:** the menu's tint layer had no corner radius of its own and relied on the menu clipping it. WebKit skips that rounded clip once the glass beside it composites (it uses `backdrop-filter`), so the tint drew as the menu's full rectangle. In light mode the tint is transparent, so it did not show.
+- **Duet does:** the tint layer inherits the menu's radius at every frame of the morph.
+- **You do:** nothing.
+- **Status:** [#198](https://github.com/JayFarei/duet/issues/198).
 
 ## Limitations
 
