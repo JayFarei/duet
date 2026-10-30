@@ -38,6 +38,7 @@ SETTLE_S = 0.5  # controls must show in the final placement within this of the f
 GRACE_S = 0.15  # the old placement may linger this long after the signals first change (one render of the chrome)
 SLIDE_S = 0.15  # once shown in the final placement, slots must stop moving within this (no slow slide)
 SPRING_S = 0.6  # a page change in place (a tap opens a page, a call to action turns "Booked") springs its slots (#101)
+PREVIEW_COLUMN = 84   # the in-app preview's own column: its page reaches the window less this
 UNPAINTED_S = 0.08  # a sample this long after the page's last frame (requestAnimationFrame) reads a layout nobody sees
 GAP_S = 0.15    # sampling gaps longer than this are reported (the page was throttled)
 ICON_SD = 6.0   # a visible slot icon whose screenshot crop has a luminance stddev under this is not painted
@@ -50,6 +51,7 @@ CLOSED = {"position": "closed"}
 # Expected per state (EXPECTED.md): catalogue.py, shared with the journeys.
 SB_SAFARI = "Safari"              # SpringBoard accessibility identifiers (dock icon, our host's icon, menu item)
 SB_HOST = "DuoE2EHost"
+SB_SETTINGS = "Settings"
 SB_SPLIT = "com.apple.springboardhome.application-shortcut-item.open-in-split"
 INNER_W = 951                     # wide inner display, points
 DIVIDER = (476, 335)              # split view divider handle on the wide inner display
@@ -623,6 +625,8 @@ class Run:
                     bad.append(f'{x["slot"]} reaches y {x["rect"]["y"] + x["rect"]["h"]:.0f}, under Safari\'s bar from the {vh:.0f}pt visual viewport\'s bottom')
         if "preview" in expect and last.get("preview") != expect["preview"]:
             bad.append(f'preview detected={last.get("preview")}, expected {expect["preview"]}')
+        if expect.get("mode") == "column" and expect.get("preview") and g["outerWidth"] < g["outerHeight"] and last["scroll"]["clientWidth"] < g["outerWidth"] - PREVIEW_COLUMN - 1:
+            bad.append(f'page laid out {last["scroll"]["clientWidth"]}pt wide, a blank band before the preview\'s {PREVIEW_COLUMN}pt column in its {g["outerWidth"]}pt window')
         fp = shown_place(last)
         if not ok(fp):
             bad.append(f'final {"hidden" if fp is None else "/".join(map(str, fp))}, expected {"hidden" if want is None else "/".join(map(str, want)) if isinstance(want, tuple) else want}')
@@ -676,7 +680,7 @@ class Run:
                 if sl["x"] < -1 or sl["x"] + sl["w"] > ww + 1 or sl["y"] < -1 or sl["y"] + sl["h"] > wh + 1:
                     bad.append(f'{sl["slot"]} cut by the window edge at {sl["x"]:.0f},{sl["y"]:.0f} ({ww}x{wh} window)')
             if is_split(g):
-                if len(slots) < 2:
+                if sum(len(sl["icons"]) for sl in slots) < 2:
                     bad.append(f"split view, {pane} pane: fewer than two Duet controls visible in the pane")
                 if pane != s.split:
                     note.append(f"native Back puts Safari in the {pane} pane, the driver expected {s.split}")
@@ -1063,7 +1067,7 @@ class Run:
                         return None
                     s.host()
                 else:
-                    if not s.open_in_split(SB_HOST):
+                    if not s.open_in_split(getattr(s, "split_partner", SB_HOST)):
                         return None
                     if not s.sb_tap(SB_SAFARI):
                         return None
@@ -1242,6 +1246,16 @@ class Run:
         s.step("split-left-to-full", "tab", t, s.split_to_full(t), {"preview": False, **UNFOLDED}, "left pane -> full width (divider to the right edge)", video=True)
         s.step("split-right", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "full width -> split view, Safari in the right pane", video=True)
         s.step("split-right-to-full", "tab", t, s.split_to_full(t), {"preview": False, **UNFOLDED}, "right pane -> full width (divider to the left edge)", video=True)
+
+    def scenario_split_right_live(s):
+        """The right pane under the status column with Live Activities: Safari's buttons come down, Duet's must stay clear. They start closed: ActivityKit needs the host in front, which a split would replace."""
+        t = s.tok("splitlive")
+        s.split_partner = SB_SETTINGS  # iOS hides an app's own Live Activities while it is on screen, so not the host
+        s.step("splitlive-tab", "tab", t, s.open_tab(t), {"preview": False, "mode": "column", "side": "right"}, "Safari tab, closed, portrait")
+        s.step("splitlive-music", "tab", t, s.la(t, "tab", on=True), {"preview": False, "mode": "column", "side": "right"}, "closed: music Live Activity")
+        s.step("splitlive-two", "tab", t, s.la(t, "tab", timer=True), {"preview": False, "mode": "column", "side": "right"}, "closed: music and timer Live Activities")
+        s.step("splitlive-unfold", "tab", t, s.unfold(t, 0), {"preview": False, **UNFOLDED}, "unfold with both running")
+        s.step("splitlive-right", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "Safari in the right pane, both running")
 
     def scenario_split_drag(s):
         """Experimental: a direct pane swap by dragging the pane's top handle (scenario split moves through full width)."""
@@ -1829,6 +1843,7 @@ class Run:
         "preview-unfolded": lambda s: s.scenario_preview_unfolded(),
         "open-in-safari-unfold": lambda s: s.scenario_open_safari_unfold(),
         "split": lambda s: s.scenario_split(),
+        "split-right-live": lambda s: s.scenario_split_right_live(),
         "split-turn": lambda s: s.scenario_split_turn(),
         "split-drag": lambda s: s.scenario_split_drag(),
         "dynamic-type": lambda s: s.scenario_dynamic_type(),
@@ -1837,7 +1852,7 @@ class Run:
         "live-preview-default": lambda s: s.scenario_live("default"),
         "live-preview-full": lambda s: s.scenario_live("full"),
     }
-    NEEDS_SIM = {"split", "split-turn", "split-drag", "open-in-safari-unfold"}
+    NEEDS_SIM = {"split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
     EXPERIMENTAL = {"split-drag"}  # run only when named with --only
 
     def main(s):

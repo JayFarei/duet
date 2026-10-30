@@ -5,6 +5,7 @@
 Every iOS and Safari quirk Duet handles, what you would see without the handling, and what is left for you to do. Most need nothing from you. "Without children" means a page that renders `<Duet>` without `children`, so the document itself scrolls.
 
 - [Split view pane, or the closed Duo turned left](#split-view-pane-or-the-closed-duo-turned-left)
+- [Right split pane holds two buttons](#right-split-pane-holds-two-buttons)
 - [Rubber band at the top or bottom of the page](#rubber-band-at-the-top-or-bottom-of-the-page)
 - [Toolbar growing back at the end of the page](#toolbar-growing-back-at-the-end-of-the-page)
 - [Full-screen `position: fixed` overlay or modal backdrop](#full-screen-position-fixed-overlay-or-modal-backdrop)
@@ -234,9 +235,9 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without handling, leaving an in-app preview for another app and coming back moves Duet's controls out of the preview's column into a strip inside the page, next to the preview's own buttons, and they stay there.
 - **Cause:** leaving, iOS snapshots the app at other sizes while the page still reads visible, then hands the preview back changed: a taller top bar for a while (382x548, 130pt of chrome), or the page 52 to 60pt narrower until something lays it out again (314x600 in the sheet's 450x670, 322x603 in the full 466x678). Both fail the preview's checks. Measured on the simulator (iOS 27.1); the timing varies between runs.
-- **Duet does:** remembers that the page was the preview, and keeps that verdict through both changes until its bottom inset goes (a tab's is 0, as after Open in Safari). The controls stay in the preview's column and stay shown, and the menu opens from the page's real edge.
-- **You do:** nothing. The narrower page itself is iOS's: Duet doesn't resize it, so a blank band can remain between the page and the column until iOS lays it out again.
-- **Status:** [#211](https://github.com/JayFarei/duet/issues/211). See [In-app preview](how-duet-decides.md#in-app-preview).
+- **Duet does:** remembers that the page was the preview, and keeps that verdict through both changes until its bottom inset goes (a tab's is 0, as after Open in Safari). The controls stay in the preview's column and stay shown, and the menu opens from the page's real edge. If the page stays narrower than the window less the column, Duet sets the viewport meta's `width=device-width` to the real width, the only thing that lays it out again, and restores your meta when the window changes (turning, unfolding, Open in Safari).
+- **You do:** nothing. A meta without `width=device-width` is left alone, and so is its blank band.
+- **Status:** [#211](https://github.com/JayFarei/duet/issues/211), [#225](https://github.com/JayFarei/duet/issues/225). See [In-app preview](how-duet-decides.md#in-app-preview).
 
 ## In-app preview buttons and Live Activities
 
@@ -445,3 +446,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** draws one form everywhere: a tinted button inside a glass capsule, with the same rim and shadow as the other controls.
 - **You do:** nothing.
 - **Status:** [#213](https://github.com/JayFarei/duet/issues/213).
+
+## Right split pane holds two buttons
+
+- **You see:** without the handling, Safari in the right split pane shows a lone "…", with a primary inside its list, though the pane has room for two buttons.
+- **Cause:** the pane reserved the closed tab's Live Activity worst case (back slot top 265pt). In the pane, music and timer activities only push the back slot to 224pt, and the pane is 9pt shorter than the closed screen, which took the band under two buttons.
+- **Duet does:** reserves the pane's measured 224pt, a band of 123.9pt, so two buttons fit at the worst case, clear of Safari's own buttons.
+- **You do:** nothing.
+- **Status:** [#226](https://github.com/JayFarei/duet/issues/226). e2e scenario `split-right-live`.

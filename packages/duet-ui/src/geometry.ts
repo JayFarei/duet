@@ -42,10 +42,10 @@ export const DUO = {
  *  the band always assumes it. */
 export const SAFARI = { rows: 2, forward: DUO.groupItem + 2, pill: DUO.pillPad + 2 * DUO.pillItem,
   /** Split-view pane: the back slot's top. The left pane has no status bar above it. The right pane sits
-   *  under the same status column as a closed tab and grows the same way (bare: 124, recording: 178, a
-   *  2-slot music activity: ~224), so it takes the closed tab's worst case. The pill sits DUO.bottom above
-   *  the window bottom. */
-  splitTop: { left: 23.5, right: DUO.top + DUO.island },
+   *  under the same status column as a closed tab but grows less: bare 124, recording 178, music alone or
+   *  music and timer Live Activities 224 (Duo Lab, iOS 27.1, 2026-10-30), not the closed tab's 264, so it takes
+   *  224. The pill sits DUO.bottom above the window bottom. */
+  splitTop: { left: 23.5, right: 224 },
   /** Closed landscape (Duo Lab simulator, iOS 27.1, 2026-10-26): the column is on the side the Duo is turned to,
    *  48pt centre line from that edge as in portrait, and its buttons sit differently on each side. `top`: the back
    *  slot's top (reader under it, a step apart); `pill`: the +/tabs pill's top. Turned left (angle 90) the island
@@ -192,7 +192,16 @@ const layoutOf = (pageWidth: number): Layout => pageWidth >= WIDE ? "wide" : "na
 /** gap.forward: the band's bottom once the preview has forward history: going back gives it a Forward button and
  *  moves its Back up a row (simulator iOS 27.1, e2e ctl02, #117). That gap has room for one button and none for the
  *  Live Activities allowance. */
-const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [44, 77], sheetInset: 4, gap: { top: 282, bottom: 428, forward: 374 } } as const;
+const PREVIEW = { width: 375, height: 667, pixelRatio: 3, chrome: [44, 77], column: 84, sheetInset: 4, gap: { top: 282, bottom: 428, forward: 374 } } as const;
+/** The width to lay the page out at when iOS left it narrower than its window, else undefined. Back from another app
+ *  the preview's page can stay 52pt short of its column for good (e2e life04, iOS 27.1: layout 314 in the sheet's 450
+ *  window, whose column leaves 366), a blank band beside it. Closed and upright only, where the column is known. */
+export function staleLayoutWidth(s: Signals, c: Context, layoutWidth: number): number | undefined {
+  const [w, h] = DUO_SIZES[0];
+  if (!c.preview || c.mode !== "column" || s.outerWidth > s.outerHeight || s.outerWidth > w + 1 || s.outerHeight > h + 1) return;
+  const width = s.outerWidth - PREVIEW.column;
+  return layoutWidth < width - 1 ? width : undefined;
+}
 /** Why the signals read as the in-app preview, for probes and logs; undefined when they do not. */
 export function previewReason(s: Signals): string | undefined {
   if (s.standalone || browserOf(s.userAgent) !== "safari") return;
