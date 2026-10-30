@@ -42,10 +42,10 @@ export const DUO = {
  *  the band always assumes it. */
 export const SAFARI = { rows: 2, forward: DUO.groupItem + 2, pill: DUO.pillPad + 2 * DUO.pillItem,
   /** Split-view pane: the back slot's top. The left pane has no status bar above it. The right pane sits
-   *  under the same status column as a closed tab and grows the same way (bare: 124, recording: 178, a
-   *  2-slot music activity: ~224), so it takes the closed tab's worst case. The pill sits DUO.bottom above
-   *  the window bottom. */
-  splitTop: { left: 23.5, right: DUO.top + DUO.island },
+   *  under the same status column as a closed tab but grows less: bare 124, recording 178, music alone or
+   *  music and timer Live Activities 224 (Duo Lab, iOS 27.1, 2026-10-30), not the closed tab's 264, so it takes
+   *  224. The pill sits DUO.bottom above the window bottom. */
+  splitTop: { left: 23.5, right: 224 },
   /** Closed landscape (Duo Lab simulator, iOS 27.1, 2026-10-26): the column is on the side the Duo is turned to,
    *  48pt centre line from that edge as in portrait, and its buttons sit differently on each side. `top`: the back
    *  slot's top (reader under it, a step apart); `pill`: the +/tabs pill's top. Turned left (angle 90) the island

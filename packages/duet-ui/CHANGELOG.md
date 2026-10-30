@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Right split pane: two buttons where one showed. The pane reserved the closed tab's Live Activity worst case (265pt) instead of its own measured 224pt (#226).
+
 ## 0.7.0
 
 - The primary in its own group is a tinted button in a glass capsule, like the one above "…", not a solid glowing circle (#213).

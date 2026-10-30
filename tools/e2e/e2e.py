@@ -50,6 +50,7 @@ CLOSED = {"position": "closed"}
 # Expected per state (EXPECTED.md): catalogue.py, shared with the journeys.
 SB_SAFARI = "Safari"              # SpringBoard accessibility identifiers (dock icon, our host's icon, menu item)
 SB_HOST = "DuoE2EHost"
+SB_SETTINGS = "Settings"
 SB_SPLIT = "com.apple.springboardhome.application-shortcut-item.open-in-split"
 INNER_W = 951                     # wide inner display, points
 DIVIDER = (476, 335)              # split view divider handle on the wide inner display
@@ -676,7 +677,7 @@ class Run:
                 if sl["x"] < -1 or sl["x"] + sl["w"] > ww + 1 or sl["y"] < -1 or sl["y"] + sl["h"] > wh + 1:
                     bad.append(f'{sl["slot"]} cut by the window edge at {sl["x"]:.0f},{sl["y"]:.0f} ({ww}x{wh} window)')
             if is_split(g):
-                if len(slots) < 2:
+                if sum(len(sl["icons"]) for sl in slots) < 2:
                     bad.append(f"split view, {pane} pane: fewer than two Duet controls visible in the pane")
                 if pane != s.split:
                     note.append(f"native Back puts Safari in the {pane} pane, the driver expected {s.split}")
@@ -1063,7 +1064,7 @@ class Run:
                         return None
                     s.host()
                 else:
-                    if not s.open_in_split(SB_HOST):
+                    if not s.open_in_split(getattr(s, "split_partner", SB_HOST)):
                         return None
                     if not s.sb_tap(SB_SAFARI):
                         return None
@@ -1242,6 +1243,16 @@ class Run:
         s.step("split-left-to-full", "tab", t, s.split_to_full(t), {"preview": False, **UNFOLDED}, "left pane -> full width (divider to the right edge)", video=True)
         s.step("split-right", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "full width -> split view, Safari in the right pane", video=True)
         s.step("split-right-to-full", "tab", t, s.split_to_full(t), {"preview": False, **UNFOLDED}, "right pane -> full width (divider to the left edge)", video=True)
+
+    def scenario_split_right_live(s):
+        """The right pane under the status column with Live Activities: Safari's buttons come down, Duet's must stay clear. They start closed: ActivityKit needs the host in front, which a split would replace."""
+        t = s.tok("splitlive")
+        s.split_partner = SB_SETTINGS  # iOS hides an app's own Live Activities while it is on screen, so not the host
+        s.step("splitlive-tab", "tab", t, s.open_tab(t), {"preview": False, "mode": "column", "side": "right"}, "Safari tab, closed, portrait")
+        s.step("splitlive-music", "tab", t, s.la(t, "tab", on=True), {"preview": False, "mode": "column", "side": "right"}, "closed: music Live Activity")
+        s.step("splitlive-two", "tab", t, s.la(t, "tab", timer=True), {"preview": False, "mode": "column", "side": "right"}, "closed: music and timer Live Activities")
+        s.step("splitlive-unfold", "tab", t, s.unfold(t, 0), {"preview": False, **UNFOLDED}, "unfold with both running")
+        s.step("splitlive-right", "tab", t, s.to_split(t, "right"), {"preview": False, **SPLIT}, "Safari in the right pane, both running")
 
     def scenario_split_drag(s):
         """Experimental: a direct pane swap by dragging the pane's top handle (scenario split moves through full width)."""
@@ -1829,6 +1840,7 @@ class Run:
         "preview-unfolded": lambda s: s.scenario_preview_unfolded(),
         "open-in-safari-unfold": lambda s: s.scenario_open_safari_unfold(),
         "split": lambda s: s.scenario_split(),
+        "split-right-live": lambda s: s.scenario_split_right_live(),
         "split-turn": lambda s: s.scenario_split_turn(),
         "split-drag": lambda s: s.scenario_split_drag(),
         "dynamic-type": lambda s: s.scenario_dynamic_type(),
@@ -1837,7 +1849,7 @@ class Run:
         "live-preview-default": lambda s: s.scenario_live("default"),
         "live-preview-full": lambda s: s.scenario_live("full"),
     }
-    NEEDS_SIM = {"split", "split-turn", "split-drag", "open-in-safari-unfold"}
+    NEEDS_SIM = {"split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
     EXPERIMENTAL = {"split-drag"}  # run only when named with --only
 
     def main(s):

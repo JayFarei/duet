@@ -100,3 +100,8 @@ test("the primary arms on the first tap and runs on the second, capsule or folde
   assert.equal(primaryTap(true, "Refresh dashboard"), "run");
   assert.equal(primaryTap(false, false), "run");
 });
+
+test("right split pane: the primary and \"…\" fit at the Live Activity worst case (#226)", () => {
+  const c = { ...detect(sig(385, 571, 469, 669)), side: "right" };
+  assert.deepEqual(kinds(template(frame(c), { menu: true, actions: 3, primary: true, rest: true }).groups), [["primary", "more"]]);
+});
