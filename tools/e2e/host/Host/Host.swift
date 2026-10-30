@@ -4,8 +4,9 @@ import UIKit
 import WebKit
 
 // e2e test host: presents a page in SFSafariViewController the way an app's link preview does, or (style webview)
-// in a full-screen WKWebView under the status area, the way X's own in-app browser does.
-//   launch args:  -url <page> -style default|full|over|sheet|webview   (presents 1s after launch)
+// in a full-screen WKWebView under the status area, the way X's own in-app browser did, or (style xsheet) the way
+// it does now: the web view on the top 61%, X's bar and the tweet card below it.
+//   launch args:  -url <page> -style default|full|over|sheet|webview|xsheet   (presents 1s after launch)
 //                 -beacon <origin>                              (Live.swift, saved for later launches)
 //   URL scheme:   duoe2e://present?style=sheet&url=<encoded>   (dismisses any open preview first)
 //                 duoe2e://safari?url=<encoded>                (dismisses the preview, opens the page in Safari,
@@ -35,6 +36,7 @@ import WebKit
     guard var top = topController() else { return }
     while let p = top.presentedViewController { top = p }
     if style == "webview" { return top.present(WebPreview(url), animated: true) }
+    if style == "xsheet" { return top.present(XSheet(url), animated: true) }
     let vc = SFSafariViewController(url: url)
     switch style {
     case "full": vc.modalPresentationStyle = .fullScreen
@@ -59,6 +61,32 @@ final class WebPreview: UIViewController {
   }
 }
 
+// X's in-app browser as of 2026-10: full screen, the WKWebView on its top 61% (413 of the closed screen's 678pt),
+// X's bar (back, site, reload) under it, the tweet card filling the rest.
+final class XSheet: UIViewController {
+  let url: URL, web = WKWebView(frame: .zero), bar = UILabel(), card = UIView()
+  init(_ url: URL) { self.url = url; super.init(nibName: nil, bundle: nil); modalPresentationStyle = .fullScreen }
+  required init?(coder: NSCoder) { fatalError() }
+  override func viewDidLoad() {
+    view.backgroundColor = .black
+    web.isInspectable = true
+    web.load(URLRequest(url: url))
+    bar.text = "X    " + (url.host ?? "")
+    bar.textColor = .white
+    bar.textAlignment = .center
+    bar.backgroundColor = UIColor(white: 0.12, alpha: 1)
+    card.backgroundColor = UIColor(white: 0.08, alpha: 1)
+    card.layer.cornerRadius = 24
+    [web, bar, card].forEach(view.addSubview)
+  }
+  override func viewDidLayoutSubviews() {
+    let b = view.bounds, h = (b.height * 0.61).rounded()
+    web.frame = CGRect(x: 0, y: 0, width: b.width, height: h)
+    bar.frame = CGRect(x: 0, y: h, width: b.width, height: 52)
+    card.frame = CGRect(x: 0, y: h + 60, width: b.width, height: max(0, b.height - h - 60))
+  }
+}
+
 @MainActor func handle(_ u: URL) {
   let q = URLComponents(url: u, resolvingAgainstBaseURL: false)?.queryItems ?? []
   func v(_ k: String) -> String? { q.first { $0.name == k }?.value }
@@ -74,7 +102,7 @@ struct Links: View {
   var body: some View {
     NavigationStack {
       List {
-        ForEach(["default", "full", "over", "sheet", "webview"], id: \.self) { st in
+        ForEach(["default", "full", "over", "sheet", "webview", "xsheet"], id: \.self) { st in
           Button("Open \(st)") { present(st, UserDefaults.standard.string(forKey: "url")) }
         }
         Button("Open in Safari") {

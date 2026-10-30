@@ -257,6 +257,14 @@ function openWideWhole(s: Signals): boolean {
   return near1(s.outerWidth, h) && near1(s.outerHeight, w) && near1(s.innerWidth, s.outerWidth) && near1(s.innerHeight, s.outerHeight);
 }
 
+/** An app's web view as wide as the screen, closed upright or open wide, whatever its height. Open, X's sheet keeps
+ *  reporting the closed screen (678x466, e2e xsheet 2026-10-30), so the open width alone says it. */
+function topWebview(s: Signals): boolean {
+  const near1 = (a: number, b: number) => Math.abs(a - b) <= 1, lo = Math.min(s.screenWidth, s.screenHeight), hi = Math.max(s.screenWidth, s.screenHeight);
+  const closed = lo === DUO_SIZES[0][0] && hi === DUO_SIZES[0][1];
+  return (closed && (s.angle ?? 0) === 0 && near1(s.innerWidth, lo)) || near1(s.innerWidth, DUO_SIZES[1][1]);
+}
+
 /** The in-app preview on the open screen, default, full screen and over full screen styles (iOS 27.1, e2e matrix
  *  2026-10-27; the sheet is UNFOLDED_SHEETS). No column, and no Safari tab has these chrome and inset pairs (a tab
  *  unfolded: chrome 126, inset 34, in both postures).
@@ -412,7 +420,10 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   // token, chrome 0, inset top 0, iOS 27.1): the status column (clock, island, Live Activities) is over the page's right
   // edge, and nothing native says so. The controls start below it, where a Home Screen app's strip does (#194). Open
   // tall, the status row heads the page and the controls already start below it.
-  const statusOver = duo && !s.standalone && side === "right" && ((!landscape && closedWhole(s)) || openWideWhole(s));
+  // X's current in-app browser is shorter: a full-width web view on the screen's top 61%, its bar and the tweet card
+  // below (#194, 466x413 closed). Only the width says so, and the short page reads landscape.
+  const statusOver = duo && !s.standalone && side === "right"
+    && ((!landscape && closedWhole(s)) || openWideWhole(s) || (browser === "webview" && topWebview(s)));
   return { ...base, mode: "inline", layout: layoutOf(s.innerWidth), side, screenWidth: s.innerWidth, screenHeight: s.innerHeight, ...(preview && { preview }), ...(preview && onClosed && landscape && browser === "safari" && !s.standalone && { hidden: "preview" as const }), ...(open === "tall" && { clearTop: UNFOLDED_PREVIEW.clear.tall }), ...(statusOver && { clearTop: DUO.top + DUO.island }), ...(split && { split }) };
 }
 
