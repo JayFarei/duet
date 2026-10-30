@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { detect } from "../src/geometry.ts";
-import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, pillRect, spring, template } from "../src/template.ts";
+import { TEMPLATE, allocate, frame, groupHeight, lead, menuBox, pillRect, primaryTap, spring, template } from "../src/template.ts";
 
 const kinds = (groups) => groups.map((g) => g.map((s) => s.kind === "action" ? s.index : s.kind));
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -74,4 +74,11 @@ test("lead and spring: ends fixed, linear() easing settles at 1", () => {
   const s = spring(240, 26);
   assert.match(s.easing, /^linear\(0,.*\)$/);
   assert.ok(Math.abs(+s.easing.slice(0, -1).split(",").at(-1) - 1) < 0.01 && s.ms > 0);
+});
+
+test("the primary arms on the first tap and runs on the second, capsule or folded row alike (#191)", () => {
+  assert.equal(primaryTap(false, undefined), "arm");
+  assert.equal(primaryTap(false, "Refresh dashboard"), "arm");
+  assert.equal(primaryTap(true, "Refresh dashboard"), "run");
+  assert.equal(primaryTap(false, false), "run");
 });

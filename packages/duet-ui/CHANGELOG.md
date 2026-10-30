@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.6.1-rc.2
+
+- An app's own web view (a link opened in X), on the closed Duo upright and on the open Duo wide: the controls no longer sit under the status column's clock, wifi and battery. The page is the whole 466x678 screen with no chrome and a top inset of 0, which read as a plain full-width page, inline right at the top. Such a page now gets `clearTop` below the status column at its worst (the island with Live Activities, 265pt), like a Home Screen app's strip. Open wide (951x669, window = screen) the status column heads the right edge the same way and gets the same `clearTop`. Open tall the status row heads the page and the controls already start below it; turned closed, no status bar shows (#194).
+
+## 0.6.1-rc.1
+
+- A primary folded into "…" arms on the first tap (its row takes the tint and reads `confirm`, the list stays open) and runs on the second, like its own capsule. It ran at once. Closing the list disarms it. A folded primary that ran in one tap now takes two; pass `confirm: false` to keep one. New pure export `primaryTap(armed, confirm)` (#191).
+- The armed capsule's accessible name is its `confirm` text ("Cancel booking"), as shown; it kept the plain label.
+- Column controls after a fast flick up then down in a closed Safari tab (#191): not reproduced. The report's own captures show the controls in place in every Safari frame (the one capture without them is the Home Screen), and repeated runs of the exact flick keep them. New e2e suite `scr06` guards it.
+- README: the folded primary, the `z-index: 50` stacking of the controls (an overlay at the same level mounted later covers the inline close), `<DuoCookie>`'s one reload on an unseen device, and the panes example without the removed `back` prop.
+
 ## 0.6.0
 
 The templated column (#181). Breaking: the chrome is rebuilt around one template, the same on every layout.

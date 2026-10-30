@@ -1,9 +1,11 @@
 import SwiftUI
 import SafariServices
 import UIKit
+import WebKit
 
-// e2e test host: presents a page in SFSafariViewController the way an app's link preview does.
-//   launch args:  -url <page> -style default|full|over|sheet   (presents 1s after launch)
+// e2e test host: presents a page in SFSafariViewController the way an app's link preview does, or (style webview)
+// in a full-screen WKWebView under the status area, the way X's own in-app browser does.
+//   launch args:  -url <page> -style default|full|over|sheet|webview   (presents 1s after launch)
 //                 -beacon <origin>                              (Live.swift, saved for later launches)
 //   URL scheme:   duoe2e://present?style=sheet&url=<encoded>   (dismisses any open preview first)
 //                 duoe2e://safari?url=<encoded>                (dismisses the preview, opens the page in Safari,
@@ -32,6 +34,7 @@ import UIKit
   dismissAll {
     guard var top = topController() else { return }
     while let p = top.presentedViewController { top = p }
+    if style == "webview" { return top.present(WebPreview(url), animated: true) }
     let vc = SFSafariViewController(url: url)
     switch style {
     case "full": vc.modalPresentationStyle = .fullScreen
@@ -40,6 +43,19 @@ import UIKit
     default: break
     }
     top.present(vc, animated: true)
+  }
+}
+
+// A WKWebView edge to edge, under the status area: no Safari token in its user agent, no browser chrome.
+final class WebPreview: UIViewController {
+  let url: URL
+  init(_ url: URL) { self.url = url; super.init(nibName: nil, bundle: nil); modalPresentationStyle = .fullScreen }
+  required init?(coder: NSCoder) { fatalError() }
+  override func loadView() {
+    let web = WKWebView(frame: .zero)
+    web.isInspectable = true
+    web.load(URLRequest(url: url))
+    view = web
   }
 }
 
@@ -58,7 +74,7 @@ struct Links: View {
   var body: some View {
     NavigationStack {
       List {
-        ForEach(["default", "full", "over", "sheet"], id: \.self) { st in
+        ForEach(["default", "full", "over", "sheet", "webview"], id: \.self) { st in
           Button("Open \(st)") { present(st, UserDefaults.standard.string(forKey: "url")) }
         }
         Button("Open in Safari") {

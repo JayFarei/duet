@@ -216,10 +216,12 @@ def steps_en(start, acts):
 #   bar         Safari's top bar takes the colour of the page under it (a sheet's scrim runs on under the bar, #136)
 # env: dark (appearance), content_size (Dynamic Type), set for the suite and restored after it.
 TAB0, PV0 = ("tab", "closed", 0, False), ("sheet", "closed", 0, False)
-CTA = [  # /book: a class row, its call to action toggling Booked, and Duet's back to the list
+CTA = [  # /book: a class row, its call to action toggling Booked (each arms, then runs, folded or not, #191), and Duet's back to the list
     (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna", "label": "Book · 2 credits"}),
-    (("tap", "Book · 2 credits"), "Tap Duet's call to action \"Book · 2 credits\"", {"label": "Booked"}),
-    (("tap", "Booked"), "Tap \"Booked\" again", {"label": "Book · 2 credits"}),
+    (("tap", "Book · 2 credits"), "Tap Duet's call to action \"Book · 2 credits\" (it arms)", {"label": "Book · 2 credits"}),
+    (("tap", "Book · 2 credits"), "Tap it again (it runs)", {"label": "Booked"}),
+    (("tap", "Booked"), "Tap \"Booked\" (it arms as \"Cancel booking\")", {"label": "Cancel booking"}),
+    (("tap", "Cancel booking"), "Tap \"Cancel booking\" (it runs)", {"label": "Book · 2 credits"}),
     (("tap", "Classes", "back"), "Tap Duet's back \"Classes\" (from \"…\" or the tab's menu where it folded)", {"path": "/book", "no_label": "Book · 2 credits"}),
 ]
 SUITES = [
@@ -254,6 +256,12 @@ SUITES = [
         (("fling", 7), "Flick the page fast down and up, 7 times, ending down", {"scroll_gt": 300}),
         (("fling", 8), "Flick fast up and down again, 8 times", {}),
     ]},
+    # #191: QA reported the column's burger and "…" gone for good after this exact flick up then down on a page with
+    # the column; the trace showed them in place throughout, so this guards the report as given.
+    {"id": "scr06", "title": "The reported flick up then down, Safari tab, outer screen: column controls stay (#191)", "page": "/book", "start": TAB0, "steps": [
+        (("drags", (((180, 490), (180, 150), 130), ((180, 170), (180, 520), 130))), "Flick up (180,490 to 180,150, 130ms), then down (180,170 to 180,520)", {"label": "Menu", "menu": False}),
+        (("drags", (((180, 490), (180, 150), 130), ((180, 170), (180, 520), 130))), "The same flick again", {"label": "Menu", "menu": False}),
+    ]},
     {"id": "nav01", "title": "Link, Safari Back and Forward, outer screen upright", "page": "/", "start": TAB0, "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),
         (("native", "BackButton"), "Tap Safari's Back", {"path": "/"}),
@@ -261,6 +269,11 @@ SUITES = [
     ]},
     # #133: the preview without forward history keeps the Live Activities allowance, so its band is shorter than a
     # button and /book's tabs merge into one; its island pill was clamped to the band's top, over the preview's Back.
+    # #191: a primary folded into "…" ran on the first tap; it arms first (its row reads its confirm), like its capsule.
+    {"id": "ctl05", "title": "A primary folded into \"…\" arms, then runs, Safari tab, outer screen (#191)", "page": "/lab?menu=5&actions=5&primary=1&confirm=1", "start": TAB0, "steps": [
+        (("tap", "New"), "Tap \"New\" in \"…\" (it arms, the menu stays open)", {"menu": True, "label": "Confirm new"}),
+        (("tap", "Confirm new"), "Tap \"Confirm new\" (it runs, the menu closes)", {"menu": False, "no_label": "Confirm new"}),
+    ]},
     {"id": "isl01", "title": "Tab menu island in the in-app preview (default style), no forward history (#133)", "page": "/book", "start": ("default", "closed", 0, False), "steps": [
         (("tap", "Sauna and cold plunge"), "Tap the class \"Sauna and cold plunge\"", {"path": "/book?c=sauna"}),
         (("menu",), "Tap Duet's tab button (its island opens)", {"menu": True}),

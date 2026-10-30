@@ -118,6 +118,11 @@ export function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
 /** The armed primary: a pill growing from its capsule toward the page. */
 export const pillRect = (r: Rect, side: Side): Rect => ({ ...r, x: side === "right" ? r.x + T.control - T.pill : r.x, w: T.pill });
 
+/** What a tap on the primary does: the first arms it (its label turns to `confirm`), the second runs it; `confirm:
+ *  false` runs at once. The same rule holds for its own capsule and for its row in "…" when the band has no room
+ *  for it (#191). */
+export const primaryTap = (armed: boolean, confirm?: string | false): "arm" | "run" => armed || confirm === false ? "run" : "arm";
+
 /** The whole template for one frame: a sheet's lone close (when the band has room; the preview's gap holds one), the preview's lone "…", the
  *  open sidebar's lone burger, else allocate. `rest`: items "…" lists whatever fits (folded, destructive, the side
  *  switch). */

@@ -179,7 +179,7 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 
 The server can't measure anything, so on the server and during hydration `useDuet()` returns a fixed snapshot: `mode: "column"`, `duo: true`, `browser: "safari"`, `layout: "narrow"`, `side: "right"` (a closed Safari tab). The real values arrive right after hydration. So `useDuet().duo` is `true` in the server HTML on every device: a page that renders a Duo layout or a desktop layout from it switches once after hydration on non-Duo devices.
 
-To choose the layout on the server, `<DuoCookie>` keeps a `duet-duo` cookie (`"1"` on a Duo) in step with the browser. Read the cookie on the server, render from it, and pass what you rendered as `rendered`. After hydration, if the browser's answer differs, `<DuoCookie>` updates the cookie and calls `onChange` (default: `location.reload()`), so a new device switches layout once. It renders nothing and works outside `<Duet>`. In the Next.js App Router:
+To choose the layout on the server, `<DuoCookie>` keeps a `duet-duo` cookie (`"1"` on a Duo) in step with the browser. Read the cookie on the server, render from it, and pass what you rendered as `rendered`. After hydration, if the browser's answer differs, `<DuoCookie>` updates the cookie and calls `onChange` (default: `location.reload()`), so a new device switches layout once: expect one reload on the first visit from a device the cookie has not seen (a Duo, when the server rendered for a non-Duo, or the other way round), and none after. It renders nothing and works outside `<Duet>`. In the Next.js App Router:
 
 ```tsx
 // app/page.tsx, a server component. DuoApp and DesktopApp are your own components.
@@ -286,6 +286,7 @@ A page with one thing to do (book, buy, join) passes it as its primary, and fold
 ```
 
 - The first tap arms it: the round button grows toward the page into a 214pt tinted pill with icon and `confirm` (or `label`). The second tap runs `onPress`. A tap anywhere else disarms it. `confirm: false` runs on the first tap.
+- Folded into "…" (no room for its own group), it arms the same way: the first tap tints its row and turns its label to `confirm`, the list stays open, the second tap runs it and closes the list. Closing the list disarms it. See [Folded primary runs at once](#folded-primary-runs-at-once).
 - `tint` on the primary overrides the accent for it alone. Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop.
 
 Between pages the controls move like a native bar: a group that appears scales up out of a blur, one that goes away shrinks into one and is kept for 450ms so it can, and the rest slide to their new places on the same spring. With reduced motion, controls crossfade in place.
@@ -330,6 +331,7 @@ Apps with a path of screens (mailboxes, inbox, message) follow the fold with `<D
 
 ```tsx
 "use client";
+import { ArrowLeft } from "lucide-react";
 import { Duet, DuetPaneBar, DuetPanes, usePanes } from "duet-ui";
 
 const PATH = ["mailboxes", "inbox", "message"];
@@ -337,7 +339,7 @@ const PATH = ["mailboxes", "inbox", "message"];
 export function Mail() {
   const nav = usePanes(PATH);
   return (
-    <Duet back={nav.back}>
+    <Duet actions={nav.back ? [{ id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: nav.back.onPress }] : []}>
       <DuetPanes path={PATH} at={nav.at} expanded={nav.expanded} panes={{
         mailboxes: <button onClick={() => nav.go("inbox")}>Inbox</button>,
         inbox: <button onClick={() => nav.go("message")}>First message</button>,
@@ -354,7 +356,7 @@ export function Mail() {
 ```
 
 - `<DuetPanes path at expanded? panes>`: `panes` maps each id in `path` to its content. `expanded` gives the focused pane the whole window.
-- `usePanes(path, initial?)` returns `at`, `go(id)` (focus a pane, leaving full screen), `layout`, `expanded`, `toggle()` (full screen on and off), `close` (focus the previous pane, `undefined` at the root) and `back`, ready for `<Duet back>`: it leaves full screen first, then steps back along the path, and is `false` when that would change nothing on screen.
+- `usePanes(path, initial?)` returns `at`, `go(id)` (focus a pane, leaving full screen), `layout`, `expanded`, `toggle()` (full screen on and off), `close` (focus the previous pane, `undefined` at the root) and `back` (`{ onPress }`, or `false`), for a Back action of your own: it leaves full screen first, then steps back along the path, and is `false` when that would change nothing on screen.
 - `<DuetPaneBar onClose? onToggle? expanded? more?>` is the pane's header pill: close, a full-screen toggle (only when `layout` is `"wide"`) and "…" with the pane's own `DuetItem`s, destructive ones last. It renders nothing when it has no buttons.
 
 Try it on the [site](https://getduet.dev/panes).
@@ -683,6 +685,22 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#147](https://github.com/JayFarei/duet/issues/147).
 
+### Overlay stacked level with the controls
+
+- **You see:** with a page overlay (a sheet, a lightbox) at `z-index: 50` appended to `<body>` after `<Duet>`, inline controls sit under it: Duet's `close` shows through the dim but takes no tap.
+- **Cause:** Duet's controls are fixed boxes at `z-index: 50` (`.duet-group`, `.duet-blob`, the column layer). Two boxes at the same level stack in document order, so an overlay mounted later wins.
+- **Duet does:** keeps its controls at `z-index: 50`, under your own top-level UI by design, so a toast or popover of yours can rise above them.
+- **You do:** keep overlays that should leave Duet's controls usable below 50 (`z-index: 40`), or mount them before `<Duet>`. Use 51 and up only for what should cover the controls.
+- **Status:** [#191](https://github.com/JayFarei/duet/issues/191), 0.6.1.
+
+### Folded primary runs at once
+
+- **You see:** without the handling, when the primary folds into "…" (the band has no room for its group, as on the closed Duo with a menu and several actions), one tap on its row runs it, while its own capsule asks for a second tap.
+- **Cause:** "…" rows ran their `onPress` on the first tap, the primary's row included.
+- **Duet does:** applies the capsule's rule to the row (`primaryTap` in the template): the first tap arms it (tinted row, label `confirm`, the list stays open), the second runs it and closes the list. `confirm: false` runs at once. Closing the list, picking another row or tapping outside disarms it.
+- **You do:** nothing.
+- **Status:** [#191](https://github.com/JayFarei/duet/issues/191), 0.6.1.
+
 ### Burger without children
 
 - **You see:** with no `children`, opening the burger shows the sidebar over the page instead of sliding the page aside.
@@ -698,6 +716,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** shows "…" alone; its list starts with a "Menu" section holding the places (checked for the current one), then the page's actions. A sheet's `close` takes that one slot instead.
 - **You do:** nothing.
 - **Status:** [#181](https://github.com/JayFarei/duet/issues/181), 0.6.0.
+
+### An app's own web view (a link opened in X)
+
+- **You see:** on the closed Duo upright, or the open Duo wide, the burger and "…" sit under the clock, wifi and battery at the top right.
+- **Cause:** some apps (X among them) open links in their own `WKWebView`, edge to edge, not in Safari's in-app preview. The page is the whole 466x678 screen, with no Safari column, no bars and a top inset of 0, so nothing tells the page that the Duo's status column (and Live Activities in the island under it) covers its right edge.
+- **Duet does:** a page that is the whole closed screen, upright, not a Home Screen app, with the controls on the right, keeps them below the status column at its worst (the island with Live Activities, 265pt), where a Home Screen app's strip starts. The same holds for a page that is the whole open screen, wide (951x669). Open tall the status row heads the page and the controls already start below it.
+- **You do:** nothing. Moving the controls left drops the allowance, nothing native is there.
+- **Status:** [#194](https://github.com/JayFarei/duet/issues/194).
 
 ## Limitations
 

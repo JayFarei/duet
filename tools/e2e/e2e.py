@@ -106,9 +106,10 @@ def address(path):
 
 def duet_buttons(r, back=False):
     """[(label, rect)] of Duet's shown buttons in a sample, an open menu's items included. back: only Duet's back (its
-    slot, or a plain menu item), not a tab of the same name ("Classes" is /book's back and its first tab)."""
+    slot, the template's actions group since 0.6.0, or a plain menu item), not a tab of the same name ("Classes" is
+    /book's back and its first tab)."""
     return [(b["label"], b["rect"]) for n in live_navs(r) for g in (n.get("slots") or []) + (n.get("menus") or []) for b in g.get("buttons") or []
-            if not back or g.get("slot") == "back" or b.get("role") == "menuitem"]
+            if not back or g.get("slot") in ("back", "actions") or b.get("role") == "menuitem"]
 
 
 def menu_items(r):
@@ -317,6 +318,7 @@ class Run:
         if callable(expect):
             expect = res["expect"] = expect(allr[-1]["sig"] if allr else None)
         res["position"] = s.position
+        s.wide = bool(allr) and allr[-1]["sig"]["outerWidth"] > 900
         native = s.native(kind, allr[-1]["sig"]["angle"] if allr else 0)
         shot = s.screenshot(sid)
         s.assess(res, allr, native, expect, t0, kind, prev)
@@ -357,6 +359,10 @@ class Run:
         """Native button frames. Closed: the UI-test runner, in closed screen points. Unfolded: XCUITest frames on the
         inner display do not map (README), so the simulator helper describes the app by pid, in points of its window
         (the pane in split view), which works for either split pane."""
+        if kind == "webview":
+            if s.position == "open":  # wide (951x669): the status column heads the right edge; tall: a row above the page
+                return [{"type": 0, "label": "Status column", "id": "status", "x": 867, "y": 0, "w": 84, "h": 173.3}] if getattr(s, "wide", False) else []
+            return (s.status_column() if angle == 0 else []) + (s.island(angle) if s.la_on else [])
         bundle = PREVIEW_SVC if kind == "preview" else SAFARI
         if s.position != "open":
             r = cmd("elements", bundle=bundle)
@@ -375,6 +381,16 @@ class Run:
             return []
         s.native_why = None if out else f"{bundle} (pid {pid}) reported no buttons"
         return out
+
+    @staticmethod
+    def status_column():
+        """An app's web view over the whole closed screen, upright, has no native buttons of its own: the obstacle is the
+        status column over its right edge (#194). SpringBoard's elements there, in portrait device points (466x678),
+        else the column down to the clock and wifi's bottom (DUO.top, 173.3) when SpringBoard reports none."""
+        r = cmd("tree", bundle=SPRINGBOARD)
+        out = [{"type": 0, "label": e.get("label") or e["id"] or "status", "id": "status", "x": e["x"], "y": e["y"], "w": e["w"], "h": e["h"]}
+               for e in (r or {}).get("elements", []) if e["x"] >= 382 and e["w"] <= 84 and 0 < e["h"] and e["y"] + e["h"] <= 180]
+        return out or [{"type": 0, "label": "Status column", "id": "status", "x": 382, "y": 0, "w": 84, "h": 173.3}]
 
     @staticmethod
     def island(angle):
@@ -618,7 +634,8 @@ class Run:
                 t_ok, lim = max(t_ok, t_final), SLIDE_S
                 rects = lambda r: {x["slot"]: x["rect"] for x in all_slots(r)}
                 end = rects(last)
-                content = lambda r: (sorted(rects(r)), sorted(l for l, _ in duet_buttons(r)))
+                # The primary arming into its pill (or disarming) is a change in place too, with or without a new label (#191).
+                content = lambda r: (sorted(rects(r)), sorted(l for l, _ in duet_buttons(r)), rects(r).get("primary", {}).get("w", 0) > 60)
                 chg = [r for r in allr if r["rx"] >= t_ok and shown_place(r) is not None and content(r) != content(last)]
                 if chg:
                     t_ok, lim = chg[-1]["rx"], SPRING_S
@@ -1153,6 +1170,22 @@ class Run:
             frm = s.angle
             s.step(f"preview-{style}-{frm}to{a}", "preview", t, s.rotate(t, a), preview_expect(style, a), f"in-app preview ({style}), turn {frm} -> {a}", video=True)
 
+    def scenario_webview(s):
+        """An app's own WKWebView over the whole closed screen (X's link preview, #194): inline right, every control
+        below the status column, with and without a Live Activity in the island."""
+        t = s.tok("webview")
+        exp = {"preview": False, "mode": "inline", "side": "right"}
+        s.step("webview-0", "webview", t, s.open_preview(t, "webview"), exp, "app web view, closed, upright")
+        s.step("webview-on", "webview", t, s.la(t, "webview", on=True), exp, "app web view: Live Activity starts", video=True)
+        s.step("webview-off", "webview", t, s.la(t, "webview", on=False), exp, "app web view: Live Activity ends", video=True)
+        any_ = {"preview": False}
+        s.step("webview-90", "webview", t, s.rotate(t, 90), any_, "app web view, closed, turn to 90", video=True)
+        s.step("webview-270", "webview", t, s.rotate(t, 270), any_, "app web view, closed, turn to 270", video=True)
+        s.step("webview-back0", "webview", t, s.rotate(t, 0), exp, "app web view, closed, back upright", video=True)
+        s.step("webview-open", "webview", t, s.unfold(t, 0), any_, "app web view, unfold wide", video=True)
+        s.step("webview-open-tall", "webview", t, s.unfold(t, 90), any_, "app web view, unfolded tall", video=True)
+        s.step("webview-fold", "webview", t, s.fold_closed(t, 0), exp, "app web view, fold back closed upright", video=True)
+
     def scenario_open_safari(s, angle):
         t = s.tok(f"pvos{angle}")
         s.step(f"openinsafari-{angle}-preview", "preview", t, s.open_preview(t, "sheet"), {"preview": True, **PREVIEW[0]}, "in-app preview (sheet) before Open in Safari")
@@ -1535,7 +1568,7 @@ class Run:
 
     def to_front(s, kind):
         """Brings the app under test back in front (Safari, or the host whose preview is open)."""
-        if kind == "preview":
+        if kind in ("preview", "webview"):
             s.host()
         else:
             sh("xcrun", "simctl", "launch", s.udid, SAFARI, check=False)
@@ -1592,6 +1625,10 @@ class Run:
                     s.sim.drag(x, y0 + h * a, x, y0 + h * b, ms=120, steps=6, end_hold_ms=0)
                     time.sleep(0.25)
                 land["delay"] = 2.0
+            elif k == "drags":  # exact drags in device points, each ((x1, y1), (x2, y2), ms), released moving (#191)
+                for (xa, ya), (xb, yb), ms in action[1]:
+                    s.sim.drag(xa, ya, xb, yb, ms=ms, steps=6, end_hold_ms=0)
+                land["delay"] = 2.0
             elif k == "type":
                 s.sim.text(action[1])
                 land["delay"] = 0.5
@@ -1634,7 +1671,7 @@ class Run:
                 time.sleep(0.15)
                 s.sim.button("HOME")
                 time.sleep(1.5)
-                c = s.sim.switcher_card(HOST if kind == "preview" else SAFARI)
+                c = s.sim.switcher_card(HOST if kind in ("preview", "webview") else SAFARI)
                 if c is None:
                     s.why = "no card for the app under test in the app switcher"
                     return None
@@ -1749,6 +1786,7 @@ class Run:
         "preview-sheet": lambda s: s.scenario_preview("sheet"),
         "preview-default": lambda s: s.scenario_preview("default"),
         "preview-full": lambda s: s.scenario_preview("full"),
+        "webview": lambda s: s.scenario_webview(),
         "open-in-safari": lambda s: s.scenario_open_safari(0),
         "open-in-safari-90": lambda s: s.scenario_open_safari(90),
         "open-in-safari-270": lambda s: s.scenario_open_safari(270),
