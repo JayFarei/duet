@@ -85,7 +85,7 @@ STATES = [(su, po, an, mu) for su in SURFACES for po in POSTURES for an in ANGLE
 
 def transitions(state):
     """(action, next state) from a state, in a fixed order. Open in Safari is closed only: on the inner display the
-    runner's taps do not land (README, Split view), see GAPS."""
+    runner's taps do not land (docs/how-duet-decides.md, Split view), see GAPS."""
     su, po, an, mu = state
     out = [(("turn", b), (su, po, b, mu)) for b in ANGLES if b != an]
     out.append((("unfold",) if po == "closed" else ("fold",), (su, "open" if po == "closed" else "closed", an, mu)))
