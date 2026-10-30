@@ -23,11 +23,12 @@ const ICONS = [Bell, Share, Bookmark, Trash2, Pencil];
 const NAMES = ["Alerts", "Share", "Save", "Delete", "Edit"];
 
 // Query keys. menu=N places (tabs=N is the 0.5 name, still read), searchTab=1 adds a Search place, back=1 opens a
-// detail with a Back action first, leading=N more actions before them, actions=N, primary=1, close=1 (a sheet).
+// detail with a Back action first, leading=N more actions before them, actions=N, primary=1, confirm=1 (the primary
+// arms as "Confirm new"), close=1 (a sheet).
 // Keys of removed props (accessory, minimize, search, morph) are ignored, so old capture URLs still load.
-type S = Record<"menu" | "back" | "actions" | "primary" | "close" | "title" | "leading" | "searchTab" | "list" | "dark" | "feed" | "bg", number>;
+type S = Record<"menu" | "back" | "actions" | "primary" | "confirm" | "close" | "title" | "leading" | "searchTab" | "list" | "dark" | "feed" | "bg", number>;
 function parse(q: string): S {
-  const s = { menu: 0, back: 0, actions: 0, primary: 0, close: 0, title: 0, leading: 0, searchTab: 0, list: 0, dark: 0, feed: 0, bg: 0 };
+  const s = { menu: 0, back: 0, actions: 0, primary: 0, confirm: 0, close: 0, title: 0, leading: 0, searchTab: 0, list: 0, dark: 0, feed: 0, bg: 0 };
   for (const kv of q.replace(/^\?/, "").split(/[,&]/)) {
     const [k0, v] = kv.split("="), k = k0 === "tabs" ? "menu" : k0;
     if (k in s) s[k as keyof S] = Number(v) || 0;
@@ -89,7 +90,7 @@ html,body{margin:0;background:var(--bg)}
           ...Array.from({ length: s.leading }, (_, i) => action(i + 2, "l")),
           ...Array.from({ length: s.actions }, (_, i) => action(i)),
         ]}
-        primary={s.primary ? { id: "new", label: "New", icon: <Plus size={22} />, onPress: () => setTapped("New") } : undefined}
+        primary={s.primary ? { id: "new", label: "New", icon: <Plus size={22} />, confirm: s.confirm ? "Confirm new" : undefined, onPress: () => setTapped("New") } : undefined}
         close={sheet ? { label: "Close", onPress: () => { setSheet(false); setTapped("Close"); } } : undefined}
       >
         {s.title > 0 && <div style={{ position: "sticky", top: 0, zIndex: 1, padding: "calc(12px + var(--duet-inset-top, 0px)) 20px 12px", ...bleed(20), background: "var(--bg)", font: "600 17px -apple-system" }}>

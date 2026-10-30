@@ -148,6 +148,8 @@
 .duet .duet-row > span { overflow: hidden; text-overflow: ellipsis; }
 .duet .duet-row:active { background: var(--duet-sel); }
 .duet .duet-row[aria-checked="true"] { color: var(--duet-tint); }
+/* The folded primary, armed: its row takes the capsule's tint and reads `confirm` until the second tap (#191). */
+.duet .duet-row[data-armed] { background: var(--duet-tint); color: #fff; }
 .duet .duet-row > .duet-check { margin-left: auto; }
 /* Destructive items (blueprint): last in "…", red. */
 .duet .duet-row[data-destructive] { color: #ff3b30; }

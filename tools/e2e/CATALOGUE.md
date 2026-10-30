@@ -24,33 +24,41 @@ Not covered yet:
 
 1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
 2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right; the address is /book?c=sauna; Duet offers "Book · 2 credits".
-3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right; Duet offers "Booked".
-4. Tap "Booked" again. Expect: controls in a column on the right; Duet offers "Book · 2 credits".
-5. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls in a column on the right; the address is /book; Duet no longer offers "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits" (it arms). Expect: controls in a column on the right; Duet offers "Book · 2 credits".
+4. Tap it again (it runs). Expect: controls in a column on the right; Duet offers "Booked".
+5. Tap "Booked" (it arms as "Cancel booking"). Expect: controls in a column on the right; Duet offers "Cancel booking".
+6. Tap "Cancel booking" (it runs). Expect: controls in a column on the right; Duet offers "Book · 2 credits".
+7. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls in a column on the right; the address is /book; Duet no longer offers "Book · 2 credits".
 
 ## ctl02: Call to action and back, in-app preview (sheet)
 
 1. Open /book in the in-app preview, sheet style, folded, on the outer screen, upright, no music. Expect: controls in a column on the right in the gap of the preview's own column.
 2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right in the gap of the preview's own column; the address is /book?c=sauna; Duet offers "Book · 2 credits".
-3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right in the gap of the preview's own column; Duet offers "Booked".
-4. Tap "Booked" again. Expect: controls in a column on the right in the gap of the preview's own column; Duet offers "Book · 2 credits".
-5. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls in a column on the right in the gap of the preview's own column; the address is /book; Duet no longer offers "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits" (it arms). Expect: controls in a column on the right in the gap of the preview's own column; Duet offers "Book · 2 credits".
+4. Tap it again (it runs). Expect: controls in a column on the right in the gap of the preview's own column; Duet offers "Booked".
+5. Tap "Booked" (it arms as "Cancel booking"). Expect: controls in a column on the right in the gap of the preview's own column; Duet offers "Cancel booking".
+6. Tap "Cancel booking" (it runs). Expect: controls in a column on the right in the gap of the preview's own column; Duet offers "Book · 2 credits".
+7. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls in a column on the right in the gap of the preview's own column; the address is /book; Duet no longer offers "Book · 2 credits".
 
 ## ctl03: Call to action and back, Safari tab, unfolded
 
 1. Open /book in a Safari tab, unfolded, on the inner screen, wide (951x669), no music. Expect: controls inline on the right.
 2. Tap the class "Sauna and cold plunge". Expect: controls inline on the right; the address is /book?c=sauna; Duet offers "Book · 2 credits".
-3. Tap Duet's call to action "Book · 2 credits". Expect: controls inline on the right; Duet offers "Booked".
-4. Tap "Booked" again. Expect: controls inline on the right; Duet offers "Book · 2 credits".
-5. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls inline on the right; the address is /book; Duet no longer offers "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits" (it arms). Expect: controls inline on the right; Duet offers "Book · 2 credits".
+4. Tap it again (it runs). Expect: controls inline on the right; Duet offers "Booked".
+5. Tap "Booked" (it arms as "Cancel booking"). Expect: controls inline on the right; Duet offers "Cancel booking".
+6. Tap "Cancel booking" (it runs). Expect: controls inline on the right; Duet offers "Book · 2 credits".
+7. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls inline on the right; the address is /book; Duet no longer offers "Book · 2 credits".
 
 ## ctl04: Call to action and back, Safari tab, outer screen on its side
 
 1. Open /book in a Safari tab, folded, on the outer screen, on its side, landscape right (90), no music. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right.
 2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the address is /book?c=sauna; Duet offers "Book · 2 credits".
-3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet offers "Booked".
-4. Tap "Booked" again. Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet offers "Book · 2 credits".
-5. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the address is /book; Duet no longer offers "Book · 2 credits".
+3. Tap Duet's call to action "Book · 2 credits" (it arms). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet offers "Book · 2 credits".
+4. Tap it again (it runs). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet offers "Booked".
+5. Tap "Booked" (it arms as "Cancel booking"). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet offers "Cancel booking".
+6. Tap "Cancel booking" (it runs). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; Duet offers "Book · 2 credits".
+7. Tap Duet's back "Classes" (from "…" or the tab's menu where it folded). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; the address is /book; Duet no longer offers "Book · 2 credits".
 
 ## scr01: Scroll kept across turn, unfold and fold, Safari tab
 
@@ -88,12 +96,24 @@ Not covered yet:
 2. Flick the page fast down and up, 7 times, ending down. Expect: controls in a column on the right in the gap of the preview's own column; the page stays scrolled down (more than 300pt).
 3. Flick fast up and down again, 8 times. Expect: controls in a column on the right in the gap of the preview's own column.
 
+## scr06: The reported flick up then down, Safari tab, outer screen: column controls stay (#191)
+
+1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Flick up (180,490 to 180,150, 130ms), then down (180,170 to 180,520). Expect: controls in a column on the right; Duet offers "Menu"; Duet's menu is closed.
+3. The same flick again. Expect: controls in a column on the right; Duet offers "Menu"; Duet's menu is closed.
+
 ## nav01: Link, Safari Back and Forward, outer screen upright
 
 1. Open / in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
 2. Tap the link "Call to action example". Expect: controls in a column on the right; the address is /book.
 3. Tap Safari's Back. Expect: controls in a column on the right; the address is /.
 4. Swipe in from the right edge (Safari Forward). Expect: controls in a column on the right; the address is /book.
+
+## ctl05: A primary folded into "…" arms, then runs, Safari tab, outer screen (#191)
+
+1. Open /lab?menu=5&actions=5&primary=1&confirm=1 in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
+2. Tap "New" in "…" (it arms, the menu stays open). Expect: controls in a column on the right; Duet's menu is open, clear of every native button; Duet offers "Confirm new".
+3. Tap "Confirm new" (it runs, the menu closes). Expect: controls in a column on the right; Duet's menu is closed; Duet no longer offers "Confirm new".
 
 ## isl01: Tab menu island in the in-app preview (default style), no forward history (#133)
 
@@ -286,13 +306,13 @@ Not covered yet:
 
 1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
 2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right; the address is /book?c=sauna; Duet offers "Book · 2 credits".
-3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right; Duet offers "Booked".
+3. Tap Duet's call to action "Book · 2 credits" (it arms). Expect: controls in a column on the right; Duet offers "Book · 2 credits".
 
 ## set03: Largest text size, call to action, Safari tab (content_size accessibility-extra-extra-extra-large)
 
 1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
 2. Tap the class "Sauna and cold plunge". Expect: controls in a column on the right; the address is /book?c=sauna; Duet offers "Book · 2 credits".
-3. Tap Duet's call to action "Book · 2 credits". Expect: controls in a column on the right; Duet offers "Booked".
+3. Tap Duet's call to action "Book · 2 credits" (it arms). Expect: controls in a column on the right; Duet offers "Book · 2 credits".
 
 ## pg01: Page /: turned, unfolded and folded, Safari tab
 

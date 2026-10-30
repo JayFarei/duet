@@ -4,7 +4,7 @@ import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, use
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, columnBand, controlsShown, isSplit, pageInsets, magnet, stable, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
-import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, pillRect, template, type Rect, type Slot } from "./template.ts";
+import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, pillRect, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
@@ -588,7 +588,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const scrolls = useRef(new Map<string, number>());
   const select = (id: string) => {
     const el = scroller.current;
-    closeSidebar(); closeMore();
+    closeSidebar(); dismiss();
     if (id === selected) return;
     if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop);
     p.menu!.onSelect(id);
@@ -598,7 +598,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const theme = { ...themeVars(p), "--duet-slide": SLIDE.easing, "--duet-slide-ms": `${SLIDE.ms}ms`, "--duet-group": GROUP.easing, "--duet-group-ms": `${GROUP.ms}ms` } as CSSProperties;
   const badge = (a: { badge?: number | string; badgeTone?: string }) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge" data-tone={a.badgeTone === "neutral" ? "neutral" : undefined}>{a.badge}</span>;
   const label = (s: Slot) => s.kind === "menu" ? "Menu" : s.kind === "more" ? "More" : s.kind === "close" ? (p.close && p.close.label) || "Close"
-    : s.kind === "primary" ? p.primary!.label : actions[s.index].label;
+    : s.kind === "primary" ? (armed && p.primary!.confirm) || p.primary!.label : actions[s.index].label;
   const icon = (s: Slot) => s.kind === "menu" ? <Menu size={22} /> : s.kind === "more" ? <Ellipsis size={22} /> : s.kind === "close" ? <X size={22} strokeWidth={2.2} />
     : s.kind === "primary" ? p.primary!.icon : actions[s.index].icon;
   const press = (s: Slot) => {
@@ -607,13 +607,18 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     else if (s.kind === "close") p.close && p.close.onPress();
     else if (s.kind === "primary") {
       closeMore();
-      if (armed || p.primary!.confirm === false) { setArmed(false); p.primary!.onPress?.(); } else setArmed(true);
+      if (primaryTap(armed, p.primary!.confirm) === "run") { setArmed(false); p.primary!.onPress?.(); } else setArmed(true);
     } else { dismiss(); actions[s.index].onPress?.(); }
   };
 
   const bar = (side: Side, i: number) => {
     const { f, placed, places, list, moreAt } = layout(side);
-    const pick = (a: DuetItem) => () => { closeMore(); a.onPress?.(); };
+    // Folded into "…", the primary arms in place (its row turns to `confirm`, the menu stays open) and runs on the
+    // second tap, like its own capsule.
+    const pick = (a: DuetItem) => () => {
+      if (a === p.primary && primaryTap(armed, p.primary.confirm) === "arm") return setArmed(true);
+      dismiss(); a.onPress?.();
+    };
     const drawsMenu = more !== "closed" && moreAt && (!split || side === menuSide);
     return (
       <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
@@ -649,9 +654,15 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
               ))}
             </>}
             <div className="duet-menu-head">{f.kind === "column" ? "This page" : "More"}</div>
-            {list.map((a) => (
-              <button key={a.id} className="duet-row" role="menuitem" data-destructive={a.destructive || undefined} onClick={pick(a)}>{a.icon}<span>{a.label}</span>{badge(a)}</button>
-            ))}
+            {list.map((a) => {
+              const arm = a === p.primary && armed;
+              return (
+                <button key={a.id} className="duet-row" role="menuitem" data-destructive={a.destructive || undefined} data-armed={arm || undefined}
+                  style={arm && p.primary!.tint ? { "--duet-tint": p.primary!.tint } as CSSProperties : undefined} onClick={pick(a)}>
+                  {a.icon}<span>{(arm && p.primary!.confirm) || a.label}</span>{badge(a)}
+                </button>
+              );
+            })}
           </Morph>
         )}
       </nav>
