@@ -5,6 +5,7 @@
 Every iOS and Safari quirk Duet handles, what you would see without the handling, and what is left for you to do. Most need nothing from you. "Without children" means a page that renders `<Duet>` without `children`, so the document itself scrolls.
 
 - [Split view pane, or the closed Duo turned left](#split-view-pane-or-the-closed-duo-turned-left)
+- [Right split pane holds two buttons](#right-split-pane-holds-two-buttons)
 - [Rubber band at the top or bottom of the page](#rubber-band-at-the-top-or-bottom-of-the-page)
 - [Toolbar growing back at the end of the page](#toolbar-growing-back-at-the-end-of-the-page)
 - [Full-screen `position: fixed` overlay or modal backdrop](#full-screen-position-fixed-overlay-or-modal-backdrop)
@@ -445,3 +446,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** draws one form everywhere: a tinted button inside a glass capsule, with the same rim and shadow as the other controls.
 - **You do:** nothing.
 - **Status:** [#213](https://github.com/JayFarei/duet/issues/213).
+
+## Right split pane holds two buttons
+
+- **You see:** without the handling, Safari in the right split pane shows a lone "…", with a primary inside its list, though the pane has room for two buttons.
+- **Cause:** the pane reserved the closed tab's Live Activity worst case (back slot top 265pt). In the pane, music and timer activities only push the back slot to 224pt, and the pane is 9pt shorter than the closed screen, which took the band under two buttons.
+- **Duet does:** reserves the pane's measured 224pt, a band of 123.9pt, so two buttons fit at the worst case, clear of Safari's own buttons.
+- **You do:** nothing.
+- **Status:** [#226](https://github.com/JayFarei/duet/issues/226). e2e scenario `split-right-live`.
