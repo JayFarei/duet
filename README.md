@@ -784,9 +784,11 @@ pnpm test:e2e
 
 ### Primary in its own capsule
 
-**What happens:** where the primary has its own group (the open screen, the in-app preview filling it), a solid tinted circle with a coloured glow stood apart from the glass controls above it, while above "…" on the closed Duo the same button sat in a glass capsule.
-
-**What Duet does:** one look everywhere: a tinted button inside a glass capsule, with the same rim and shadow as the other controls (#213).
+- **You see:** without the handling, where the primary has its own group (the open screen, the in-app preview filling it), a solid tinted circle with a coloured glow stands apart from the glass controls above it.
+- **Cause:** the own group replaced the capsule's glass with the tint, while the form sharing a capsule with "…" drew a tinted button inside glass.
+- **Duet does:** draws one form everywhere: a tinted button inside a glass capsule, with the same rim and shadow as the other controls.
+- **You do:** nothing.
+- **Status:** [#213](https://github.com/JayFarei/duet/issues/213).
 
 ## License
 
