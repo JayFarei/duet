@@ -1196,10 +1196,11 @@ class Run:
     def scenario_webview(s, style="webview"):
         """An app's own WKWebView on the closed screen (X's link preview, #194): inline right, every control below the
         status column, with and without a Live Activity in the island. style webview: over the whole screen (X before
-        2026-10); xsheet: on its top 61%, X's bar and the tweet card below it (X since)."""
+        2026-10); xsheet: 382pt wide, out of the status column, on its top 70%, X's bar over its foot and the tweet card below (X since, measured on a real Duo, #243)."""
         n = style
         t = s.tok(n)
-        exp = {"preview": False, "mode": "inline", "side": "right"}
+        # xsheet stops at the status column closed upright, so it is not a Duo there (#243) and the site drops Duet.
+        exp = {"preview": False, "hidden": True} if style == "xsheet" else {"preview": False, "mode": "inline", "side": "right"}
         what = "app web view" if style == "webview" else "X-style web view sheet"
         s.step(f"{n}-0", "webview", t, s.open_preview(t, style), exp, f"{what}, closed, upright")
         s.step(f"{n}-on", "webview", t, s.la(t, "webview", on=True), exp, f"{what}: Live Activity starts", video=True)

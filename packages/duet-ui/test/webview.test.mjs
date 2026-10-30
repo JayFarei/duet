@@ -29,7 +29,7 @@ test("web view, closed, upright, controls on the left: nothing to clear", () => 
   assert.equal(detect(sig(), "left").clearTop, undefined);
 });
 
-// X's in-app browser as of 2026-10 (user's report on #194, e2e host style "xsheet"): the web view is full width on the
+// X's in-app browser early in 2026-10 (user's report on #194; since measured at 382pt wide, #243): the web view is full width on the
 // screen's top 61%, X's bar and the tweet card below it, so the page reads 466x413 and landscape.
 // Measured (e2e xsheet, 2026-10-30): closed upright inner = outer = 466x414, screen 678x466, inset right 84, bottom 0;
 // open wide 951x408, screen still 678x466, angle 270.
@@ -48,8 +48,15 @@ test("X sheet, open wide: clear of the status column", () => {
     assert.ok(!hit(g.rect, column), `${g.group.map((x) => x.kind).join("+")} at ${g.rect.x},${g.rect.y} under the status column (${JSON.stringify(spec)})`);
 });
 
-test("web view narrower than the screen: unchanged", () => {
-  assert.equal(detect(sig({ innerWidth: 382, outerWidth: 382 })).clearTop, undefined);
+// X's sheet on a real Duo, closed upright (#243): the web view stops at the status column, so the page is not a Duo's.
+test("web view that stops at the status column: not a Duo", () => {
+  for (const [innerHeight, outerHeight] of [[422, 477], [541, 587]]) {
+    const c = detect(sig({ innerWidth: 382, outerWidth: 382, innerHeight, outerHeight, visualHeight: innerHeight, insetBottom: 0 }));
+    assert.deepEqual([c.duo, c.device, c.mode, c.clearTop], [false, "iphone", "inline", undefined]);
+  }
+  assert.equal(detect(sig()).duo, true);
+  const safari = sig({ innerWidth: 382, outerWidth: 466, userAgent: X.replace("Mobile/15E148 Twitter for iPhone/11.0", "Version/27.1 Mobile/15E148 Safari/604.1") });
+  assert.equal(detect(safari).duo, true);
 });
 
 test("Home Screen app and turned web view: unchanged", () => {

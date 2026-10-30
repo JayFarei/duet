@@ -299,7 +299,11 @@ function unfoldedPreview(s: Signals): "wide" | "tall" | undefined {
  *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
 const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
-export const isDuo = (s: Signals) => isIOS(s) !== false && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
+export const isDuo = (s: Signals) => isIOS(s) !== false && !besideColumn(s) && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
+/** An app's web view that stops at the status column on the closed screen, upright (X's sheet: outer 382 of 466, real
+ *  Duo, #243). Nothing past its edge is drawn, so the column is out of reach: the page gets what any other phone gets. */
+const besideColumn = (s: Signals) => browserOf(s.userAgent) === "webview" && !s.standalone && (s.angle ?? 0) === 0
+  && Math.min(s.screenWidth, s.screenHeight) === DUO_SIZES[0][0] && Math.max(s.screenWidth, s.screenHeight) === DUO_SIZES[0][1] && Math.abs(s.outerWidth - (DUO_SIZES[0][0] - 84)) <= 1;
 
 /** iOS has no model in its UA, so the sizes above say Duo; the UA says iPhone. Safari's "Request Desktop Website"
  *  sends a Mac UA, told from a Mac by touch. undefined when the signals carry no UA. */
@@ -429,7 +433,7 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
   // token, chrome 0, inset top 0, iOS 27.1): the status column (clock, island, Live Activities) is over the page's right
   // edge, and nothing native says so. The controls start below it, where a Home Screen app's strip does (#194). Open
   // tall, the status row heads the page and the controls already start below it.
-  // X's current in-app browser is shorter: a full-width web view on the screen's top 61%, its bar and the tweet card
+  // A shorter form, X's in-app browser in early 2026-10: a full-width web view on the screen's top 61%, its bar and the tweet card
   // below (#194, 466x413 closed). Only the width says so, and the short page reads landscape.
   const statusOver = duo && !s.standalone && side === "right"
     && ((!landscape && closedWhole(s)) || openWideWhole(s) || (browser === "webview" && topWebview(s)));
