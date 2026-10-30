@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+Everything from 0.7.1-rc.1, unchanged.
+
+Known issue: in the in-app preview, on a page with a solid sticky header, "…" can disappear after returning from another app (#235). 0.7.0 does the same.
+
 ## 0.7.1-rc.1
 
 - Right split pane: two buttons where one showed. The pane reserved the closed tab's Live Activity worst case (265pt) instead of its own measured 224pt (#226).
