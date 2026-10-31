@@ -57,3 +57,16 @@ test('selecting a pane action returns focus before calling the application', asy
   expect(selected).toHaveBeenCalledOnce();
   expect(document.activeElement).toBe(trigger);
 });
+test('Tab dismisses a non-modal pane menu and continues through the page', async () => {
+  render(<><button>Before</button><DuetPaneBar more={[{ id: 'save', label: 'Save', icon: null }]} /><button>After</button></>);
+  await userEvent.click(screen.getByRole('button', { name: 'More' }));
+  await userEvent.tab();
+  expect(screen.queryByRole('menu')).toBeNull();
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: 'After' }));
+});
+test('application action can move focus to its own control', async () => {
+  render(<><DuetPaneBar more={[{ id: 'save', label: 'Save', icon: null, onPress: () => screen.getByRole('textbox', { name: 'Editor' }).focus() }]} /><input aria-label="Editor" /></>);
+  await userEvent.click(screen.getByRole('button', { name: 'More' }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Save' }));
+  expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Editor' }));
+});
