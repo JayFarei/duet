@@ -84,6 +84,11 @@ test('column document sidebar opens at the current scroll position', async ({ pa
   const box = await frame.getByRole('navigation', { name: 'Menu', exact: true }).boundingBox();
   expect(box!.y).toBeGreaterThanOrEqual(0);
   expect(box!.y).toBeLessThan(100);
+  await frame.getByRole('button', { name: 'Home', exact: true }).click();
+  // Keep the same document position through the closing transition, then release it.
+  const sidebar = frame.locator('.duet-sidebar');
+  expect(await sidebar.evaluate(el => parseFloat((el as HTMLElement).style.top))).toBeGreaterThan(300);
+  await expect.poll(() => sidebar.evaluate(el => (el as HTMLElement).style.top)).toBe('');
 });
 
 test('real-browser menu keyboard contract and review recording', async ({ page }, testInfo) => {
