@@ -21,10 +21,11 @@ export function useMenuFocus(ref: RefObject<HTMLElement | null>, open: boolean, 
         all[next]?.focus();
       }
     };
-    // Restore before React calls the app: it may open a dialog and intentionally move focus.
-    const activate = (e: MouseEvent) => {
-      if ((e.target as Element).closest("button")) previous?.focus({ preventScroll: true });
-    };
+    // A selection may unmount the menu before passive cleanup can inspect focus.
+    // Wait for the app handler: keep focus if it arms a confirmation or opens an editor.
+    const activate = () => queueMicrotask(() => {
+      if ((!root.isConnected || root.closest("[inert]")) && document.activeElement === document.body) previous?.focus({ preventScroll: true });
+    });
     root.addEventListener("click", activate);
     root.addEventListener("keydown", key);
     return () => {
