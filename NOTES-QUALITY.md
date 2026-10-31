@@ -21,3 +21,5 @@ Real Safari chrome/hinge/Island painting cannot be certified by desktop WebKit s
 - Overflow morph menu had the same focus defect; new role-based regression failed before applying shared focus lifecycle.
 - Isolated remaining baseline crash: no-JS/no-external-assets home still crashes WebKit; removing `<video>` tags passes; a minimal single video reproduces the crash. Library reading-column assertions now use `/quality` in both engines. Chromium retains home smoke; WebKit home media smoke explicitly skips with the native backend reason, pending real Safari playback.
 - Do not overlap Playwright invocations or rebuild/pack dist while its server runs: an exploratory overlap caused trace deletion and transient module resolution errors. Subsequent validation runs are serialized.
+- A follow-up focus regression reproduced lost focus on action selection (the menu unmounted before passive effect cleanup could restore it). Restore to the opener before the app callback, allowing the callback to focus a newly opened dialog.
+- Full baseline generation is exercising 64 tests across both engines; checking and reviewing images before a comparison-only run.

@@ -21,8 +21,14 @@ export function useMenuFocus(ref: RefObject<HTMLElement | null>, open: boolean, 
         all[next]?.focus();
       }
     };
+    // Restore before React calls the app: it may open a dialog and intentionally move focus.
+    const activate = (e: MouseEvent) => {
+      if ((e.target as Element).closest("button")) previous?.focus({ preventScroll: true });
+    };
+    root.addEventListener("click", activate);
     root.addEventListener("keydown", key);
     return () => {
+      root.removeEventListener("click", activate);
       root.removeEventListener("keydown", key);
       if (root.contains(document.activeElement)) previous?.focus({ preventScroll: true });
     };
