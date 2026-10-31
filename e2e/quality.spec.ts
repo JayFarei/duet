@@ -113,4 +113,8 @@ test('real-browser menu keyboard contract and review recording', async ({ page }
   await expect(page.getByRole('menuitem').first()).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('menu')).toHaveCount(0);
+  await page.locator('.duet-pane-bar').getByRole('button', { name: 'More' }).click();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.locator('.duet:not(.duet-sidebar)').getByRole('button', { name: 'Menu', exact: true })).toBeFocused();
 });

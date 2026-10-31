@@ -7,7 +7,7 @@
     "dev": "pnpm --filter duet-ui build && pnpm --parallel --filter \"./apps/*\" --filter \"./examples/*\" dev",
     "test": "pnpm --filter duet-ui test",
     "test:e2e": "pnpm --filter duet-ui build && playwright test",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm -r typecheck && tsc -p tsconfig.quality.json",
     "test:components": "vitest run",
     "test:distribution": "node scripts/check-distribution.mjs",
     "test:quality": "pnpm test && pnpm test:components && pnpm test:distribution && pnpm test:e2e"

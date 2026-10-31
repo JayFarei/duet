@@ -80,7 +80,9 @@ test("dragging a control across the middle moves the strip, and the side is reme
   await page.mouse.up();
   await expect.poll(() => probe(page).then((r) => r.side)).toBe("left");
   expect(await page.evaluate(() => localStorage.getItem("duet-side"))).toBe("left");
-  expect(await selected(), "a drag must not select the tab it started on").toBe(before);
+  expect(await selected(), "a drag must not change navigation").toBe(before);
+  await expect(page.locator("#tapped")).toHaveCount(0);
+  await expect(page.getByRole("button", { expanded: true })).toHaveCount(0);
   await page.reload();
   await page.waitForTimeout(600);
   expect((await probe(page)).side).toBe("left");
