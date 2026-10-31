@@ -31,7 +31,7 @@
   --duet-lift: rgb(255 255 255 / 0.18);
   --duet-sel: rgb(60 60 67 / 0.18);
   --duet-menu: transparent;
-  --duet-ink: #000; --duet-dim: rgb(60 60 67 / 0.6);
+  --duet-ink: #000; --duet-dim: #5f5f66;
   --duet-tint: #0088ff;
   --duet-icon-size: 22px; --duet-tab-icon-size: 24px; --duet-icon-weight: 2;
   --duet-badge: #ff3b30; --duet-badge-neutral: #6e6e73; --duet-badge-ink: #fff;
@@ -47,7 +47,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-lg-theme="light"]) .duet {
-    --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
+    --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: #b0b0b9; --duet-badge-neutral: #636366;
     --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
     --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
@@ -55,7 +55,7 @@
   }
 }
 [data-lg-theme="dark"] .duet {
-  --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
+  --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: #b0b0b9; --duet-badge-neutral: #636366;
   --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
   --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
   --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
@@ -140,7 +140,7 @@
 .duet-menu[data-rest] { pointer-events: auto; }
 .duet-list { width: 100%; height: 100%; box-sizing: border-box; padding: 6px; overflow: hidden; }
 .duet-menu[data-rest] > .duet-list { overflow-y: auto; overscroll-behavior: contain; }
-.duet-menu-head { height: 26px; padding: 4px 12px 0; font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-ink); box-sizing: border-box; }
+.duet-menu-head { height: 26px; padding: 4px 12px 0; font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-dim); box-sizing: border-box; }
 .duet .duet-row { justify-content: flex-start; gap: 12px; width: 100%; height: 44px; padding: 0 12px; border-radius: 14px; font-size: 17px; text-align: left; white-space: nowrap; position: relative; }
 .duet .duet-row > span { overflow: hidden; text-overflow: ellipsis; }
 .duet .duet-row:active { background: var(--duet-sel); }
@@ -163,7 +163,7 @@ html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }
-.duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-ink); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-dim); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .duet-sidebar .duet-side-row { justify-content: flex-start; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; position: relative; }
 .duet-sidebar .duet-side-row > span { overflow: hidden; text-overflow: ellipsis; }
 .duet-sidebar .duet-side-row:active, .duet-sidebar .duet-side-row[aria-current="page"] { background: var(--duet-sel); }
