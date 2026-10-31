@@ -10,3 +10,7 @@ Goal: six deliverables for reliable duet-ui, branch `quality/shadcn-grade`. Neve
 ## Validation and outstanding work
 Pending: repaired browser baseline, layered tests, posture matrix, audit/integration docs, CI, fresh-package consumer, media and draft PR.
 Real Safari chrome/hinge/Island painting cannot be certified by desktop WebKit signal emulation.
+- Regression-first: Vitest reproduced selected-item callback suppression, missing sidebar focus/Escape, and missing pane menu focus/arrow/Escape (all failed before fixes). Existing browser drag regression revealed a second stale `.duet-glass` selector in production `useSideDrag`, not just tests; changed to `.duet-group`.
+- Added non-modal focus lifecycle and arrow/Home/End navigation; selected items call onSelect without resetting their saved scroll.
+- WebKit iframe exposed SSR-only guard nodes missing on client emulation; gate decorative guards until hydration, covered by SSR and browser error assertions.
+- Worktree administrative directory is mounted read-only despite shared git directory being writable. Using a copied administrative index under shared `.git/quality-admin` with the same branch refs for commits; no branch change.
