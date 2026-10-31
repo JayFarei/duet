@@ -163,7 +163,7 @@ html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }
-.duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-dim); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+.duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-ink); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .duet-sidebar .duet-side-row { justify-content: flex-start; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; position: relative; }
 .duet-sidebar .duet-side-row > span { overflow: hidden; text-overflow: ellipsis; }
 .duet-sidebar .duet-side-row:active, .duet-sidebar .duet-side-row[aria-current="page"] { background: var(--duet-sel); }

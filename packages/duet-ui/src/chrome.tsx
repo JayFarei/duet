@@ -493,6 +493,19 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const t = setTimeout(() => setSidebar("closed"), SLIDE.ms);
     return () => clearTimeout(t);
   }, [sidebar]);
+  // In column mode the overlay is absolute: fixed boxes cannot paint into Safari's column.
+  // Keep document-scroll consumers at the visible page rather than opening at document y=0.
+  useLayout(() => {
+    const el = sidebarRef.current;
+    if (!el || ctx.mode !== "column" || p.children !== undefined || sidebar !== "open") return;
+    el.style.top = "0px";
+    const origin = el.getBoundingClientRect().top + scrollY;
+    const pin = () => { el.style.top = `${scrollY - origin}px`; };
+    pin();
+    addEventListener("scroll", pin, { passive: true });
+    addEventListener("resize", pin);
+    return () => { removeEventListener("scroll", pin); removeEventListener("resize", pin); el.style.top = ""; };
+  }, [ctx.mode, sidebar === "open", p.children !== undefined]);
   useMenuFocus(sidebarRef, sidebar === "open", () => setSidebar("closing"));
   const closeMore = () => setMore((m) => (m === "open" ? "closing" : m));
   const closeSidebar = () => setSidebar((s) => (s === "open" ? "closing" : s));
