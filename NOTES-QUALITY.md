@@ -33,6 +33,8 @@ Real Safari chrome/hinge/Island painting cannot be certified by desktop WebKit s
 - Fixed CI visual reproducibility without reducing the comparator: bundle a 13 KiB licensed Latin font, normalize only fixture inputs/focus, pin Ubuntu 24.04, and run PR CI once rather than duplicate branch+PR jobs. All 36 quality tests pass while regenerating the affected baselines; mobile/desktop/video evidence refreshed.
 - Final source review added a folded-primary keyboard regression: the first tap arms a confirmation rather than closing the menu, so generic click focus restoration must not move focus back to More. It failed before the correction. Restore after the app handler only when a removed/inert menu left focus on body; retain confirmation focus and any intentional app focus.
 
+- Font-pinned GitHub run validated all screenshots and axe checks: 64 browser tests passed, with one remaining mobile review test clicking during the SSR column-to-inline hydration handoff. Require the mounted fixture's inline mode before the keyboard journey (other posture tests already await their mode). This separates first-paint SSR coverage from an interactive journey's readiness precondition.
+
 ## Final report — 31 October 2026
 
 Draft PR: https://github.com/JayFarei/duet/pull/248
@@ -56,10 +58,11 @@ Branch: `quality/shadcn-grade`, pushed against `main`. No merge, release or depl
 | Workspace typechecks + quality harness typecheck | **Pass** |
 | Packed npm exports + fresh pnpm 10.32.0 Vite/TypeScript consumer | **Pass**, production bundle built from installed tarball |
 | Full Playwright comparison run | **65 pass, 0 fail, 1 explicit skip** in WebKit + Chromium; **38 visual baselines match** |
-| Later focus/drag follow-up | **4 pass** across both engines |
+| Focus/drag + sidebar follow-ups | **4 pass** for focus/drag, then **4 pass** for focus/sidebar after the confirmation correction |
+| Hydration-ready keyboard journey repetitions | **10 pass** (five per engine), with strict screenshot comparison |
 | Later sidebar closing-position regression | Failed in both engines before fix; **2 pass** after fix |
 | Axe | **Pass**, both engines, light/dark, closed/sidebar/pane/overflow menu states; no rule suppression |
-| GitHub Actions | Build, typecheck, unit, component/SSR and distribution steps pass. Initial CI exposed cross-distro font drift; deterministic fixture fonts and pinned Ubuntu runner replace that variability. Final PR run pending; see PR checks. |
+| GitHub Actions | Build, typecheck, unit, component/SSR and distribution steps pass. Initial CI exposed cross-distro font drift; deterministic fixture fonts and pinned Ubuntu runner replace that variability. All 38 snapshots and axe states match on Ubuntu as well as Debian. One remote keyboard journey exposed an SSR readiness race; the corrected journey passes ten local repetitions. Final PR run pending; see PR checks. |
 | Physical Duo Safari / VoiceOver | **Not run; required before leaving draft** |
 
 The single skip is the **Linux WebKit home-media smoke**, with an explicit test reason. Reduction: minimal `<video src="/media/strip.mp4">` crashes the media backend without app JS; removing video elements lets the home load. The library reading-column test now runs on the small network-free consumer in both engines; Chromium retains the home smoke. This is not represented as a product fix or a physical Safari failure.
@@ -88,4 +91,3 @@ export GIT_WORK_TREE=/workspace/repos/wt/duet-quality
 
 The original administrative index could not be refreshed in this sandbox, so plain `git status` without these variables can show stale staged changes even though the branch commits and files agree. Outside this sandbox, after confirming all work is committed, `git reset --mixed HEAD` refreshes that original index without changing working files. `.quality-inputs/`, task/log files and generated results were not committed.
 
-- Font-pinned GitHub run validated all screenshots and axe checks: 64 browser tests passed, with one remaining mobile review test clicking during the SSR column-to-inline hydration handoff. Require the mounted fixture's inline mode before the keyboard journey (other posture tests already await their mode). This separates first-paint SSR coverage from an interactive journey's readiness precondition.
