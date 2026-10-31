@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Navigation callbacks now fire when the current menu item is activated again. Apps that only want changes should guard against the selected id explicitly.
+- Restore dragging inline controls after the capsule markup change.
+- Pin document-scroll sidebars to the visible page in Safari column mode.
+- Add keyboard focus, arrow/Home/End navigation, Escape dismissal and focus return for sidebar, pane and overflow menus.
+- Improve sidebar heading and destructive text contrast; expose `--duet-destructive` for text independently of badge red.
+- Mount decorative Safari guards after hydration to avoid an iframe preview hydration mismatch.
+- Add two-engine posture, accessibility, visual, SSR and fresh-package consumer gates; require real Duo Safari evidence for interactive/layout changes.
+
 ## 0.7.1
 
 Everything from 0.7.1-rc.1, unchanged.

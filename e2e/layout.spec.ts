@@ -44,7 +44,7 @@ function probe(page: Page) {
       }
     }
     // The sticky title bar must span the strip too, or scrolled content shows between them.
-    const title = [...root.querySelectorAll("div")].find((d) => getComputedStyle(d).position === "sticky");
+    const title = [...root.querySelectorAll("div")].find((d) => getComputedStyle(d).position === "sticky" && !d.closest(".duet-pane-bar"));
     if (title) {
       const t = title.getBoundingClientRect(), gap = right ? innerWidth - t.right : t.left;
       if (gap > 1) bad.push(`sticky title stops ${gap.toFixed(0)}px short of the edge`);
