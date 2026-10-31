@@ -83,3 +83,5 @@ export GIT_WORK_TREE=/workspace/repos/wt/duet-quality
 ```
 
 The original administrative index could not be refreshed in this sandbox, so plain `git status` without these variables can show stale staged changes even though the branch commits and files agree. Outside this sandbox, after confirming all work is committed, `git reset --mixed HEAD` refreshes that original index without changing working files. `.quality-inputs/`, task/log files and generated results were not committed.
+
+- GitHub caught cross-distro visual drift: local Debian resolves Arial to Arimo and system-ui to Noto Sans, while the runner uses different fonts. Pin a small SIL OFL licensed font subset and native-input/focus styling **inside the fixture only**, then regenerate/review baselines. Do not add screenshot tolerance or disable comparisons.

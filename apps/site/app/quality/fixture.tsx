@@ -1,4 +1,5 @@
 "use client";
+import "./fixture.css";
 import { useEffect, useState } from "react";
 import { Duet, DuetPaneBar, column, useDuet } from "duet-ui";
 
@@ -19,7 +20,7 @@ export function QualityFixture() {
     {Array.from({ length: 12 }, (_, i) => <section key={i} style={{ minHeight: 120 }}><h2>Section {i + 1}</h2><p>Keep readable content beside the controls.</p></section>)}
   </main>;
   const props = { menu: { items: [{ id: "home", label: "Home" }, { id: "journey", label: "Journey" }], selected, onSelect: (id: string) => { setSelected(id); setCalls((n) => n + 1); } }, actions: [{ id: "share", label: "Share", icon: <span aria-hidden>↑</span> }, { id: "delete", label: "Delete page", icon: null, destructive: true }] };
-  return <div style={{ width: ctx.width, fontFamily: "Arial, sans-serif", background: "#fff" }}>
+  return <div className="quality-fixture" style={{ width: ctx.width, fontFamily: "Arial, sans-serif", background: "#fff" }}>
     <Duet {...props}>{documentScroll ? undefined : content}</Duet>
     {documentScroll && content}
   </div>;
