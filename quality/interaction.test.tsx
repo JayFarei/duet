@@ -48,3 +48,12 @@ test('overflow action menu supports keyboard dismissal and focus return', async 
   await userEvent.keyboard('{Escape}');
   expect(document.activeElement).toBe(trigger);
 });
+test('selecting a pane action returns focus before calling the application', async () => {
+  const selected = vi.fn();
+  render(<DuetPaneBar more={[{ id: 'save', label: 'Save', icon: null, onPress: selected }]} />);
+  const trigger = screen.getByRole('button', { name: 'More' });
+  await userEvent.click(trigger);
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Save' }));
+  expect(selected).toHaveBeenCalledOnce();
+  expect(document.activeElement).toBe(trigger);
+});
