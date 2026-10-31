@@ -61,13 +61,16 @@ test('fold/turn/URL-bar/keyboard sequence preserves draft and navigation', async
   }
 });
 
-test('axe: closed, sidebar, and action menu have no WCAG A/AA violations', async ({ page }) => {
+for (const scheme of ['light', 'dark'] as const) test(`axe: ${scheme} closed, sidebar, and action menus`, async ({ page }) => {
+  await page.emulateMedia({ colorScheme: scheme });
   await page.goto('/quality');
-  for (const state of ['closed', 'sidebar', 'actions']) {
+  for (const state of ['closed', 'sidebar', 'actions', 'overflow']) {
     if (state === 'sidebar') await page.getByRole('button', { name: 'Menu', exact: true }).click();
     if (state === 'actions') { await page.keyboard.press('Escape'); await page.locator('.duet-pane-bar').getByRole('button', { name: 'More' }).click(); }
+    if (state === 'overflow') { await page.keyboard.press('Escape'); await page.locator('.duet:not(.duet-sidebar)').getByRole('button', { name: 'More', exact: true }).click(); }
     const result = await new AxeBuilder({ page }).include('main').include('.duet').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
     expect(result.violations).toEqual([]);
+    if (state === 'actions' || state === 'overflow') await expect(page).toHaveScreenshot(`${scheme}-${state}.png`, { animations: 'disabled' });
   }
 });
 
@@ -91,6 +94,7 @@ test('real-browser menu keyboard contract and review recording', async ({ page }
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeFocused();
   await page.keyboard.press('End');
   await expect(page.getByRole('button', { name: 'Journey', exact: true })).toBeFocused();
+  await expect(page).toHaveScreenshot('mobile-menu.png', { animations: 'disabled' });
   await page.screenshot({ path: testInfo.outputPath('mobile.png') });
   await page.keyboard.press('Escape');
   await expect(menu).toBeFocused();
@@ -102,6 +106,7 @@ test('real-browser menu keyboard contract and review recording', async ({ page }
   await page.setViewportSize({ width: 1280, height: 800 });
   await menu.click();
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeFocused();
+  await expect(page).toHaveScreenshot('desktop-menu.png', { animations: 'disabled' });
   await page.screenshot({ path: testInfo.outputPath('desktop.png') });
   await page.keyboard.press('Escape');
   await page.locator('.duet:not(.duet-sidebar)').getByRole('button', { name: 'More', exact: true }).click();
