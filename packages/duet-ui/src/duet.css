@@ -108,9 +108,53 @@
     top var(--duet-group-ms) var(--duet-group), height var(--duet-group-ms) var(--duet-group), background 200ms ease;
 }
 .duet .duet-btn { position: absolute; left: 0; height: 49px; transition: width var(--duet-group-ms) var(--duet-group); }
-/* iOS swells glass under the finger, lighter, rather than pressing it in. */
-.duet-group:has(.duet-btn:active) { scale: 1.12; }
-.duet-group:has(.duet-btn:active)::before { background: var(--duet-lift); }
+/* The press (press.ts, #251), measured from Safari's own column. iOS swells glass under the finger, lighter, rather
+   than pressing it in: a lone button by scale, a capsule by its shape, then a hold or a drag opens it: wider, items
+   further apart with their labels, and a lens that overhangs it following the finger. WebKit cannot displace content,
+   so the lens's refraction is its magnified accent copy (.duet-lens-ink) and a coloured rim. */
+.duet-group[data-press="down"]:not(:has(> .duet-btn:nth-of-type(2))) { scale: 1.12; }
+.duet-group:is([data-press="down"], [data-press="open"])::before { background: var(--duet-lift); }
+.duet-group[data-press="down"]:has(> .duet-btn:nth-of-type(2)), .duet-group[data-press="open"] {
+  left: var(--duet-p-x) !important; top: var(--duet-p-y) !important; width: var(--duet-p-w) !important; height: var(--duet-p-h) !important;
+}
+.duet-group[data-press="down"] { transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left 130ms ease-out, top 130ms ease-out, width 130ms ease-out, height 130ms ease-out, background 200ms ease; }
+.duet-group[data-press="open"] {
+  overflow: visible; border-radius: 39px;
+  transition: left var(--duet-press-rise-ms) var(--duet-press-rise), top var(--duet-press-rise-ms) var(--duet-press-rise), width var(--duet-press-rise-ms) var(--duet-press-rise), height var(--duet-press-rise-ms) var(--duet-press-rise), border-radius var(--duet-press-rise-ms) var(--duet-press-rise);
+}
+.duet-group[data-press="fall"] {
+  transition: scale 160ms ease-out, left var(--duet-press-fall-ms) var(--duet-press-fall), top var(--duet-press-fall-ms) var(--duet-press-fall), width var(--duet-press-fall-ms) var(--duet-press-fall), height var(--duet-press-fall-ms) var(--duet-press-fall), border-radius var(--duet-press-fall-ms) var(--duet-press-fall);
+}
+.duet-group[data-press="open"] > .duet-btn {
+  top: calc(8px + var(--duet-j) * var(--duet-p-pitch)) !important; width: 100% !important;
+  transition: top var(--duet-press-rise-ms) var(--duet-press-rise), width var(--duet-press-rise-ms) var(--duet-press-rise);
+}
+.duet-group[data-press="fall"] > .duet-btn { transition: top var(--duet-press-fall-ms) var(--duet-press-fall), width var(--duet-press-fall-ms) var(--duet-press-fall); }
+.duet-btn > :not(.duet-label, .duet-badge) { transition: translate 200ms ease-out; }
+.duet-group[data-press="open"] .duet-btn > :not(.duet-label, .duet-badge) { translate: 0 -8px; }
+.duet-label {
+  position: absolute; left: 2px; right: 2px; bottom: -3px; text-align: center; font: 500 11px/14px -apple-system, system-ui, sans-serif; color: var(--duet-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; filter: blur(4px); pointer-events: none; transition: opacity 160ms ease-out, filter 160ms ease-out;
+}
+.duet-group[data-press="open"] .duet-label { opacity: 1; filter: none; }
+.duet-lens {
+  position: absolute; z-index: 1; left: -4px; right: -4px; top: calc(var(--duet-lens-y) - 38px); height: 76px; border-radius: 38px; pointer-events: none;
+  background: rgb(255 255 255 / 0.42); -webkit-backdrop-filter: blur(6px) saturate(1.4); backdrop-filter: blur(6px) saturate(1.4);
+  box-shadow: inset 5px 0 6px -5px rgb(0 0 0 / 0.22), inset -5px 0 6px -5px rgb(0 0 0 / 0.22), 0 2px 10px rgb(0 0 0 / 0.1);
+  animation: duet-ink-in 120ms ease-out backwards;
+}
+.duet-lens::before {
+  content: ""; position: absolute; inset: 0; padding: 1.5px; border-radius: inherit;
+  background: conic-gradient(from 300deg, #6cf6c1, #6db4ff, #b58cff, transparent 120deg, transparent 180deg, #b58cff, #6db4ff, #6cf6c1, transparent 300deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.duet-lens-ink {
+  position: absolute; z-index: 2; inset: 0; pointer-events: none; --duet-icon: var(--duet-tint); --duet-ink: var(--duet-tint); color: var(--duet-tint);
+  clip-path: inset(calc(var(--duet-lens-y) - 38px) -4px calc(100% - var(--duet-lens-y) - 38px) -4px round 38px);
+  scale: 1.06; transform-origin: 50% var(--duet-lens-y);
+}
+.duet-lens-ink > .duet-btn { top: calc(8px + var(--duet-j) * var(--duet-p-pitch)) !important; width: 100% !important; }
+.duet-btn[data-hover]::after { content: ""; position: absolute; inset: 2px 4px; border-radius: 22px; background: var(--duet-lift); pointer-events: none; }
 .duet-btn[data-destructive] { color: #ff3b30; }
 
 /* The primary: a tinted button in a glass capsule, on its own or sharing one with "…" (#213). A tap grows the capsule
@@ -387,7 +431,9 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
   .duet-group[data-enter] { animation: duet-appear 0.2s ease-out backwards; }
   .duet-group[data-leaving] { animation: duet-vanish 0.2s ease-in forwards; }
   .duet-group[data-enter] > button, .duet-group[data-leaving] > button { animation: none; }
-  .duet-group, .duet .duet-btn, .duet-sidebar, .duet-scroller { transition: none; }
+  .duet-group, .duet-group[data-press], .duet .duet-btn, .duet-group[data-press] > .duet-btn, .duet-btn > *, .duet-label, .duet-sidebar, .duet-scroller { transition: none !important; }
+  .duet-lens { animation: none; }
+  .duet-lens-ink { scale: 1; }
 }
 @keyframes duet-appear { from { opacity: 0; } }
 @keyframes duet-vanish { to { opacity: 0; } }

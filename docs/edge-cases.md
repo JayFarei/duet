@@ -311,13 +311,21 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#94](https://github.com/JayFarei/duet/issues/94).
 
-## Column buttons fire on touch down
+## Column buttons fire on release
 
-- **You see:** buttons in Safari's column fire as the finger lands and show no native press state.
-- **Cause:** touches in the column reach the page but are not hit-tested to elements outside the viewport, and Safari usually keeps the touch end.
-- **Duet does:** listens for `pointerdown`, finds the button under the touch's coordinates and clicks it. In a split pane, the tap also tells Duet which side the pane is on.
-- **You do:** nothing. Don't put anything that needs a long press or a drag in the column.
-- **Status:** see [Column mode](how-duet-decides.md#column-mode-how-it-works).
+- **You see:** a capsule in Safari's column swells as the finger lands and opens with labels after a hold or a drag, with a lens following the finger. The item under the lens runs on release, and the release fires once.
+- **Cause:** touches in the column reach the page but are not hit-tested to elements outside the viewport, so `:active` never shows there. The simulator delivers the moves and the release. Whether every real device does is unverified, and earlier notes say Safari "usually" keeps the touch end.
+- **Duet does:** listens on the window, finds the button under the touch's coordinates and drives the press itself. If no release has been seen on the page, a finger with no moves for 1.2s runs its item, so a tap still works if a device keeps the touch end. That tap would run 1.2s late, and a finger held still that long runs its item. Once a release has been seen, a lost finger lets go without running anything. In a split pane, the tap also tells Duet which side the pane is on.
+- **You do:** nothing. Don't put anything else that needs a long press or a drag in the column.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251). See [Column mode](how-duet-decides.md#column-mode-how-it-works).
+
+## A held column button brings up the text loupe
+
+- **You see:** without the handling, holding a column button starts text selection on the page beneath, with its loupe. The touch is taken from the press, and a ghost lens is left behind.
+- **Cause:** the column's touches land on the page, and iOS treats a still finger there as a selection gesture.
+- **Duet does:** cancels `touchstart` and `selectstart` while a press is live, and only then, so the page still selects text and scrolls normally.
+- **You do:** nothing.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Seen in the right split pane on the Duo sim.
 
 ## Animations removed by a page reset
 

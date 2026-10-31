@@ -7,6 +7,7 @@ import { DUO, columnBand, controlsShown, isSplit, pageInsets, magnet, stable, st
 import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
+import { PRESS, listenPress } from "./press.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import "./duet.css";
 
@@ -184,7 +185,7 @@ const noop = () => () => {};
  *  0px 1000000px) computes exactly but Safari's compositor paints it up to 18pt off in momentum (2026-10-27).
  *  Browsers without scroll timelines get the transform. Touches there reach the page
  *  but are not hit-tested to our elements, and Safari keeps the touch end (no pointerup, no click), so we route
- *  them by coordinates on pointerdown. Nothing in the column scrolls, so a touch there is always a tap.
+ *  them by coordinates (press.ts for the capsules). Nothing in the column scrolls.
  *  Split pane: the column is on the pane's outer edge, which the page cannot see, so the document spans a column
  *  on each side, scrolled 84 across, and the controls are drawn in both (refs[0] left, refs[1] right). Each pane
  *  shows only its own column, and a tap there names the side (`tapSide`). A left-hand column (closed landscape,
@@ -287,7 +288,7 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
       // Skip a capsule that is morphing into its menu (the menu covers it) or leaving.
       for (const b of el?.querySelectorAll<HTMLButtonElement>(".duet-group:not([data-morphing], [data-leaving]) > button") ?? []) {
         const r = b.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) { b.click(); return; }
+        if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return; // press.ts runs it on release
       }
       columnMiss?.();
     };
@@ -602,6 +603,12 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     return () => { removeEventListener("pointerdown", close); if (columnMiss === dismiss) columnMiss = null; };
   }, [open, nav, nav2]); // eslint-disable-line react-hooks/exhaustive-deps -- dismiss only sets state
   useSideDrag(ctx.mode === "inline" ? ctx.side : null, nav, () => { setMore("closed"); setArmed(false); setAsk("closed"); });
+  const pressCtx = useRef(ctx);
+  pressCtx.current = ctx;
+  useEffect(() => listenPress(() => [nav.current, nav2.current], (el) => {
+    const c = pressCtx.current;
+    return c.mode === "column" ? columnBand({ ...c, side: el.dataset.side as Side }) : { top: 16, bottom: innerHeight - 16 };
+  }), [nav, nav2]);
 
   // The safe areas only reach the page with viewport-fit=cover. Set on mount, not on import, so a page that only
   // imports DuoCookie keeps its own viewport on other phones.
@@ -625,7 +632,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   };
   useLayout(() => { if (scroller.current && selected !== undefined) scroller.current.scrollTop = scrolls.current.get(selected) ?? 0; }, [selected]);
 
-  const theme = { ...themeVars(p), "--duet-slide": SLIDE.easing, "--duet-slide-ms": `${SLIDE.ms}ms`, "--duet-group": GROUP.easing, "--duet-group-ms": `${GROUP.ms}ms` } as CSSProperties;
+  const theme = { ...themeVars(p), "--duet-slide": SLIDE.easing, "--duet-slide-ms": `${SLIDE.ms}ms`, "--duet-group": GROUP.easing, "--duet-group-ms": `${GROUP.ms}ms`, "--duet-press-rise": PRESS.rise.easing, "--duet-press-rise-ms": `${PRESS.rise.ms}ms`, "--duet-press-fall": PRESS.fall.easing, "--duet-press-fall-ms": `${PRESS.fall.ms}ms` } as CSSProperties;
   const badge = (a: { badge?: number | string; badgeTone?: string }) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge" data-tone={a.badgeTone === "neutral" ? "neutral" : undefined}>{a.badge}</span>;
   const label = (s: Slot) => s.kind === "menu" ? "Menu" : s.kind === "more" ? "More" : s.kind === "close" ? (p.close && p.close.label) || "Close"
     : s.kind === "primary" ? p.primary!.label : actions[s.index].label;
@@ -667,6 +674,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
                   aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : s.kind === "primary" && p.primary!.confirm !== false ? ask === "open" : undefined}
                   style={{ top: j * TEMPLATE.item, width: rect.w }} onClick={() => press(s)}>
                   {icon(s)}
+                  {g.group.length > 1 && <span className="duet-label" aria-hidden>{label(s)}</span>}
                   {s.kind === "action" && badge(actions[s.index])}
                 </button>
               ))}

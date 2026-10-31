@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Column press rebuilt from Safari's own column, measured from a 60fps recording (#251). A capsule swells as the finger lands, then opens wider and taller with labels after 230ms or a drag. A lens follows the finger and tints what it covers, and release runs the item under it, on springs fitted to native.
+- Behaviour change: column buttons fire on release, not on touch down. If a device never reports a release, a tap runs 1.2s late, and a finger held still that long runs its item.
+- Holding a column button no longer starts text selection and its loupe on the page beneath.
+
 ## 0.7.1
 
 Everything from 0.7.1-rc.1, unchanged.
