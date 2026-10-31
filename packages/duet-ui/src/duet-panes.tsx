@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useDuet, type DuetItem } from "./chrome.tsx";
 import { Ellipsis, Maximize, Minimize, X } from "./icons.tsx";
+import { useMenuFocus } from "./menu-focus.ts";
 import { backFrom, panes as paneWindow } from "./panes.ts";
 
 export interface DuetPanesProps {
@@ -76,6 +77,8 @@ export function DuetPaneBar({ onClose, onToggle, expanded = false, more = [] }: 
   const { layout } = useDuet();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useMenuFocus(menuRef, open, () => setOpen(false));
   useEffect(() => {
     if (!open) return;
     const off = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
@@ -94,7 +97,7 @@ export function DuetPaneBar({ onClose, onToggle, expanded = false, more = [] }: 
         {items.length > 0 && <button aria-label="More" aria-expanded={open} onClick={() => setOpen(!open)}><Ellipsis size={20} /></button>}
       </div>
       {open && (
-        <div className="duet-pane-menu" role="menu">
+        <div ref={menuRef} className="duet-pane-menu" role="menu" aria-label="Pane actions">
           {items.map((m, i) => (
             <button key={m.id} role="menuitem" onClick={pick(m)} data-destructive={m.destructive || undefined}
               data-sep={(m.destructive && !items[i - 1]?.destructive && i > 0) || undefined}>

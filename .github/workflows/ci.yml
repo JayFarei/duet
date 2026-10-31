@@ -1,16 +1,37 @@
-name: CI
+name: Quality
 on:
-  push: { branches: [main] }
+  push:
+    branches: [main]
   pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
+        with: { version: 10.32.0 }
       - uses: actions/setup-node@v5
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test:components
+      - run: pnpm test:distribution
+      - run: pnpm exec playwright install --with-deps webkit chromium
+      # Missing/changed baselines and any axe violations fail this step. Never update snapshots in CI.
+      - run: pnpm exec playwright test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quality-browser-evidence
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 14

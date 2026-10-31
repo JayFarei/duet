@@ -9,6 +9,7 @@ import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./s
 import { unboot } from "./boot.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import "./duet.css";
+import { useMenuFocus } from "./menu-focus.ts";
 
 export interface DuetItem {
   id: string; label: string; icon: ReactNode; onPress?: () => void;
@@ -316,7 +317,7 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
     const el = nav.current;
     if (!side || !el) return;
     let x0: number | null = null, y0 = 0, dragging = false, free = false;
-    const down = (e: PointerEvent) => { if ((e.target as Element).closest(".duet-glass:not(.duet-menu)")) { x0 = e.clientX; y0 = e.clientY; dragging = false; } };
+    const down = (e: PointerEvent) => { if ((e.target as Element).closest(".duet-group")) { x0 = e.clientX; y0 = e.clientY; dragging = false; } };
     const move = (e: PointerEvent) => {
       if (x0 === null) return;
       // Only a deliberate sideways swipe picks the strip up: a scrub along the rail, or a wobbly tap, never does.
@@ -389,6 +390,7 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
  *  React renders it once per open. */
 function Morph({ open, from, slots, box, onClosed, children, role = "menu", label }: { open: boolean; from: Rect; slots: ReactNode[]; box: Rect; onClosed: () => void; children: ReactNode; role?: string; label?: string }) {
   const blob = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null);
+  useMenuFocus(blob, open, onClosed);
   const st = useRef({ s: 0, v: 0, raf: 0, last: 0, clear: 0 });
   const closed = useRef(onClosed);
   closed.current = onClosed;
@@ -465,6 +467,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const p = props as unknown as DuetProps; // menu ids are only typed at the boundary
   const ctx = useDuet();
   const scroller = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const hydrated = useSyncExternalStore(noop, () => true, () => false);
   // The sidebar stays "closing" while the page slides back, so the card keeps its background and radius.
   const [sidebar, setSidebar] = useState<Phase>("closed");
   const [more, setMore] = useState<Phase>("closed");
@@ -490,6 +494,20 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
     const t = setTimeout(() => setSidebar("closed"), SLIDE.ms);
     return () => clearTimeout(t);
   }, [sidebar]);
+  // In column mode the overlay is absolute: fixed boxes cannot paint into Safari's column.
+  // Keep document-scroll consumers at the visible page rather than opening at document y=0.
+  useLayout(() => {
+    const el = sidebarRef.current;
+    if (!el || ctx.mode !== "column" || p.children !== undefined || sidebar === "closed") return;
+    el.style.top = "0px";
+    const origin = el.getBoundingClientRect().top + scrollY;
+    const pin = () => { el.style.top = `${scrollY - origin}px`; };
+    pin();
+    addEventListener("scroll", pin, { passive: true });
+    addEventListener("resize", pin);
+    return () => { removeEventListener("scroll", pin); removeEventListener("resize", pin); el.style.top = ""; };
+  }, [ctx.mode, sidebar !== "closed", p.children !== undefined]);
+  useMenuFocus(sidebarRef, sidebar === "open", () => setSidebar("closing"));
   const closeMore = () => setMore((m) => (m === "open" ? "closing" : m));
   const closeSidebar = () => setSidebar((s) => (s === "open" ? "closing" : s));
   const closeAsk = () => setAsk((a) => (a === "open" ? "closing" : a));
@@ -619,7 +637,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const select = (id: string) => {
     const el = scroller.current;
     closeSidebar(); dismiss();
-    if (id === selected) return;
+    if (id === selected) { p.menu!.onSelect(id); return; }
     if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop);
     p.menu!.onSelect(id);
   };
@@ -712,7 +730,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   return (
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.menu && p.menu.burger !== false && (
-        <nav className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
+        <nav ref={sidebarRef} className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
           style={{ ...theme, width: ctx.mode === "column" ? ctx.width : slide }} inert={sidebar !== "open" || undefined}>
           <div className="duet-side-head">Menu</div>
           {menuItems.map((m) => (
@@ -730,7 +748,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
       {/* On both viewport edges, so a page's full-screen overlay cannot hide Safari's column (duet.css). Mounted on a Duo in
           Safari whatever the mode: a guard that drops while a turn or fold is in transit leaves the column filled with the
           overlay once it is back (#119). */}
-      {ctx.duo && ctx.browser === "safari" && !emulatedSignals() && (["left", "right"] as const).map((side) => <span key={side} className="duet-guard" data-side={side} aria-hidden />)}
+      {hydrated && ctx.duo && ctx.browser === "safari" && !emulatedSignals() && (["left", "right"] as const).map((side) => <span key={side} className="duet-guard" data-side={side} aria-hidden />)}
     </GlassProvider>
   );
 }

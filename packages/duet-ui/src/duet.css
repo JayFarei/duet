@@ -31,7 +31,7 @@
   --duet-lift: rgb(255 255 255 / 0.18);
   --duet-sel: rgb(60 60 67 / 0.18);
   --duet-menu: transparent;
-  --duet-ink: #000; --duet-dim: rgb(60 60 67 / 0.6);
+  --duet-ink: #000; --duet-dim: #5f5f66;
   --duet-tint: #0088ff;
   --duet-icon-size: 22px; --duet-tab-icon-size: 24px; --duet-icon-weight: 2;
   --duet-badge: #ff3b30; --duet-badge-neutral: #6e6e73; --duet-badge-ink: #fff;
@@ -47,7 +47,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-lg-theme="light"]) .duet {
-    --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
+    --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: #b0b0b9; --duet-badge-neutral: #636366;
     --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
     --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
@@ -55,7 +55,7 @@
   }
 }
 [data-lg-theme="dark"] .duet {
-  --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
+  --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: #b0b0b9; --duet-badge-neutral: #636366;
   --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
   --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
   --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
@@ -111,7 +111,7 @@
 /* iOS swells glass under the finger, lighter, rather than pressing it in. */
 .duet-group:has(.duet-btn:active) { scale: 1.12; }
 .duet-group:has(.duet-btn:active)::before { background: var(--duet-lift); }
-.duet-btn[data-destructive] { color: #ff3b30; }
+.duet-btn[data-destructive] { color: var(--duet-destructive, #c5221f); }
 
 /* The primary: a tinted button in a glass capsule, on its own or sharing one with "…" (#213). A tap grows the capsule
    into its confirmation box (the "…" morph, below). */
@@ -149,7 +149,7 @@
 .duet .duet-row[data-armed] { background: var(--duet-tint); color: #fff; }
 .duet .duet-row > .duet-check { margin-left: auto; }
 /* Destructive items (blueprint): last in "…", red. */
-.duet .duet-row[data-destructive] { color: #ff3b30; }
+.duet .duet-row[data-destructive] { color: var(--duet-destructive, #c5221f); }
 .duet .duet-row .duet-badge { position: static; margin-left: auto; box-shadow: none; }
 
 /* The sidebar sits under the page; the burger slides the page (the inner scroller) away by --duet-slide. */
@@ -348,25 +348,27 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
   font-family: -apple-system, system-ui, sans-serif;
 }
 .duet-pane-pill, .duet-pane-menu {
-  --duet-pane-glass: rgb(255 255 255 / 0.72); --duet-pane-ink: #000; --duet-pane-ring: rgb(0 0 0 / 0.12);
+  --duet-pane-menu-surface: #fff; --duet-pane-glass: rgb(255 255 255 / 0.72); --duet-pane-ink: #000; --duet-pane-ring: rgb(0 0 0 / 0.12);
   background: var(--duet-pane-glass); color: var(--duet-pane-ink); box-shadow: 0 0 0 0.5px var(--duet-pane-ring), 0 4px 14px rgb(0 0 0 / 0.08);
   -webkit-backdrop-filter: blur(18px) saturate(1.6); backdrop-filter: blur(18px) saturate(1.6);
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-lg-theme="light"]) :is(.duet-pane-pill, .duet-pane-menu) { --duet-pane-glass: rgb(44 44 46 / 0.72); --duet-pane-ink: #fff; --duet-pane-ring: rgb(255 255 255 / 0.14); }
+  :root:not([data-lg-theme="light"]) :is(.duet-pane-pill, .duet-pane-menu) { --duet-pane-menu-surface: #2c2c2e; --duet-pane-glass: rgb(44 44 46 / 0.72); --duet-pane-ink: #fff; --duet-pane-ring: rgb(255 255 255 / 0.14); }
 }
-[data-lg-theme="dark"] :is(.duet-pane-pill, .duet-pane-menu) { --duet-pane-glass: rgb(44 44 46 / 0.72); --duet-pane-ink: #fff; --duet-pane-ring: rgb(255 255 255 / 0.14); }
+[data-lg-theme="dark"] :is(.duet-pane-pill, .duet-pane-menu) { --duet-pane-menu-surface: #2c2c2e; --duet-pane-glass: rgb(44 44 46 / 0.72); --duet-pane-ink: #fff; --duet-pane-ring: rgb(255 255 255 / 0.14); }
 .duet-pane-pill { display: flex; padding: 2px; border-radius: 999px; }
 .duet-pane-bar button { appearance: none; border: 0; background: none; color: inherit; margin: 0; cursor: pointer; display: flex; align-items: center; -webkit-tap-highlight-color: transparent; }
 .duet-pane-pill > button { width: 36px; height: 36px; justify-content: center; border-radius: 999px; transition: background 0.15s; }
 .duet-pane-pill > button:active, .duet-pane-pill > button[aria-expanded="true"] { background: rgb(128 128 128 / 0.2); }
 .duet-pane-menu {
+  /* Text-bearing menus need a predictable contrast surface over any page background. */
+  background: var(--duet-pane-menu-surface);
   margin-top: 46px; min-width: 220px; padding: 6px; border-radius: 18px; display: flex; flex-direction: column;
   transform-origin: top right; animation: duet-fade 0.3s var(--duet-spring-out, ease-out) both;
 }
 .duet-pane-menu > button { height: 44px; padding: 0 12px; gap: 12px; justify-content: space-between; border-radius: 12px; font: 400 17px -apple-system, system-ui; text-align: left; }
 .duet-pane-menu > button:active { background: rgb(128 128 128 / 0.18); }
-.duet-pane-menu > button[data-destructive] { color: #ff3b30; }
+.duet-pane-menu > button[data-destructive] { color: var(--duet-destructive, #c5221f); }
 .duet-pane-menu > button[data-sep] { margin-top: 7px; position: relative; }
 .duet-pane-menu > button[data-sep]::before { content: ""; position: absolute; top: -4px; left: 12px; right: 12px; border-top: 0.5px solid var(--duet-pane-ring); }
 @media (prefers-reduced-motion: reduce) { .duet-pane-menu { animation: none; } }
@@ -391,3 +393,10 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 }
 @keyframes duet-appear { from { opacity: 0; } }
 @keyframes duet-vanish { to { opacity: 0; } }
+
+/* Destructive text needs 4.5:1, unlike the brighter decorative badge fill. */
+:root { --duet-destructive: #c5221f; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-lg-theme="light"]) { --duet-destructive: #ff6961; }
+}
+:root[data-lg-theme="dark"] { --duet-destructive: #ff6961; }

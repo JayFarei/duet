@@ -13,14 +13,14 @@ async function open(page: Page, side: "left" | "right", url = LAB) {
   // Seed the side once per test; a reload must keep what the user chose.
   await page.addInitScript((s) => { try { if (!sessionStorage.getItem("seeded")) { localStorage.setItem("duet-side", s); sessionStorage.setItem("seeded", "1"); } } catch {} }, side);
   await page.goto(url);
-  await page.locator(".duet .duet-glass").first().waitFor();
+  await page.locator(".duet:not(.duet-sidebar) .duet-group").first().waitFor();
   await page.waitForTimeout(600); // let the detector settle (it re-reads on a short timer after load)
 }
 
 /** The strip's inner edge, and every text node in the page that crosses it. */
 function probe(page: Page) {
   return page.evaluate(() => {
-    const glass = [...document.querySelectorAll(".duet .duet-glass")].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
+    const glass = [...document.querySelectorAll(".duet:not(.duet-sidebar) .duet-group")].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
     const right = glass[0].left > innerWidth / 2;
     const edge = right ? Math.min(...glass.map((r) => r.left)) : Math.max(...glass.map((r) => r.right));
     const root = document.querySelector(".duet-scroller") ?? document.body;
@@ -44,7 +44,7 @@ function probe(page: Page) {
       }
     }
     // The sticky title bar must span the strip too, or scrolled content shows between them.
-    const title = [...root.querySelectorAll("div")].find((d) => getComputedStyle(d).position === "sticky");
+    const title = [...root.querySelectorAll("div")].find((d) => getComputedStyle(d).position === "sticky" && !d.closest(".duet-pane-bar"));
     if (title) {
       const t = title.getBoundingClientRect(), gap = right ? innerWidth - t.right : t.left;
       if (gap > 1) bad.push(`sticky title stops ${gap.toFixed(0)}px short of the edge`);
@@ -69,10 +69,10 @@ for (const size of SIZES) {
 test("dragging a control across the middle moves the strip, and the side is remembered", async ({ page }) => {
   await page.setViewportSize({ width: 951, height: 543 });
   await open(page, "right");
-  const pill = page.locator(".duet .duet-glass").last();
+  const pill = page.locator(".duet:not(.duet-sidebar) .duet-group").last();
   const box = (await pill.boundingBox())!;
   const y = box.y + box.height / 2;
-  const selected = () => page.locator(".duet .duet-tab[aria-selected=true]").getAttribute("aria-label");
+  const selected = () => page.locator(".duet-sidebar [aria-current=page]").textContent();
   const before = await selected();
   await page.mouse.move(box.x + box.width / 2, y);
   await page.mouse.down();
@@ -80,7 +80,9 @@ test("dragging a control across the middle moves the strip, and the side is reme
   await page.mouse.up();
   await expect.poll(() => probe(page).then((r) => r.side)).toBe("left");
   expect(await page.evaluate(() => localStorage.getItem("duet-side"))).toBe("left");
-  expect(await selected(), "a drag must not select the tab it started on").toBe(before);
+  expect(await selected(), "a drag must not change navigation").toBe(before);
+  await expect(page.locator("#tapped")).toHaveCount(0);
+  await expect(page.getByRole("button", { expanded: true })).toHaveCount(0);
   await page.reload();
   await page.waitForTimeout(600);
   expect((await probe(page)).side).toBe("left");
@@ -91,16 +93,18 @@ test("a page in an iframe never claims Safari's column", async ({ page }) => {
   await page.setViewportSize({ width: 466, height: 678 });
   await page.goto("/mockup?scene=split");
   const frame = page.frameLocator("iframe");
-  await frame.locator(".duet .duet-glass").first().waitFor();
+  await frame.locator(".duet:not(.duet-sidebar) .duet-group").first().waitFor();
   expect(await frame.locator("html").getAttribute("data-duet-mode")).toBe("inline");
 });
 
 test("a reading column centres on the whole window, not the space beside the strip", async ({ page }) => {
+  // Keep the library layout contract independent of the home page's videos: a minimal
+  // <video src=...> crashes this Linux WebKit media backend before any app JS runs.
   // Open portrait has room to centre 680px clear of the 84pt strip, so the column sits mid-screen on either side.
   await page.setViewportSize({ width: 951, height: 543 });
   for (const side of ["right", "left"] as const) {
     await page.evaluate((s) => localStorage.setItem("duet-side", s), side).catch(() => {});
-    await open(page, side, "/?plain");
+    await open(page, side, "/quality");
     expect((await probe(page)).side).toBe(side);
     const mid = await page.evaluate(() => { const r = document.querySelector("main")!.getBoundingClientRect(); return (r.left + r.right) / 2 - innerWidth / 2; });
     expect(Math.abs(mid), `${side}: column off centre by ${mid}px`).toBeLessThan(2);
@@ -109,4 +113,10 @@ test("a reading column centres on the whole window, not the space beside the str
   await page.setViewportSize({ width: 385, height: 571 });
   await page.reload(); await page.waitForTimeout(600);
   expect((await probe(page)).bad).toEqual([]);
+});
+
+test('home page consumer smoke (Chromium media backend)', async ({ page, browserName }) => {
+  test.skip(browserName === 'webkit', 'Linux WebKit crashes on a minimal video element; library layout is tested on /quality in both engines. Real Safari media check pending.');
+  await page.goto('/?plain');
+  await expect(page.getByRole('heading', { name: /Native-feeling controls/ })).toBeVisible();
 });

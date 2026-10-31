@@ -73,6 +73,9 @@ On phones and browsers that are not an iPhone Duo in Safari or a Home Screen app
 | Understand which layout you get and why | [How Duet decides](docs/how-duet-decides.md) |
 | Know what Duet cannot guarantee | [Limitations](docs/how-duet-decides.md#limitations) |
 | Debug something odd on a device | [Edge cases](docs/edge-cases.md) |
+| Avoid integration footguns | [Quality integration guide](docs/QUALITY-INTEGRATION.md) |
+| Review quality coverage and limitations | [Quality audit](docs/QUALITY-AUDIT.md) and [Duo matrix](docs/DUO-TEST-MATRIX.md) |
+| Contribute a reliable change | [Quality checklist](CONTRIBUTING.md) |
 
 ## Examples
 
