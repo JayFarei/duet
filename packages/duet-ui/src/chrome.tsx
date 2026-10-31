@@ -607,7 +607,9 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   pressCtx.current = ctx;
   useEffect(() => listenPress(() => [nav.current, nav2.current], (el) => {
     const c = pressCtx.current;
-    return c.mode === "column" ? columnBand({ ...c, side: el.dataset.side as Side }) : { top: 16, bottom: innerHeight - 16 };
+    // A held capsule may take the room a Live Activity would otherwise reserve: Safari's buttons paint over it if one is up.
+    const b = c.mode === "column" ? columnBand({ ...c, side: el.dataset.side as Side }) : undefined;
+    return b ? { top: b.top - b.reach, bottom: b.bottom } : { top: 16, bottom: innerHeight - 16 };
   }), [nav, nav2]);
 
   // The safe areas only reach the page with viewport-fit=cover. Set on mount, not on import, so a page that only

@@ -462,3 +462,19 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** reserves the pane's measured 224pt, a band of 123.9pt, so two buttons fit at the worst case, clear of Safari's own buttons.
 - **You do:** nothing.
 - **Status:** [#226](https://github.com/JayFarei/duet/issues/226). e2e scenario `split-right-live`.
+
+## Column press in a short band
+
+- **You see:** without the handling, a two-item capsule in closed portrait opens with "GitHub" touching the "…" below it, since the band under the Live Activity slot is short.
+- **Cause:** the open capsule stayed inside the band reserved at rest, which leaves less pitch than label and icon need.
+- **Duet does:** lets the press open up into the Live Activity reach. If an activity is up, Safari's buttons paint over the capsule's top while it is held. If the pitch still cannot clear a label, the capsule opens without labels.
+- **You do:** nothing.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Seen on the closed screen of the Duo sim.
+
+## Column lens bend is only on its own copy
+
+- **You see:** the lens bends the accent icons and labels at its rim, but not the capsule's edge or the page behind it, which native does bend. On a page whose CSP has no `data:` images, the accent copy is not bent at all.
+- **Cause:** WebKit does not apply a displacement filter to a backdrop, only to an element's own content. The displacement map is a `data:` PNG, and a filter whose image is missing would blank the copy.
+- **Duet does:** bends a magnified accent copy of the items, and uses the filter only once the map has loaded, so a blocked map leaves the copy clear and unbent.
+- **You do:** nothing.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Backdrop bending cannot be matched from the web.
