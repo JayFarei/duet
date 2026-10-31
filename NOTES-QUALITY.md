@@ -88,3 +88,4 @@ export GIT_WORK_TREE=/workspace/repos/wt/duet-quality
 
 The original administrative index could not be refreshed in this sandbox, so plain `git status` without these variables can show stale staged changes even though the branch commits and files agree. Outside this sandbox, after confirming all work is committed, `git reset --mixed HEAD` refreshes that original index without changing working files. `.quality-inputs/`, task/log files and generated results were not committed.
 
+- Font-pinned GitHub run validated all screenshots and axe checks: 64 browser tests passed, with one remaining mobile review test clicking during the SSR column-to-inline hydration handoff. Require the mounted fixture's inline mode before the keyboard journey (other posture tests already await their mode). This separates first-paint SSR coverage from an interactive journey's readiness precondition.

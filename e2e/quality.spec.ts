@@ -94,6 +94,8 @@ test('column document sidebar opens at the current scroll position', async ({ pa
 test('real-browser menu keyboard contract and review recording', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/quality');
+  // SSR starts with a column snapshot; wait for the mounted consumer's real layout before tapping.
+  await expect(page.locator('html')).toHaveAttribute('data-duet-mode', 'inline');
   const menu = page.getByRole('button', { name: 'Menu', exact: true });
   await menu.click();
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeFocused();
