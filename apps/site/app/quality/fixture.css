@@ -1,7 +1,7 @@
 /* Fixture-only normalization: keep pixel comparisons independent of Linux distro fonts and native inputs. */
 @font-face {
   font-family: DuetQuality;
-  src: url('./quality-font.woff2') format('woff2');
+  src: url('./quality-font.woff') format('woff');
   font-weight: 100 900;
   font-display: block;
 }
