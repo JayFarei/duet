@@ -1,6 +1,6 @@
 # Duo test matrix
 
-The source of automated cases is `e2e/postures.ts`. Run both WebKit and Chromium through the existing `playwright.config.ts`. `e2e/quality.spec.ts` uses a same-origin parent/iframe and the library's existing `duet:signals` preview protocol. The fixtures are deterministic inputs, **not a Safari browser UI emulator**. Coordinates come from existing measured geometry fixtures and the supplied diagnoses; unknown Live Activity and hinge behaviour remains a device check.
+The source of automated cases is `e2e/postures.ts`. Run both WebKit and Chromium through the existing `playwright.config.ts`. `e2e/quality.spec.ts` uses a same-origin parent/iframe and the library's existing `duet:signals` preview protocol. The fixtures are deterministic inputs, **not a Safari browser UI emulator**. Fixture typography uses a bundled 13 KiB SIL OFL Arimo Latin subset, with normalized input/focus styles, so Debian/Ubuntu system-font differences cannot invalidate image comparisons. Production component typography remains unchanged. CI pins Ubuntu 24.04. Coordinates come from existing measured geometry fixtures and the supplied diagnoses; unknown Live Activity and hinge behaviour remains a device check.
 
 | Case | Page / window CSS px | Expected behaviour | Automated evidence |
 | --- | --- | --- | --- |
