@@ -21,13 +21,17 @@ Real Safari chrome/hinge/Island painting cannot be certified by desktop WebKit s
 - Overflow morph menu had the same focus defect; new role-based regression failed before applying shared focus lifecycle.
 - Isolated remaining baseline crash: no-JS/no-external-assets home still crashes WebKit; removing `<video>` tags passes; a minimal single video reproduces the crash. Library reading-column assertions now use `/quality` in both engines. Chromium retains home smoke; WebKit home media smoke explicitly skips with the native backend reason, pending real Safari playback.
 - Do not overlap Playwright invocations or rebuild/pack dist while its server runs: an exploratory overlap caused trace deletion and transient module resolution errors. Subsequent validation runs are serialized.
-- A follow-up focus regression reproduced lost focus on action selection (the menu unmounted before passive effect cleanup could restore it). Restore to the opener before the app callback, allowing the callback to focus a newly opened dialog.
+- A follow-up focus regression reproduced lost focus on action selection (the menu unmounted before passive effect cleanup could restore it). Restore focus only when needed after activation; preserve a callback that focuses its own editor or a row that arms confirmation.
 - Full baseline generation is exercising 64 tests across both engines; checking and reviewing images before a comparison-only run.
 - Expanded axe to light/dark and overflow menus. New failures: overflow heading reused the same low-contrast dim colour; dark translucent pane menu over white yielded only 2:1 destructive text contrast. Use primary ink for small menu headings and an opaque theme-aware text-bearing pane menu surface (keep pill glass); test this hostile background explicitly.
 - All six expanded axe/review tests pass in both engines. Preserve the public `--duet-dim` heading customization by strengthening its default colours rather than making it ineffective; regenerate/review affected heading snapshots.
 - Final comparison-only browser run: 65 pass, 1 explicit WebKit media skip; 38 baselines compare, no axe violations in both themes/engines.
 - Final keyboard edge check found another defect before fix: Tab dismissed an unmounted menu then restarted at the page's first control. Return to opener before allowing native Tab progression. Added app-owned focus regression to ensure action callbacks can intentionally focus an editor.
 - Closing-transition regression failed in both browsers: releasing the absolute sidebar's pin as soon as `open` became `closing` jumped it back to document top. Retain the pin through the closing phase and release only when fully closed.
+
+- GitHub caught cross-distro visual drift: local Debian resolves Arial to Arimo and system-ui to Noto Sans, while the runner uses different fonts. Pin a small SIL OFL licensed font subset and native-input/focus styling **inside the fixture only**, then regenerate/review baselines. Do not add screenshot tolerance or disable comparisons.
+- Fixed CI visual reproducibility without reducing the comparator: bundle a 13 KiB licensed Latin font, normalize only fixture inputs/focus, pin Ubuntu 24.04, and run PR CI once rather than duplicate branch+PR jobs. All 36 quality tests pass while regenerating the affected baselines; mobile/desktop/video evidence refreshed.
+- Final source review added a folded-primary keyboard regression: the first tap arms a confirmation rather than closing the menu, so generic click focus restoration must not move focus back to More. It failed before the correction. Restore after the app handler only when a removed/inert menu left focus on body; retain confirmation focus and any intentional app focus.
 
 ## Final report — 31 October 2026
 
@@ -40,7 +44,7 @@ Branch: `quality/shadcn-grade`, pushed against `main`. No merge, release or depl
 2. [Written matrix](docs/DUO-TEST-MATRIX.md), `e2e/postures.ts` and existing `playwright.config.ts` cover 13 static states, both engines, fold/turn transitions, hinge centre assertions, split view, URL bar/banner/keyboard, phone/desktop fallback, and navigation/focus. 38 committed screenshots include both themes and menu states.
 3. Retained pure geometry tests; added Vitest/Testing Library/user-event role tests, real-browser behaviours, axe failures, visual comparison, node-only SSR rendering, npm export validation and an isolated installed-tarball consumer typecheck/production build. No registry/CLI exists, so registry validation is explicitly not applicable; its future introduction requires a registry/CLI gate.
 4. GitHub Actions runs all automated layers and uploads browser evidence. CONTRIBUTING and the PR template require a documented **real Duo Safari pass for interactive/layout changes**, plus VoiceOver/manual checks. Maintainers still need to configure branch protection to require Quality/check.
-5. Verified/fixed bugs: current-item callbacks swallowed; dead drag initiation; scrolled column sidebar opening off screen and jumping on close; sidebar/pane/overflow focus and keyboard handling; lost focus after action selection; Tab restarting at the page's first control; low-contrast sidebar/overflow headings and destructive text; dark translucent menu contrast over a white background; iframe hydration guard mismatch. Regression tests reproduced the interaction/layout/contrast defects before their fixes; the SSR assertion also protects the observed browser hydration failure.
+5. Verified/fixed bugs: current-item callbacks swallowed; dead drag initiation; scrolled column sidebar opening off screen and jumping on close; sidebar/pane/overflow focus and keyboard handling; lost focus after action selection; Tab restarting at the page's first control; focus leaving a folded primary while it arms confirmation; low-contrast sidebar/overflow headings and destructive text; dark translucent menu contrast over a white background; iframe hydration guard mismatch. Regression tests reproduced the interaction/layout/contrast defects before their fixes; the SSR assertion also protects the observed browser hydration failure.
 6. [Integration guidance](docs/QUALITY-INTEGRATION.md), README links and Unreleased changelog explain re-selection compatibility, inner/document scrolling, stable horizontal targets, insets, safe areas, SSR, themes, non-modal focus and performance footguns.
 
 ### Validation results
@@ -48,14 +52,14 @@ Branch: `quality/shadcn-grade`, pushed against `main`. No merge, release or depl
 | Layer | Result |
 | --- | --- |
 | Existing Node geometry/signal/template tests | **251 pass, 0 fail** |
-| Vitest role/user-event component tests + node SSR | **8 pass, 0 fail** |
+| Vitest role/user-event component tests + node SSR | **9 pass, 0 fail** |
 | Workspace typechecks + quality harness typecheck | **Pass** |
 | Packed npm exports + fresh pnpm 10.32.0 Vite/TypeScript consumer | **Pass**, production bundle built from installed tarball |
 | Full Playwright comparison run | **65 pass, 0 fail, 1 explicit skip** in WebKit + Chromium; **38 visual baselines match** |
 | Later focus/drag follow-up | **4 pass** across both engines |
 | Later sidebar closing-position regression | Failed in both engines before fix; **2 pass** after fix |
 | Axe | **Pass**, both engines, light/dark, closed/sidebar/pane/overflow menu states; no rule suppression |
-| GitHub Actions | Build, typecheck, unit, component/SSR and distribution steps passed on the first pushed revision; browser run in progress when this report was written. See PR checks for the final revision. |
+| GitHub Actions | Build, typecheck, unit, component/SSR and distribution steps pass. Initial CI exposed cross-distro font drift; deterministic fixture fonts and pinned Ubuntu runner replace that variability. Final PR run pending; see PR checks. |
 | Physical Duo Safari / VoiceOver | **Not run; required before leaving draft** |
 
 The single skip is the **Linux WebKit home-media smoke**, with an explicit test reason. Reduction: minimal `<video src="/media/strip.mp4">` crashes the media backend without app JS; removing video elements lets the home load. The library reading-column test now runs on the small network-free consumer in both engines; Chromium retains the home smoke. This is not represented as a product fix or a physical Safari failure.
@@ -84,6 +88,3 @@ export GIT_WORK_TREE=/workspace/repos/wt/duet-quality
 
 The original administrative index could not be refreshed in this sandbox, so plain `git status` without these variables can show stale staged changes even though the branch commits and files agree. Outside this sandbox, after confirming all work is committed, `git reset --mixed HEAD` refreshes that original index without changing working files. `.quality-inputs/`, task/log files and generated results were not committed.
 
-- GitHub caught cross-distro visual drift: local Debian resolves Arial to Arimo and system-ui to Noto Sans, while the runner uses different fonts. Pin a small SIL OFL licensed font subset and native-input/focus styling **inside the fixture only**, then regenerate/review baselines. Do not add screenshot tolerance or disable comparisons.
-- Fixed CI visual reproducibility without reducing the comparator: bundle a 13 KiB licensed Latin font, normalize only fixture inputs/focus, pin Ubuntu 24.04, and run PR CI once rather than duplicate branch+PR jobs. All 36 quality tests pass while regenerating the affected baselines; mobile/desktop/video evidence refreshed.
-- Final source review added a folded-primary keyboard regression: the first tap arms a confirmation rather than closing the menu, so generic click focus restoration must not move focus back to More. It failed before the correction. Restore after the app handler only when a removed/inert menu left focus on body; retain confirmation focus and any intentional app focus.

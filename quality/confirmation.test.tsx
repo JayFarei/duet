@@ -16,7 +16,7 @@ test('folded primary stays focused when armed, so Enter confirms instead of clos
   const save = vi.fn();
   render(<Duet actions={[{ id: "delete", label: "Delete", icon: null, destructive: true }]} primary={{ id: 'new', label: 'New', icon: null, confirm: 'Confirm new', onPress: save }} />);
   await userEvent.click(screen.getByRole('button', { name: 'More' }));
-  await userEvent.click(screen.getByRole('menuitem', { name: 'New', exact: true }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'New' }));
   expect(save).not.toHaveBeenCalled();
   expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Confirm new' }));
   await userEvent.keyboard('{Enter}');
