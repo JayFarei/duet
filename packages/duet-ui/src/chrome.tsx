@@ -390,6 +390,7 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
  *  React renders it once per open. */
 function Morph({ open, from, slots, box, onClosed, children, role = "menu", label }: { open: boolean; from: Rect; slots: ReactNode[]; box: Rect; onClosed: () => void; children: ReactNode; role?: string; label?: string }) {
   const blob = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null);
+  useMenuFocus(blob, open, onClosed);
   const st = useRef({ s: 0, v: 0, raf: 0, last: 0, clear: 0 });
   const closed = useRef(onClosed);
   closed.current = onClosed;

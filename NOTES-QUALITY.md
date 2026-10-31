@@ -17,3 +17,5 @@ Real Safari chrome/hinge/Island painting cannot be certified by desktop WebKit s
 - Added 13 signal-driven screenshot/behaviour states in WebKit and Chromium plus transition, axe and document-scroll regressions. Initial WebKit run confirmed all static detector states.
 - Reproduced two further bugs before fixing: document-scroll column sidebar opens at y=-898 after scrolling; axe finds sidebar heading contrast 3.28:1 (requires 4.5:1). Pin absolute sidebar to visible document position; use primary ink for its small heading.
 - npm distribution has no registry/CLI: tarball export validation and a fresh Vite+TypeScript consumer production build passed. Pin the fixture's packageManager to pnpm 10.32.0.
+- Axe additionally reproduced destructive pane-menu text contrast 3.54:1. Separate destructive text from decorative badge red with theme-aware accessible text colours.
+- Overflow morph menu had the same focus defect; new role-based regression failed before applying shared focus lifecycle.

@@ -111,7 +111,7 @@
 /* iOS swells glass under the finger, lighter, rather than pressing it in. */
 .duet-group:has(.duet-btn:active) { scale: 1.12; }
 .duet-group:has(.duet-btn:active)::before { background: var(--duet-lift); }
-.duet-btn[data-destructive] { color: #ff3b30; }
+.duet-btn[data-destructive] { color: var(--duet-destructive, #c5221f); }
 
 /* The primary: a tinted button in a glass capsule, on its own or sharing one with "…" (#213). A tap grows the capsule
    into its confirmation box (the "…" morph, below). */
@@ -149,7 +149,7 @@
 .duet .duet-row[data-armed] { background: var(--duet-tint); color: #fff; }
 .duet .duet-row > .duet-check { margin-left: auto; }
 /* Destructive items (blueprint): last in "…", red. */
-.duet .duet-row[data-destructive] { color: #ff3b30; }
+.duet .duet-row[data-destructive] { color: var(--duet-destructive, #c5221f); }
 .duet .duet-row .duet-badge { position: static; margin-left: auto; box-shadow: none; }
 
 /* The sidebar sits under the page; the burger slides the page (the inner scroller) away by --duet-slide. */
@@ -366,7 +366,7 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 }
 .duet-pane-menu > button { height: 44px; padding: 0 12px; gap: 12px; justify-content: space-between; border-radius: 12px; font: 400 17px -apple-system, system-ui; text-align: left; }
 .duet-pane-menu > button:active { background: rgb(128 128 128 / 0.18); }
-.duet-pane-menu > button[data-destructive] { color: #ff3b30; }
+.duet-pane-menu > button[data-destructive] { color: var(--duet-destructive, #c5221f); }
 .duet-pane-menu > button[data-sep] { margin-top: 7px; position: relative; }
 .duet-pane-menu > button[data-sep]::before { content: ""; position: absolute; top: -4px; left: 12px; right: 12px; border-top: 0.5px solid var(--duet-pane-ring); }
 @media (prefers-reduced-motion: reduce) { .duet-pane-menu { animation: none; } }
@@ -391,3 +391,10 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 }
 @keyframes duet-appear { from { opacity: 0; } }
 @keyframes duet-vanish { to { opacity: 0; } }
+
+/* Destructive text needs 4.5:1, unlike the brighter decorative badge fill. */
+:root { --duet-destructive: #c5221f; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-lg-theme="light"]) { --duet-destructive: #ff6961; }
+}
+:root[data-lg-theme="dark"] { --duet-destructive: #ff6961; }
