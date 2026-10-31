@@ -11,7 +11,7 @@ export function useMenuFocus(ref: RefObject<HTMLElement | null>, open: boolean, 
     items()[0]?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") { e.preventDefault(); previous?.focus({ preventScroll: true }); dismiss(); }
-      else if (e.key === "Tab") dismiss();
+      else if (e.key === "Tab") { previous?.focus({ preventScroll: true }); dismiss(); }
       else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key)) {
         const all = items();
         if (!all.length) return;
