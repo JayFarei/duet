@@ -42,6 +42,8 @@ test('overflow action menu supports keyboard dismissal and focus return', async 
   render(<Duet actions={[{ id: 'delete', label: 'Delete', icon: null, destructive: true }]} />);
   const trigger = screen.getByRole('button', { name: 'More' });
   await userEvent.click(trigger);
+  expect(document.activeElement).toBe(screen.getAllByRole('menuitem')[0]);
+  await userEvent.keyboard('{End}');
   expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Delete' }));
   await userEvent.keyboard('{Escape}');
   expect(document.activeElement).toBe(trigger);

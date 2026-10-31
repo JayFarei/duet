@@ -19,3 +19,5 @@ Real Safari chrome/hinge/Island painting cannot be certified by desktop WebKit s
 - npm distribution has no registry/CLI: tarball export validation and a fresh Vite+TypeScript consumer production build passed. Pin the fixture's packageManager to pnpm 10.32.0.
 - Axe additionally reproduced destructive pane-menu text contrast 3.54:1. Separate destructive text from decorative badge red with theme-aware accessible text colours.
 - Overflow morph menu had the same focus defect; new role-based regression failed before applying shared focus lifecycle.
+- Isolated remaining baseline crash: no-JS/no-external-assets home still crashes WebKit; removing `<video>` tags passes; a minimal single video reproduces the crash. Library reading-column assertions now use `/quality` in both engines. Chromium retains home smoke; WebKit home media smoke explicitly skips with the native backend reason, pending real Safari playback.
+- Do not overlap Playwright invocations or rebuild/pack dist while its server runs: an exploratory overlap caused trace deletion and transient module resolution errors. Subsequent validation runs are serialized.

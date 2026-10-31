@@ -20,10 +20,21 @@ for (const posture of postures) {
     await expect(frame.getByRole('textbox', { name: 'Draft' })).toBeVisible();
     await frame.getByRole('textbox', { name: 'Draft' }).fill('Keep this draft');
     if (!posture.s.editing) {
+      await frame.getByRole('textbox', { name: 'Draft' }).evaluate((el: HTMLInputElement) => el.blur());
+      await expect(frame.locator('.duet[data-keyboard]')).toHaveCount(0);
       // Control boxes are inside the emulated screen and do not overlap one another.
       const rects = await frame.locator('.duet:not(.duet-sidebar) .duet-group:not([data-leaving])').evaluateAll(els => els.map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; }));
       expect(rects.length).toBeGreaterThan(0);
-      for (const r of rects) { expect(r.y).toBeGreaterThanOrEqual(0); expect(r.y + r.h).toBeLessThanOrEqual(posture.s.outerHeight + 1); }
+      for (const r of rects) {
+        expect(r.y).toBeGreaterThanOrEqual(0);
+        expect(r.y + r.h).toBeLessThanOrEqual(posture.s.outerHeight + 1);
+        if (posture.name === 'unfolded') expect(r.x + r.w <= 951 / 2 || r.x >= 951 / 2, 'control avoids vertical hinge centre').toBe(true);
+        if (posture.name.startsWith('unfolded-tall')) expect(r.y + r.h <= 825 / 2 || r.y >= 825 / 2, 'control avoids horizontal hinge centre').toBe(true);
+      }
+      for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i], b = rects[j];
+        expect(a.x + a.w <= b.x + 1 || b.x + b.w <= a.x + 1 || a.y + a.h <= b.y + 1 || b.y + b.h <= a.y + 1, 'controls never overlap').toBe(true);
+      }
       const burger = frame.getByRole('button', { name: 'Menu', exact: true });
       if (await burger.count() === 1) {
         await burger.click();
@@ -32,6 +43,7 @@ for (const posture of postures) {
       }
     }
     await expect(frame.getByRole('textbox', { name: 'Draft' })).toHaveValue('Keep this draft');
+    if (!posture.s.editing) await expect(frame.locator('.duet-scroller[data-slid]')).toHaveCount(0);
     await expect(page).toHaveScreenshot(`${posture.name}.png`, { animations: 'disabled' });
     expect(errors).toEqual([]);
   });
@@ -69,4 +81,31 @@ test('column document sidebar opens at the current scroll position', async ({ pa
   const box = await frame.getByRole('navigation', { name: 'Menu', exact: true }).boundingBox();
   expect(box!.y).toBeGreaterThanOrEqual(0);
   expect(box!.y).toBeLessThan(100);
+});
+
+test('real-browser menu keyboard contract and review recording', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/quality');
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  await menu.click();
+  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('button', { name: 'Journey', exact: true })).toBeFocused();
+  await page.screenshot({ path: testInfo.outputPath('mobile.png') });
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeFocused();
+  await page.locator('.duet-pane-bar').getByRole('button', { name: 'More' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Save' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: 'Delete', exact: true })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await menu.click();
+  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeFocused();
+  await page.screenshot({ path: testInfo.outputPath('desktop.png') });
+  await page.keyboard.press('Escape');
+  await page.locator('.duet:not(.duet-sidebar)').getByRole('button', { name: 'More', exact: true }).click();
+  await expect(page.getByRole('menuitem').first()).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
 });
