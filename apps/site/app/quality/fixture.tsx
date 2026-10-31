@@ -1,15 +1,13 @@
 "use client";
 import "./fixture.css";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Duet, DuetPaneBar, column, useDuet } from "duet-ui";
 
 // Deliberately small, network-free consumer for browser contracts and visual review.
-export function QualityFixture() {
+export function QualityFixture({ documentScroll = false }: { documentScroll?: boolean }) {
   const ctx = useDuet();
   const [selected, setSelected] = useState("home");
   const [calls, setCalls] = useState(0);
-  const [documentScroll, setDocumentScroll] = useState(false);
-  useEffect(() => setDocumentScroll(new URLSearchParams(location.search).has("document")), []);
   const content = <main style={{ ...column(680, 20), paddingTop: 24, paddingBottom: 32, color: "#111827", background: "#fff" }}>
     <h1 style={{ fontSize: 28 }}>Duet quality fixture</h1>
     <p>Navigation and drafts survive a fold or a turn.</p>

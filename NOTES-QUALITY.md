@@ -91,3 +91,4 @@ export GIT_WORK_TREE=/workspace/repos/wt/duet-quality
 
 The original administrative index could not be refreshed in this sandbox, so plain `git status` without these variables can show stale staged changes even though the branch commits and files agree. Outside this sandbox, after confirming all work is committed, `git reset --mixed HEAD` refreshes that original index without changing working files. `.quality-inputs/`, task/log files and generated results were not committed.
 
+- Cold CI found a second fixture startup race: `?document` was read in a mount effect, moving the content between inner and document scrollers while Playwright began scrolling. Pass the request mode from the server page instead, so the DOM is stable from SSR onward. The font comparison and keyboard journey passed on that run; no retries/tolerance added.
