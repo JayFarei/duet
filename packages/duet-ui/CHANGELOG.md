@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Column press rebuilt from Safari's own column, measured from a 60fps recording (#251). A capsule swells as the finger lands, then opens wider and taller with labels after 205ms or a drag. A lens follows the finger and tints what it covers, and release runs the item under it, on springs fitted to native.
+- Behaviour change: column buttons fire on release, not on touch down. If a device never reports a release, a tap runs 1.2s late, and a finger held still that long runs its item.
+- Holding a column button no longer starts text selection and its loupe on the page beneath.
+- Column press, closer to native: the lens's accent copy now bends and fringes at its rim, the release now eases out instead of snapping (the fitted spring was past critical damping and produced an invalid easing, so it never ran), and a two-item capsule can open up into the space reserved for a Live Activity, so its labels clear the next icon. Where the band is still too short for labels, the capsule opens without them.
+- Column press, measured against native with five items on the Duo's large screen (#251): the open capsule and its item spacing match native's 78 by 303, the press opens sooner, the release falls on a spring fitted to native's, and the lens follows the finger one to one past the last item. In dark mode the pressed capsule keeps the page's colour instead of washing it out, and the lens tint is closer to native's cyan. Light mode glass is unchanged.
+- Column press, superposed frame by frame on native (#251): the open capsule's corners are 30.5 by 33px rather than a 39px stadium, as native's are a tighter rounded rectangle. A still finger now scales the capsule, its item spacing and its icons about the capsule's centre by 6% over 170ms, and the icons stay scaled until the fall. Rise and fall use a measured stiffness 204 spring, damping 14.6 and 22.8, so the rise rings as native's does and the fall lands with a 3% undershoot. Icons travel on the same springs and wait 70ms on the fall, so a far icon first dips up with the shrinking spacing, as native's does. The lens stays still on the page while the capsule moves under it, is 68pt tall when open, bends labels half as much in a rim about half as wide, and labels fade linearly, 130ms in and 200ms out.
+
 ## 0.7.1
 
 Everything from 0.7.1-rc.1, unchanged.

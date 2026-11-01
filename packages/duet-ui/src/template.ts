@@ -12,9 +12,10 @@ export const groupHeight = (n: number) => T.control + (n - 1) * T.item;
 
 /** A damped spring as a CSS linear() easing (Safari 17.2+), with the time it takes to settle. */
 export function spring(stiffness: number, damping: number, n = 40) {
-  const w0 = Math.sqrt(stiffness), z = damping / (2 * w0), wd = w0 * Math.sqrt(1 - z * z);
-  const x = (t: number) => 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t));
-  const end = -Math.log(0.002) / (z * w0);
+  const w0 = Math.sqrt(stiffness), z = damping / (2 * w0), wd = w0 * Math.sqrt(Math.abs(1 - z * z)) || 1e-6, under = z < 1;
+  const x = (t: number) => 1 - Math.exp(-z * w0 * t) * ((under ? Math.cos : Math.cosh)(wd * t) + (z * w0 / wd) * (under ? Math.sin : Math.sinh)(wd * t));
+  let end = -Math.log(0.002) / (z * w0);
+  while (!under && 1 - x(end) > 0.002) end += 0.01; // past critical damping the envelope above is too quick
   return { easing: `linear(${Array.from({ length: n + 1 }, (_, i) => +x((i / n) * end).toFixed(4)).join(",")})`, ms: Math.round(end * 1000) };
 }
 /** The sidebar's slide and the groups' moves. */
