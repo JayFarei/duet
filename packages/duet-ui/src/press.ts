@@ -106,8 +106,8 @@ function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: numb
   for (const b of buttons) { const c = b.cloneNode(true) as HTMLElement; c.removeAttribute("aria-label"); c.removeAttribute("aria-current"); c.tabIndex = -1; rail.appendChild(c); }
   // In the capsule's parent's coordinates: native holds the lens still in the page while the capsule swells and opens around it.
   const at = (i: number) => buttons[i].offsetTop + group.offsetTop + LENS.rest;
-  // With a selection the lens is the bubble, lifted off the selected item and sent to the tapped one.
-  const hop = buttons.some((b) => b.hasAttribute("aria-current")), home = at(hop ? index : from), born = performance.now();
+  // On a tab the lens is the bubble, lifted off the selected tab and sent to the tapped one.
+  const hop = from !== index || buttons[index].hasAttribute("aria-current"), home = at(hop ? index : from), born = performance.now();
   let s: LensState = { y: at(from), vy: 0, w: hop ? HOP.end.w : LENS.gone.w, vw: 0, h: hop ? HOP.end.h : LENS.gone.h, vh: 0, q: 0, vq: 0 }, raf = 0, last = 0, falling = false, hole = 1, done = false;
   const lens: Lens = {
     goal: { y: home, ...(hop ? HOP.size : LENS.down) }, follow: false,
@@ -233,7 +233,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     const n = h.buttons.length;
     const move = (t: TouchEvent) => { if (t.cancelable) t.preventDefault(); }; // the column must not scroll the page
     addEventListener("touchmove", move, { passive: false });
-    const selected = h.buttons.findIndex((b) => b.hasAttribute("aria-current"));
+    const selected = h.buttons[h.index].hasAttribute("data-tab") ? h.buttons.findIndex((b) => b.hasAttribute("aria-current")) : -1;
     p = { id: e.pointerId, touch: e.pointerType === "touch", group: g, buttons: h.buttons, rest, shape: pressShape(rest, n, band(h.nav)), x0: e.clientX, y0: e.clientY, index: h.index, fx: e.clientX, fy: e.clientY, left: 0, top: 0, lens: null, hold: 0, dog: 0, born: performance.now(), hop: selected >= 0, move };
     muted = Infinity;
     clearTimeout(lifting);

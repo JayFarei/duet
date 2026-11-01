@@ -23,25 +23,27 @@ export interface DuetItem {
   destructive?: boolean;
   /** Lives in "…" even where the column has room for it, after the actions that folded for room. */
   folded?: boolean;
-  /** The page this action shows, for actions used as tabs: in the capsule it sits in a bubble, in `tint`, and a tap on
-   *  another tab sends the bubble over to it. */
-  selected?: boolean;
 }
 /** The page's call to action (Pay $48.00), a tinted button in the controls showing its icon. A tap grows it into a box
  *  beside the column, its label over a `confirm` button (default: the label) that calls onPress and collapses the box
  *  back into the button. `confirm: false`: one tap, no box. */
+type Action = DuetItem & { tab?: boolean; selected?: boolean };
 export type DuetPrimary = DuetItem & { confirm?: string | false };
 /** A place in the app, listed in the sidebar the burger opens. */
 export interface DuetMenuItem<T extends string = string> {
   id: T; label: string; icon?: ReactNode;
   badge?: number | string; badgeTone?: "alert" | "neutral";
 }
-export interface DuetProps<T extends string = string> {
+export interface DuetProps<T extends string = string, U extends string = string> {
   /** The app's places: the burger, first in the column, opens them in a sidebar and slides the page aside. The ids are
    *  typed from `items`: declare them `as const` and `onSelect` gets the union. Each place keeps its own scroll
    *  position in the inner scroller. In the in-app preview (one button of room), or with `burger: false`, they lead "…"
    *  under "Menu" instead. */
   menu?: { items: readonly DuetMenuItem<T>[]; selected?: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; burger?: boolean };
+  /** Destinations, one of which is always showing, where `actions` are commands that fire and leave nothing behind. They
+   *  head the actions in the capsule; the selected one sits in a bubble, in `tint`, and a tap on another sends the bubble
+   *  over to it and calls `onSelect`. A tap on the selected one does nothing. */
+  tabs?: { items: readonly (DuetMenuItem<U> & { icon: ReactNode })[]; selected?: NoInfer<U>; onSelect: (id: NoInfer<U>) => void };
   /** The page's actions: shown after the burger while they fit, the rest in "…". Destructive and folded items are
    *  always in "…". */
   actions?: DuetItem[];
@@ -465,7 +467,7 @@ function Morph({ open, from, slots, box, onClosed, children, role = "menu", labe
 
 type Phase = "open" | "closing" | "closed";
 
-export function Duet<T extends string = string>(props: DuetProps<T>) {
+export function Duet<T extends string = string, U extends string = string>(props: DuetProps<T, U>) {
   const p = props as unknown as DuetProps; // menu ids are only typed at the boundary
   const ctx = useDuet();
   const scroller = useRef<HTMLDivElement>(null);
@@ -499,7 +501,8 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
   const closeAsk = () => setAsk((a) => (a === "open" ? "closing" : a));
   const dismiss = () => { closeMore(); setArmed(false); closeAsk(); };
 
-  const actions = (p.actions ?? []).filter((a) => !a.destructive && !a.folded), destructive = (p.actions ?? []).filter((a) => a.destructive);
+  const tabs = (p.tabs?.items ?? []).map((t): Action => ({ ...t, tab: true, selected: t.id === p.tabs!.selected, onPress: t.id === p.tabs!.selected ? undefined : () => p.tabs!.onSelect(t.id) }));
+  const actions: Action[] = [...tabs, ...(p.actions ?? []).filter((a) => !a.destructive && !a.folded)], destructive = (p.actions ?? []).filter((a) => a.destructive);
   const folded = (p.actions ?? []).filter((a) => a.folded && !a.destructive);
   const menuItems = p.menu?.items ?? [];
   // Split pane in column mode: the controls are drawn in both of Safari's possible columns (useColumnLayer).
@@ -675,7 +678,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
               style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h,  }}>
               <i className="duet-rim" aria-hidden />
               {g.group.map((s, j) => (
-                <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined} aria-current={s.kind === "action" && actions[s.index].selected ? "page" : undefined}
+                <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined} data-tab={s.kind === "action" && actions[s.index].tab || undefined} aria-current={s.kind === "action" && actions[s.index].selected ? "page" : undefined}
                   aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : s.kind === "primary" && p.primary!.confirm !== false ? ask === "open" : undefined}
                   style={{ top: j * TEMPLATE.item, width: rect.w }} onClick={() => press(s)}>
                   {icon(s)}

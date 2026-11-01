@@ -54,6 +54,8 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Square backing behind the open menu](#square-backing-behind-the-open-menu)
 - [Call to action hidden in the closed column](#call-to-action-hidden-in-the-closed-column)
 - [Primary in its own capsule](#primary-in-its-own-capsule)
+- [Selected tab in the column](#selected-tab-in-the-column)
+- [Light capsule with a white band](#light-capsule-with-a-white-band)
 
 ## Split view pane, or the closed Duo turned left
 
@@ -497,8 +499,16 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 ## Selected tab in the column
 
-- **You see:** a `selected` item sits on a darker bubble with its icon in the tint. Tapping another item lifts the bubble into a clear lens, carries it over, and settles it as the bubble again on the new item, with a brief dip in the icon.
+- **You see:** the selected item of `tabs` sits on a darker bubble with its icon in the tint. Tapping another item lifts the bubble into a clear lens, carries it over, and settles it as the bubble again on the new item, with a brief dip in the icon.
 - **Cause:** native's selection is one object that moves. Tinting the new item and fading the old one would show two states at once and lose the travel.
-- **Duet does:** sets `aria-current` from `DuetItem.selected`. While the lens is up it carries the tint and the capsule's items stay plain. The swap back to the bubble is a single frame, because fading first would show the plain item through the lens's hole.
-- **You do:** set `selected` on the current item and move it when the tap lands.
+- **Duet does:** sets `aria-current` on the selected tab. A tap on an `actions` item in the same capsule fires it with the plain lens and leaves the bubble where it was. While the lens is up it carries the tint and the capsule's items stay plain. The swap back to the bubble is a single frame, because fading first would show the plain item through the lens's hole.
+- **You do:** pass `tabs={{ items, selected, onSelect }}` and move `selected` in `onSelect`.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Measured against Apple News+ in dark mode on the Duo. The light mode values are a judgment call, with no native reference recorded.
+
+## Light capsule with a white band
+
+- **You see:** without the handling, on a light page, a capsule has a hard white band about 5pt wide inside its edge, with a greyer panel inside that.
+- **Cause:** the rim ring brightens its backdrop to suggest native's refracted edge. On dark glass that reads as a soft edge. On light glass it clips to white, 255 against 248 inside, with a hard step where the ring ends.
+- **Duet does:** keeps only the ring's blur in light mode (`--duet-rim-filter`). Safari's own light buttons have no band: measured on the Duo, they have a thin edge line and a soft shade.
+- **You do:** nothing.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251).

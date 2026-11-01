@@ -9,6 +9,7 @@ Props, theming, the call to action, `useDuet()` and the lower-level exports.
 | Prop | Type | What it does |
 | --- | --- | --- |
 | `menu` | `{ items, selected, onSelect }` | The app's places (`DuetMenuItem[]`). The burger heads the controls and opens them in a sidebar, sliding the page aside. Each place keeps its scroll position |
+| `tabs` | `{ items, selected, onSelect }` | Destinations (`DuetMenuItem[]`), one always showing. They head the capsule; the selected one sits in a bubble in `tint`, and a tap on another sends the bubble over and calls `onSelect`. Use `actions` for commands, which fire and leave nothing selected. |
 | `actions` | `DuetItem[]` | Round buttons under the burger while they fit, the rest in "…". `destructive: true` items only show in "…", last, in red; `folded: true` items only in "…" |
 | `primary` | `DuetPrimary` | The screen's main action, always on screen: a tinted button showing its icon, in a slot of the controls. It has its own group under the others (at the thumb inline), or takes the burger's slot above "…" where that does not fit. A tap grows it into a confirmation box whose button runs it, see [Call to action](#call-to-action). Folds into "…" only where one button is all that fits |
 | `close` | `false \| { label?, onPress }` | A sheet or card is open: the controls hold only a close button until it is cleared |

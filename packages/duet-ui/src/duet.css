@@ -37,7 +37,7 @@
   --duet-badge: #ff3b30; --duet-badge-neutral: #6e6e73; --duet-badge-ink: #fff;
   --duet-glass-lg: transparent; --duet-glass-sharp: contrast(0.2675) brightness(1.3925) saturate(2.1); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
   --duet-glass-edge: 0 0 0 0.5px rgb(0 0 0 / 0.1), -0.75px 0 0 -0.25px rgb(0 0 0 / 0.22), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.22);
-  --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08);
+  --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08); --duet-rim-filter: blur(2.5px);
   --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.02); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.12);
   color: var(--duet-ink);
   -webkit-tap-highlight-color: transparent;
@@ -50,7 +50,7 @@
     --duet-lens-accent: color-mix(in srgb, var(--duet-tint) 60%, #5ce4ff); --duet-lens-rim: rgb(0 0 0 / 0.5); --duet-tab-sel: rgb(0 0 0 / 0.55); --duet-tab-rim: rgb(8 8 8 / 0.75); --duet-tab-line: rgb(255 255 255 / 0.05); --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
     --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken; --duet-glass-press: blur(30px) brightness(0.99) contrast(2.07) saturate(0.85); --duet-press-lift: transparent;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
-    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
+    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --duet-rim-filter: blur(2.5px) brightness(1.08);
     --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18);
   }
 }
@@ -58,7 +58,7 @@
   --duet-lens-accent: color-mix(in srgb, var(--duet-tint) 60%, #5ce4ff); --duet-lens-rim: rgb(0 0 0 / 0.5); --duet-tab-sel: rgb(0 0 0 / 0.55); --duet-tab-rim: rgb(8 8 8 / 0.75); --duet-tab-line: rgb(255 255 255 / 0.05); --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
   --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken; --duet-glass-press: blur(30px) brightness(0.99) contrast(2.07) saturate(0.85); --duet-press-lift: transparent;
   --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
-  --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
+  --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --duet-rim-filter: blur(2.5px) brightness(1.08);
   --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18);
 }
 /* In Safari's column the capsules follow the system, not the page, so they match Safari's own buttons beside them.
@@ -68,7 +68,7 @@
     --duet-ink: #000; --duet-lens-accent: var(--duet-tint); --duet-lens-rim: rgb(0 0 0 / 0.16); --duet-tab-sel: rgb(0 0 0 / 0.07); --duet-tab-rim: rgb(0 0 0 / 0.14); --duet-tab-line: rgb(0 0 0 / 0.05);
     --duet-glass-sharp: contrast(0.2675) brightness(1.3925) saturate(2.1); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten; --duet-glass-press: var(--duet-glass-base); --duet-press-lift: var(--duet-lift);
     --duet-glass-edge: 0 0 0 0.5px rgb(0 0 0 / 0.1), -0.75px 0 0 -0.25px rgb(0 0 0 / 0.22), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.22);
-    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08);
+    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08); --duet-rim-filter: blur(2.5px);
   }
 }
 @media (prefers-color-scheme: dark) {
@@ -76,7 +76,7 @@
     --duet-ink: #fff; --duet-lens-accent: color-mix(in srgb, var(--duet-tint) 60%, #5ce4ff); --duet-lens-rim: rgb(0 0 0 / 0.5); --duet-tab-sel: rgb(0 0 0 / 0.55); --duet-tab-rim: rgb(8 8 8 / 0.75); --duet-tab-line: rgb(255 255 255 / 0.05);
     --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken; --duet-glass-press: blur(30px) brightness(0.99) contrast(2.07) saturate(0.85); --duet-press-lift: transparent;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
-    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
+    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --duet-rim-filter: blur(2.5px) brightness(1.08);
   }
 }
 .duet button, .duet-sidebar button {
@@ -97,7 +97,7 @@
 :is(.duet-group, .duet-blob)::after { -webkit-backdrop-filter: var(--duet-glass-base); backdrop-filter: var(--duet-glass-base); mix-blend-mode: var(--duet-glass-blend); transition: -webkit-backdrop-filter 200ms ease, backdrop-filter 200ms ease; }
 .duet-rim {
   position: absolute; inset: 0; box-sizing: border-box; padding: 5px; border-radius: inherit; box-shadow: var(--duet-glass-rim); pointer-events: none;
-  -webkit-backdrop-filter: blur(2.5px) brightness(1.08); backdrop-filter: blur(2.5px) brightness(1.08);
+  -webkit-backdrop-filter: var(--duet-rim-filter); backdrop-filter: var(--duet-rim-filter);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 /* Groups reshape on GROUP's spring (--duet-group, set by chrome.tsx from template.ts), so a page change, the sidebar
@@ -158,7 +158,7 @@
 .duet-lens-ink { z-index: 2; overflow: hidden; clip-path: inset(0 round 40px); --duet-icon: var(--duet-lens-accent); --duet-ink: var(--duet-lens-accent); color: var(--duet-lens-accent); }
 .duet-lens-rail { position: absolute; left: calc(var(--duet-lens-w) / 2 - 39px); top: calc(var(--duet-lens-h) / 2 - var(--duet-lens-y)); width: 78px; }
 .duet-lens-rail > .duet-btn { width: 100% !important; scale: 1.17; transform-origin: 50% 27.75px; }
-/* The selected tab (DuetItem.selected, #251): a bubble darker than the glass and the icon in the tint. While the lens is
+/* The selected tab (the `tabs` prop, #251): a bubble darker than the glass and the icon in the tint. While the lens is
    up it carries the selection, tinting what it passes over, so the rest of the capsule is plain. It lands on a dip. */
 .duet-btn[aria-current] { isolation: isolate; color: var(--duet-tint); --duet-icon: var(--duet-tint); --duet-ink: var(--duet-tint); }
 .duet-btn[aria-current]::before { content: ""; position: absolute; inset: 0 2px; z-index: -1; border-radius: 22px / 24.5px; background: var(--duet-tab-sel); pointer-events: none; }
