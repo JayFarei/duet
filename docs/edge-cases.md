@@ -471,6 +471,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Seen on the closed screen of the Duo sim.
 
+## Column press swell depends on the capsule's height
+
+- **You see:** a still finger grows a five-item capsule by about 16pt but a two-item capsule by about 6pt.
+- **Cause:** native scales the capsule about its centre by about 6%, measured on five items, and nothing was measured for two.
+- **Duet does:** applies the same 6% to any height through geometry, not `scale`, so the swell runs straight on into the open shape. The items spread with it and the icons grow 6%. The lens stays still on the page while the capsule moves under it.
+- **You do:** nothing.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Two and three items are unverified against native, since the only reference has five.
+
 ## Five-item press at full width is inline, not a column
 
 - **You see:** on the Duo's large full-width page, a group of five actions shows six items, the fifth followed by "…" for More, and they sit at the page top. Native's five-item column has no "…" and sits lower.

@@ -1,7 +1,7 @@
 // The capsule under a finger (#251): its open shape stays in the band, and the lens names the right item.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LENS, PRESS, lensAt, lensStep, pressShape, refractMap } from "../src/press.ts";
+import { LENS, PRESS, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
 import { TEMPLATE, spring } from "../src/template.ts";
 
 const rest = { x: 400, y: 400, w: 46, h: 104 };
@@ -13,7 +13,9 @@ test("springs: valid easings either side of critical damping", () => {
     assert.equal(stops[0], 0); assert.ok(Math.abs(stops.at(-1) - 1) < 0.01); assert.ok(s.ms > 0);
   }
   const fall = PRESS.fall.easing.slice(7, -1).split(",").map(Number);
-  assert.ok(fall.every((v, i) => !i || v >= fall[i - 1]), "fall does not overshoot");
+  const rise = PRESS.rise.easing.slice(7, -1).split(",").map(Number);
+  assert.ok(Math.max(...rise) > 1.1, "rise overshoots by more than 10%");
+  assert.ok(Math.max(...fall) > 1 && Math.max(...fall) < 1.05, "fall undershoots rest by under 5%");
 });
 
 test("open: wider, centred on rest, rising more than it falls", () => {
@@ -37,9 +39,21 @@ test("open: a short band gives up pitch, never below the resting height", () => 
   assert.ok(s.h >= rest.h);
 });
 
-test("open: five items match native's 78 by 303", () => {
-  assert.equal(pressShape(rest, 5).w, 78);
-  assert.ok(Math.abs(pressShape(rest, 5).h - 303) < 1);
+test("open: five items match native's width and height", () => {
+  assert.equal(pressShape(rest, 5).w, PRESS.width);
+  assert.ok(Math.abs(pressShape(rest, 5).h - 301) < 1, "native measures 302, ours adds a 1pt rim");
+});
+
+test("swell: scales about the capsule's centre, its items spreading with it", () => {
+  for (const r of [rest, { x: 400, y: 200, w: 46, h: 262 }]) {
+    const s = swellShape(r);
+    assert.ok(Math.abs(s.w - r.w * PRESS.swell) < 1e-9); assert.ok(Math.abs(s.h - r.h * PRESS.swell) < 1e-9);
+    assert.ok(Math.abs(s.x + s.w / 2 - (r.x + r.w / 2)) < 1e-9); assert.ok(Math.abs(s.y + s.h / 2 - (r.y + r.h / 2)) < 1e-9);
+    assert.ok(Math.abs(s.pitch - TEMPLATE.item * PRESS.swell) < 1e-9);
+    assert.equal(s.labels, false);
+    assert.ok(Math.abs(s.top - (PRESS.swell - 1) * TEMPLATE.control / 2) < 1e-9, "the first item stays centred in its scaled slot");
+  }
+  assert.ok(swellShape({ ...rest, h: 262 }).h - 262 > swellShape(rest).h - rest.h, "a tall capsule grows more");
 });
 
 test("open: labels only where they clear the next icon", () => {

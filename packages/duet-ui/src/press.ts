@@ -4,14 +4,21 @@
 // :active never shows there.
 import { spring, TEMPLATE, type Rect } from "./template.ts";
 
-/** Fitted to a 60fps recording of Safari's own column: rise overshoots about 15%, fall has no overshoot. */
-export const PRESS = { rise: spring(286, 17.5), fall: spring(260, 30), hold: 205, slop: 8, width: 78, pitch: 57, inset: 17, pad: 26, labelled: 44, up: 0.61, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000 } as const;
+/** Fitted to a 60fps recording of Safari's own column: rise overshoots about 15%, fall about 3%, on one spring per phase. */
+export const PRESS = { rise: spring(204, 14.6), fall: spring(204, 22.8), swell: 1.06, hold: 205, slop: 8, width: 78.8, pitch: 57, inset: 13.7, pad: 23.5, labelled: 44, up: 0.65, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000 } as const;
 
 /** The lens in points, on [stiffness, damping] springs, fitted to the same recording: at a touch, open and let go. Native
  *  narrows as it speeds up and widens as it slows (area kept), ringing at about 0.6s, and runs a little past the ends. */
-export const LENS = { down: { w: 66, h: 82 }, open: { w: 90, h: 88 }, gone: { w: 46, h: 49 }, centre: 14.5, rest: 24.5, radius: 40, band: 12, bend: 26, past: 24, pastOver: 24, travel: [1000, 63], grow: [286, 17.5], fall: [260, 30], stretch: [100, 6], kick: 0.0053, maxStretch: 0.12, ms: 200 } as const;
+export const LENS = { down: { w: 64, h: 60 }, open: { w: 90, h: 68 }, gone: { w: 46, h: 49 }, centre: 14.5, rest: 24.5, radius: 40, band: 7, bend: 13, past: 24, pastOver: 24, travel: [1000, 63], grow: [286, 17.5], fall: [260, 30], stretch: [100, 6], kick: 0.0053, maxStretch: 0.12, ms: 200 } as const;
 
-export type PressShape = { x: number; y: number; w: number; h: number; pitch: number; labels: boolean };
+export type PressShape = { x: number; y: number; w: number; h: number; top: number; pitch: number; labels: boolean };
+
+/** The capsule under a still finger: native scales it about its centre, the items spreading with it, so a tall capsule
+ *  grows more than a short one. Geometry rather than `scale`, so it runs straight on into the open shape. */
+export function swellShape(rest: Rect): PressShape {
+  const k = PRESS.swell, w = rest.w * k, h = rest.h * k;
+  return { x: rest.x - (w - rest.w) / 2, y: rest.y - (h - rest.h) / 2, w, h, top: (k - 1) * TEMPLATE.control / 2, pitch: TEMPLATE.item * k, labels: false };
+}
 
 /** The open capsule: wider, its items further apart, rising more than it falls as native does. It stays in `band`
  *  (a little of the gap to Safari's buttons may go), giving up pitch when the band is short, never below rest, and its
@@ -22,7 +29,7 @@ export function pressShape(rest: Rect, n: number, band?: { top: number; bottom: 
   const h = Math.min(room, TEMPLATE.control + (n - 1) * PRESS.pitch + PRESS.pad);
   const y = Math.min(Math.max(top, rest.y - (h - rest.h) * PRESS.up), Math.max(top, bottom - h));
   const pitch = n > 1 ? (h - TEMPLATE.control - PRESS.pad) / (n - 1) : 0;
-  return { x: rest.x + (rest.w - PRESS.width) / 2, y, w: PRESS.width, h, pitch, labels: pitch >= PRESS.labelled };
+  return { x: rest.x + (rest.w - PRESS.width) / 2, y, w: PRESS.width, h, top: PRESS.inset, pitch, labels: pitch >= PRESS.labelled };
 }
 
 /** The lens centre for a finger at `fy` (the capsule's coordinates) and the item it names. Past the first and last item
@@ -92,8 +99,9 @@ function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: numb
   const ink = document.createElement("div"); ink.className = "duet-lens-ink"; ink.setAttribute("aria-hidden", ""); ink.inert = true; ink.style.filter = refract;
   const rail = document.createElement("div"); rail.className = "duet-lens-rail"; ink.appendChild(rail);
   for (const b of buttons) { const c = b.cloneNode(true) as HTMLElement; c.removeAttribute("aria-label"); c.tabIndex = -1; rail.appendChild(c); }
-  const home = () => buttons[index].offsetTop + LENS.rest;
-  let s: LensState = { y: home(), vy: 0, w: LENS.gone.w, vw: 0, h: LENS.gone.h, vh: 0, q: 0, vq: 0 }, raf = 0, last = 0, falling = false, hole = 1, done = false;
+  // In the capsule's parent's coordinates: native holds the lens still in the page while the capsule swells and opens around it.
+  const home = buttons[index].offsetTop + group.offsetTop + LENS.rest;
+  let s: LensState = { y: home, vy: 0, w: LENS.gone.w, vw: 0, h: LENS.gone.h, vh: 0, q: 0, vq: 0 }, raf = 0, last = 0, falling = false, hole = 1, done = false;
   const lens: Lens = {
     goal: { y: s.y, ...LENS.down }, follow: false,
     fall() {
@@ -109,13 +117,13 @@ function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: numb
     },
   };
   const write = () => {
-    const w = s.w * (1 + s.q), h = s.h / (1 + s.q);
-    group.style.setProperty("--duet-lens-y", `${s.y}px`); group.style.setProperty("--duet-lens-w", `${w}px`); group.style.setProperty("--duet-lens-h", `${h}px`);
+    const w = s.w * (1 + s.q), h = s.h / (1 + s.q), y = s.y - group.offsetTop;
+    group.style.setProperty("--duet-lens-y", `${y}px`); group.style.setProperty("--duet-lens-w", `${w}px`); group.style.setProperty("--duet-lens-h", `${h}px`);
     group.style.setProperty("--duet-hole-w", `${w * hole}px`); group.style.setProperty("--duet-hole-h", `${h * hole}px`);
-    for (const b of buttons) b.style.setProperty("--duet-lens-dy", `${s.y - (h * hole) / 2 - b.offsetTop}px`);
+    for (const b of buttons) b.style.setProperty("--duet-lens-dy", `${y - (h * hole) / 2 - b.offsetTop}px`);
   };
   const tick = (now: number) => {
-    if (!lens.follow && group.isConnected) lens.goal.y = home();
+    if (!lens.follow && group.isConnected) lens.goal.y = home;
     s = still ? { ...s, y: lens.goal.y, w: lens.goal.w, h: lens.goal.h } : lensStep(s, lens.goal, falling ? LENS.fall : LENS.grow, Math.min(0.033, last ? (now - last) / 1000 : 1 / 60));
     last = now;
     write();
@@ -147,13 +155,13 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     return null;
   };
   const vars = (el: HTMLElement, s: PressShape) => {
-    for (const [k, v] of Object.entries({ x: s.x, y: s.y, w: s.w, h: s.h, pitch: s.pitch })) el.style.setProperty(`--duet-p-${k}`, `${v}px`);
+    for (const [k, v] of Object.entries({ x: s.x, y: s.y, w: s.w, h: s.h, top: s.top, pitch: s.pitch })) el.style.setProperty(`--duet-p-${k}`, `${v}px`);
   };
   const lens = (e: { clientY: number }) => {
     if (!p?.lens) return;
     const { y, index } = lensAt(e.clientY - p.top, p.buttons.length, p.shape.pitch);
     p.index = index;
-    p.lens.goal = { y, ...LENS.open };
+    p.lens.goal = { y: y + p.shape.y, ...LENS.open };
   };
   /** Open: the capsule takes its shape, the lens its size, and it follows the finger from here. */
   const open = (e: { clientY: number }) => {
@@ -206,7 +214,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     muted = Infinity;
     fading?.stop(); fading = null;
     if (n > 1) {
-      vars(g, { x: rest.x - 1.5, y: rest.y - 4.5, w: rest.w + 3, h: rest.h + 9, pitch: TEMPLATE.item, labels: false });
+      vars(g, swellShape(rest));
       h.buttons.forEach((b, i) => b.style.setProperty("--duet-j", `${i}`));
       p.lens = mountLens(g, h.buttons, h.index, still());
     }

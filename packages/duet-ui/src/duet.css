@@ -119,31 +119,34 @@
 .duet-group[data-press="down"]:has(> .duet-btn:nth-of-type(2)), .duet-group[data-press="open"] {
   left: var(--duet-p-x) !important; top: var(--duet-p-y) !important; width: var(--duet-p-w) !important; height: var(--duet-p-h) !important;
 }
-.duet-group[data-press="down"] { transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left 130ms ease-out, top 130ms ease-out, width 130ms ease-out, height 130ms ease-out, background 200ms ease; }
+.duet-group[data-press="down"] { transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left 170ms ease-out, top 170ms ease-out, width 170ms ease-out, height 170ms ease-out, background 200ms ease; }
+.duet-group[data-press="down"]:has(> .duet-btn:nth-of-type(2)) .duet-btn { top: calc(var(--duet-p-top) + var(--duet-j) * var(--duet-p-pitch)) !important; transition: top 170ms ease-out; }
 .duet-group:has(> .duet-lens) { overflow: visible; }
 .duet-group:has(> .duet-lens) > .duet-btn {
   -webkit-mask: linear-gradient(#000 0 0), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 88' preserveAspectRatio='none'%3E%3Crect width='90' height='88' rx='40'/%3E%3C/svg%3E") center var(--duet-lens-dy) / var(--duet-hole-w) var(--duet-hole-h) no-repeat;
   -webkit-mask-composite: xor; mask-composite: exclude;
 }
 .duet-group[data-press="open"] {
-  border-radius: 39px;
+  border-radius: 30.5px / 33px;
   transition: left var(--duet-press-rise-ms) var(--duet-press-rise), top var(--duet-press-rise-ms) var(--duet-press-rise), width var(--duet-press-rise-ms) var(--duet-press-rise), height var(--duet-press-rise-ms) var(--duet-press-rise), border-radius var(--duet-press-rise-ms) var(--duet-press-rise);
 }
 .duet-group[data-press="fall"] {
   transition: scale 160ms ease-out, left var(--duet-press-fall-ms) var(--duet-press-fall), top var(--duet-press-fall-ms) var(--duet-press-fall), width var(--duet-press-fall-ms) var(--duet-press-fall), height var(--duet-press-fall-ms) var(--duet-press-fall), border-radius var(--duet-press-fall-ms) var(--duet-press-fall);
 }
 .duet-group[data-press="open"] .duet-btn {
-  top: calc(17px + var(--duet-j) * var(--duet-p-pitch)) !important; width: 100% !important;
+  top: calc(var(--duet-p-top) + var(--duet-j) * var(--duet-p-pitch)) !important; width: 100% !important;
   transition: top var(--duet-press-rise-ms) var(--duet-press-rise), width var(--duet-press-rise-ms) var(--duet-press-rise);
 }
 .duet-group[data-press="fall"] .duet-btn { transition: top var(--duet-press-fall-ms) var(--duet-press-fall), width var(--duet-press-fall-ms) var(--duet-press-fall); }
-.duet-btn > :not(.duet-label, .duet-badge) { transition: translate 200ms ease-out; }
-.duet-group[data-press="open"] .duet-btn > :not(.duet-label, .duet-badge) { translate: 0 -8px; }
+.duet-btn > :not(.duet-label, .duet-badge) { transition: translate 200ms ease-out, scale 170ms ease-out; }
+.duet-group:is([data-press="down"]:has(> .duet-btn:nth-of-type(2)), [data-press="open"]) .duet-btn > :not(.duet-label, .duet-badge) { scale: 1.06; }
+.duet-group[data-press="open"] .duet-btn > :not(.duet-label, .duet-badge) { translate: 0 -8px; transition: translate var(--duet-press-rise-ms) var(--duet-press-rise), scale 170ms ease-out; }
+.duet-group[data-press="fall"] .duet-btn > :not(.duet-label, .duet-badge) { transition: translate var(--duet-press-fall-ms) var(--duet-press-fall) 70ms, scale 170ms ease-out; }
 .duet-label {
   position: absolute; left: 2px; right: 2px; bottom: 3px; text-align: center; font: 500 11px/14px -apple-system, system-ui, sans-serif; color: var(--duet-ink);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; filter: blur(4px); pointer-events: none; transition: opacity 160ms ease-out, filter 160ms ease-out;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; filter: blur(4px); pointer-events: none; transition: opacity 200ms linear, filter 200ms linear;
 }
-.duet-group[data-press="open"]:not([data-press-tight]) .duet-label { opacity: 1; filter: none; }
+.duet-group[data-press="open"]:not([data-press-tight]) .duet-label { opacity: 1; filter: none; transition: opacity 130ms linear, filter 130ms linear; }
 .duet-lens, .duet-lens-ink {
   position: absolute; left: calc(50% - var(--duet-lens-w) / 2); top: calc(var(--duet-lens-y) - var(--duet-lens-h) / 2); width: var(--duet-lens-w); height: var(--duet-lens-h);
   border-radius: 40px; pointer-events: none; transition: opacity 67ms ease-out;
