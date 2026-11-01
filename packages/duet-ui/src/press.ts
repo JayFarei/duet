@@ -5,11 +5,11 @@
 import { spring, TEMPLATE, type Rect } from "./template.ts";
 
 /** Fitted to a 60fps recording of Safari's own column: rise overshoots about 15%, fall has no overshoot. */
-export const PRESS = { rise: spring(286, 17.5), fall: spring(205, 29), hold: 230, slop: 8, width: 78, pitch: 57, inset: 12.5, pad: 21.5, labelled: 44, up: 0.7, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000 } as const;
+export const PRESS = { rise: spring(286, 17.5), fall: spring(260, 30), hold: 205, slop: 8, width: 78, pitch: 57, inset: 17, pad: 26, labelled: 44, up: 0.61, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000 } as const;
 
 /** The lens in points, on [stiffness, damping] springs, fitted to the same recording: at a touch, open and let go. Native
  *  narrows as it speeds up and widens as it slows (area kept), ringing at about 0.6s, and runs a little past the ends. */
-export const LENS = { down: { w: 66, h: 82 }, open: { w: 90, h: 88 }, gone: { w: 46, h: 49 }, centre: 19, rest: 24.5, radius: 40, band: 12, bend: 26, past: 12, pastOver: 36, travel: [1000, 63], grow: [286, 17.5], fall: [205, 29], stretch: [100, 6], kick: 0.0053, maxStretch: 0.12, ms: 200 } as const;
+export const LENS = { down: { w: 66, h: 82 }, open: { w: 90, h: 88 }, gone: { w: 46, h: 49 }, centre: 14.5, rest: 24.5, radius: 40, band: 12, bend: 26, past: 24, pastOver: 24, travel: [1000, 63], grow: [286, 17.5], fall: [260, 30], stretch: [100, 6], kick: 0.0053, maxStretch: 0.12, ms: 200 } as const;
 
 export type PressShape = { x: number; y: number; w: number; h: number; pitch: number; labels: boolean };
 
@@ -206,7 +206,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     muted = Infinity;
     fading?.stop(); fading = null;
     if (n > 1) {
-      vars(g, { x: rest.x - 2, y: rest.y - 4.5, w: rest.w + 4, h: rest.h + 9, pitch: TEMPLATE.item, labels: false });
+      vars(g, { x: rest.x - 1.5, y: rest.y - 4.5, w: rest.w + 3, h: rest.h + 9, pitch: TEMPLATE.item, labels: false });
       h.buttons.forEach((b, i) => b.style.setProperty("--duet-j", `${i}`));
       p.lens = mountLens(g, h.buttons, h.index, still());
     }

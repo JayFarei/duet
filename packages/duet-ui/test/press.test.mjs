@@ -37,9 +37,9 @@ test("open: a short band gives up pitch, never below the resting height", () => 
   assert.ok(s.h >= rest.h);
 });
 
-test("open: five items match native's 78 by 299", () => {
+test("open: five items match native's 78 by 303", () => {
   assert.equal(pressShape(rest, 5).w, 78);
-  assert.ok(Math.abs(pressShape(rest, 5).h - 299) < 1);
+  assert.ok(Math.abs(pressShape(rest, 5).h - 303) < 1);
 });
 
 test("open: labels only where they clear the next icon", () => {

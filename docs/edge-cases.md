@@ -471,6 +471,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Seen on the closed screen of the Duo sim.
 
+## Five-item press at full width is inline, not a column
+
+- **You see:** on the Duo's large full-width page, a group of five actions shows six items, the fifth followed by "…" for More, and they sit at the page top. Native's five-item column has no "…" and sits lower.
+- **Cause:** open full-width Safari is always inline. Only a split pane is a column, and a split pane's band fits two or three buttons, so five items cannot reach a real column.
+- **Duet does:** runs the same press in both modes, so the capsule, labels and lens behave alike. Near the page top, the capsule stops at the top edge and opens downward instead of rising.
+- **You do:** nothing.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Seen on the inner screen of the Duo sim. The press was measured there with a test-only build that drops "…" and a lowered capsule, then checked on the normal build.
+
 ## Column lens bend is only on its own copy
 
 - **You see:** the lens bends the accent icons and labels at its rim, but not the capsule's edge or the page behind it, which native does bend. On a page whose CSP has no `data:` images, the accent copy is not bent at all.
