@@ -105,3 +105,66 @@ test("right split pane: the primary and \"…\" fit at the Live Activity worst c
   const c = { ...detect(sig(385, 571, 469, 669)), side: "right" };
   assert.deepEqual(kinds(template(frame(c), { menu: true, actions: 3, primary: true, rest: true }).groups), [["primary", "more"]]);
 });
+
+// The capsule at the foot of the room (#254): where fingers rest, as in native apps, inside the same gap (#110).
+const end = (p) => p.rect.y + p.rect.h;
+
+test("foot: open full screen, the burger heads the strip and the capsule ends at its foot", () => {
+  const f = frame(detect(sig(951, 543, 951, 669)));
+  const t = template(f, { menu: true, actions: 4, rest: true }).placed;
+  assert.deepEqual(kinds(t.map((p) => p.group)), [["menu"], [0, 1, 2, 3, "more"]]);
+  assert.equal(t[0].rect.y, f.top);
+  assert.equal(end(t[1]), f.bottom);
+});
+
+test("foot: the primary keeps the very foot, the capsule stacks above it", () => {
+  const f = frame(detect(sig(951, 543, 951, 669)));
+  const t = template(f, { menu: true, actions: 3, primary: true }).placed;
+  assert.equal(t[0].rect.y, f.top);
+  assert.equal(end(t[2]), f.bottom);
+  assert.ok(t[2].primary);
+  assert.equal(end(t[1]) + TEMPLATE.gap, t[2].rect.y);
+});
+
+test("foot: no burger, the capsule still ends at the foot; a lone burger stays at the head", () => {
+  const f = frame(detect(sig(951, 543, 951, 669)));
+  assert.equal(end(template(f, { actions: 3 }).placed[0]), f.bottom);
+  assert.equal(template(f, { menu: true, actions: 0 }).placed[0].rect.y, f.top);
+});
+
+test("foot: on the open Duo it ends where native capsules do, 23.7pt above the screen bottom", () => {
+  assert.equal(frame(detect(sig(951, 543, 951, 669))).bottom, 543 - 23.7);
+  assert.equal(frame(detect(sig(951, 543, 951, 669, { insetBottom: 34 }))).bottom, 543 - 23.7, "native capsules sit over the home indicator's inset");
+});
+
+test("foot: inline groups stay in the room and never overlap, at any height", () => {
+  for (let h = 120; h <= 900; h += 13) for (let n = 0; n <= 8; n++) for (const primary of [false, true]) {
+    const f = frame(detect(sig(951, h, 951, h + 126)));
+    const t = template(f, { menu: true, actions: n, primary, rest: true }).placed;
+    for (const [i, p] of t.entries()) {
+      assert.ok(p.rect.y >= f.top - 0.01 && end(p) <= f.bottom + 0.01, `${h}/${n}: ${JSON.stringify(p.rect)} outside ${f.top} to ${f.bottom}`);
+      if (i) assert.ok(p.rect.y >= end(t[i - 1]) + TEMPLATE.gap - 0.01, `${h}/${n}: group ${i} overlaps`);
+    }
+  }
+});
+
+test("foot: a split pane's stack ends at its band's foot, clear of Safari's pill", () => {
+  const f = frame({ ...detect(sig(385, 571, 469, 669)), side: "left" });
+  const t = template(f, { menu: true, actions: 2 }).placed;
+  assert.equal(end(t.at(-1)), f.bottom);
+});
+
+test("foot: a stack that overfills the band keeps its centring (the lone group's allowance)", () => {
+  const f = frame({ ...detect(sig(385, 571, 469, 669)), side: "right" }), short = { ...f, bottom: f.top + 95 };
+  const t = template(short, { menu: true, actions: 3, primary: true, rest: true }).placed;
+  assert.ok(end(t[0]) > short.bottom, "overfills");
+  assert.ok(Math.abs(t[0].rect.y - short.top - (short.bottom - end(t[0]))) < 0.01);
+});
+
+test("foot: \"…\" at the foot opens upward, inside the page", () => {
+  const f = frame(detect(sig(951, 543, 951, 669)));
+  const c = template(f, { menu: true, actions: 3, rest: true }).placed[1].rect, more = { ...c, y: c.y + c.h - TEMPLATE.control, h: TEMPLATE.control };
+  const b = menuBox(f, more, 4);
+  assert.equal(b.y + b.h, more.y + more.h);
+  assert.ok(b.y >= f.insetTop);
+});

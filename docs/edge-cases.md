@@ -56,6 +56,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Primary in its own capsule](#primary-in-its-own-capsule)
 - [Selected tab in the column](#selected-tab-in-the-column)
 - [Light capsule with a white band](#light-capsule-with-a-white-band)
+- [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
 
 ## Split view pane, or the closed Duo turned left
 
@@ -512,3 +513,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** keeps only the ring's blur in light mode (`--duet-rim-filter`). Safari's own light buttons have no band: measured on the Duo, they have a thin edge line and a soft shade.
 - **You do:** nothing.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251).
+
+## Capsule far from the fingers on the open screen
+
+- **You see:** without the handling, on the Duo's inner screen in full screen Safari or a split pane, the capsule floats mid-page, well above where a thumb rests. Native apps keep theirs near the foot.
+- **Cause:** the controls centred in their band. In full screen Safari all its bars are at the top, so the band runs to the screen's bottom edge and its middle is a long reach.
+- **Duet does:** ends the stack at the foot of the band: 23.7pt above the screen's bottom in full screen, like native capsules, whatever the home indicator inset, and just above Safari's +/tabs pill in a split pane. A lone burger stays at the head of the page. Safari's column on the closed Duo stays centred, and a stack too tall for its band still centres.
+- **You do:** nothing. The room is unchanged from the [#110](https://github.com/JayFarei/duet/issues/110) contract, only the position inside it moved.
+- **Status:** [#254](https://github.com/JayFarei/duet/issues/254). Verified on the Duo in full screen and split left, with the capsule open under a press. Split right and the burger plus capsule layout are covered by unit tests only.

@@ -69,6 +69,8 @@ export interface Frame {
   ph: number; insetTop: number;
   /** Strip centre line, and the band the groups stay in. */
   cx: number; top: number; bottom: number;
+  /** The stack ends at the band's foot, where fingers rest, rather than centring in it. */
+  foot: boolean;
   /** The page-side edge the menu opens past: the column's inner edge, or the strip's. */
   edge: number;
 }
@@ -81,13 +83,13 @@ export function frame(c: Context): Frame {
   const clear = c.clearTop ?? -Infinity;
   if (band) {
     const reach = c.screenWidth - c.width - T.edge;
-    return { kind: "column", side: c.side, preview: !!c.preview, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top: Math.max(band.top, clear), bottom: band.bottom, edge: right ? cx - reach : cx + reach };
+    return { kind: "column", side: c.side, preview: !!c.preview, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top: Math.max(band.top, clear), bottom: band.bottom, foot: !!c.split, edge: right ? cx - reach : cx + reach };
   }
   const strip = c.mode === "strip" && !c.preview;
   const top = Math.max(strip ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap, clear);
-  const bottom = strip ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
+  const bottom = strip ? c.height - DUO.bottom : c.duo && !c.preview ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
   const edge = right ? cx - T.control / 2 - 4 : cx + T.control / 2 + 4;
-  return { kind: "inline", side: c.side, preview: false, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top, bottom, edge };
+  return { kind: "inline", side: c.side, preview: false, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top, bottom, foot: true, edge };
 }
 /** What a lone group may take beyond the band in the column: all but RAIL.gap of the gap kept on each side. */
 export const extra = (f: Frame) => f.kind === "column" ? 2 * T.gap - 2 * RAIL.gap : 0;
@@ -96,16 +98,19 @@ export interface Rect { x: number; y: number; w: number; h: number }
 /** `primary`: the primary's own capsule, placed at the strip's foot (in either form only its button is tinted). */
 export interface Placed { group: Group; rect: Rect; primary: boolean }
 
-/** In the column the stack centres in the band; elsewhere the menu heads the strip and the primary sits at its foot,
- *  under the thumb. */
+/** The closed column centres the stack in its band, as does any band it overfills. Elsewhere the stack ends at the
+ *  band's foot, under the thumb, with the primary lowest; inline, a lone burger stays at the head of the strip. */
 export function place(f: Frame, groups: Group[]): Placed[] {
   const heights = groups.map((g) => groupHeight(g.length));
   const total = heights.reduce((s, h) => s + h, 0) + (groups.length - 1) * T.gap;
   const x = f.cx - T.control / 2;
-  let y = f.kind === "column" ? f.top + (f.bottom - f.top - total) / 2 : f.top;
+  const head = f.kind === "inline" && groups[0]?.length === 1 && groups[0][0].kind === "menu";
+  const stack = head ? total - heights[0] - T.gap : total;
+  const start = f.foot && total <= f.bottom - f.top ? f.bottom - stack : f.top + (f.bottom - f.top - total) / 2;
+  let y = head ? start - heights[0] - T.gap : start;
   return groups.map((group, i) => {
     const primary = group.length === 1 && group[0].kind === "primary";
-    const top = primary && f.kind === "inline" ? f.bottom - T.control : y;
+    const top = head && !i ? f.top : y;
     y += heights[i] + T.gap;
     return { group, rect: { x, y: top, w: T.control, h: heights[i] }, primary };
   });
