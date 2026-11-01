@@ -141,6 +141,9 @@ export interface Context {
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
+  /** Room for a docked section column (`menu.dock`): the Duo's inner screen at a wide size, in Safari or on the Home
+   *  Screen. Absent on the closed screen, in split view and on every other device. Also `<html data-duet-dock>`. */
+  dock?: true;
   /** Running on an iPhone Duo, in any posture or mode (see isDuo). */
   duo: boolean;
   /** A Safari split-view pane on the open Duo (see isSplit). In column mode nothing tells which pane it is, so
@@ -387,6 +390,17 @@ export const keyboardUp = (s: Signals) => s.editing !== false && (shortView(s) |
 /** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
  *  caller holds a sticky one (stable()). */
 export function detect(s: Signals, preferred?: Side, allowColumn = true, preview = isPreview(s)): Context {
+  const c = detectMode(s, preferred, allowColumn, preview);
+  return dockRoom(s, c) ? { ...c, dock: true } : c;
+}
+
+/** Room for a docked section column: a Duo's inner screen, wide, whatever Safari or the Home Screen makes of it. The
+ *  closed screen (678 wide on the Home Screen, turned) and split panes keep the burger, and so does the in-app preview.
+ *  The screen's short side rules out an iPad window that happens to be the open Duo's size (deviceOf). */
+const dockRoom = (s: Signals, c: Context) => c.device === "duo" && !c.preview && !c.split && s.innerWidth >= WIDE
+  && Math.max(s.outerWidth, s.outerHeight) > 679 && Math.min(s.screenWidth, s.screenHeight) < 700;
+
+function detectMode(s: Signals, preferred: Side | undefined, allowColumn: boolean, preview: boolean): Context {
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
   const keyboard = keyboardUp(s);
@@ -693,6 +707,10 @@ export function pageInsets(o: {
     shift: 0,
   };
 }
+
+/** How far the burger's sidebar keeps its rows in from the document's left edge: what the page keeps clear of there,
+ *  whether by its inset or by being shifted across Safari's column. On a Duo only: elsewhere the sidebar is as it was. */
+export const sidebarInset = (o: { device: Device; left: string; shift: number }) => o.device !== "duo" ? "0px" : o.shift ? `${o.shift}px` : o.left;
 
 /** Closed landscape Safari tab: its column's buttons sit apart from portrait's (SAFARI.landscape). */
 const landscapeColumn = (c: Context) => !c.split && !c.preview && c.screenWidth > c.screenHeight;

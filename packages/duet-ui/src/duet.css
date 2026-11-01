@@ -227,7 +227,7 @@
 
 /* The sidebar sits under the page; the burger slides the page (the inner scroller) away by --duet-slide. */
 .duet-sidebar {
-  position: fixed; left: 0; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; padding: calc(18px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
+  position: fixed; left: 0; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; padding: calc(18px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom)) calc(14px + var(--duet-sidebar-inset, 0px));
   overflow: auto; overscroll-behavior: contain; background: var(--duet-solid); color: var(--duet-ink); opacity: 0.6; translate: -40px 0; visibility: hidden;
   transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease, visibility 0s var(--duet-slide-ms);
   -webkit-tap-highlight-color: transparent; font-family: -apple-system, system-ui, sans-serif;
@@ -236,6 +236,13 @@ html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }
+/* Docked (menu.dock, where <html data-duet-dock> says there is room): the sidebar stays on screen and the page sits
+   beside it. CSS alone, so it holds from the first paint, over the server's closed snapshot (hence the !important
+   width). The shadow carries the column up over the 21pt above a Home Screen app's viewport. */
+:root { --duet-dock: 220px; }
+html[data-duet-dock] .duet-sidebar[data-dock] { visibility: visible; opacity: 1; translate: none; transition: none; pointer-events: auto; width: calc(var(--duet-dock) + var(--duet-dock-inset, 0px)) !important; padding-left: calc(14px + var(--duet-dock-inset, 0px)); box-shadow: inset -0.5px 0 0 var(--duet-ring), 0 -32px 0 var(--duet-solid); }
+html[data-duet-dock] .duet-sidebar[data-dock] ~ .duet-scroller { left: calc(var(--duet-dock) + var(--duet-dock-inset, 0px)); }
+html[data-duet-dock]:has(.duet-sidebar[data-dock][data-overlay]) { padding-left: calc(var(--duet-dock) + var(--duet-dock-inset, 0px)); }
 .duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-dim); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .duet-sidebar .duet-side-row { justify-content: flex-start; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; position: relative; }
 .duet-sidebar .duet-side-row > span { overflow: hidden; text-overflow: ellipsis; }

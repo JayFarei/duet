@@ -4,6 +4,11 @@
 
 Every iOS and Safari quirk Duet handles, what you would see without the handling, and what is left for you to do. Most need nothing from you. "Without children" means a page that renders `<Duet>` without `children`, so the document itself scrolls.
 
+- [Section column on the inner screen](#section-column-on-the-inner-screen)
+- [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
+- [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
+- [Band above a column in a Home Screen app](#band-above-a-column-in-a-home-screen-app)
+- [Burger mid-page on a wide window](#burger-mid-page-on-a-wide-window)
 - [Split view pane, or the closed Duo turned left](#split-view-pane-or-the-closed-duo-turned-left)
 - [Right split pane holds two buttons](#right-split-pane-holds-two-buttons)
 - [Rubber band at the top or bottom of the page](#rubber-band-at-the-top-or-bottom-of-the-page)
@@ -530,3 +535,43 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** ends the stack at the foot of the band: 23.7pt above the screen's bottom in full screen, like native capsules, whatever the home indicator inset, and just above Safari's +/tabs pill in a split pane. A lone burger stays at the head of the page. Safari's column on the closed Duo stays centred, and a stack too tall for its band still centres.
 - **You do:** nothing. The room is unchanged from the [#110](https://github.com/JayFarei/duet/issues/110) contract, only the position inside it moved.
 - **Status:** [#254](https://github.com/JayFarei/duet/issues/254). Verified on the Duo in full screen and split left, with the capsule open under a press. Split right and the burger plus capsule layout are covered by unit tests only.
+
+## Section column on the inner screen
+
+- **You see:** without the handling, every `menu` gets a burger, even at 951pt wide, and apps with the room hide their places behind it or build a column of their own beside `burger: false`.
+- **Cause:** the library's only way to show places was the sliding sidebar.
+- **Duet does:** with `menu.dock`, keeps the places in a column left of the page wherever the Duo's inner screen has the room (`useDuet().dock`: 600pt or wider, not the closed screen, a split pane or the in-app preview). A narrower window gets the burger. An iPad or desktop gets what it got without `dock`.
+- **You do:** pass `dock: true`, and inline `bootScript`. See [Docked column](api.md#docked-column).
+- **Status:** unit tests over the measured windows, and desktop WebKit with emulated window and screen sizes, before and after hydration. Not yet seen on the simulator or a device. The placement contract ([#110](https://github.com/JayFarei/duet/issues/110)) is untouched: the controls keep their room, only the burger leaves the template.
+
+## Wrong layout on a fresh origin's first paint
+
+- **You see:** without the handling, a first visit paints the closed Duo's layout until hydration, or until `<DuoCookie>` reloads.
+- **Cause:** the server cannot measure the window, so it renders a closed snapshot, and a cookie only helps from the second visit.
+- **Duet does:** `bootScript` reads the window, screen and user agent before the first paint and sets `data-duet-dock`. The server always renders a docking menu's nav, and CSS alone places it and the page. Controls wait for the mounted chrome (`data-duet-pending`).
+- **You do:** inline `bootScript` as the first child of `<body>`. Without it the column appears at hydration. A left-side inline strip or the Home Screen's strip inset arrives at mount, so the column's rows move by that much then.
+- **Status:** tested against stubbed browsers (8.4KB, budget 10KB in `test/boot.test.mjs`), and in desktop WebKit with emulated sizes. Not yet seen on a device.
+
+## Sidebar under Safari's floating buttons in split view
+
+- **You see:** without the handling, in a split pane the burger's sidebar opens from the document's left edge, so Safari's buttons in its left column, and the burger, sit over its rows.
+- **Cause:** the document spans the left column and is scrolled across it, and the sidebar started at document x 0. The page keeps clear by an inset, the sidebar did not.
+- **Duet does:** on a Duo, sets `--duet-sidebar-inset` to the page's left inset, pads the rows by it and widens the sidebar to match, so they keep their width.
+- **You do:** nothing.
+- **Status:** unit tests only. Not yet seen on the simulator. Other devices are unchanged.
+
+## Band above a column in a Home Screen app
+
+- **You see:** about 20pt of page background above a full-height column in a Home Screen app in portrait.
+- **Cause:** the app's viewport starts 21pt below the screen's top (`innerHeight` 930 of `outerHeight` 951), and what shows there is the root background.
+- **Duet does:** the docked column carries its colour 32pt above the viewport with a box shadow.
+- **You do:** a column of your own needs the same, or a root background that matches it.
+- **Status:** not yet checked on the simulator or a device: whether WebKit paints that shadow there is an assumption.
+
+## Burger mid-page on a wide window
+
+- **You see:** on an unfolded Duo, the burger at the closed screen's position, about 393pt across, with no error.
+- **Cause:** the page has not hydrated, so `useDuet()` still holds its server snapshot. `next dev` causes this over a LAN or VPN name without `allowedDevOrigins`.
+- **Duet does:** with `bootScript`, hides those controls until the chrome mounts, so a page stuck there shows none.
+- **You do:** fix hydration. See [Server rendering](server-rendering.md).
+- **Status:** the hiding is tested against stubbed browsers.

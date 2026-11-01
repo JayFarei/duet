@@ -3,7 +3,7 @@
 import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, controlsShown, isSplit, pageInsets, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
+import { DUO, columnBand, controlsShown, isSplit, pageInsets, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
 import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
@@ -39,7 +39,11 @@ export interface DuetProps<T extends string = string, U extends string = string>
    *  typed from `items`: declare them `as const` and `onSelect` gets the union. Each place keeps its own scroll
    *  position in the inner scroller. In the in-app preview (one button of room), or with `burger: false`, they lead "…"
    *  under "Menu" instead. */
-  menu?: { items: readonly DuetMenuItem<T>[]; selected?: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; burger?: boolean };
+  menu?: { items: readonly DuetMenuItem<T>[]; selected?: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; burger?: boolean;
+    /** Dock the places as a column beside the page wherever the Duo's inner screen has the room (`useDuet().dock`),
+     *  from the first paint with `bootScript`, and leave them to the burger everywhere else. Other devices are not
+     *  affected. Set it false for a moment to give the room back, say while a pane is open. */
+    dock?: boolean };
   /** Destinations, one of which is always showing, where `actions` are commands that fire and leave nothing behind. They
    *  head the actions in the capsule; the selected one sits in a bubble, in `tint`, and a tap on another sends the bubble
    *  over to it and calls `onSelect`. A tap on the selected one does nothing. */
@@ -160,6 +164,8 @@ export function useDuet(): Context {
   // The pre-paint boot guessed the column; once mounted a page that is not in it takes the guess back (a page whose
   // <Duet> is in the column takes it over instead, below).
   useEffect(() => { if (ctx.mode !== "column") unboot(); }, [ctx.mode]);
+  // Only a client reading counts (stable() always sets confidence, the server snapshot never does).
+  useLayout(() => { if (ctx.confidence) document.documentElement.toggleAttribute("data-duet-dock", !!ctx.dock); }, [!!ctx.confidence, !!ctx.dock]);
   return ctx;
 }
 
@@ -506,6 +512,8 @@ export function Duet<T extends string = string, U extends string = string>(props
   const actions: Action[] = [...tabs, ...(p.actions ?? []).filter((a) => !a.destructive && !a.folded)], destructive = (p.actions ?? []).filter((a) => a.destructive);
   const folded = (p.actions ?? []).filter((a) => a.folded && !a.destructive);
   const menuItems = p.menu?.items ?? [];
+  const docked = !!p.menu?.dock && !!ctx.dock;
+  useEffect(() => { if (docked) setSidebar("closed"); }, [docked]);
   // Split pane in column mode: the controls are drawn in both of Safari's possible columns (useColumnLayer).
   const split = ctx.mode === "column" && !!ctx.split, column = ctx.screenWidth - ctx.width;
   const sides: Side[] = split ? ["left", "right"] : [ctx.side];
@@ -517,11 +525,11 @@ export function Duet<T extends string = string, U extends string = string>(props
   const layout = (side: Side) => {
     const f = frame(side === ctx.side ? ctx : { ...ctx, side });
     const inline = f.kind === "inline";
-    const burger = !!p.menu && p.menu.burger !== false;
-    const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger ? 1 : 0);
+    const burger = !!p.menu && p.menu.burger !== false && !docked;
+    const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger && !docked ? 1 : 0);
     const a = template(f, { close: !!p.close, menu: burger, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" }), placed = a.placed;
     // No burger (the preview): the app's places close "…" under "Menu".
-    const places = p.menu && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
+    const places = p.menu && !docked && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
     const askAt = placed.find((g) => g.group.some((s) => s.kind === "primary")), moreAt = placed.find((g) => g.group.some((s) => s.kind === "more"));
     // Sharing a capsule with "…", the primary is in the capsule that turns into the list, so the list leads with it.
     const list: DuetItem[] = [
@@ -556,7 +564,10 @@ export function Duet<T extends string = string, U extends string = string>(props
     r.marginRight = shift ? `${-shift}px` : "";
     document.documentElement.toggleAttribute("data-duet-reserve", !!shift);
     // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
-    for (const [k, v] of [["right", right], ["left", left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
+    // Docked, the column takes the left edge and runs under controls on that side, so the page has nothing to keep clear of there.
+    r.setProperty("--duet-dock-inset", docked ? left : "0px");
+    r.setProperty("--duet-sidebar-inset", sidebarInset({ device: ctx.device, left, shift }));
+    for (const [k, v] of [["right", right], ["left", docked ? "0px" : left]]) { r.setProperty(`--duet-inset-${k}`, v); r.setProperty(`--duet-edge-${k}`, v); }
     // iOS blurs the top of a Home Screen web app (scroll-edge effect) without reporting a safe-area
     // inset, closed and unfolded; pages pad their top content by this much to stay sharp.
     r.setProperty("--duet-inset-top", ctx.mode === "strip" && ctx.standalone ? `${DUO.edgeBlur}px` : "0px");
@@ -575,7 +586,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     document.documentElement.dataset.duetMode = ctx.mode;
     document.documentElement.toggleAttribute("data-duet-emulated", !!emulatedSignals());
     document.documentElement.toggleAttribute("data-duet-split", split);
-  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, ctx.offsetTop, split, inner, reserve]);
+  }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, ctx.offsetTop, split, inner, reserve, docked, ctx.device]);
   useEffect(() => () => {
     const h = document.documentElement;
     h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
@@ -726,15 +737,16 @@ export function Duet<T extends string = string, U extends string = string>(props
   // The burger slides the page aside by the screen's width in the column (the page leaves with its column), and by
   // up to 40% of it inline, where the page stays in view as a card to tap back to.
   const slide = ctx.mode === "column" ? ctx.screenWidth : Math.min(340, ctx.width * 0.4);
-  const slid = sidebar !== "closed";
+  const slid = sidebar !== "closed" && !docked;
+  const clear = "var(--duet-sidebar-inset, 0px)";
   return (
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
-      {p.menu && p.menu.burger !== false && (
-        <nav className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
-          style={{ ...theme, width: ctx.mode === "column" ? ctx.width : slide }} inert={sidebar !== "open" || undefined}>
+      {p.menu && (p.menu.burger !== false || p.menu.dock) && (
+        <nav className="duet duet-sidebar" data-dock={p.menu.dock || undefined} data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
+          style={{ ...theme, width: `calc(${ctx.mode === "column" ? ctx.width : slide}px + ${clear})` }} inert={(sidebar !== "open" && !docked) || undefined}>
           <div className="duet-side-head">Menu</div>
           {menuItems.map((m) => (
-            <button key={m.id} className="duet-side-row" aria-current={m.id === selected ? "page" : undefined} tabIndex={sidebar === "open" ? 0 : -1} onClick={() => select(m.id)}>
+            <button key={m.id} className="duet-side-row" aria-current={m.id === selected ? "page" : undefined} tabIndex={sidebar === "open" || docked ? 0 : -1} onClick={() => select(m.id)}>
               {m.icon}<span>{m.label}</span>{badge(m)}
             </button>
           ))}
@@ -742,7 +754,7 @@ export function Duet<T extends string = string, U extends string = string>(props
       )}
       {p.children !== undefined && (
         <div ref={scroller} className="duet-scroller" data-slid={slid || undefined} onPointerDownCapture={slid ? closeSidebar : undefined}
-          style={{ ...theme, translate: sidebar === "open" ? `${slide}px 0` : undefined }}>{p.children}</div>
+          style={{ ...theme, translate: slid && sidebar === "open" ? (ctx.mode === "column" ? `${slide}px 0` : `calc(${slide}px + ${clear}) 0`) : undefined }}>{p.children}</div>
       )}
       {sides.map(bar)}
       {/* On both viewport edges, so a page's full-screen overlay cannot hide Safari's column (duet.css). Mounted on a Duo in
