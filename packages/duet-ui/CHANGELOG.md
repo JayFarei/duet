@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Light mode column buttons and capsule match native glass on the Duo: no pale seam at the caps, an edge line that darkens the page colour, and fill that keeps saturated colours (#256). Dark mode is unchanged.
+
 ## 0.8.0-rc.1
 
 - Action capsule at the foot of the room on the Duo's open screen, full screen Safari and split panes, where fingers rest (#254). Same room, new position in it.

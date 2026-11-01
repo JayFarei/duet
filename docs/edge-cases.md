@@ -56,6 +56,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Primary in its own capsule](#primary-in-its-own-capsule)
 - [Selected tab in the column](#selected-tab-in-the-column)
 - [Light capsule with a white band](#light-capsule-with-a-white-band)
+- [Light capsule edge reads as a seam](#light-capsule-edge-reads-as-a-seam)
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
 
 ## Split view pane, or the closed Duo turned left
@@ -510,9 +511,17 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, on a light page, a capsule has a hard white band about 5pt wide inside its edge, with a greyer panel inside that.
 - **Cause:** the rim ring brightens its backdrop to suggest native's refracted edge. On dark glass that reads as a soft edge. On light glass it clips to white, 255 against 248 inside, with a hard step where the ring ends.
-- **Duet does:** keeps only the ring's blur in light mode (`--duet-rim-filter`). Safari's own light buttons have no band: measured on the Duo, they have a thin edge line and a soft shade.
+- **Duet does:** turns off the ring's backdrop filter in light mode (`--duet-rim-filter`). Safari's own light buttons have no band: measured on the Duo, they have a thin edge line and a soft shade.
 - **You do:** nothing.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251).
+
+## Light capsule edge reads as a seam
+
+- **You see:** without the handling, on a light page, a capsule has a washed out fill, a pale seam at its top and bottom caps, and an edge line that is thicker on the left. On a saturated page the colour drains, red fill G 173 falling to 155 at the side against native's flat 152.
+- **Cause:** three things. The line was a box shadow in one flat colour, so it could not darken each page colour the way native's does. The rim was added light, which greys a saturated page. Its 5pt mask band also cut off native's long shade at the caps, and its shadows also lit the sides.
+- **Duet does:** in light mode, draws the line with a new ring under the glass (`.duet-edge`), whose backdrop filter darkens the page itself, and insets the glass 0.6pt so that ring sees the page. The rim uses `color-dodge` with a 16pt band, which brightens each colour in its own hue. Negative spread keeps the sides at zero. Dark mode opts out of all of this.
+- **You do:** nothing.
+- **Status:** [#256](https://github.com/JayFarei/duet/issues/256). Measured against Safari's own column on the closed Duo on 8 flat colours: total error 15340 before, 8658 after. Remaining: caps on near white pages are brighter than native (254 to 255 against 248 to 253), and the line lacks native's soft outer pixel. The press lens and selection bubble are unchanged, with no native light reference found.
 
 ## Capsule far from the fingers on the open screen
 

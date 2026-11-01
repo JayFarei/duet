@@ -456,6 +456,7 @@ function Morph({ open, from, slots, box, onClosed, children, role = "menu", labe
   return (
     <div ref={blob} className="duet-blob" role={role} aria-label={label} style={{ left: from.x, top: from.y, width: from.w, height: from.h, borderRadius: TEMPLATE.control / 2 }}>
       <div ref={fill} className="duet-fill" style={{ opacity: 0 }} aria-hidden />
+      <i className="duet-edge" aria-hidden />
       <i className="duet-rim" aria-hidden />
       <div ref={face} className="duet-face" style={{ width: from.w, height: from.h }} aria-hidden>
         {slots.map((icon, i) => <span key={i} style={{ top: i * TEMPLATE.item }}>{icon}</span>)}
@@ -676,6 +677,7 @@ export function Duet<T extends string = string, U extends string = string>(props
             <div key={gi} className="duet-group" data-duet-slot={g.group.length === 1 ? g.group[0].kind : g.group[0].kind === "menu" ? "menu" : "actions"}
               data-primary={g.primary || undefined} data-morphing={(g === moreAt && drawsMenu) || (g === askAt && drawsAsk) || undefined}
               style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h,  }}>
+              <i className="duet-edge" aria-hidden />
               <i className="duet-rim" aria-hidden />
               {g.group.map((s, j) => (
                 <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined} data-tab={s.kind === "action" && actions[s.index].tab || undefined} aria-current={s.kind === "action" && actions[s.index].selected ? "page" : undefined}
