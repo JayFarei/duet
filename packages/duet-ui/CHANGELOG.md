@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.0-rc.1
 
+- Action capsule at the foot of the room on the Duo's open screen, full screen Safari and split panes, where fingers rest (#254). Same room, new position in it.
 - Column press rebuilt from Safari's own column, measured from a 60fps recording (#251). A capsule swells as the finger lands, then opens wider and taller with labels after 205ms or a drag. A lens follows the finger and tints what it covers, and release runs the item under it, on springs fitted to native.
 - Behaviour change: column buttons fire on release, not on touch down. If a device never reports a release, a tap runs 1.2s late, and a finger held still that long runs its item.
 - Holding a column button no longer starts text selection and its loupe on the page beneath.
