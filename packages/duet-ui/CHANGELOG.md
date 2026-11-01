@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0-rc.2
 
 - Light mode column buttons and capsule match native glass on the Duo: no pale seam at the caps, an edge line that darkens the page colour, and fill that keeps saturated colours (#256). Dark mode is unchanged.
 
