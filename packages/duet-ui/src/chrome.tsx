@@ -23,6 +23,9 @@ export interface DuetItem {
   destructive?: boolean;
   /** Lives in "…" even where the column has room for it, after the actions that folded for room. */
   folded?: boolean;
+  /** The page this action shows, for actions used as tabs: in the capsule it sits in a bubble, in `tint`, and a tap on
+   *  another tab sends the bubble over to it. */
+  selected?: boolean;
 }
 /** The page's call to action (Pay $48.00), a tinted button in the controls showing its icon. A tap grows it into a box
  *  beside the column, its label over a `confirm` button (default: the label) that calls onPress and collapses the box
@@ -672,7 +675,7 @@ export function Duet<T extends string = string>(props: DuetProps<T>) {
               style={{ left: rect.x, top: rect.y, width: rect.w, height: rect.h,  }}>
               <i className="duet-rim" aria-hidden />
               {g.group.map((s, j) => (
-                <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined}
+                <button key={s.kind === "action" ? actions[s.index].id : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined} aria-current={s.kind === "action" && actions[s.index].selected ? "page" : undefined}
                   aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : s.kind === "primary" && p.primary!.confirm !== false ? ask === "open" : undefined}
                   style={{ top: j * TEMPLATE.item, width: rect.w }} onClick={() => press(s)}>
                   {icon(s)}

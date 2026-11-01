@@ -5,11 +5,16 @@
 import { spring, TEMPLATE, type Rect } from "./template.ts";
 
 /** Fitted to a 60fps recording of Safari's own column: rise overshoots about 15%, fall about 3%, on one spring per phase. */
-export const PRESS = { rise: spring(204, 14.6), fall: spring(204, 22.8), swell: 1.06, hold: 205, slop: 8, width: 78.8, pitch: 57, inset: 13.7, pad: 23.5, labelled: 44, up: 0.65, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000 } as const;
+export const PRESS = { rise: spring(204, 14.6), fall: spring(204, 22.8), swell: 1.06, hold: 205, slop: 8, width: 78.8, pitch: 57, inset: 13.7, pad: 23.5, labelled: 44, up: 0.65, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000, tapHold: 150 } as const;
 
 /** The lens in points, on [stiffness, damping] springs, fitted to the same recording: at a touch, open and let go. Native
  *  narrows as it speeds up and widens as it slows (area kept), ringing at about 0.6s, and runs a little past the ends. */
 export const LENS = { down: { w: 64, h: 60 }, open: { w: 90, h: 68 }, gone: { w: 46, h: 49 }, centre: 14.5, rest: 24.5, radius: 40, band: 7, bend: 13, past: 24, pastOver: 24, travel: [1000, 63], grow: [286, 17.5], fall: [260, 30], stretch: [100, 6], kick: 0.0053, maxStretch: 0.12, ms: 200 } as const;
+
+/** A tap on a capsule with a selected item, from a 60fps recording of Apple News: the lens leaves the old item at once on
+ *  a critically damped spring, grown tall, and past `hold` shrinks into the new item's bubble over `ms`. The icon there
+ *  dips and recovers (duet.css), in the same time for one item or three. */
+export const HOP = { size: { w: 60, h: 80 }, end: { w: 44, h: 49 }, travel: [324, 36], grow: [900, 60], fall: [1600, 80], hold: 250, ms: 70, arrive: 433 } as const;
 
 export type PressShape = { x: number; y: number; w: number; h: number; top: number; pitch: number; labels: boolean };
 
@@ -43,11 +48,11 @@ export type LensState = { y: number; vy: number; w: number; vw: number; h: numbe
 
 /** One frame of the lens towards `goal`: the size on `size`, the position on the travel spring, and a stretch `q` kicked
  *  by each change in speed (speeding up narrows it). Stepped in pieces so a long frame stays stable. */
-export function lensStep(s: LensState, goal: { y: number; w: number; h: number }, size: readonly [number, number], dt: number): LensState {
+export function lensStep(s: LensState, goal: { y: number; w: number; h: number }, size: readonly [number, number], dt: number, travel: readonly [number, number] = LENS.travel): LensState {
   const out = { ...s };
   for (let i = 0; i < 4; i++) {
     const t = dt / 4, speed = Math.abs(out.vy);
-    out.vy += (LENS.travel[0] * (goal.y - out.y) - LENS.travel[1] * out.vy) * t; out.y += out.vy * t;
+    out.vy += (travel[0] * (goal.y - out.y) - travel[1] * out.vy) * t; out.y += out.vy * t;
     out.vw += (size[0] * (goal.w - out.w) - size[1] * out.vw) * t; out.w += out.vw * t;
     out.vh += (size[0] * (goal.h - out.h) - size[1] * out.vh) * t; out.h += out.vh * t;
     out.vq += (-LENS.stretch[0] * out.q - LENS.stretch[1] * out.vq) * t - LENS.kick * (Math.abs(out.vy) - speed); out.q += out.vq * t;
@@ -94,21 +99,34 @@ function loadRefraction() {
 type Lens = { goal: { y: number; w: number; h: number }; follow: boolean; fall: () => void; stop: () => void };
 
 /** The lens on `group`, starting at the item's size and growing to `goal`, until fall() or stop(). */
-function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: number, still: boolean): Lens {
+function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: number, still: boolean, from = index): Lens {
   const glass = document.createElement("i"); glass.className = "duet-lens"; glass.setAttribute("aria-hidden", "");
   const ink = document.createElement("div"); ink.className = "duet-lens-ink"; ink.setAttribute("aria-hidden", ""); ink.inert = true; ink.style.filter = refract;
   const rail = document.createElement("div"); rail.className = "duet-lens-rail"; ink.appendChild(rail);
-  for (const b of buttons) { const c = b.cloneNode(true) as HTMLElement; c.removeAttribute("aria-label"); c.tabIndex = -1; rail.appendChild(c); }
+  for (const b of buttons) { const c = b.cloneNode(true) as HTMLElement; c.removeAttribute("aria-label"); c.removeAttribute("aria-current"); c.tabIndex = -1; rail.appendChild(c); }
   // In the capsule's parent's coordinates: native holds the lens still in the page while the capsule swells and opens around it.
-  const home = buttons[index].offsetTop + group.offsetTop + LENS.rest;
-  let s: LensState = { y: home, vy: 0, w: LENS.gone.w, vw: 0, h: LENS.gone.h, vh: 0, q: 0, vq: 0 }, raf = 0, last = 0, falling = false, hole = 1, done = false;
+  const at = (i: number) => buttons[i].offsetTop + group.offsetTop + LENS.rest;
+  // With a selection the lens is the bubble, lifted off the selected item and sent to the tapped one.
+  const hop = buttons.some((b) => b.hasAttribute("aria-current")), home = at(hop ? index : from), born = performance.now();
+  let s: LensState = { y: at(from), vy: 0, w: hop ? HOP.end.w : LENS.gone.w, vw: 0, h: hop ? HOP.end.h : LENS.gone.h, vh: 0, q: 0, vq: 0 }, raf = 0, last = 0, falling = false, hole = 1, done = false;
   const lens: Lens = {
-    goal: { y: s.y, ...LENS.down }, follow: false,
+    goal: { y: home, ...(hop ? HOP.size : LENS.down) }, follow: false,
     fall() {
       if (still) return lens.stop();
-      lens.follow = false; falling = true; lens.goal = { y: lens.goal.y, ...LENS.gone };
-      setTimeout(() => { hole = 0; glass.style.opacity = ink.style.opacity = "0"; }, LENS.ms * 2 / 3);
-      setTimeout(lens.stop, LENS.ms);
+      const ms = hop ? HOP.ms : LENS.ms, land = () => {
+        if (done) return;
+        lens.follow = false; falling = true; lens.goal = { y: lens.goal.y, ...(hop ? HOP.end : LENS.gone) };
+        // A hop ends in one swap to the bubble: fading first would show the plain item through the hole.
+        if (!hop) setTimeout(() => { hole = 0; glass.style.opacity = ink.style.opacity = "0"; }, ms * 2 / 3);
+        setTimeout(() => {
+          if (done) return;
+          const moved = hop && Math.abs(lens.goal.y - at(from)) > 1;
+          lens.stop();
+          const b = moved ? group.querySelector<HTMLElement>(":scope > .duet-btn[aria-current]") : null;
+          if (b) { b.dataset.arrive = ""; setTimeout(() => { delete b.dataset.arrive; }, HOP.arrive); }
+        }, ms);
+      };
+      if (hop) setTimeout(land, Math.max(0, HOP.hold - (performance.now() - born))); else land();
     },
     stop() {
       if (done) return;
@@ -117,14 +135,14 @@ function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: numb
     },
   };
   const write = () => {
-    const w = s.w * (1 + s.q), h = s.h / (1 + s.q), y = s.y - group.offsetTop;
+    const q = hop ? 0 : s.q, w = s.w * (1 + q), h = s.h / (1 + q), y = s.y - group.offsetTop;
     group.style.setProperty("--duet-lens-y", `${y}px`); group.style.setProperty("--duet-lens-w", `${w}px`); group.style.setProperty("--duet-lens-h", `${h}px`);
     group.style.setProperty("--duet-hole-w", `${w * hole}px`); group.style.setProperty("--duet-hole-h", `${h * hole}px`);
     for (const b of buttons) b.style.setProperty("--duet-lens-dy", `${y - (h * hole) / 2 - b.offsetTop}px`);
   };
   const tick = (now: number) => {
     if (!lens.follow && group.isConnected) lens.goal.y = home;
-    s = still ? { ...s, y: lens.goal.y, w: lens.goal.w, h: lens.goal.h } : lensStep(s, lens.goal, falling ? LENS.fall : LENS.grow, Math.min(0.033, last ? (now - last) / 1000 : 1 / 60));
+    s = still ? { ...s, y: lens.goal.y, w: lens.goal.w, h: lens.goal.h } : lensStep(s, lens.goal, hop ? (falling ? HOP.fall : HOP.grow) : falling ? LENS.fall : LENS.grow, Math.min(0.033, last ? (now - last) / 1000 : 1 / 60), hop && !lens.follow ? HOP.travel : LENS.travel);
     last = now;
     write();
     raf = requestAnimationFrame(tick);
@@ -135,11 +153,11 @@ function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: numb
   return lens;
 }
 
-type Press = { id: number; touch: boolean; group: HTMLElement; buttons: HTMLButtonElement[]; rest: Rect; shape: PressShape; x0: number; y0: number; index: number; fx: number; fy: number; left: number; top: number; lens: Lens | null; hold: number; dog: number; move: (e: TouchEvent) => void };
+type Press = { id: number; touch: boolean; group: HTMLElement; buttons: HTMLButtonElement[]; rest: Rect; shape: PressShape; x0: number; y0: number; index: number; fx: number; fy: number; left: number; top: number; lens: Lens | null; hold: number; dog: number; born: number; hop: boolean; move: (e: TouchEvent) => void };
 
 /** Listens on the window for presses on the capsules in `roots`. Returns the cleanup. */
 export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTMLElement) => { top: number; bottom: number } | undefined) {
-  let p: Press | null = null, hovered: HTMLElement | null = null, muted = 0, released = false, fading: Lens | null = null;
+  let p: Press | null = null, hovered: HTMLElement | null = null, muted = 0, released = false, fading: Lens | null = null, lifting = 0;
   loadRefraction(); // now, since it loads asynchronously and the first press should have it
   const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -184,10 +202,15 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     const wasOpen = q.group.dataset.press === "open";
     if (!q.group.isConnected) { q.lens?.stop(); return; }
     if (q.lens) { fading = q.lens; q.lens.fall(); }
-    q.group.dataset.press = "fall";
     const group = q.group;
     group.removeAttribute("data-press-tight");
-    setTimeout(() => { if (group.dataset.press === "fall") delete group.dataset.press; }, still() ? 0 : PRESS.fall.ms);
+    // A quick tap still swells in full before it falls, as native's does.
+    const fall = () => {
+      group.dataset.press = "fall";
+      setTimeout(() => { if (group.dataset.press === "fall") delete group.dataset.press; }, still() ? 0 : PRESS.fall.ms);
+    };
+    const wait = q.hop && !wasOpen && !still() ? PRESS.tapHold - (performance.now() - q.born) : 0;
+    if (wait > 0) lifting = window.setTimeout(fall, wait); else fall();
     if (!fire) return;
     const inside = wasOpen
       ? q.fx >= q.left - PRESS.reach && q.fx <= q.left + q.shape.w + PRESS.reach && q.fy >= q.top - PRESS.reach && q.fy <= q.top + q.shape.h + PRESS.reach
@@ -210,13 +233,15 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     const n = h.buttons.length;
     const move = (t: TouchEvent) => { if (t.cancelable) t.preventDefault(); }; // the column must not scroll the page
     addEventListener("touchmove", move, { passive: false });
-    p = { id: e.pointerId, touch: e.pointerType === "touch", group: g, buttons: h.buttons, rest, shape: pressShape(rest, n, band(h.nav)), x0: e.clientX, y0: e.clientY, index: h.index, fx: e.clientX, fy: e.clientY, left: 0, top: 0, lens: null, hold: 0, dog: 0, move };
+    const selected = h.buttons.findIndex((b) => b.hasAttribute("aria-current"));
+    p = { id: e.pointerId, touch: e.pointerType === "touch", group: g, buttons: h.buttons, rest, shape: pressShape(rest, n, band(h.nav)), x0: e.clientX, y0: e.clientY, index: h.index, fx: e.clientX, fy: e.clientY, left: 0, top: 0, lens: null, hold: 0, dog: 0, born: performance.now(), hop: selected >= 0, move };
     muted = Infinity;
+    clearTimeout(lifting);
     fading?.stop(); fading = null;
     if (n > 1) {
       vars(g, swellShape(rest));
       h.buttons.forEach((b, i) => b.style.setProperty("--duet-j", `${i}`));
-      p.lens = mountLens(g, h.buttons, h.index, still());
+      p.lens = mountLens(g, h.buttons, h.index, still(), selected >= 0 ? selected : h.index);
     }
     g.dataset.press = "down";
     if (n > 1) p.hold = window.setTimeout(() => open({ clientY: p ? p.fy : e.clientY }), PRESS.hold);

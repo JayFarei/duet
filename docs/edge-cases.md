@@ -494,3 +494,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** bends a magnified accent copy of the items, and uses the filter only once the map has loaded, so a blocked map leaves the copy clear and unbent.
 - **You do:** nothing.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Backdrop bending cannot be matched from the web.
+
+## Selected tab in the column
+
+- **You see:** a `selected` item sits on a darker bubble with its icon in the tint. Tapping another item lifts the bubble into a clear lens, carries it over, and settles it as the bubble again on the new item, with a brief dip in the icon.
+- **Cause:** native's selection is one object that moves. Tinting the new item and fading the old one would show two states at once and lose the travel.
+- **Duet does:** sets `aria-current` from `DuetItem.selected`. While the lens is up it carries the tint and the capsule's items stay plain. The swap back to the bubble is a single frame, because fading first would show the plain item through the lens's hole.
+- **You do:** set `selected` on the current item and move it when the tap lands.
+- **Status:** [#251](https://github.com/JayFarei/duet/issues/251). Measured against Apple News+ in dark mode on the Duo. The light mode values are a judgment call, with no native reference recorded.

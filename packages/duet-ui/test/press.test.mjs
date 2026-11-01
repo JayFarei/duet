@@ -1,7 +1,7 @@
 // The capsule under a finger (#251): its open shape stays in the band, and the lens names the right item.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { LENS, PRESS, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
+import { HOP, LENS, PRESS, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
 import { TEMPLATE, spring } from "../src/template.ts";
 
 const rest = { x: 400, y: 400, w: 46, h: 104 };
@@ -103,4 +103,16 @@ test("refraction map: neutral inside the band, pointing inward at the rim", () =
 
 test("lens: one item has no pitch to divide by", () => {
   assert.equal(lensAt(50, 1, 0).index, 0);
+});
+
+test("hop: the lens reaches the tapped item in about the same time from one item or three", () => {
+  const settle = (d) => { let s = { y: 0, vy: 0, w: HOP.end.w, vw: 0, h: HOP.end.h, vh: 0, q: 0, vq: 0 }, f = 0; while (Math.abs(s.y - d) > 2 && f < 200) { s = lensStep(s, { y: d, ...HOP.size }, HOP.grow, 1 / 60, HOP.travel); f++; } return f; };
+  assert.ok(settle(147) >= 15 && settle(147) <= 30, String(settle(147)));
+  assert.ok(settle(147) - settle(49) <= 8, "a spring, so a longer trip barely takes longer");
+});
+
+test("hop: no overshoot past the tapped item, and it ends bubble sized", () => {
+  let s = { y: 0, vy: 0, w: HOP.end.w, vw: 0, h: HOP.end.h, vh: 0, q: 0, vq: 0 }, most = 0;
+  for (let i = 0; i < 120; i++) { s = lensStep(s, { y: 100, ...HOP.end }, HOP.fall, 1 / 60, HOP.travel); most = Math.max(most, s.y); }
+  assert.ok(most <= 100.5); assert.ok(Math.abs(s.w - HOP.end.w) < 0.01 && Math.abs(s.h - HOP.end.h) < 0.01);
 });
