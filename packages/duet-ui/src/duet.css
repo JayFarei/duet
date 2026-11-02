@@ -240,6 +240,10 @@ html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--
    beside it. CSS alone, so it holds from the first paint, over the server's closed snapshot (hence the !important
    width). The shadow carries the column up over the 21pt above a Home Screen app's viewport. */
 :root { --duet-dock: 220px; }
+/* GlassProvider sets data-lg-theme only once mounted. Until then a docked rail, the one thing on screen, follows a forced
+   appearance itself instead of the system's. */
+:root:not([data-lg-theme]) .duet-sidebar[data-appearance="dark"] { --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366; }
+:root:not([data-lg-theme]) .duet-sidebar[data-appearance="light"] { --duet-solid: rgb(242 242 247); --duet-ring: rgb(140 144 152 / 0.35); --duet-sel: rgb(60 60 67 / 0.18); --duet-ink: #000; --duet-dim: rgb(60 60 67 / 0.6); --duet-badge-neutral: #6e6e73; }
 html[data-duet-dock] .duet-sidebar[data-dock] { visibility: visible; opacity: 1; translate: none; transition: none; pointer-events: auto; width: calc(var(--duet-dock) + var(--duet-dock-inset, 0px)) !important; padding-left: calc(14px + var(--duet-dock-inset, 0px)); box-shadow: inset -0.5px 0 0 var(--duet-ring), 0 -32px 0 var(--duet-solid); }
 html[data-duet-dock] .duet-sidebar[data-dock] ~ .duet-scroller { left: calc(var(--duet-dock) + var(--duet-dock-inset, 0px)); }
 html[data-duet-dock]:has(.duet-sidebar[data-dock][data-overlay]) { padding-left: calc(var(--duet-dock) + var(--duet-dock-inset, 0px)); }

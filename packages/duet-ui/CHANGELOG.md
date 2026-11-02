@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The docked column takes its light or dark colours from the first paint, instead of flashing light beside a dark page until `GlassProvider` mounts.
+- A Home Screen app launching on an unfolded Duo keeps its burger and controls hidden until the window lands, instead of painting them at the closed screen's places. The docked column is placed from the first paint of that launch.
 - `menu.dock`: the places stay in a column beside the page on the Duo's inner screen with the room, in Safari and on the Home Screen, and go to the burger only where the window is narrow. New `useDuet().dock`, `<html data-duet-dock>` and `--duet-dock`. Other devices are unaffected.
 - `bootScript` places the docked column from the first paint, with no cookie or reload, and hides the server-rendered controls on the inner screen until the chrome mounts.
 - Split view on a Duo: the open sidebar keeps clear of Safari's floating buttons and the burger, by the page's left inset (`--duet-sidebar-inset`).
