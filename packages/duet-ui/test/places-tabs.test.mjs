@@ -161,10 +161,20 @@ test("the docs' table is the rule", () => {
     "Closed Safari, turned": detect(sig(594, 368, 678, 466, { angle: 90 })),
     "Closed Home Screen": detect(sig(466, 657, 466, 678, { ...standalone, insetRight: 84 })),
   };
+  assert.match(chrome, /hasRest = \(inline: boolean\) => .*\|\| inline;/);
+  assert.match(chrome, /hasRest\(frame\(c\)\.kind === "inline"\)/);
   const doc = readFileSync(new URL("../../../docs/how-duet-decides.md", import.meta.url), "utf8");
   for (const [name, c] of Object.entries(windows)) {
     const row = doc.match(new RegExp(`^\\| ${name}[^|]*\\| ([^|]+) \\| ([^|]+) \\|$`, "m"));
     assert.ok(row, name);
-    assert.deepEqual([row[1], row[2]].map((x) => +x), [most(c, true), most(c, false)], name);
+    // As the chrome counts it: an inline window always has "…", since "Move controls" is listed there.
+    assert.deepEqual([row[1], row[2]].map((x) => +x), [most(c, true), most(c, frame(c).kind === "inline")], name);
+  }
+});
+
+test("the docs do not describe the removed docked column", () => {
+  for (const f of ["server-rendering", "api", "how-duet-decides", "edge-cases"]) {
+    const doc = readFileSync(new URL(`../../../docs/${f}.md`, import.meta.url), "utf8");
+    assert.doesNotMatch(doc, /data-duet-dock|--duet-dock|\(api\.md#docked-column/, f);
   }
 });

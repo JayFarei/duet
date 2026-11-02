@@ -3,6 +3,8 @@
 ## Unreleased
 
 - `menu.tabs`: the app's places are tabs in the capsule when all of them fit, and the burger with its sidebar when they do not. Icons required, all or nothing, actions and primary fold first. Correct from the first paint, an open sidebar closes when tabs take over. Other apps are unchanged.
+- Docs: the tabs table counts "…" in every inline window, since "Move controls" is always listed there: 8 and 14 in full-screen Safari, not 9 and 15, with Home Screen rows corrected too.
+- Docs: `server-rendering.md` no longer describes the removed docked column.
 - `placesFit(context, places, rest)`: the rule behind `menu.tabs`, pure and exported.
 - `menu.tabs`: the "…" list ends at its own height from a capsule taller than it, so it stays in the page. Other apps keep the height they had, on every device.
 - On a Duo, a new mode or window width closes "…", so a Home Screen app does not keep it open off the screen after a fold.

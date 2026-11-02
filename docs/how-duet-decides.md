@@ -118,23 +118,23 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 
 ## Tabs or burger
 
-With `menu.tabs`, `placesFit` decides the whole set. The places fit when `groupHeight(places + 1)` (with "…") or `groupHeight(places)` (nothing else to show) is within the mode's band, plus the 12pt a lone column group may take. A group is 49pt plus 51.7pt per further button. "…" counts when anything else needs it, so a page with actions or a primary can read burger at the margin where one without reads tabs.
+With `menu.tabs`, `placesFit` decides the whole set. The places fit when `groupHeight(places + 1)` (with "…") or `groupHeight(places)` (nothing else to show) is within the mode's band, plus the 12pt a lone column group may take. A group is 49pt plus 51.7pt per further button. "…" counts when anything else needs it. Safari's column and a split pane can have nothing else, so a page with actions or a primary can read burger at the margin where one without reads tabs. Every other window, full-screen Safari and a Home Screen app included, always lists "Move controls" in "…", so "…" always counts there and actions change nothing.
 
 The band is the same one every control uses, so forward history and Live Activities need no run-time signal: Safari's column already assumes the back slot and two activities. A Home Screen app on the Duo reads its strip's room from the start, 389pt in any window, because its insets land up to 600ms late and reading them then would show tabs and then a burger. The inner screen held upright is the exception, since it runs inline.
 
-The most places that fit in each window, from the rule. Closed Safari, turned, Split View left and the capsules a left pane draws for the right were checked at the edge on the Duo simulator, and Home Screen wide and closed at 6 and 7. The counts above 7 in full-screen Safari and Home Screen tall are from the rule alone. A test holds this table to `placesFit`. With "…" is a page with actions or a primary, without is a page with neither. The burger starts one place above the count.
+The most places that fit in each window, from the rule. Closed Safari, turned, Split View left and the capsules a left pane draws for the right were checked at the edge on the Duo simulator, and Home Screen wide and closed at 6 and 7. The counts in full-screen Safari and Home Screen tall were checked at the edge without actions, the counts with actions there follow from the same "…". A test holds this table to `placesFit`. With actions is a page with actions or a primary, without is a page with neither. The burger starts one place above the count.
 
-| Window | With "…" | Without |
+| Window | With actions | Without |
 | --- | --- | --- |
-| Safari full screen, wide 951x543, with or without forward history | 8 | 9 |
-| Safari full screen, tall 669x825, with or without forward history | 14 | 15 |
-| Home Screen, wide 951x669 | 6 | 7 |
-| Home Screen, tall 669x869 | 15 | 16 |
+| Safari full screen, wide 951x543, with or without forward history | 8 | 8 |
+| Safari full screen, tall 669x825, with or without forward history | 14 | 14 |
+| Home Screen, wide 951x669 | 6 | 6 |
+| Home Screen, tall 669x869 | 15 | 15 |
 | Split View, left, 385x571, with or without forward history | 5 | 6 |
 | Split View, right | 1 | 2 |
 | Closed Safari, upright, 382x580, with or without forward history | 1 | 2 |
 | Closed Safari, turned, 594x368 | 0 | 1 |
-| Closed Home Screen, 466x657 | 6 | 7 |
+| Closed Home Screen, 466x657 | 6 | 6 |
 
 Two places on closed Safari upright, with actions: burger and "…". Where the band holds a single button, closed Safari turned, a page with actions shows only "…", because a burger there would lose the actions. In a `menu.tabs` app the places lead that list, then "This page". The same window without actions shows the burger.
 

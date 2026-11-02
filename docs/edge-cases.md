@@ -9,6 +9,8 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [The "…" list off the screen after folding a Home Screen app](#the--list-off-the-screen-after-folding-a-home-screen-app)
 - [Places below the fold of "…" with one button of room](#places-below-the-fold-of--with-one-button-of-room)
 - [An action folding after a Home Screen tabs app paints](#an-action-folding-after-a-home-screen-tabs-app-paints)
+- [A burger one place before the tabs table said](#a-burger-one-place-before-the-tabs-table-said)
+- [Docs describing the removed docked column](#docs-describing-the-removed-docked-column)
 - [Five places behind a burger with room for tabs](#five-places-behind-a-burger-with-room-for-tabs)
 - [Tabs then a burger while a Home Screen app launches](#tabs-then-a-burger-while-a-home-screen-app-launches)
 - [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
@@ -586,6 +588,22 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** a `menu.tabs` app allocates from the strip's room as well, in the same windows. An app without `menu.tabs` keeps its allocation.
 - **You do:** nothing.
 - **Status:** seen on the Duo simulator, rotation and cold launches, by a frame trail.
+
+## A burger one place before the tabs table said
+
+- **You see:** a `menu.tabs` app without actions, full-screen Safari at 951x543 with 9 places or at 669x825 with 15: a burger and "…", where the table in the docs said tabs fit.
+- **Cause:** the table counted those windows with no "…". Inline windows, which include a Home Screen app's, always list "Move controls" there, so "…" always takes a slot.
+- **Duet does:** nothing changes, the capsule keeps "…" so the controls can still be moved. The table now gives 8 and 14, 6 for Home Screen wide and closed, and 15 for Home Screen tall, whatever the page's actions. A test holds it to the chrome's count.
+- **You do:** nothing. Plan on the "With actions" column unless the window is Safari's column or a split pane.
+- **Status:** seen on the Duo simulator without actions, at each limit and one above, in Safari wide and tall, Home Screen wide and tall and closed Home Screen.
+
+## Docs describing the removed docked column
+
+- **You see:** [Pre-paint boot](server-rendering.md#pre-paint-boot) linked to a section that no longer exists and named an attribute the boot script no longer sets.
+- **Cause:** the column's removal missed that page.
+- **Duet does:** the page describes what `bootScript` does now, and a test keeps the removed names out of the docs.
+- **You do:** nothing. Remove any CSS you keyed on the old attribute.
+- **Status:** `test/places-tabs.test.mjs`. The boot's `data-duet-pending` was seen on the Duo simulator.
 
 ## Five places behind a burger with room for tabs
 
