@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { detect } from "../src/geometry.ts";
-import { allocate, canMoveControls, frame, landingRoom, menuBox, morphHeight, placesFit, template } from "../src/template.ts";
+import { allocate, canMoveControls, frame, landingRoom, menuBox, morphHeight, placesFit, tabsPitch, TEMPLATE, TIGHTEST_TAB_PITCH, template } from "../src/template.ts";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -18,13 +18,38 @@ const closed = detect(sig(382, 580, 466, 678)), split = detect(sig(385, 571, 469
 
 test("placesFit: all of them in one capsule, with room for \"…\" when anything else competes", () => {
   const left = { ...split, side: "left" }, right = { ...split, side: "right" };
-  assert.equal(placesFit(left, 6, false), true);
-  assert.equal(placesFit(left, 6, true), false, "\"…\" takes a slot");
-  assert.equal(placesFit(left, 5, true), true);
+  assert.equal(placesFit(left, 7, false), true);
+  assert.equal(placesFit(left, 7, true), false, "\"…\" takes a slot");
+  assert.equal(placesFit(left, 6, true), true);
   assert.equal(placesFit(right, 2, false), true);
   assert.equal(placesFit(right, 3, false), false);
   assert.equal(placesFit(closed, 3, false), false);
   assert.equal(placesFit(closed, 2, false), true);
+});
+
+test("tabsPitch: the normal pitch while it fits, then tighter down to the floor, then the burger", () => {
+  const wide = detect(sig(669, 543, 669, 951));
+  const pitches = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => tabsPitch(wide, n, true));
+  assert.equal(tabsPitch(wide, 8, true), TEMPLATE.item, "exactly what it was while it fits");
+  assert.ok(pitches[8] < TEMPLATE.item && pitches[8] >= TIGHTEST_TAB_PITCH, "9 tighten");
+  assert.equal(pitches[10], undefined, "11 go behind the burger");
+});
+
+test("template: tight tabs are one capsule with \"…\", every button at the one pitch, inside the band", () => {
+  const wide = detect(sig(669, 543, 669, 951)), f = frame(wide), tabPitch = tabsPitch(wide, 9, true);
+  const { placed, primary, shown } = template(f, { places: 9, actions: 2, primary: true, rest: true, tabPitch });
+  assert.equal(placed.length, 1);
+  assert.deepEqual(placed[0].group.map((s) => s.kind), [...Array(9).fill("place"), "more"]);
+  assert.equal(placed[0].pitch, tabPitch);
+  assert.equal(placed[0].rect.h, TEMPLATE.control + 9 * tabPitch);
+  assert.ok(placed[0].rect.y >= f.top - 12 && placed[0].rect.y + placed[0].rect.h <= f.bottom + 12);
+  assert.equal(shown, 0); assert.equal(primary, false);
+});
+
+test("template: an action group keeps the normal pitch whatever the tabs do", () => {
+  const f = frame(detect(sig(669, 869, 669, 951)));
+  const { placed } = template(f, { actions: 3, tabPitch: 45 });
+  for (const g of placed) assert.equal(g.pitch, TEMPLATE.item);
 });
 
 test("placesFit: no places is not tabs, and the preview's one button is never tabs", () => {
@@ -76,7 +101,7 @@ test("the dock is gone: no public option, attribute or variable", () => {
 });
 
 test("chrome: a place without an icon stays behind the burger, for callers the types do not reach", () => {
-  assert.match(chrome, /p\.menu\?\.tabs && menuItems\.every\(\(i\) => i\.icon\) && placesFit\(/);
+  assert.match(chrome, /p\.menu\?\.tabs && menuItems\.every\(\(i\) => i\.icon\) \? tabsPitch\(/);
 });
 
 test("placesFit: a Duo Home Screen app reads the strip's room while its inset is still landing", () => {
@@ -88,8 +113,8 @@ test("placesFit: a Duo Home Screen app reads the strip's room while its inset is
   const turning = detect(sig(951, 587, 951, 669, { standalone: true }));
   const wide = detect(sig(951, 648, 951, 669, { standalone: true, insetRight: 84 }));
   for (const n of [5, 6, 7]) assert.equal(placesFit(turning, n, true), placesFit(wide, n, true), `wide n=${n}`);
-  assert.equal(placesFit(wide, 6, true), true);
-  assert.equal(placesFit(wide, 7, true), false);
+  assert.equal(placesFit(wide, 7, true), true);
+  assert.equal(placesFit(wide, 8, true), false);
 });
 
 test("placesFit: the inner screen upright as a Home Screen app is inline, with more room than the strip", () => {

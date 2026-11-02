@@ -20,9 +20,9 @@ export type PressShape = { x: number; y: number; w: number; h: number; top: numb
 
 /** The capsule under a still finger: native scales it about its centre, the items spreading with it, so a tall capsule
  *  grows more than a short one. Geometry rather than `scale`, so it runs straight on into the open shape. */
-export function swellShape(rest: Rect): PressShape {
+export function swellShape(rest: Rect, restPitch: number = TEMPLATE.item): PressShape {
   const k = PRESS.swell, w = rest.w * k, h = rest.h * k;
-  return { x: rest.x - (w - rest.w) / 2, y: rest.y - (h - rest.h) / 2, w, h, top: (k - 1) * TEMPLATE.control / 2, pitch: TEMPLATE.item * k, labels: false };
+  return { x: rest.x - (w - rest.w) / 2, y: rest.y - (h - rest.h) / 2, w, h, top: (k - 1) * TEMPLATE.control / 2, pitch: restPitch * k, labels: false };
 }
 
 /** The open capsule: wider, its items further apart, rising more than it falls as native does. It stays in `band`
@@ -239,7 +239,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     clearTimeout(lifting);
     fading?.stop(); fading = null;
     if (n > 1) {
-      vars(g, swellShape(rest));
+      vars(g, swellShape(rest, h.buttons[1].offsetTop - h.buttons[0].offsetTop));
       h.buttons.forEach((b, i) => b.style.setProperty("--duet-j", `${i}`));
       p.lens = mountLens(g, h.buttons, h.index, still(), selected >= 0 ? selected : h.index);
     }

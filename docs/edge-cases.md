@@ -78,6 +78,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Light capsule with a white band](#light-capsule-with-a-white-band)
 - [Light capsule edge reads as a seam](#light-capsule-edge-reads-as-a-seam)
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
+- [Tabs a little too tall for the room](#tabs-a-little-too-tall-for-the-room)
 
 ## Split view pane, or the closed Duo turned left
 
@@ -726,3 +727,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** with `bootScript`, hides those controls until the chrome mounts, so a page stuck there shows none.
 - **You do:** fix hydration. See [Server rendering](server-rendering.md).
 - **Status:** the hiding is tested against stubbed browsers.
+
+## Tabs a little too tall for the room
+
+- **You see:** a burger on a wide Duo although the places nearly fit at the normal spacing.
+- **Cause:** the all or nothing test at 51.7pt per button ignored how much room was really left.
+- **Duet does:** `tabsPitch` tightens the tabs group alone, down to 44pt, and the capsule, the "…" morph and the press lens read that one pitch. Below 44pt, the burger.
+- **You do:** nothing.
+- **Status:** unit tested, and checked on the Duo simulator.
