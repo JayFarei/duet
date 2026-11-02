@@ -397,8 +397,19 @@ export function detect(s: Signals, preferred?: Side, allowColumn = true, preview
 /** Room for a docked section column: a Duo's inner screen, wide, whatever Safari or the Home Screen makes of it. The
  *  closed screen (678 wide on the Home Screen, turned) and split panes keep the burger, and so does the in-app preview.
  *  The screen's short side rules out an iPad window that happens to be the open Duo's size (deviceOf). */
-const dockRoom = (s: Signals, c: Context) => c.device === "duo" && !c.preview && !c.split && s.innerWidth >= WIDE
+const dockRoom = (s: Signals, c: Context) => c.device === "duo" && !c.preview && !c.split && (s.innerWidth >= WIDE || launching(s))
   && Math.max(s.outerWidth, s.outerHeight) > 679 && Math.min(s.screenWidth, s.screenHeight) < 700;
+
+/** A Home Screen app starting on the inner screen: iOS already reports the open screen's outer size, but the page is
+ *  still the closed screen's width (~200ms, both ways up), then in landscape the full width before its 84pt band lands
+ *  (iOS 27.1, Duo sim). Controls placed from these readings stand at the closed screen's places over half-width content.
+ *  fit none's 867 inside 951 stays what it is. */
+const launching = (s: Signals) => {
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1, [w, h] = DUO_SIZES[1];
+  return s.standalone && isIOS(s) !== false && near(Math.min(s.outerWidth, s.outerHeight), w) && near(Math.max(s.outerWidth, s.outerHeight), h)
+    && Math.min(s.screenWidth, s.screenHeight) < 700
+    && (near(s.innerWidth, DUO_SIZES[0][0]) || (near(s.innerWidth, h) && s.insetLeft < STRIP_INSET && s.insetRight < STRIP_INSET));
+};
 
 function detectMode(s: Signals, preferred: Side | undefined, allowColumn: boolean, preview: boolean): Context {
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
@@ -572,7 +583,9 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   if ((s.scale ?? 1) !== 1 && d.last) {
     if (d.lastKey === key) {
       const keyboard = keyboardUp(s) || undefined;
-      return { ...d.last, keyboard, confidence: "held" };
+      // A Home Screen launch passes through a scale of 2.04, its closed width drawn across the open screen.
+      if (d.pendingUntil !== undefined && now >= d.pendingUntil) d.pendingUntil = undefined;
+      return { ...d.last, keyboard, confidence: "held", ...(d.pendingUntil === undefined ? {} : { hidden: "pending" as const }) };
     }
     s = { ...s, scale: 1 };
   }
@@ -591,7 +604,7 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   const [cw, ch] = DUO_SIZES[0];
   const handedBack = raw && !isPreview(s) && (s.innerWidth > s.innerHeight) === (s.outerWidth > s.outerHeight)
     && Math.min(s.outerWidth, s.outerHeight) <= cw + 1 && Math.max(s.outerWidth, s.outerHeight) <= ch + 1;
-  const pending = !handedBack && previewPending(s);
+  const pending = (!handedBack && previewPending(s)) || launching(s);
   if (d.bornAt === undefined) [d.bornAt, d.pendingAt] = [now, pending ? now : undefined];
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;

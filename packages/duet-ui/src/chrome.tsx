@@ -744,7 +744,7 @@ export function Duet<T extends string = string, U extends string = string>(props
   return (
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.menu && (p.menu.burger !== false || p.menu.dock) && (
-        <nav className="duet duet-sidebar" data-dock={p.menu.dock || undefined} data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
+        <nav className="duet duet-sidebar" data-appearance={glassTheme(p.appearance, p.dark)} data-dock={p.menu.dock || undefined} data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
           style={{ ...theme, width: `calc(${ctx.mode === "column" ? ctx.width : slide}px + ${clear})` }} inert={(sidebar !== "open" && !docked) || undefined}>
           <div className="duet-side-head">Menu</div>
           {menuItems.map((m) => (

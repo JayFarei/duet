@@ -6,6 +6,8 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - [Section column on the inner screen](#section-column-on-the-inner-screen)
 - [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
+- [Light column beside a dark page on first paint](#light-column-beside-a-dark-page-on-first-paint)
+- [Controls at the closed screen's places while a Home Screen app launches](#controls-at-the-closed-screens-places-while-a-home-screen-app-launches)
 - [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
 - [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
 - [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
@@ -554,7 +556,23 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** the server cannot measure the window, so it renders a closed snapshot, and a cookie only helps from the second visit.
 - **Duet does:** `bootScript` reads the window, screen and user agent before the first paint and sets `data-duet-dock`. The server always renders a docking menu's nav, and CSS alone places it and the page. Controls wait for the mounted chrome (`data-duet-pending`).
 - **You do:** inline `bootScript` as the first child of `<body>`. Without it the column appears at hydration. A left-side inline strip or the Home Screen's strip inset arrives at mount, so the column's rows move by that much then.
-- **Status:** tested against stubbed browsers (8.4KB, budget 10KB in `test/boot.test.mjs`), and in desktop WebKit with emulated sizes. Not yet seen on a device.
+- **Status:** tested against stubbed browsers (8.7KB, budget 10KB in `test/boot.test.mjs`), in desktop WebKit with emulated sizes, and on the Duo simulator in Safari and on the Home Screen. Not yet seen on a device.
+
+## Light column beside a dark page on first paint
+
+- **You see:** without the handling, the docked column is light (rgb(242,242,247) on the simulator) for about 100ms beside a dark page, then turns dark. Measured in Safari and on the Home Screen, at 951x669 and 669x951.
+- **Cause:** the column's colours follow `html[data-lg-theme]`, which `GlassProvider` sets when it mounts, after the first paint.
+- **Duet does:** the nav carries `data-appearance` from the server render, and `duet.css` uses it for the column's colours until `data-lg-theme` lands.
+- **You do:** pass `appearance="light"` or `"dark"` when the app forces a theme. With `"auto"`, or neither prop, the column follows the system's colour scheme, and the app's page should too.
+- **Status:** `test/first-paint.test.mjs`, and on the Duo simulator the first sample at t=16-19ms is rgb(0,0,0). Safari still shows a white frame or two on reload, not attributed to Duet. Other devices are unchanged.
+
+## Controls at the closed screen's places while a Home Screen app launches
+
+- **You see:** without the handling, an unfolded Duo's Home Screen app first paints the burger and controls at the closed screen's places, over content at half width, for about 200 to 300ms, in landscape and portrait.
+- **Cause:** iOS starts the app with a 466x678 viewport inside an open outer window (951x669 or 669x951), then reports `visualViewport.scale` 2.04 at 466x669 with the insets landed, then 951x669, then the strip inset. The boot script and `stable()` read the first of these as a closed screen, and a reading held at scale 2.04 dropped the hidden state.
+- **Duet does:** treats those launch readings as pending, so the column is placed from the first paint and the controls stay hidden until the window lands. A reading held at another scale keeps the hidden state until the 1000ms cap. The match needs standalone, an open outer window, a screen under 700pt on its short side, and an inner width near 466 or 951 with no side inset yet, so a closed Duo, an iPad, Safari and desktop are unchanged.
+- **You do:** nothing.
+- **Status:** `test/first-paint.test.mjs`, and on the Duo simulator: controls hidden until t=196-247ms, then in place. Not fixed, because iOS sets it: page content is still laid out at half width beside the column for about 200ms, a launch with no band can wait up to the 1s cap, and the white launch splash comes before the document loads. Not yet seen on a device.
 
 ## Sidebar under Safari's floating buttons in split view
 
