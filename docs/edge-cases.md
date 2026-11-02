@@ -5,6 +5,7 @@
 Every iOS and Safari quirk Duet handles, what you would see without the handling, and what is left for you to do. Most need nothing from you. "Without children" means a page that renders `<Duet>` without `children`, so the document itself scrolls.
 
 - [The "…" list past the screen's foot in a tall capsule](#the--list-past-the-screens-foot-in-a-tall-capsule)
+- [The "…" list in an app that has not opted in to tabs](#the--list-in-an-app-that-has-not-opted-in-to-tabs)
 - [The "…" list off the screen after folding a Home Screen app](#the--list-off-the-screen-after-folding-a-home-screen-app)
 - [Places below the fold of "…" with one button of room](#places-below-the-fold-of--with-one-button-of-room)
 - [An action folding after a Home Screen tabs app paints](#an-action-folding-after-a-home-screen-tabs-app-paints)
@@ -550,9 +551,17 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** a `menu.tabs` capsule holding five places and "…": the open list runs off the foot of the page, over Safari's buttons in Split View.
 - **Cause:** the morph kept the capsule's height when that was taller than the list. It only ever grew before tabs made a capsule that tall.
-- **Duet does:** the morph ends at the list's height, from a taller capsule as from a shorter one.
+- **Duet does:** in a `menu.tabs` app, the morph ends at the list's height, from a taller capsule as from a shorter one.
 - **You do:** nothing.
 - **Status:** seen on the Duo simulator, see the release's evidence: Safari wide, Home Screen tall, Split View left. A capsule shorter than its list has the path it had.
+
+## The "…" list in an app that has not opted in to tabs
+
+- **You see:** without the handling, upgrading changes an app that did not ask for anything: its open "…" list is shorter on iPhone, iPad and desktop, 82pt instead of the capsule's 152pt, and sits somewhere else.
+- **Cause:** the fix for a tall `menu.tabs` capsule changed the morph for every app.
+- **Duet does:** only `menu.tabs` apps end at the list's height. Any other app keeps the capsule's height when that is taller, as in 0.8.0-rc.2, on every device, the Duo included. So its list can still leave blank room, or reach past the page's foot on a small screen.
+- **You do:** nothing. To get the shorter list, opt in with `menu.tabs`.
+- **Status:** same list rectangle as 0.8.0-rc.2 on the Duo simulator in Safari wide and tall, with and without a `tabs` capsule, and in Playwright WebKit at phone, iPad and desktop sizes, not on those devices.
 
 ## The "…" list off the screen after folding a Home Screen app
 

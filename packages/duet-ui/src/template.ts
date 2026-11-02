@@ -145,9 +145,9 @@ export function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
   return { x, y: Math.min(Math.max(y, Math.max(f.insetTop, 12)), f.ph - 12 - h), w, h };
 }
 
-/** The morph's height for its spring progress `tall`, with the press swell: a capsule taller than the list ends at the
- *  list's height, and so does one shorter, which swells first. */
-export const morphHeight = (from: number, box: number, tall: number, swell: number) => Math.max(mix(from, Math.min(from, box), tall) * swell, mix(from, box, tall));
+/** The morph's height for its spring progress `tall`, with the press swell. Past the swell it heads for the list.
+ *  `fit` (menu.tabs): a capsule taller than the list ends at the list's height. Otherwise it keeps its own height. */
+export const morphHeight = (from: number, box: number, tall: number, swell: number, fit: boolean) => Math.max((fit ? mix(from, Math.min(from, box), tall) : from) * swell, mix(from, box, tall));
 
 /** The primary's confirmation: its whole capsule grows into this box beside it, its label over a `confirm` button. */
 export const confirmBox = (f: Frame, from: Rect): Rect => menuBox(f, from, 2, 0);

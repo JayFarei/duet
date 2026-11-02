@@ -397,7 +397,7 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
  *  interruptible either way with its velocity kept. The capsule hides (data-morphing) and this blob takes its place,
  *  starting as the capsule (its glass, its icons on .duet-face) and ending as the menu. Driven from rAF on refs, so
  *  React renders it once per open. */
-function Morph({ open, from, slots, box, onClosed, children, role = "menu", label }: { open: boolean; from: Rect; slots: ReactNode[]; box: Rect; onClosed: () => void; children: ReactNode; role?: string; label?: string }) {
+function Morph({ open, from, slots, box, fit, onClosed, children, role = "menu", label }: { open: boolean; from: Rect; slots: ReactNode[]; box: Rect; fit: boolean; onClosed: () => void; children: ReactNode; role?: string; label?: string }) {
   const blob = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null);
   const st = useRef({ s: 0, v: 0, raf: 0, last: 0, clear: 0 });
   const closed = useRef(onClosed);
@@ -411,7 +411,7 @@ function Morph({ open, from, slots, box, onClosed, children, role = "menu", labe
     const tall = lead(lead(s, 3), 1.5), wide = lead(lead(s, -1), -0.6), outer = lead(lead(s, 3), 3);
     // The press swell: up to 1.2x, over before the shape leaves the capsule's size.
     const swell = 1 + 0.2 * Math.sin(Math.PI * clamp01(s / 0.3));
-    const w = Math.max(from.w * swell, mix(from.w, box.w, wide)), h = morphHeight(from.h, box.h, tall, swell);
+    const w = Math.max(from.w * swell, mix(from.w, box.w, wide)), h = morphHeight(from.h, box.h, tall, swell, fit);
     const o = mix(left ? from.x + from.w : from.x, left ? box.x + box.w : box.x, outer) + (left ? 1 : -1) * (w - mix(from.w, box.w, wide)) / 2;
     const cy = mix(from.y + from.h / 2, box.y + box.h / 2, tall);
     const r = mix(Math.min(w, h) / 2, 28, clamp01((wide - 0.15) / 0.6));
@@ -721,7 +721,7 @@ export function Duet<T extends string = string, U extends string = string>(props
           );
         })}</Presence>
         {drawsMenu && moreAt && (
-          <Morph open={more === "open"} from={moreAt.rect} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, places.length ? 2 : 1)} onClosed={() => setMore("closed")}>
+          <Morph open={more === "open"} from={moreAt.rect} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, places.length ? 2 : 1)} fit={!!p.menu?.tabs} onClosed={() => setMore("closed")}>
             {placesFirst && placeRows}
             <div className="duet-menu-head">{f.kind === "column" ? "This page" : "More"}</div>
             {list.map((a) => {
@@ -737,7 +737,7 @@ export function Duet<T extends string = string, U extends string = string>(props
           </Morph>
         )}
         {drawsAsk && askAt && (
-          <Morph open={ask === "open"} from={askAt.rect} slots={askAt.group.map(icon)} box={confirmBox(f, askAt.rect)} onClosed={() => setAsk("closed")} role="dialog" label={p.primary!.label}>
+          <Morph open={ask === "open"} from={askAt.rect} slots={askAt.group.map(icon)} box={confirmBox(f, askAt.rect)} fit={!!p.menu?.tabs} onClosed={() => setAsk("closed")} role="dialog" label={p.primary!.label}>
             <div className="duet-confirm-head" style={tint}>{p.primary!.icon}<span>{p.primary!.label}</span></div>
             <button className="duet-row duet-confirm" style={tint} onClick={() => { setAsk("closing"); p.primary!.onPress?.(); }}>
               <span>{p.primary!.confirm || p.primary!.label}</span>

@@ -4,7 +4,7 @@
 
 - `menu.tabs`: the app's places are tabs in the capsule when all of them fit, and the burger with its sidebar when they do not. Icons required, all or nothing, actions and primary fold first. Correct from the first paint, an open sidebar closes when tabs take over. Other apps are unchanged.
 - `placesFit(context, places, rest)`: the rule behind `menu.tabs`, pure and exported.
-- The "…" list ends at its own height from a capsule taller than it, so it stays in the page.
+- `menu.tabs`: the "…" list ends at its own height from a capsule taller than it, so it stays in the page. Other apps keep the height they had, on every device.
 - On a Duo, a new mode or window width closes "…", so a Home Screen app does not keep it open off the screen after a fold.
 - One button of room in a `menu.tabs` app: the places lead the "…" list. Docs: the tabs table gives the count with and without "…", tested against the rule.
 - A Home Screen `menu.tabs` app allocates its actions from the strip's room too, so an action does not fold after the first paint.

@@ -98,12 +98,19 @@ test("placesFit: the inner screen upright as a Home Screen app is inline, with m
 });
 
 // Defects found on the simulator once places made the capsule tall.
-test("the \"…\" panel ends at the list's size, from a capsule taller or shorter than the list", () => {
-  assert.equal(morphHeight(411, 200, 1, 1), 200, "taller capsule");
-  assert.equal(morphHeight(49, 200, 1, 1), 200, "shorter capsule");
-  assert.equal(morphHeight(411, 200, 0, 1), 411, "starts as the capsule");
+test("the \"…\" panel of a menu.tabs app ends at the list's size, from a capsule taller or shorter than the list", () => {
+  assert.equal(morphHeight(411, 200, 1, 1, true), 200, "taller capsule");
+  assert.equal(morphHeight(49, 200, 1, 1, true), 200, "shorter capsule");
+  assert.equal(morphHeight(411, 200, 0, 1, true), 411, "starts as the capsule");
   // A short capsule's path is what it was: the swell, then the list.
-  for (const [t, sw] of [[0, 1], [0.1, 1.2], [0.5, 1.1], [0.9, 1]]) assert.equal(morphHeight(49, 200, t, sw), Math.max(49 * sw, 49 + 151 * t));
+  for (const [t, sw] of [[0, 1], [0.1, 1.2], [0.5, 1.1], [0.9, 1]]) assert.equal(morphHeight(49, 200, t, sw, true), Math.max(49 * sw, 49 + 151 * t));
+});
+
+test("the \"…\" panel of any other app keeps 0.8.0-rc.2's height, whatever the capsule", () => {
+  for (const [from, box] of [[152, 82], [411, 82], [49, 200]])
+    for (const [t, sw] of [[0, 1], [0.1, 1.2], [0.5, 1.1], [0.9, 1], [1, 1]])
+      assert.equal(morphHeight(from, box, t, sw, false), Math.max(from * sw, from + (box - from) * t), `${from} to ${box} at ${t}`);
+  assert.equal(morphHeight(152, 82, 1, 1, false), 152, "the capsule's height, as tagged");
 });
 
 test("the box a tall capsule grows into stays in the page", () => {
