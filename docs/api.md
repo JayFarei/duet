@@ -35,6 +35,7 @@ Pass `tabs: true` on `menu` and the app's places are tabs at the head of the cap
 
 - All or nothing: a place never sits alone in "…", and the set never splits between tabs and sidebar.
 - The app's actions and primary fold into "…" first. Only when the places do not fit beside "…" does the app fall back to the burger.
+- Where the band holds one button (closed Safari turned), a page with actions shows only "…", with the places first in its list. Without actions it shows the burger.
 - Tabs behave like the `tabs` prop: the selected one sits in a bubble in `tint`, with the same press.
 - `placesFit(context, places, rest)` is the rule, pure and exported, `rest` meaning something else needs "…". See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the room each mode has.
 - On the Duo, inline `bootScript`: the controls stay hidden until the chrome has mounted, so neither form shows before the right one, with no cookie or reload. See [Pre-paint boot](server-rendering.md#pre-paint-boot). On every device the nav stays hidden until hydration.
@@ -89,7 +90,7 @@ A page with one thing to do (book, buy, join) passes it as its primary, and fold
 
 - The primary is a tinted button in a slot of the controls, 49pt like every other, showing its icon. Its `label` is its accessible name and shows when it opens. Controls never leave the column, so nothing sits over the page at rest.
 - A tap grows the button into a confirmation box beside the column, on the same spring as "…": the icon and `label`, then a tinted button reading `confirm` (or `label`). The button runs `onPress` and the box folds back into the button, which now shows whatever the page passes next (a green Booked check, say). A tap anywhere else closes the box. `confirm: false` runs on the first tap, with no box.
-- Where its own group does not fit (the closed column with a menu), it takes the burger's slot, above "…" in one capsule, and the places move into the "…" list, in a "Menu" section after the page's own. Where one button is all that fits, it folds into "…".
+- Where its own group does not fit (the closed column with a menu), it takes the burger's slot, above "…" in one capsule, and the places move into the "…" list, in a "Menu" section after the page's own. With `menu.tabs` the section comes first. Where one button is all that fits, it folds into "…".
 - Folded into "…" (no room for its own group), it arms the same way: the first tap tints its row and turns its label to `confirm`, the list stays open, the second tap runs it and closes the list. Closing the list disarms it. See [Folded primary runs at once](edge-cases.md#folded-primary-runs-at-once).
 - `tint` on the primary overrides the accent for it alone. Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop.
 

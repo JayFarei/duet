@@ -4,6 +4,10 @@
 
 Every iOS and Safari quirk Duet handles, what you would see without the handling, and what is left for you to do. Most need nothing from you. "Without children" means a page that renders `<Duet>` without `children`, so the document itself scrolls.
 
+- [The "…" list past the screen's foot in a tall capsule](#the--list-past-the-screens-foot-in-a-tall-capsule)
+- [The "…" list off the screen after folding a Home Screen app](#the--list-off-the-screen-after-folding-a-home-screen-app)
+- [Places below the fold of "…" with one button of room](#places-below-the-fold-of--with-one-button-of-room)
+- [An action folding after a Home Screen tabs app paints](#an-action-folding-after-a-home-screen-tabs-app-paints)
 - [Five places behind a burger with room for tabs](#five-places-behind-a-burger-with-room-for-tabs)
 - [Tabs then a burger while a Home Screen app launches](#tabs-then-a-burger-while-a-home-screen-app-launches)
 - [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
@@ -541,6 +545,38 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** ends the stack at the foot of the band: 23.7pt above the screen's bottom in full screen, like native capsules, whatever the home indicator inset, and just above Safari's +/tabs pill in a split pane. A lone burger stays at the head of the page. Safari's column on the closed Duo stays centred, and a stack too tall for its band still centres.
 - **You do:** nothing. The room is unchanged from the [#110](https://github.com/JayFarei/duet/issues/110) contract, only the position inside it moved.
 - **Status:** [#254](https://github.com/JayFarei/duet/issues/254). Verified on the Duo in full screen and split left, with the capsule open under a press. Split right and the burger plus capsule layout are covered by unit tests only.
+
+## The "…" list past the screen's foot in a tall capsule
+
+- **You see:** a `menu.tabs` capsule holding five places and "…": the open list runs off the foot of the page, over Safari's buttons in Split View.
+- **Cause:** the morph kept the capsule's height when that was taller than the list. It only ever grew before tabs made a capsule that tall.
+- **Duet does:** the morph ends at the list's height, from a taller capsule as from a shorter one.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, see the release's evidence: Safari wide, Home Screen tall, Split View left. A capsule shorter than its list has the path it had.
+
+## The "…" list off the screen after folding a Home Screen app
+
+- **You see:** "…" open in a closed Home Screen app, then unfold: the list stays open at its old place, clipped by the right edge, and again on folding back.
+- **Cause:** an open list's geometry is fixed when it opens. Safari's fold changed tabs to burger and so closed it. A Home Screen app reads the same room in both windows, so nothing closed it.
+- **Duet does:** on a Duo, a new mode or window width closes "…" and any open confirmation. A height change does not, so Safari's bar collapsing leaves it open. Other devices keep what they did.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, unfolding and folding.
+
+## Places below the fold of "…" with one button of room
+
+- **You see:** closed Safari turned, a `menu.tabs` app with actions: only "…", and its list opens with the actions, so a fifth place is below the fold.
+- **Cause:** the band holds one button. A burger there would lose the actions, so "…" holds everything.
+- **Duet does:** a `menu.tabs` app lists the places first in that one button, since they are what the burger would have been. Without actions the burger shows. Other apps keep "This page" first.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator at 594x368.
+
+## An action folding after a Home Screen tabs app paints
+
+- **You see:** a Home Screen tabs app wide, after a rotation or launch: the capsule shows two actions and "…", then one action folds into "…" about 700ms later.
+- **Cause:** the places decision read the strip's room from the start, the action allocation read the inline band that holds until the inset lands.
+- **Duet does:** a `menu.tabs` app allocates from the strip's room as well, in the same windows. An app without `menu.tabs` keeps its allocation.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, rotation and cold launches, by a frame trail.
 
 ## Five places behind a burger with room for tabs
 

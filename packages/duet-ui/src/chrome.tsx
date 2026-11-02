@@ -4,7 +4,7 @@ import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, use
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, columnBand, controlsShown, isSplit, pageInsets, sheetLayout, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
-import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, placesFit, primaryTap, template, type Rect, type Slot } from "./template.ts";
+import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, morphHeight, landingRoom, placesFit, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { PRESS, listenPress } from "./press.ts";
@@ -411,7 +411,7 @@ function Morph({ open, from, slots, box, onClosed, children, role = "menu", labe
     const tall = lead(lead(s, 3), 1.5), wide = lead(lead(s, -1), -0.6), outer = lead(lead(s, 3), 3);
     // The press swell: up to 1.2x, over before the shape leaves the capsule's size.
     const swell = 1 + 0.2 * Math.sin(Math.PI * clamp01(s / 0.3));
-    const w = Math.max(from.w * swell, mix(from.w, box.w, wide)), h = Math.max(from.h * swell, mix(from.h, box.h, tall));
+    const w = Math.max(from.w * swell, mix(from.w, box.w, wide)), h = morphHeight(from.h, box.h, tall, swell);
     const o = mix(left ? from.x + from.w : from.x, left ? box.x + box.w : box.x, outer) + (left ? 1 : -1) * (w - mix(from.w, box.w, wide)) / 2;
     const cy = mix(from.y + from.h / 2, box.y + box.h / 2, tall);
     const r = mix(Math.min(w, h) / 2, 28, clamp01((wide - 0.15) / 0.6));
@@ -526,16 +526,18 @@ export function Duet<T extends string = string, U extends string = string>(props
   };
   // A switch leaves nothing open: "…" lists something else now, and with no burger left nothing could close the sheet.
   const asTabs = sides.map(placesAsTabs), tabsKey = asTabs.join();
-  useLayout(() => { setMore("closed"); setArmed(false); setAsk("closed"); if (asTabs.every(Boolean)) setSidebar("closed"); }, [tabsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- tabsKey is asTabs
+  useLayout(() => { if (asTabs.every(Boolean)) setSidebar("closed"); }, [tabsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- tabsKey is asTabs
+  // So does a new window on a Duo: an open menu's geometry is fixed when it opens, so a fold or turn would leave it at its old place, off the screen.
+  useLayout(() => { setMore("closed"); setArmed(false); setAsk("closed"); }, [tabsKey, ctx.duo && `${ctx.mode} ${ctx.width}`]);
 
   // The template for one side: its groups, where they go, and what "…" lists.
   const layout = (side: Side) => {
-    const f = frame(side === ctx.side ? ctx : { ...ctx, side });
+    const c = side === ctx.side ? ctx : { ...ctx, side }, f = frame(c);
     const inline = f.kind === "inline";
     const tabbed = placesAsTabs(side);
     const burger = !!p.menu && p.menu.burger !== false && !tabbed;
     const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger && !tabbed ? 1 : 0);
-    const a = template(f, { close: !!p.close, menu: burger, places: tabbed ? menuItems.length : 0, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" && !tabbed }), placed = a.placed;
+    const a = template(f, { room: p.menu?.tabs ? landingRoom(c) : undefined, close: !!p.close, menu: burger, places: tabbed ? menuItems.length : 0, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" && !tabbed }), placed = a.placed;
     // No burger (the preview): the app's places close "…" under "Menu".
     const places = p.menu && !tabbed && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
     const askAt = placed.find((g) => g.group.some((s) => s.kind === "primary")), moreAt = placed.find((g) => g.group.some((s) => s.kind === "more"));
@@ -548,7 +550,9 @@ export function Duet<T extends string = string, U extends string = string>(props
       } }] : []),
       ...destructive,
     ];
-    return { f, placed, places, list, moreAt, askAt };
+    // No burger in a tabs app: the places are what it would have been, so they lead the list. A primary sharing "…" keeps the lead.
+    const placesFirst = !!p.menu?.tabs && askAt !== moreAt;
+    return { f, placed, places, list, moreAt, askAt, placesFirst };
   };
 
   const reserve = p.reserve !== false;
@@ -677,7 +681,7 @@ export function Duet<T extends string = string, U extends string = string>(props
   };
 
   const bar = (side: Side, i: number) => {
-    const { f, placed, places, list, moreAt, askAt } = layout(side);
+    const { f, placed, places, list, moreAt, askAt, placesFirst } = layout(side);
     // Folded into "…", the primary arms in place (its row turns to `confirm`, the menu stays open) and runs on the
     // second tap, like its own capsule.
     const pick = (a: DuetItem) => () => {
@@ -687,6 +691,12 @@ export function Duet<T extends string = string, U extends string = string>(props
     const drawsMenu = more !== "closed" && moreAt && (!split || side === menuSide);
     const drawsAsk = ask !== "closed" && askAt && (!split || side === menuSide);
     const tint = p.primary?.tint ? { "--duet-tint": p.primary.tint } as CSSProperties : undefined;
+    const placeRows = places.length > 0 && <>
+      <div className="duet-menu-head">Menu</div>
+      {places.map((m) => (
+        <button key={m.id} className="duet-row" role="menuitemradio" aria-checked={m.id === selected} onClick={() => select(m.id)}>{m.icon}<span>{m.label}</span>{badge(m)}</button>
+      ))}
+    </>;
     return (
       <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden ?? (p.menu?.tabs && !ctx.confidence ? "pending" : undefined)} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
         <Presence>{placed.map((g, gi) => {
@@ -712,6 +722,7 @@ export function Duet<T extends string = string, U extends string = string>(props
         })}</Presence>
         {drawsMenu && moreAt && (
           <Morph open={more === "open"} from={moreAt.rect} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, places.length ? 2 : 1)} onClosed={() => setMore("closed")}>
+            {placesFirst && placeRows}
             <div className="duet-menu-head">{f.kind === "column" ? "This page" : "More"}</div>
             {list.map((a) => {
               const arm = a === p.primary && armed;
@@ -722,12 +733,7 @@ export function Duet<T extends string = string, U extends string = string>(props
                 </button>
               );
             })}
-            {places.length > 0 && <>
-              <div className="duet-menu-head">Menu</div>
-              {places.map((m) => (
-                <button key={m.id} className="duet-row" role="menuitemradio" aria-checked={m.id === selected} onClick={() => select(m.id)}>{m.icon}<span>{m.label}</span>{badge(m)}</button>
-              ))}
-            </>}
+            {!placesFirst && placeRows}
           </Morph>
         )}
         {drawsAsk && askAt && (

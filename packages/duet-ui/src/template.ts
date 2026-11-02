@@ -27,6 +27,7 @@ export const CLEAR_MS = 110;
 /** s plus k·s(1-s)²: 0 to 1 with slope 1 at 1 (so a spring's overshoot carries on smoothly), leading for k > 0
  *  (up to 3), lagging for k < 0 (down to -1). */
 export const lead = (s: number, k: number) => s + k * s * (1 - s) * (1 - s);
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 export type Slot = { kind: "place"; index: number } | { kind: "menu" } | { kind: "more" } | { kind: "close" } | { kind: "primary" } | { kind: "action"; index: number };
 export type Group = Slot[];
@@ -118,17 +119,20 @@ export function place(f: Frame, groups: Group[]): Placed[] {
   });
 }
 
+/** A Duo Home Screen app, but for the inner screen upright, is the strip once its inset lands, up to 600ms after the
+ *  first paint or a turn (stable() holds inline meanwhile), and its viewport passes through shorter heights. The strip's
+ *  room is the screen's 678pt less its fixed margins, whatever the viewport says, so read that from the start: no capsule
+ *  that shows, then gives way to a burger, and no action that shows, then folds. */
+const stripFrame = (c: Context) => c.duo && c.standalone && !(c.width >= WIDE && c.height > c.width) ? frame({ ...c, mode: "strip", height: DUO_SIZES[0][1], offsetTop: 0 }) : undefined;
+/** The room a menu.tabs app allocates from in this window, where the window's own band would mislead (stripFrame). */
+export const landingRoom = (c: Context) => { const f = stripFrame(c); return f && f.bottom - f.top; };
+
 /** Whether the app's places go in the capsule as tabs (menu.tabs) rather than behind the burger: all of them in one
  *  capsule, plus "…" when anything else (`rest`: actions, the primary, anything "…" lists) needs folding. Never in the
  *  in-app preview, whose gap holds one button. From the smallest height at this window (stableHeight), so Safari's bar
  *  collapsing on a scroll cannot flip it. Pure, and the only place this is decided. */
 export function placesFit(c: Context, places: number, rest: boolean): boolean {
-  // A Duo Home Screen app, but for the inner screen upright, is the strip once its inset lands, up to 600ms after the
-  // first paint or a turn (stable() holds inline meanwhile), and its viewport passes through shorter heights. The strip's
-  // room is the screen's 678pt less its fixed margins, whatever the viewport says, so read that from the start: no capsule
-  // that shows, then gives way to a burger.
-  const strip = c.duo && c.standalone && !(c.width >= WIDE && c.height > c.width);
-  const f = frame(strip ? { ...c, mode: "strip", height: DUO_SIZES[0][1], offsetTop: 0 } : { ...c, height: c.stableHeight });
+  const f = stripFrame(c) ?? frame({ ...c, height: c.stableHeight });
   return places > 0 && !f.preview && groupHeight(places + (rest ? 1 : 0)) <= f.bottom - f.top + extra(f);
 }
 
@@ -141,6 +145,10 @@ export function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
   return { x, y: Math.min(Math.max(y, Math.max(f.insetTop, 12)), f.ph - 12 - h), w, h };
 }
 
+/** The morph's height for its spring progress `tall`, with the press swell: a capsule taller than the list ends at the
+ *  list's height, and so does one shorter, which swells first. */
+export const morphHeight = (from: number, box: number, tall: number, swell: number) => Math.max(mix(from, Math.min(from, box), tall) * swell, mix(from, box, tall));
+
 /** The primary's confirmation: its whole capsule grows into this box beside it, its label over a `confirm` button. */
 export const confirmBox = (f: Frame, from: Rect): Rect => menuBox(f, from, 2, 0);
 
@@ -150,12 +158,12 @@ export const primaryTap = (armed: boolean, confirm?: string | false): "arm" | "r
 
 /** The whole template for one frame: a sheet's lone close (when the band has room; the preview's gap holds one), the preview's lone "…", the
  *  open sidebar's lone burger, else allocate. `rest`: items "…" lists whatever fits (folded, destructive, the side
- *  switch). */
-export function template(f: Frame, o: { close?: boolean; menu?: boolean; places?: number; actions: number; primary?: boolean; rest?: boolean; sidebar?: boolean }) {
+ *  switch). `room`: allocate from this height rather than the frame's band (landingRoom). */
+export function template(f: Frame, o: { room?: number; close?: boolean; menu?: boolean; places?: number; actions: number; primary?: boolean; rest?: boolean; sidebar?: boolean }) {
   const none = (groups: Group[]) => ({ groups, shown: 0, primary: false });
   const a = o.close ? none(f.preview || f.bottom - f.top + extra(f) >= T.control ? [[{ kind: "close" }]] : [])
     : f.preview ? none(o.menu || o.places || o.actions || o.primary || o.rest ? [[{ kind: "more" }]] : [])
     : o.sidebar ? none([[{ kind: "menu" }]])
-    : allocate(f.bottom - f.top, o.actions, { menu: o.menu, places: o.places, primary: o.primary, split: f.kind === "inline", rest: o.rest, extra: extra(f) });
+    : allocate(o.room ?? f.bottom - f.top, o.actions, { menu: o.menu, places: o.places, primary: o.primary, split: f.kind === "inline", rest: o.rest, extra: extra(f) });
   return { ...a, placed: place(f, a.groups) };
 }

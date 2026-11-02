@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { detect } from "../src/geometry.ts";
-import { allocate, frame, placesFit, template } from "../src/template.ts";
+import { allocate, frame, landingRoom, menuBox, morphHeight, placesFit, template } from "../src/template.ts";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -95,4 +95,69 @@ test("placesFit: a Duo Home Screen app reads the strip's room while its inset is
 test("placesFit: the inner screen upright as a Home Screen app is inline, with more room than the strip", () => {
   const tall = detect(sig(669, 869, 669, 951, { standalone: true, insetBottom: 34 }));
   assert.equal(placesFit(tall, 7, true), true);
+});
+
+// Defects found on the simulator once places made the capsule tall.
+test("the \"…\" panel ends at the list's size, from a capsule taller or shorter than the list", () => {
+  assert.equal(morphHeight(411, 200, 1, 1), 200, "taller capsule");
+  assert.equal(morphHeight(49, 200, 1, 1), 200, "shorter capsule");
+  assert.equal(morphHeight(411, 200, 0, 1), 411, "starts as the capsule");
+  // A short capsule's path is what it was: the swell, then the list.
+  for (const [t, sw] of [[0, 1], [0.1, 1.2], [0.5, 1.1], [0.9, 1]]) assert.equal(morphHeight(49, 200, t, sw), Math.max(49 * sw, 49 + 151 * t));
+});
+
+test("the box a tall capsule grows into stays in the page", () => {
+  for (const c of [detect(sig(951, 543, 951, 669)), detect(sig(669, 869, 669, 951, { standalone: true, insetBottom: 34 })), { ...split, side: "left" }]) {
+    const f = frame(c), g = template(f, { places: 5, actions: 2, rest: false }).placed[0];
+    const b = menuBox(f, g.rect, 2);
+    assert.ok(b.y >= 0 && b.y + b.h <= c.height - 12, `${c.width}x${c.height}: ${b.y}+${b.h}`);
+  }
+});
+
+test("a Home Screen tabs app allocates its actions from the strip's room while the inset lands, so nothing refolds", () => {
+  const forms = (c) => kinds(template(frame(c), { room: landingRoom(c), places: 5, actions: 2, rest: true }).groups);
+  const wide = detect(sig(951, 648, 951, 669, { standalone: true, insetRight: 84 }));
+  for (const c of [detect(sig(951, 648, 951, 669, { standalone: true })), detect(sig(951, 587, 951, 669, { standalone: true }))]) {
+    assert.equal(c.mode, "inline");
+    assert.deepEqual(forms(c), forms(wide));
+  }
+  assert.deepEqual(forms(wide), [["p0", "p1", "p2", "p3", "p4", 0, "more"]]);
+  assert.deepEqual(forms(detect(sig(466, 657, 466, 678, { standalone: true }))), forms(detect(sig(466, 657, 466, 678, { standalone: true, insetRight: 84 }))));
+  // Not a Home Screen app, or the inner screen upright: the window's own band.
+  assert.equal(landingRoom(detect(sig(951, 543, 951, 669))), undefined);
+  assert.equal(landingRoom(detect(sig(669, 869, 669, 951, { standalone: true, insetBottom: 34 }))), undefined);
+});
+
+test("a new window on a Duo closes \"…\", other devices keep what they did", () => {
+  assert.match(chrome, /setMore\("closed"\); setArmed\(false\); setAsk\("closed"\); \}, \[tabsKey, ctx\.duo && `\$\{ctx\.mode\} \$\{ctx\.width\}`\]\)/);
+});
+
+test("one button of room in a tabs app: the places lead \"…\"", () => {
+  const turned = detect(sig(594, 368, 678, 466, { angle: 90 }));
+  assert.deepEqual(kinds(template(frame(turned), { menu: true, actions: 2 }).groups), [["more"]]);
+  assert.deepEqual(kinds(template(frame(turned), { menu: true, actions: 0 }).groups), [["menu"]]);
+  assert.match(chrome, /placesFirst = !!p\.menu\?\.tabs && askAt !== moreAt/);
+  assert.ok(chrome.indexOf("{placesFirst && placeRows}") < chrome.indexOf("{!placesFirst && placeRows}"));
+});
+
+test("the docs' table is the rule", () => {
+  const most = (c, rest) => { let k = 0; while (k < 20 && placesFit(c, k + 1, rest)) k++; return k; };
+  const standalone = { standalone: true };
+  const windows = {
+    "Safari full screen, wide": detect(sig(951, 543, 951, 669)),
+    "Safari full screen, tall": detect(sig(669, 825, 669, 951)),
+    "Home Screen, wide": detect(sig(951, 648, 951, 669, { ...standalone, insetRight: 84 })),
+    "Home Screen, tall": detect(sig(669, 869, 669, 951, { ...standalone, insetBottom: 34 })),
+    "Split View, left": { ...split, side: "left" },
+    "Split View, right": { ...split, side: "right" },
+    "Closed Safari, upright": closed,
+    "Closed Safari, turned": detect(sig(594, 368, 678, 466, { angle: 90 })),
+    "Closed Home Screen": detect(sig(466, 657, 466, 678, { ...standalone, insetRight: 84 })),
+  };
+  const doc = readFileSync(new URL("../../../docs/how-duet-decides.md", import.meta.url), "utf8");
+  for (const [name, c] of Object.entries(windows)) {
+    const row = doc.match(new RegExp(`^\\| ${name}[^|]*\\| ([^|]+) \\| ([^|]+) \\|$`, "m"));
+    assert.ok(row, name);
+    assert.deepEqual([row[1], row[2]].map((x) => +x), [most(c, true), most(c, false)], name);
+  }
 });

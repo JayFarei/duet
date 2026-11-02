@@ -4,6 +4,10 @@
 
 - `menu.tabs`: the app's places are tabs in the capsule when all of them fit, and the burger with its sidebar when they do not. Icons required, all or nothing, actions and primary fold first. Correct from the first paint, an open sidebar closes when tabs take over. Other apps are unchanged.
 - `placesFit(context, places, rest)`: the rule behind `menu.tabs`, pure and exported.
+- The "…" list ends at its own height from a capsule taller than it, so it stays in the page.
+- On a Duo, a new mode or window width closes "…", so a Home Screen app does not keep it open off the screen after a fold.
+- One button of room in a `menu.tabs` app: the places lead the "…" list. Docs: the tabs table gives the count with and without "…", tested against the rule.
+- A Home Screen `menu.tabs` app allocates its actions from the strip's room too, so an action does not fold after the first paint.
 - A Home Screen tabs app on a Duo reads its strip's room from the start, so a launch does not show tabs and then a burger.
 - A Home Screen app launching on an unfolded Duo keeps its burger and controls hidden until the window lands, instead of painting them at the closed screen's places.
 - Split view on a Duo: the open sidebar keeps clear of Safari's floating buttons and the burger, by the page's left inset (`--duet-sidebar-inset`).
