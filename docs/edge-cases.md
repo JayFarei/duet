@@ -79,6 +79,9 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Light capsule edge reads as a seam](#light-capsule-edge-reads-as-a-seam)
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
 - [Tabs a little too tall for the room](#tabs-a-little-too-tall-for-the-room)
+- [Tapping away from "…" pressed what was underneath](#tapping-away-from--pressed-what-was-underneath)
+- [A dark circle as "…" comes back](#a-dark-circle-as--comes-back)
+- [Page content jumps 84pt on an inline Duo page](#page-content-jumps-84pt-on-an-inline-duo-page)
 
 ## Split view pane, or the closed Duo turned left
 
@@ -735,3 +738,27 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** `tabsPitch` tightens the tabs group alone, down to 44pt, and the capsule, the "…" morph and the press lens read that one pitch. Below 44pt, the burger.
 - **You do:** nothing.
 - **Status:** unit tested, and checked on the Duo simulator.
+
+## Tapping away from "…" pressed what was underneath
+
+- **You see:** closing "…" by tapping the page also opened whatever the finger landed on.
+- **Cause:** the menu closed on pointerdown, and the same tap's click then reached the page.
+- **Duet does:** the click of the dismissing tap stops at the window, once. A scroll or a later tap is unaffected.
+- **You do:** nothing.
+- **Status:** reproduced and checked on the Duo simulator.
+
+## A dark circle as "…" comes back
+
+- **You see:** closing the sidebar, the "…" arrives dark and vanishes or pops before it settles.
+- **Cause:** fading the group's host makes it the glass's backdrop root, so the glass sees nothing and its color-dodge rim paints dark. "…" also waited for the sidebar to finish closing.
+- **Duet does:** fades the glass layers and scales the host, and brings "…" back as closing starts, so it is one motion.
+- **You do:** nothing.
+- **Status:** cause proven by CSS variants, checked frame by frame on the Duo simulator.
+
+## Page content jumps 84pt on an inline Duo page
+
+- **You see:** the first frame of a wide Safari page on the open Duo lays out under the controls, then shifts on mount.
+- **Cause:** the boot script set nothing for inline pages, the inset arrived with React about 100ms in.
+- **Duet does:** the boot script sets the inset on the controls' side before the first paint, the mounted chrome overwrites it.
+- **You do:** use `bootScript`, and pad with `--duet-inset-*`.
+- **Status:** checked on the Duo simulator.

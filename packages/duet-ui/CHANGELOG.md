@@ -4,6 +4,9 @@
 
 - **Behaviour change:** moving the controls is now an option, `moveControls`, off by default. Off: no "Move controls" row, no drag across the page, the default side even if an earlier visit stored another, and no "…" when nothing else needs it, so tabs get its room (9 places in wide Safari, 15 in tall). To keep the old behaviour pass `moveControls`.
 - Tabs use the room: when the places do not fit at the normal 51.7pt pitch, the tabs capsule tightens, down to 44pt (`tabsPitch`), before falling back to the burger. A wide Safari on the open Duo now holds 11 places, or 10 with "…". Tabs that already fit are pixel identical.
+- "…" no longer shows as a dark disc when the sidebar closes: it returns as closing starts, in one motion, its glass fading rather than its host.
+- A tap that dismisses "…" no longer also presses what lies under it.
+- `bootScript` sets the 84pt inset of a wide or tall Safari page on the open Duo before the first paint, so its content does not jump on mount.
 - With `moveControls`, a Home Screen app in a strip no longer lists a "Move controls" row that did nothing: `canMoveControls` is true only where the controls can change edge.
 - Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place at once, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
 

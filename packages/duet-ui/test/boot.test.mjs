@@ -41,7 +41,7 @@ test("the Duo's inner screen with room: the controls held back, no cookie, no mo
     "home screen landscape": { inner: [951, 648], outer: [951, 669], screen: [466, 678], standalone: true },
   };
   for (const [name, c] of Object.entries(cases))
-    assert.deepEqual(run(c), { attrs: { "data-duet-pending": "" }, vars: {} }, name);
+    assert.deepEqual(run(c), { attrs: { "data-duet-pending": "" }, vars: c.standalone ? {} : { "--duet-inset-right": "84px" } }, name);
 });
 
 test("split view: the column, as ever", () => {
