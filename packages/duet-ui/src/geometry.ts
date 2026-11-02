@@ -627,6 +627,10 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     if (now < d.landUntil!) return moving();
   }
   Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
+  // Turning an open Home Screen app to wide: the wide window comes ~370ms before the strip's inset, and read as inline
+  // its burger sits over the status bar. Hidden, and nothing committed, so the inset landing is taken at once, in place.
+  // Only a window not shown yet: if no strip comes, inline commits at the settle and stays.
+  if (settling && d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight) return moving();
   // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once. Safari's column
   // never leaves a tab on drift alone, so column to inline is held after the settle too: a real Duo's bar and
   // keyboard read outside every range measured on the simulator (#132), and a wrong inline verdict committed once the

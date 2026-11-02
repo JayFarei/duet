@@ -15,6 +15,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Tabs then a burger while a Home Screen app launches](#tabs-then-a-burger-while-a-home-screen-app-launches)
 - [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
 - [Controls at the closed screen's places while a Home Screen app launches](#controls-at-the-closed-screens-places-while-a-home-screen-app-launches)
+- [Burger over the clock while a Home Screen app turns to wide](#burger-over-the-clock-while-a-home-screen-app-turns-to-wide)
 - [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
 - [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
 - [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
@@ -628,6 +629,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** `bootScript` reads the window, screen and user agent before the first paint and sets `data-duet-pending` on the inner screen, so the controls wait for the mounted chrome. With `menu.tabs` the nav also waits for hydration everywhere, so neither a burger nor tabs show before the right one.
 - **You do:** inline `bootScript` as the first child of `<body>`.
 - **Status:** tested against stubbed browsers (8.7KB, budget 10KB in `test/boot.test.mjs`), and on the Duo simulator on fresh host names in closed Safari, and in Home Screen launches with no cookie. Not yet seen on a device.
+
+## Burger over the clock while a Home Screen app turns to wide
+
+- **You see:** without the handling, turning an open Duo's Home Screen app from tall to wide leaves the burger at the inline top, over the status clock and Wi-Fi, for about 900ms, then glides it to its strip place over about 450ms.
+- **Cause:** the wide window comes about 370ms before the strip's 84pt inset, and without the inset the page reads as inline. Inline committed in that window, so the inset landing was held to the settle, and the commit at the settle was "sure", which turned transitions back on.
+- **Duet does:** hides the controls, committing nothing, while a window not yet shown reads inline in a turn of a Duo's wide Home Screen app. The inset landing commits the strip at once, while transitions are still off. If no inset comes, inline commits at the settle, at most 2s, and later events do not hide it again. The match needs standalone, a Duo, and a window wider than tall and at least 600pt wide, so Safari, the iPad, phones and desktop are unchanged.
+- **You do:** nothing.
+- **Status:** `test/first-paint.test.mjs`, and on the Duo simulator at 30fps, burger and tabs forms, both directions: controls absent for 12 frames (390ms) going to wide, 8 of them the rotation itself, then in place with no movement. Going to tall was already at once. Not fixed, because iOS sets it: the rest of the wait for the inset. A launch in wide was not exercised on the simulator here, only in the tests. Not yet seen on a device.
 
 ## Controls at the closed screen's places while a Home Screen app launches
 

@@ -92,3 +92,58 @@ test("only the first reading counts: a running app whose inset goes away is not 
 test("full screen fit none keeps inner 867 inside outer 951: not a launch", () => {
   assert.notEqual(stable({}, sig(867, 669, 951, 669), undefined, 0).hidden, "pending");
 });
+
+// A live turn of an open Duo's Home Screen app from tall to wide (Duo simulator, 30fps): the wide window comes ~30ms in,
+// its strip inset ~370ms later. Until then the page reads inline, whose burger sits at the top, over the status bar.
+const TALL = sig(669, 869, 669, 951, { insetBottom: 34 });
+const TURN_TO_WIDE = [sig(951, 587, 951, 669, { insetBottom: 34 }), sig(951, 648, 951, 669, { insetTop: 61, insetBottom: 34 }), sig(951, 648, 951, 669, { insetBottom: 34 })];
+const WIDE_LANDED = sig(951, 648, 951, 669, { insetRight: 84, insetBottom: 34 });
+
+test("turning an open Home Screen app to wide: no inline controls before the strip, which lands in place while settling", () => {
+  const d = {};
+  stable(d, TALL, undefined, 0);
+  TURN_TO_WIDE.forEach((s, i) => {
+    const c = stable(d, s, undefined, 100 + i * 100, true);
+    assert.equal(c.hidden, "moving", `reading ${i}`);
+    assert.equal(c.width, 669, "the last context stays whole");
+  });
+  const landed = stable(d, WIDE_LANDED, undefined, 400, true);
+  assert.equal(landed.mode, "strip", "not held back to the settle, or it glides from the inline top");
+  assert.equal(landed.hidden, undefined);
+  assert.equal(landed.confidence, "settling", "no transition");
+  const sure = stable(d, WIDE_LANDED, undefined, 1400);
+  assert.equal(sure.mode, "strip");
+  assert.equal(sure.confidence, "sure");
+});
+
+test("a wide Home Screen window whose strip never lands shows inline at the settle, and stays shown", () => {
+  const d = {};
+  stable(d, TALL, undefined, 0);
+  assert.equal(stable(d, TURN_TO_WIDE[2], undefined, 100, true).hidden, "moving");
+  const settled = stable(d, TURN_TO_WIDE[2], undefined, 2100);
+  assert.equal(settled.mode, "inline");
+  assert.equal(settled.hidden, undefined);
+  assert.equal(stable(d, TURN_TO_WIDE[2], undefined, 2200, true).hidden, undefined, "a later event does not hide it again");
+});
+
+test("turning back to tall does not hide: the inline place is taken at once", () => {
+  const d = {};
+  stable(d, TALL, undefined, 0);
+  stable(d, WIDE_LANDED, undefined, 100);
+  const c = stable(d, sig(669, 930, 669, 951, { insetTop: 61, insetBottom: 34 }), undefined, 200, true);
+  assert.equal(c.mode, "inline");
+  assert.equal(c.hidden, undefined);
+});
+
+test("the wait for the strip is the open Duo's Home Screen app only", () => {
+  for (const [name, s] of Object.entries({
+    "Safari tab": sig(951, 543, 951, 669, { standalone: false }),
+    iPad: sig(1366, 1024, 1366, 1024, { userAgent: MAC, screenWidth: 1024, screenHeight: 1366 }),
+    phone: sig(852, 393, 852, 393, { screenWidth: 393, screenHeight: 852 }),
+    desktop: sig(1512, 900, 1512, 982, { userAgent: MAC, touchPoints: 0, standalone: false, screenWidth: 1512, screenHeight: 982 }),
+  })) {
+    const d = {};
+    stable(d, sig(s.innerHeight, s.innerWidth, s.outerHeight, s.outerWidth, s), undefined, 0);
+    assert.notEqual(stable(d, s, undefined, 100, true).hidden, "moving", name);
+  }
+});
