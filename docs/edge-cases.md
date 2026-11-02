@@ -10,6 +10,8 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
 - [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
 - [Band above a column in a Home Screen app](#band-above-a-column-in-a-home-screen-app)
+- [Header in the status bar after rotating a Home Screen app](#header-in-the-status-bar-after-rotating-a-home-screen-app)
+- [Blank strip below a Home Screen app](#blank-strip-below-a-home-screen-app)
 - [Burger mid-page on a wide window](#burger-mid-page-on-a-wide-window)
 - [Split view pane, or the closed Duo turned left](#split-view-pane-or-the-closed-duo-turned-left)
 - [Right split pane holds two buttons](#right-split-pane-holds-two-buttons)
@@ -580,11 +582,27 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 ## Band above a column in a Home Screen app
 
-- **You see:** about 20pt of page background above a full-height column in a Home Screen app in portrait.
-- **Cause:** the app's viewport starts 21pt below the screen's top (`innerHeight` 930 of `outerHeight` 951), and what shows there is the root background.
-- **Duet does:** the docked column carries its colour 32pt above the viewport with a box shadow.
-- **You do:** a column of your own needs the same, or a root background that matches it.
-- **Status:** not yet checked on the simulator or a device: whether WebKit paints that shadow there is an assumption.
+- **You see:** a band above a full-height column in a Home Screen app in portrait: 21pt of viewport offset after rotating to tall, 82pt when launched tall. It takes the page's colour, not the column's.
+- **Cause:** the app's viewport starts below the screen's top (`innerHeight` 930 or 869 of `outerHeight` 951), and iOS fills what shows there.
+- **Duet does:** the docked column carries its colour 32pt above the viewport with a box shadow. That does not fully cover the band: launched tall iOS's tint shows over it. Nothing the page sets reaches it.
+- **You do:** keep the page's top colour at the viewport's top so the band matches the page, and use the `default` status bar style. See [Status bar style](layout.md#status-bar-style-for-home-screen-apps).
+- **Status:** observed on the Duo simulator: light page, Default style, launched tall the band is page white down to about y 82 and the column's colour starts below it. Rotated, the column's colour fades out toward the screen's top. Cosmetic, a platform limit.
+
+## Header in the status bar after rotating a Home Screen app
+
+- **You see:** launched wide then rotated to tall, a page's header sits in the clock and Wi-Fi row, blurred by iOS. The burger is clear, and a relaunch looks right.
+- **Cause:** the rotated app has a safe top of 61pt (82 with `black-translucent`), launched tall it has 0. `--duet-inset-top` stays 0 there, because it holds only the blur iOS does not report, so a page padding by it alone gets 0.
+- **Duet does:** nothing changes: the burger follows the safe area, and `--duet-inset-top` keeps adding to it. Putting the safe top in the variable would double it for pages and the pane bar that add the two (title at y 134 instead of 73).
+- **You do:** pad by `calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px))` with `viewport-fit=cover`. See [Keeping the top clear](layout.md#keeping-the-top-clear).
+- **Status:** observed on the Duo simulator: variable alone, title y 12; the sum, title y 73, below the status bar, y 12 launched tall.
+
+## Blank strip below a Home Screen app
+
+- **You see:** an empty strip below the page that does not scroll: 82pt launched tall, 21pt rotated to tall or wide.
+- **Cause:** the icon was added with `black-translucent`. The viewport starts at the screen's top and ends short of its foot. The other styles do not do this.
+- **Duet does:** nothing it can: the style is read when the icon is added, and it is not Duet's meta.
+- **You do:** use `default` and add the icon again. If you keep `black-translucent`, the `html` and `body` background paints the strip. See [Status bar style](layout.md#status-bar-style-for-home-screen-apps).
+- **Status:** observed on the Duo simulator, bare page and fixture. Manifest display modes through a real Add to Home Screen were not tested.
 
 ## Burger mid-page on a wide window
 
