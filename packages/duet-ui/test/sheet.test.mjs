@@ -39,6 +39,15 @@ test("the sheet closes on that change", () => {
 });
 
 test("in the column the open sheet paints down behind Safari's bar, with its rows still ending above it", () => {
-  assert.match(css, /html\[data-duet-mode="column"\] \.duet-sidebar\[data-open\] \{ box-shadow: 0 240px 0 var\(--duet-solid\); \}/);
+  assert.match(css, /html\[data-duet-mode="column"\] \.duet-sidebar\[data-open\] \{ box-shadow: 0 240px 0 var\(--duet-solid\), var\(--duet-sidebar-inset, 0px\) 0 0 var\(--duet-solid\), var\(--duet-sidebar-inset, 0px\) 240px 0 var\(--duet-solid\); \}/);
   assert.match(css, /html\[data-duet-mode="column"\] \.duet-sidebar \{[^}]*height: var\(--duet-vh, 100vh\)/);
+});
+
+test("split view, right pane: the open sheet clears Safari's column on the far edge, which the page cannot tell from the near one", () => {
+  // The slid page ran from x -84 by the 469pt screen width, leaving its Canvas card over the 84pt strip beside the rail.
+  assert.match(chrome, /translate: slid && sidebar === "open" \? `calc\(\$\{slide\}px \+ \$\{clear\}\) 0` : undefined/);
+});
+
+test("split view, right pane: the card moving through the strip is the rail's colour unless the page names its own, not Canvas white", () => {
+  assert.match(css, /html\[data-duet-mode="column"\] \.duet-scroller\[data-slid\] \{ background: var\(--duet-page, var\(--duet-solid\)\); \}/);
 });

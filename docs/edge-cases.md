@@ -11,6 +11,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
 - [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
 - [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
+- [White strip beside the open sidebar in the right split pane](#white-strip-beside-the-open-sidebar-in-the-right-split-pane)
 - [Band above a column in a Home Screen app](#band-above-a-column-in-a-home-screen-app)
 - [Header in the status bar after rotating a Home Screen app](#header-in-the-status-bar-after-rotating-a-home-screen-app)
 - [Blank strip below a Home Screen app](#blank-strip-below-a-home-screen-app)
@@ -597,6 +598,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** in a column, the open sidebar carries its colour 240pt further down with a box shadow. Its height stays the viewport's, so the last rows stay above the bar, and a shadow adds no scrollable overflow.
 - **You do:** nothing. After scrolling, Safari compacts its bar and paints it itself from 589pt down, in the page's `theme-color`. Forcing the root background to the sidebar's colour did not change it, so a theme colour unlike the sidebar's shows as a band there.
 - **Status:** seen on the Duo simulator, both panes: the pixels at 580pt and 660pt are the sidebar's colour, before they were the page's. The compacted bar's band remains. The closed screen's column has the same rule, not checked with the sidebar open there.
+
+## White strip beside the open sidebar in the right split pane
+
+- **You see:** without the handling, with Safari in the right pane, the open sidebar leaves Safari's 84pt column beside it white, on a dark page too.
+- **Cause:** not the canvas. The document spans a column on each side, starting 84pt left of the viewport, and the page cannot tell which pane it is in. The page slid by the screen's width landed at x 385, still over the strip, carrying its card background, `Canvas`, which is white without a dark `color-scheme`.
+- **Duet does:** in a column, the page also slides by the left inset, `--duet-sidebar-inset`, the sidebar's shadow carries its colour across the right edge by the same inset, and the moving card takes `--duet-page`, falling back to the sidebar's colour instead of `Canvas`. The inset is 0 outside a split pane, so those columns paint as before, apart from the card's fallback colour while it leaves.
+- **You do:** nothing. Set `--duet-page` if the moving card should be your page's colour.
+- **Status:** seen on the Duo simulator, both panes, dark and light: (875,300) was white, it is now the sidebar's colour, and the burger closes the sheet. The strip no longer holds a tappable card in the right pane. A frame scan of the slide shows the fallback colour during the move; a closed screen column with the sheet open was not reached.
 
 ## Band above a column in a Home Screen app
 

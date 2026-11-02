@@ -7,6 +7,7 @@
 - `menu.dock`: the places stay in a column beside the page on the Duo's inner screen with the room, in Safari and on the Home Screen, and go to the burger only where the window is narrow. New `useDuet().dock`, `<html data-duet-dock>` and `--duet-dock`. Other devices are unaffected.
 - `bootScript` places the docked column from the first paint, with no cookie or reload, and hides the server-rendered controls on the inner screen until the chrome mounts.
 - Split view on a Duo: the open sidebar keeps clear of Safari's floating buttons and the burger, by the page's left inset (`--duet-sidebar-inset`).
+- Split view on a Duo, right pane: the open sidebar no longer leaves Safari's column white beside it, and the moving page card falls back to the sidebar's colour instead of `Canvas`.
 - On a Duo, the burger's open sheet closes when the window crosses a layout (split pane to full, or folding), so the page is not left pushed beside it.
 - Column mode: the open sidebar's colour carries on to the screen's foot behind Safari's bar.
 - The docked column carries its colour above a Home Screen app's viewport with a shadow; iOS's band still shows over it.

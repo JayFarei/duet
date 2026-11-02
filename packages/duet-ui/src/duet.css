@@ -234,8 +234,9 @@
 }
 html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--duet-vh, 100vh); bottom: auto; }
 /* The height keeps the last row above Safari's bar. The surface carries on down behind the bar, which the page's canvas
-   would show otherwise; a shadow, as it adds no scrollable overflow. 240pt: the bar's 98pt plus the document's 98pt of scroll. */
-html[data-duet-mode="column"] .duet-sidebar[data-open] { box-shadow: 0 240px 0 var(--duet-solid); }
+   would show otherwise; a shadow, as it adds no scrollable overflow. 240pt: the bar's 98pt plus the document's 98pt of scroll.
+   And across the right edge, by the inset: a split pane's column can be on either side, and the page cannot tell which. */
+html[data-duet-mode="column"] .duet-sidebar[data-open] { box-shadow: 0 240px 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 0 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 240px 0 var(--duet-solid); }
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }
@@ -257,6 +258,8 @@ html[data-duet-dock]:has(.duet-sidebar[data-dock][data-overlay]) { padding-left:
 .duet-sidebar .duet-badge { position: static; margin-left: auto; box-shadow: none; }
 .duet-scroller { transition: translate var(--duet-slide-ms) var(--duet-slide), border-radius 300ms ease, box-shadow 300ms ease; }
 .duet-scroller[data-slid] { background: var(--duet-page, Canvas); border-radius: 28px; box-shadow: 0 0 0 0.5px var(--duet-ring), -12px 0 40px rgb(0 0 0 / 0.18); overflow: hidden; }
+/* In a split pane the card passes through the strip beside the rail on its way out; Canvas would flash white beside a dark rail. */
+html[data-duet-mode="column"] .duet-scroller[data-slid] { background: var(--duet-page, var(--duet-solid)); }
 /* A tap on the slid page closes the sidebar; the page itself takes no taps meanwhile. */
 .duet-scroller[data-slid] > * { pointer-events: none; }
 .duet-sidebar :is(.duet-side-row) { color: var(--duet-ink); }

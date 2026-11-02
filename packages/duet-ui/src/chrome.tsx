@@ -738,6 +738,7 @@ export function Duet<T extends string = string, U extends string = string>(props
 
   // The burger slides the page aside by the screen's width in the column (the page leaves with its column), and by
   // up to 40% of it inline, where the page stays in view as a card to tap back to.
+  // Plus the left inset: a split pane's page starts that far left of the viewport and runs under a column on either side.
   const slide = ctx.mode === "column" ? ctx.screenWidth : Math.min(340, ctx.width * 0.4);
   const slid = sidebar !== "closed" && !docked;
   const clear = "var(--duet-sidebar-inset, 0px)";
@@ -756,7 +757,7 @@ export function Duet<T extends string = string, U extends string = string>(props
       )}
       {p.children !== undefined && (
         <div ref={scroller} className="duet-scroller" data-slid={slid || undefined} onPointerDownCapture={slid ? closeSidebar : undefined}
-          style={{ ...theme, translate: slid && sidebar === "open" ? (ctx.mode === "column" ? `${slide}px 0` : `calc(${slide}px + ${clear}) 0`) : undefined }}>{p.children}</div>
+          style={{ ...theme, translate: slid && sidebar === "open" ? `calc(${slide}px + ${clear}) 0` : undefined }}>{p.children}</div>
       )}
       {sides.map(bar)}
       {/* On both viewport edges, so a page's full-screen overlay cannot hide Safari's column (duet.css). Mounted on a Duo in
