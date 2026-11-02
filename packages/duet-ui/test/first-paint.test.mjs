@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { stable, PREVIEW_RISE } from "../src/geometry.ts";
+import { stable, PREVIEW_RISE, LAND_HOLD } from "../src/geometry.ts";
 
 const bootScript = await (await import("../scripts/boot.mjs")).bundle();
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
@@ -157,7 +157,9 @@ test("a page that opts out of cover turns to wide: inline commits in place at 86
   const d = {}, opts = { uncovered: true };
   stable(d, sig(669, 930, 669, 951, opts), undefined, 0);
   assert.equal(stable(d, sig(951, 648, 951, 669, opts), undefined, 100, true).hidden, "moving", "before the page narrows, it would stand 84pt off");
-  const c = stable(d, sig(867, 648, 951, 669, opts), undefined, 480, true);
+  assert.equal(stable(d, sig(867, 648, 951, 669, opts), undefined, 480, true).hidden, "moving", "the tall status clock is still fading: the burger would sit over it");
+  assert.equal(d.landUntil, 480 + LAND_HOLD, "the caller re-reads then, no resize may follow");
+  const c = stable(d, sig(867, 648, 951, 669, opts), undefined, 480 + LAND_HOLD, true);
   assert.equal(c.mode, "inline");
   assert.equal(c.hidden, undefined);
   assert.equal(c.width, 867);
@@ -165,6 +167,13 @@ test("a page that opts out of cover turns to wide: inline commits in place at 86
   const sure = stable(d, sig(867, 648, 951, 669, opts), undefined, 1100);
   assert.equal(sure.width, 867);
   assert.equal(sure.confidence, "sure");
+});
+
+test("a page that opts out of cover, narrowed by its first wide reading, still waits out the clock's fade", () => {
+  const d = {}, opts = { uncovered: true };
+  stable(d, sig(669, 930, 669, 951, opts), undefined, 0);
+  assert.equal(stable(d, sig(867, 648, 951, 669, opts), undefined, 400, true).hidden, "moving");
+  assert.equal(stable(d, sig(867, 648, 951, 669, opts), undefined, 400 + LAND_HOLD, true).hidden, undefined);
 });
 
 test("turning back to tall does not hide: the inline place is taken at once", () => {

@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place at once, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
+- Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place after about 0.5s, once the tall status clock has faded, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
 
 ## 0.8.0-rc.3
 

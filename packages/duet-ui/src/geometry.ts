@@ -625,18 +625,20 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     Object.assign(d, { moving: true, landKey: undefined, landUntil: undefined });
     return moving();
   }
+  // Turning an open Home Screen app to wide: the wide window comes ~370ms before the strip's inset, and read as inline
+  // its burger sits over the status bar. A page that opts out of cover gets no strip: iOS narrows it to 867 while the tall
+  // status clock still fades, so it lands like a transit, LAND_HOLD after that, still settling, so in place with no glide.
+  const toWide = settling && !!d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight;
+  if (toWide && s.uncovered) d.moving = true;
   // Landed after a transit: hidden until the landing holds LAND_HOLD (the caller re-reads at landUntil).
   if (settling && d.moving) {
     if (d.landKey !== stableKey) Object.assign(d, { landKey: stableKey, landAt: now, landUntil: now + LAND_HOLD });
     if (now < d.landUntil!) return moving();
   }
   Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
-  // Turning an open Home Screen app to wide: the wide window comes ~370ms before the strip's inset, and read as inline
-  // its burger sits over the status bar. Hidden, and nothing committed, so the inset landing is taken at once, in place.
-  // Only a window not shown yet: if no strip comes, inline commits at the settle and stays. A page that opts out of cover
-  // gets no strip: it commits as soon as iOS narrows it to 867, while settling, so the controls appear in place, no glide.
-  if (settling && d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight
-    && !(s.uncovered && s.innerWidth < s.outerWidth)) return moving();
+  // Hidden, and nothing committed, so the inset landing is taken at once, in place. Only a window not shown yet: if no
+  // strip comes, inline commits at the settle and stays.
+  if (toWide && !(s.uncovered && s.innerWidth < s.outerWidth)) return moving();
   // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once. Safari's column
   // never leaves a tab on drift alone, so column to inline is held after the settle too: a real Duo's bar and
   // keyboard read outside every range measured on the simulator (#132), and a wrong inline verdict committed once the
