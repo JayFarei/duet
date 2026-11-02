@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place at once, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
+
 ## 0.8.0-rc.3
 
 - Turning an open Duo's Home Screen app to wide no longer leaves the burger over the status clock and glides it into the strip: the controls stay hidden until the strip's inset lands, then appear in place.

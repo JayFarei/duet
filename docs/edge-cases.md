@@ -16,6 +16,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
 - [Controls at the closed screen's places while a Home Screen app launches](#controls-at-the-closed-screens-places-while-a-home-screen-app-launches)
 - [Burger over the clock while a Home Screen app turns to wide](#burger-over-the-clock-while-a-home-screen-app-turns-to-wide)
+- [Controls glide or hop on a wide Home Screen app](#controls-glide-or-hop-on-a-wide-home-screen-app)
 - [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
 - [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
 - [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
@@ -634,9 +635,17 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, turning an open Duo's Home Screen app from tall to wide leaves the burger at the inline top, over the status clock and Wi-Fi, for about 900ms, then glides it to its strip place over about 450ms.
 - **Cause:** the wide window comes about 370ms before the strip's 84pt inset, and without the inset the page reads as inline. Inline committed in that window, so the inset landing was held to the settle, and the commit at the settle was "sure", which turned transitions back on.
-- **Duet does:** hides the controls, committing nothing, while a window not yet shown reads inline in a turn of a Duo's wide Home Screen app. The inset landing commits the strip at once, while transitions are still off. If no inset comes, inline commits at the settle, at most 2s, and later events do not hide it again. The match needs standalone, a Duo, and a window wider than tall and at least 600pt wide, so Safari, the iPad, phones and desktop are unchanged.
+- **Duet does:** hides the controls, committing nothing, while a window not yet shown reads inline in a turn of a Duo's wide Home Screen app. The inset landing commits the strip at once, while transitions are still off. If no inset comes, inline commits at the settle, at most 2s, and later events do not hide it again. A page that opts out of `viewport-fit=cover` never gets an inset, see [Controls glide or hop on a wide Home Screen app](#controls-glide-or-hop-on-a-wide-home-screen-app). The match needs standalone, a Duo, and a window wider than tall and at least 600pt wide, so Safari, the iPad, phones and desktop are unchanged.
 - **You do:** nothing.
 - **Status:** `test/first-paint.test.mjs`, and on the Duo simulator at 30fps, burger and tabs forms, both directions: controls absent for 12 frames (390ms) going to wide, 8 of them the rotation itself, then in place with no movement. Going to tall was already at once. Not fixed, because iOS sets it: the rest of the wait for the inset. A launch in wide was not exercised on the simulator here, only in the tests. Not yet seen on a device.
+
+## Controls glide or hop on a wide Home Screen app
+
+- **You see:** without the handling, two things on an open Duo. A page with `viewport-fit=auto` or `contain` turned from tall to wide hides its controls for about 1s, then the tall tabs capsule morphs to the burger over about 480ms. A wide launch shows the controls at x=794 for 1 or 2 frames of the launch fade, sometimes as the inline burger at the top, then they hop 84pt to x=878.
+- **Cause:** the turn's hold waits for a strip inset that never comes to a page that opts out of cover, so inline committed only at the settle, which turns transitions back on. On a launch of any other page, iOS reads 867 inside the 951 window for 60 to 90ms, with inset 0 or 84, and that reading was taken as the final window.
+- **Duet does:** reads the viewport meta. With an explicit `viewport-fit=auto` or `contain`, it ends the hold when iOS narrows the page to 867, so the controls appear in place with no transition, and a launch shows at 867 as before. Without that, a wide launch waits at 867 for the 951 window, capped at 1s. A viewport meta with no `viewport-fit` counts as cover, since Duet adds it at mount. The match needs a standalone Duo, so Safari, the iPad, phones and desktop are unchanged, and final places are unchanged.
+- **You do:** nothing.
+- **Status:** `test/first-paint.test.mjs`, and on the Duo simulator, 30fps recordings. Turn with `viewport-fit=auto`: hidden about 350ms, then in place at [794,11], no glide. Before, about 1s and a 480ms glide. Wide launch with cover: 9 of 9 show the controls once at [878,265], no hop. Before, 9 of 9 showed a reading at x=794 first. Tall launches, and the wide to tall turn, are unchanged. A launch that stays at 867 on a page with cover has its controls hidden for up to 1s; that case is covered by tests only, since it was not seen on the simulator. Not yet seen on a device.
 
 ## Controls at the closed screen's places while a Home Screen app launches
 

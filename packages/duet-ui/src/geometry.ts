@@ -60,6 +60,9 @@ export const RAIL = { gap: 5 } as const;
 export interface Signals {
   innerWidth: number;
   innerHeight: number;
+  /** The viewport meta asks for viewport-fit=auto or contain, so Duet leaves it alone: on an open Duo a Home Screen page
+   *  gets no strip and no inset, it stands 867 wide inside the 951 window. Absent, the key counts as cover: Duet adds it. */
+  uncovered?: boolean;
   /** Safari window incl. its column. Lags rotation by ~400ms; `screen.*` is stale, never use it for Safari. */
   outerWidth: number;
   outerHeight: number;
@@ -399,12 +402,13 @@ export const openRoom = (s: Signals, c: Context) => c.device === "duo" && !c.pre
 /** A Home Screen app starting on the inner screen: iOS already reports the open screen's outer size, but the page is
  *  still the closed screen's width (~200ms, both ways up), then in landscape the full width before its 84pt band lands
  *  (iOS 27.1, Duo sim). Controls placed from these readings stand at the closed screen's places over half-width content.
- *  fit none's 867 inside 951 stays what it is. */
+ *  A launch also reads 867 inside 951 for ~60-90ms, inset or not, before that full width. Only a page that opts out of
+ *  cover stays at 867. */
 const launching = (s: Signals) => {
   const near = (a: number, b: number) => Math.abs(a - b) <= 1, [w, h] = DUO_SIZES[1];
   return s.standalone && isIOS(s) !== false && near(Math.min(s.outerWidth, s.outerHeight), w) && near(Math.max(s.outerWidth, s.outerHeight), h)
     && Math.min(s.screenWidth, s.screenHeight) < 700
-    && (near(s.innerWidth, DUO_SIZES[0][0]) || (near(s.innerWidth, h) && s.insetLeft < STRIP_INSET && s.insetRight < STRIP_INSET));
+    && (near(s.innerWidth, DUO_SIZES[0][0]) || (near(s.innerWidth, h - 84) && !s.uncovered) || (near(s.innerWidth, h) && s.insetLeft < STRIP_INSET && s.insetRight < STRIP_INSET));
 };
 
 function detectMode(s: Signals, preferred: Side | undefined, allowColumn: boolean, preview: boolean): Context {
@@ -629,8 +633,10 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
   // Turning an open Home Screen app to wide: the wide window comes ~370ms before the strip's inset, and read as inline
   // its burger sits over the status bar. Hidden, and nothing committed, so the inset landing is taken at once, in place.
-  // Only a window not shown yet: if no strip comes, inline commits at the settle and stays.
-  if (settling && d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight) return moving();
+  // Only a window not shown yet: if no strip comes, inline commits at the settle and stays. A page that opts out of cover
+  // gets no strip: it commits as soon as iOS narrows it to 867, while settling, so the controls appear in place, no glide.
+  if (settling && d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight
+    && !(s.uncovered && s.innerWidth < s.outerWidth)) return moving();
   // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once. Safari's column
   // never leaves a tab on drift alone, so column to inline is held after the settle too: a real Duo's bar and
   // keyboard read outside every range measured on the simulator (#132), and a wrong inline verdict committed once the

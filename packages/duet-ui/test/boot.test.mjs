@@ -19,7 +19,7 @@ function run({ inner, outer, screen, ua = SAFARI, standalone = false, framed = f
     innerWidth: inner[0], innerHeight: inner[1], outerWidth: outer[0], outerHeight: outer[1], devicePixelRatio: 3,
     screen: { width: screen[0], height: screen[1], orientation: { angle: 0 } },
     navigator: { userAgent: ua, maxTouchPoints: 5, standalone }, matchMedia: () => ({ matches: false }),
-    document: { documentElement: html }, visualViewport: { height: inner[1], scale: 1 },
+    document: { documentElement: html, querySelector: () => null }, visualViewport: { height: inner[1], scale: 1 },
   };
   g.window = g; g.top = framed ? {} : g;
   vm.runInNewContext(bootScript, g);
