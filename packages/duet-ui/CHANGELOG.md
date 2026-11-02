@@ -2,8 +2,9 @@
 
 ## Unreleased
 
+- **Behaviour change:** `menu.tabs` is no longer all or nothing, so the burger is rarer. Where the places do not all fit, the first ones stay tabs and the rest go in "…", at the widest pitch from 51.7pt down to 44pt (`placeTabs`): 9 places on a wide Home Screen are 7 tabs and "…" at 48.6pt. The burger only where fewer than three tabs would show, closed Safari and the right of Split View. Places that all fit are pixel identical. Put the primary places first.
 - **Behaviour change:** moving the controls is now an option, `moveControls`, off by default. Off: no "Move controls" row, no drag across the page, the default side even if an earlier visit stored another, and no "…" when nothing else needs it, so tabs get its room (9 places in wide Safari, 15 in tall). To keep the old behaviour pass `moveControls`.
-- Tabs use the room: when the places do not fit at the normal 51.7pt pitch, the tabs capsule tightens, down to 44pt (`tabsPitch`), before falling back to the burger. A wide Safari on the open Duo now holds 11 places, or 10 with "…". Tabs that already fit are pixel identical.
+- Tabs use the room: when the places do not fit at the normal 51.7pt pitch, the tabs capsule tightens, down to 44pt (`placeTabs`), before folding any. A wide Safari on the open Duo now holds 11 places, or 10 with "…". Tabs that already fit are pixel identical.
 - "…" no longer shows as a dark disc when the sidebar closes: it returns as closing starts, in one motion, its glass fading rather than its host.
 - A tap that dismisses "…" no longer also presses what lies under it.
 - `bootScript` sets the 84pt inset of a wide or tall Safari page on the open Duo before the first paint, so its content does not jump on mount.

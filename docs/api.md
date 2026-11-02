@@ -24,21 +24,22 @@ Props, theming, the call to action, `useDuet()` and the lower-level exports.
 
 ## The template
 
-One template on every layout, the same in Safari's column, the strip, inline and split view: the burger first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time; then the primary takes the burger's slot above "…", whose list ends with a "Menu" section (the places), and only where one button is all that fits does it fold into "…" itself. The in-app preview's gap holds one button, so it shows only "…", whose list leads with "This page", then a "Menu" section (the places). "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `placesFit`, `menuBox`, `confirmBox`) for tests and custom chrome.
+One template on every layout, the same in Safari's column, the strip, inline and split view: the burger first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time; then the primary takes the burger's slot above "…", whose list ends with a "Menu" section (the places), and only where one button is all that fits does it fold into "…" itself. The in-app preview's gap holds one button, so it shows only "…", whose list leads with "This page", then a "Menu" section (the places). "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `placeTabs`, `placesFit`, `menuBox`, `confirmBox`) for tests and custom chrome.
 
 ## Tabs or burger
 
-Pass `tabs: true` on `menu` and the app's places are tabs at the head of the capsule wherever all of them fit, and the burger with its sidebar wherever they do not. Icons are required, and an item without one keeps the burger.
+Pass `tabs: true` on `menu` and the app's places are tabs at the head of the capsule. Where not all of them fit, the first ones stay tabs and the rest go in "…". Where that leaves fewer than three tabs, the burger with its sidebar. Icons are required, and an item without one keeps the burger.
 
 ```tsx
 <Duet menu={{ items, selected, onSelect, tabs: true }} actions={actions} primary={primary}>{page}</Duet>
 ```
 
-- All or nothing: a place never sits alone in "…", and the set never splits between tabs and sidebar.
-- The app's actions and primary fold into "…" first. Only when the places do not fit beside "…" does the app fall back to the burger.
+- Put the primary places first: the order is yours, and tabs never reorder or swap on selection. 9 places on a wide Home Screen are 7 tabs and "…" holding the other 2.
+- "…" lists only the folded places, in a section ahead of folded actions and destructive items. When the selected place is folded, "…" shows the selected bubble and the list marks the place. The set never splits between tabs and sidebar.
+- The app's actions and primary fold into "…" first. The burger takes over only where fewer than three tabs would show, closed Safari and the right of Split View.
 - Where the band holds one button (closed Safari turned), a page with actions shows only "…", with the places first in its list. Without actions it shows the burger.
 - Tabs behave like the `tabs` prop: the selected one sits in a bubble in `tint`, with the same press.
-- `placesFit(context, places, rest)` is the rule, pure and exported, `rest` meaning something else needs "…". See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the room each mode has.
+- `placeTabs(context, places, rest)` is the rule, pure and exported, `rest` meaning something else needs "…". It returns `{ shown, pitch }`, or undefined for the burger. `placesFit` is whether every place is shown. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the room each mode has.
 - On the Duo, inline `bootScript`: the controls stay hidden until the chrome has mounted, so neither form shows before the right one, with no cookie or reload. See [Pre-paint boot](server-rendering.md#pre-paint-boot). On every device the nav stays hidden until hydration.
 - An open sidebar closes when tabs take over. The switch across rotation, Split View and folding goes through the usual hidden move.
 - On an iPad, phone or desktop the same rule runs on the inline template: tabs when they fit the window's height, else the burger. An app that does not pass `tabs: true` is unchanged everywhere.
@@ -103,7 +104,7 @@ Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wid
 
 ## Lower-level exports
 
-`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`, `groupHeight`, `placesFit` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`, `groupHeight`, `placeTabs`, `placesFit` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
 
 `readSignals()` returns the current `Signals` from the window, the same reading the chrome uses (browser only). `watchSignals(cb)` calls `cb` whenever they may have changed, with the triggers and settle polling described in [Which mode](how-duet-decides.md#which-mode), and returns the unsubscribe. Together with `detect` they let a page act on the mode before React mounts:
 

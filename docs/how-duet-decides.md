@@ -118,23 +118,23 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 
 ## Tabs or burger
 
-With `menu.tabs`, `tabsPitch` decides the whole set, and `placesFit` is whether it found a pitch. The places fit when `groupHeight(places + 1)` (with "…") or `groupHeight(places)` (nothing else to show) is within the mode's band, plus the 12pt a lone column group may take. A group is 49pt plus 51.7pt per further button. When that does not fit, the tabs group alone tightens its pitch to what the room allows, down to 44pt, so buttons stay 49pt tall and their icons clear, and the capsule, the "…" morph and the press lens all read that one pitch. Below 44pt, the burger. Tabs at 51.7pt are unchanged, and action groups always keep it. "…" counts when anything else needs it. A page with actions or a primary can read burger at the margin where one without reads tabs. With `moveControls`, a window that can change edge lists "Move controls" in "…", so "…" always counts there and the table's With actions column applies.
+With `menu.tabs`, `placeTabs` decides how many places are tabs and at what pitch, and `placesFit` is whether all of them are. The places fit when `groupHeight(places + 1)` (with "…") or `groupHeight(places)` (nothing else to show) is within the mode's band, plus the 12pt a lone column group may take. A group is 49pt plus 51.7pt per further button. When that does not fit, the tabs group alone tightens its pitch to what the room allows, down to 44pt, so buttons stay 49pt tall and their icons clear, and the capsule, the "…" morph and the press lens all read that one pitch. When they do not fit at 44pt either, as many leading places as fit beside "…" stay tabs, at the widest pitch from 51.7pt down to 44pt, and the others go in "…", in the app's order. The burger only when that leaves fewer than three tabs, where a tab or two and "…" would not be useful. Order is the app's, so the first places are the primary ones, and selecting a folded place swaps nothing: "…" takes the selected bubble and its list marks the place. Tabs at 51.7pt are unchanged, and action groups always keep it. "…" counts when anything else needs it. With `moveControls`, a window that can change edge lists "Move controls" in "…", so "…" always counts there and the table's With actions column applies.
 
 The band is the same one every control uses, so forward history and Live Activities need no run-time signal: Safari's column already assumes the back slot and two activities. A Home Screen app on the Duo reads its strip's room from the start, 389pt in any window, because its insets land up to 600ms late and reading them then would show tabs and then a burger. The inner screen held upright is the exception, since it runs inline.
 
-The most places that fit in each window, from the rule. Closed Safari, turned, Split View left and the capsules a left pane draws for the right were checked at the edge on the Duo simulator, and Home Screen wide and closed at 6 and 7. The counts in full-screen Safari and Home Screen tall were checked at the edge without actions, the counts with actions there follow from the same "…". A test holds this table to `placesFit`. With actions is a page with actions or a primary, without is a page with neither. The burger starts one place above the count.
+The most places that fit in each window, from the rule. Closed Safari, turned, Split View left and the capsules a left pane draws for the right were checked at the edge on the Duo simulator, and Home Screen wide and closed at 6 and 7. The counts in full-screen Safari and Home Screen tall were checked at the edge without actions, the counts with actions there follow from the same "…". A test holds this table to `placeTabs`. With actions and Without are the most places that are all tabs, on a page with actions or a primary, and on a page with neither. Past those counts is Overflow: the tabs that show beside "…" however many places there are, on any page, or the burger.
 
-| Window | With actions | Without |
-| --- | --- | --- |
-| Safari full screen, wide 951x543, with or without forward history | 10 | 11 |
-| Safari full screen, tall 669x825, with or without forward history | 16 | 17 |
-| Home Screen, wide 951x669 | 7 | 8 |
-| Home Screen, tall 669x869 | 17 | 18 |
-| Split View, left, 385x571, with or without forward history | 6 | 7 |
-| Split View, right | 1 | 2 |
-| Closed Safari, upright, 382x580, with or without forward history | 1 | 2 |
-| Closed Safari, turned, 594x368 | 0 | 1 |
-| Closed Home Screen, 466x657 | 7 | 8 |
+| Window | With actions | Without | Overflow |
+| --- | --- | --- | --- |
+| Safari full screen, wide 951x543, with or without forward history | 10 | 11 | 10 |
+| Safari full screen, tall 669x825, with or without forward history | 16 | 17 | 16 |
+| Home Screen, wide 951x669 | 7 | 8 | 7 |
+| Home Screen, tall 669x869 | 17 | 18 | 17 |
+| Split View, left, 385x571, with or without forward history | 6 | 7 | 6 |
+| Split View, right | 1 | 2 | burger |
+| Closed Safari, upright, 382x580, with or without forward history | 1 | 2 | burger |
+| Closed Safari, turned, 594x368 | 0 | 1 | burger |
+| Closed Home Screen, 466x657 | 7 | 8 | 7 |
 
 Two places on closed Safari upright, with actions: burger and "…". Where the band holds a single button, closed Safari turned, a page with actions shows only "…", because a burger there would lose the actions. In a `menu.tabs` app the places lead that list, then "This page". The same window without actions shows the burger.
 

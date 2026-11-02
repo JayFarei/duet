@@ -631,7 +631,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, an app chooses `tabs` or `menu` once. Tabs fold into "…" one at a time where room runs out, and a burger hides five places on a screen with room for all of them.
 - **Cause:** tabs merged into the actions, so nothing could turn them into a burger.
-- **Duet does:** with `menu.tabs`, `placesFit` shows every place as a tab or none: a burger with its sidebar otherwise. Actions and primary fold first. An item without an icon keeps the burger. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the measured counts.
+- **Duet does:** with `menu.tabs`, `placeTabs` keeps the places as tabs, folding the last ones into "…" when the window is short, and the burger with its sidebar only below three tabs. Actions and primary fold first. An item without an icon keeps the burger. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the measured counts.
 - **You do:** pass `tabs: true` with an icon on every item, and inline `bootScript`.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator at 2, 3, 5, 6 and 7 places in Safari wide and tall, Home Screen wide and tall, Split View both sides, closed Safari and closed Home Screen. An open sidebar closes on unfolding into tabs. A rotation at the margin (7 places on the Home Screen) shows the old form for one frame, under 5ms, as the window lands. Live Activities are modelled. Not yet seen on a device.
 
@@ -639,7 +639,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, a Home Screen app with 7 places shows tabs for about 600ms, then a burger.
 - **Cause:** the strip's insets land late. The first readings are inline with more room, and `stable()` holds that mode for 550 to 600ms.
-- **Duet does:** on a Duo Home Screen app, except the inner screen upright, `placesFit` reads the strip's room from the start, from the screen's fixed height, so it gives the same answer at launch, after rotation and once the insets land.
+- **Duet does:** on a Duo Home Screen app, except the inner screen upright, `placeTabs` reads the strip's room from the start, from the screen's fixed height, so it gives the same answer at launch, after rotation and once the insets land.
 - **You do:** nothing.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: first visible at t=153-190ms in the final form, closed and open, with the same rects when the strip commits at about 800ms.
 
@@ -735,7 +735,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** a burger on a wide Duo although the places nearly fit at the normal spacing.
 - **Cause:** the all or nothing test at 51.7pt per button ignored how much room was really left.
-- **Duet does:** `tabsPitch` tightens the tabs group alone, down to 44pt, and the capsule, the "…" morph and the press lens read that one pitch. Below 44pt, the burger.
+- **Duet does:** `placeTabs` tightens the tabs group alone, down to 44pt, and the capsule, the "…" morph and the press lens read that one pitch. Below 44pt, the last places fold into "…".
 - **You do:** nothing.
 - **Status:** unit tested, and checked on the Duo simulator.
 
@@ -762,3 +762,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** the boot script sets the inset on the controls' side before the first paint, the mounted chrome overwrites it.
 - **You do:** use `bootScript`, and pad with `--duet-inset-*`.
 - **Status:** checked on the Duo simulator.
+
+## One place too many hid every tab
+
+- **You see:** without the handling, 9 places on a wide Home Screen are all behind a burger, in a window that holds 7 tabs and "…".
+- **Cause:** the tabs rule was all or nothing.
+- **Duet does:** `placeTabs` keeps as many leading places as fit beside "…", at the widest pitch down to 44pt, and "…" lists the others ahead of folded actions and destructive items. If the selected place is folded, "…" shows the selected bubble and the list marks the place. The burger only below three tabs. Order never changes.
+- **You do:** put the primary places first.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: 9 places in wide Home Screen give 7 tabs and "…" (8 give 8 tabs), 12 in wide Safari give 10 and "…", closed Home Screen 7 and "…", Split left 6 and "…", closed Safari and Split right the burger. Selecting a folded place, the mark in the list and the press lens over "…" checked in wide Safari.
