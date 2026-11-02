@@ -233,6 +233,9 @@
   -webkit-tap-highlight-color: transparent; font-family: -apple-system, system-ui, sans-serif;
 }
 html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--duet-vh, 100vh); bottom: auto; }
+/* The height keeps the last row above Safari's bar. The surface carries on down behind the bar, which the page's canvas
+   would show otherwise; a shadow, as it adds no scrollable overflow. 240pt: the bar's 98pt plus the document's 98pt of scroll. */
+html[data-duet-mode="column"] .duet-sidebar[data-open] { box-shadow: 0 240px 0 var(--duet-solid); }
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }

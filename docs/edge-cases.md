@@ -7,6 +7,8 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Section column on the inner screen](#section-column-on-the-inner-screen)
 - [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
 - [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
+- [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
+- [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
 - [Band above a column in a Home Screen app](#band-above-a-column-in-a-home-screen-app)
 - [Burger mid-page on a wide window](#burger-mid-page-on-a-wide-window)
 - [Split view pane, or the closed Duo turned left](#split-view-pane-or-the-closed-duo-turned-left)
@@ -558,7 +560,23 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** the document spans the left column and is scrolled across it, and the sidebar started at document x 0. The page keeps clear by an inset, the sidebar did not.
 - **Duet does:** on a Duo, sets `--duet-sidebar-inset` to the page's left inset, pads the rows by it and widens the sidebar to match, so they keep their width.
 - **You do:** nothing.
-- **Status:** unit tests only. Not yet seen on the simulator. Other devices are unchanged.
+- **Status:** seen on the Duo simulator: sidebar from x -84, burger clear of the rows. Other devices are unchanged.
+
+## Page stuck pushed after resizing with the menu open
+
+- **You see:** without the handling, open the burger in Split View and drag the divider to full: the page stays pushed 340pt to the right beside a menu that no longer belongs, and the actions capsule is gone.
+- **Cause:** the open state outlived the layout it was opened in. The window crossed the 600pt split width, and the push is only right for that layout.
+- **Duet does:** on a Duo, closes the sheet when the layout changes (`sheetLayout`: mode and split). The bar compacting, or a resize within one layout, leaves it open.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, left and right pane, 951x543 after the drag: scroller x 340 before, 0 after, title x 356 before, 16 after, capsule back. Other devices are unchanged, the sheet stays open across their resizes.
+
+## Open sidebar ends short of the screen in split view
+
+- **You see:** without the handling, the open sidebar stops at the viewport's foot, 571pt, with a band of page colour down to the screen's foot behind Safari's URL pill.
+- **Cause:** a split pane's viewport ends above the bar, the bar floats over the page, and the sidebar is only as tall as the viewport.
+- **Duet does:** in a column, the open sidebar carries its colour 240pt further down with a box shadow. Its height stays the viewport's, so the last rows stay above the bar, and a shadow adds no scrollable overflow.
+- **You do:** nothing. After scrolling, Safari compacts its bar and paints it itself from 589pt down, in the page's `theme-color`. Forcing the root background to the sidebar's colour did not change it, so a theme colour unlike the sidebar's shows as a band there.
+- **Status:** seen on the Duo simulator, both panes: the pixels at 580pt and 660pt are the sidebar's colour, before they were the page's. The compacted bar's band remains. The closed screen's column has the same rule, not checked with the sidebar open there.
 
 ## Band above a column in a Home Screen app
 

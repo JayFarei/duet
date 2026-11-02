@@ -710,6 +710,10 @@ export function pageInsets(o: {
 
 /** How far the burger's sidebar keeps its rows in from the document's left edge: what the page keeps clear of there,
  *  whether by its inset or by being shifted across Safari's column. On a Duo only: elsewhere the sidebar is as it was. */
+/** What the burger's open sheet was laid out for, on a Duo: the sheet closes when this changes, since a window resized
+ *  across a split pane's width or folded leaves it pushing a page it no longer fits. Constant on other devices. */
+export const sheetLayout = (c: Context) => c.device === "duo" ? `${c.mode}${c.split ? " split" : ""}` : "";
+
 export const sidebarInset = (o: { device: Device; left: string; shift: number }) => o.device !== "duo" ? "0px" : o.shift ? `${o.shift}px` : o.left;
 
 /** Closed landscape Safari tab: its column's buttons sit apart from portrait's (SAFARI.landscape). */
