@@ -545,7 +545,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     const tabPitch = placesPitch(side), tabbed = tabPitch !== undefined;
     const burger = !!p.menu && p.menu.burger !== false && !tabbed;
     const always = folded.length + destructive.length + (move ? 1 : 0) + (p.menu && !burger && !tabbed ? 1 : 0);
-    const a = template(f, { room: p.menu?.tabs ? landingRoom(c) : undefined, close: !!p.close, menu: burger, places: tabbed ? menuItems.length : 0, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" && !tabbed, tabPitch }), placed = a.placed;
+    const a = template(f, { room: p.menu?.tabs ? landingRoom(c) : undefined, close: !!p.close, menu: burger, places: tabbed ? menuItems.length : 0, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar === "open" && !tabbed, tabPitch }), placed = a.placed;
     // No burger (the preview): the app's places close "…" under "Menu".
     const places = p.menu && !tabbed && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
     const askAt = placed.find((g) => g.group.some((s) => s.kind === "primary")), moreAt = placed.find((g) => g.group.some((s) => s.kind === "more"));
