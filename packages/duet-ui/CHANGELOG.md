@@ -5,7 +5,8 @@
 - `menu.dock`: the places stay in a column beside the page on the Duo's inner screen with the room, in Safari and on the Home Screen, and go to the burger only where the window is narrow. New `useDuet().dock`, `<html data-duet-dock>` and `--duet-dock`. Other devices are unaffected.
 - `bootScript` places the docked column from the first paint, with no cookie or reload, and hides the server-rendered controls on the inner screen until the chrome mounts.
 - Split view on a Duo: the open sidebar keeps clear of Safari's floating buttons and the burger, by the page's left inset (`--duet-sidebar-inset`).
-- The docked column covers the 21pt above a Home Screen app's viewport.
+- The docked column carries its colour above a Home Screen app's viewport with a shadow; iOS's band still shows over it.
+- Docs: pad top content by `calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px))`, which clears the status bar in a Home Screen app rotated to tall, and use the `default` status bar style. `--duet-inset-top` is unchanged.
 - Docs: `useDuet()` keeps its server snapshot until hydration, how to recognise that, and `allowedDevOrigins` for `next dev` over a LAN or VPN name.
 
 ## 0.8.0-rc.2
