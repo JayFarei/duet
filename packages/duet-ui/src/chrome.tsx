@@ -3,7 +3,7 @@
 import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
-import { DUO, columnBand, controlsShown, isSplit, pageInsets, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
+import { DUO, columnBand, controlsShown, isSplit, pageInsets, sheetLayout, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
 import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
@@ -514,6 +514,8 @@ export function Duet<T extends string = string, U extends string = string>(props
   const menuItems = p.menu?.items ?? [];
   const docked = !!p.menu?.dock && !!ctx.dock;
   useEffect(() => { if (docked) setSidebar("closed"); }, [docked]);
+  const sheet = sheetLayout(ctx);
+  useEffect(() => { setSidebar("closed"); }, [sheet]);
   // Split pane in column mode: the controls are drawn in both of Safari's possible columns (useColumnLayer).
   const split = ctx.mode === "column" && !!ctx.split, column = ctx.screenWidth - ctx.width;
   const sides: Side[] = split ? ["left", "right"] : [ctx.side];

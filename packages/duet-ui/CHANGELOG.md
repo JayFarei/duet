@@ -6,6 +6,8 @@
 - `bootScript` places the docked column from the first paint, with no cookie or reload, and hides the server-rendered controls on the inner screen until the chrome mounts.
 - Split view on a Duo: the open sidebar keeps clear of Safari's floating buttons and the burger, by the page's left inset (`--duet-sidebar-inset`).
 - The docked column covers the 21pt above a Home Screen app's viewport.
+- On a Duo, the burger's open sheet closes when the window crosses a layout (split pane to full, or folding), so the page is not left pushed beside it.
+- Column mode: the open sidebar's colour carries on to the screen's foot behind Safari's bar.
 - Docs: `useDuet()` keeps its server snapshot until hydration, how to recognise that, and `allowedDevOrigins` for `next dev` over a LAN or VPN name.
 
 ## 0.8.0-rc.2
