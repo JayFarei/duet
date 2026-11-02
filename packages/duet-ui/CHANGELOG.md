@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0-rc.3
 
 - Turning an open Duo's Home Screen app to wide no longer leaves the burger over the status clock and glides it into the strip: the controls stay hidden until the strip's inset lands, then appear in place.
 - `menu.tabs`: the app's places are tabs in the capsule when all of them fit, and the burger with its sidebar when they do not. Icons required, all or nothing, actions and primary fold first. Correct from the first paint, an open sidebar closes when tabs take over. Other apps are unchanged.
