@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { detect } from "../src/geometry.ts";
-import { allocate, frame, landingRoom, menuBox, morphHeight, placesFit, template } from "../src/template.ts";
+import { allocate, canMoveControls, frame, landingRoom, menuBox, morphHeight, placesFit, template } from "../src/template.ts";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -161,15 +161,25 @@ test("the docs' table is the rule", () => {
     "Closed Safari, turned": detect(sig(594, 368, 678, 466, { angle: 90 })),
     "Closed Home Screen": detect(sig(466, 657, 466, 678, { ...standalone, insetRight: 84 })),
   };
-  assert.match(chrome, /hasRest = \(inline: boolean\) => .*\|\| inline;/);
-  assert.match(chrome, /hasRest\(frame\(c\)\.kind === "inline"\)/);
+  assert.match(chrome, /hasRest = \(c: Context\) => .*\|\| movable\(c\);/);
   const doc = readFileSync(new URL("../../../docs/how-duet-decides.md", import.meta.url), "utf8");
   for (const [name, c] of Object.entries(windows)) {
     const row = doc.match(new RegExp(`^\\| ${name}[^|]*\\| ([^|]+) \\| ([^|]+) \\|$`, "m"));
     assert.ok(row, name);
-    // As the chrome counts it: an inline window always has "…", since "Move controls" is listed there.
-    assert.deepEqual([row[1], row[2]].map((x) => +x), [most(c, true), most(c, frame(c).kind === "inline")], name);
+    assert.deepEqual([row[1], row[2]].map((x) => +x), [most(c, true), most(c, false)], name);
   }
+});
+
+test("moveControls: only a window that can change edge offers the move, and only when the app asks", () => {
+  assert.equal(canMoveControls(detect(sig(951, 543, 951, 669))), true); // Safari full screen
+  assert.equal(canMoveControls(detect(sig(669, 869, 669, 951, { standalone: true, insetBottom: 34 }))), true); // Home Screen, tall: inline
+  assert.equal(canMoveControls(detect(sig(951, 648, 951, 669, { standalone: true, insetRight: 84 }))), false); // Home Screen, wide: the strip
+  assert.equal(canMoveControls(detect(sig(951, 648, 951, 669, { standalone: true }))), false); // the same, before its inset lands
+  assert.equal(canMoveControls(detect(sig(466, 657, 466, 678, { standalone: true, insetRight: 84 }))), false); // closed Home Screen
+  assert.equal(canMoveControls(closed), false); // Safari's column
+  assert.match(chrome, /movable = \(c: Context\) => !!p\.moveControls && canMoveControls\(c\)/);
+  assert.match(chrome, /useSideDrag\(movable\(ctx\) \? ctx\.side : null,/);
+  assert.match(chrome, /if \(!sideChoice\) return undefined;/);
 });
 
 test("the docs do not describe the removed docked column", () => {

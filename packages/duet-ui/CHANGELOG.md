@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Behaviour change:** moving the controls is now an option, `moveControls`, off by default. Off: no "Move controls" row, no drag across the page, the default side even if an earlier visit stored another, and no "…" when nothing else needs it, so tabs get its room (9 places in wide Safari, 15 in tall). To keep the old behaviour pass `moveControls`.
+- With `moveControls`, a Home Screen app in a strip no longer lists a "Move controls" row that did nothing: `canMoveControls` is true only where the controls can change edge.
 - Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place at once, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
 
 ## 0.8.0-rc.3

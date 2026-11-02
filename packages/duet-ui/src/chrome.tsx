@@ -4,7 +4,7 @@ import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, use
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, columnBand, controlsShown, isSplit, pageInsets, sheetLayout, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
-import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, morphHeight, landingRoom, placesFit, primaryTap, template, type Rect, type Slot } from "./template.ts";
+import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, morphHeight, landingRoom, canMoveControls, placesFit, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { PRESS, listenPress } from "./press.ts";
@@ -76,6 +76,10 @@ export interface DuetProps<T extends string = string, U extends string = string>
    *  `false` lets the page run under the column instead: it keeps clear by `--duet-inset-left/right`, through
    *  column() and bleed(). */
   reserve?: boolean;
+  /** Offers "Move controls left/right" in "…" and the drag across the page, in a window where the controls can change
+   *  edge (`canMoveControls`), and honours the side the user chose. Default `false`: the controls stay on the default
+   *  side, whatever an earlier visit stored, and this adds nothing to "…". */
+  moveControls?: boolean;
 }
 
 // --- context ------------------------------------------------------------------------------------
@@ -87,8 +91,11 @@ const envInset = (side: Side) => { const e = emulatedSignals(); return e ? `${si
 const sideKey = (split: boolean) => split ? "duet-side-split" : "duet-side";
 const preferred = new Map<string, Side | null>();
 const listeners = new Set<() => void>();
+// Off unless the app passes moveControls: a side stored by an earlier visit stays unread.
+let sideChoice = false;
 /** undefined until the user moves the controls: then detect() picks the side for the context. */
 function preferredSide(split: boolean): Side | undefined {
+  if (!sideChoice) return undefined;
   const key = sideKey(split);
   if (!preferred.has(key)) { try { const v = localStorage.getItem(key); preferred.set(key, v === "left" || v === "right" ? v : null); } catch { preferred.set(key, null); } }
   return preferred.get(key) ?? undefined;
@@ -519,10 +526,11 @@ export function Duet<T extends string = string, U extends string = string>(props
   const [menuSide, setMenuSide] = useState<Side>(ctx.side);
   const inner = p.children !== undefined; // the inner scroller, which runs on under Safari's column
   // Whether this side's copy has the places as tabs. Each copy of a split pane decides for its own column: their rooms differ.
-  const hasRest = (inline: boolean) => actions.length > 0 || !!p.primary || folded.length + destructive.length > 0 || inline;
+  const movable = (c: Context) => !!p.moveControls && canMoveControls(c);
+  const hasRest = (c: Context) => actions.length > 0 || !!p.primary || folded.length + destructive.length > 0 || movable(c);
   const placesAsTabs = (side: Side) => {
     const c = side === ctx.side ? ctx : { ...ctx, side };
-    return !!p.menu?.tabs && menuItems.every((i) => i.icon) && placesFit(c, menuItems.length, hasRest(frame(c).kind === "inline"));
+    return !!p.menu?.tabs && menuItems.every((i) => i.icon) && placesFit(c, menuItems.length, hasRest(c));
   };
   // A switch leaves nothing open: "…" lists something else now, and with no burger left nothing could close the sheet.
   const asTabs = sides.map(placesAsTabs), tabsKey = asTabs.join();
@@ -533,10 +541,10 @@ export function Duet<T extends string = string, U extends string = string>(props
   // The template for one side: its groups, where they go, and what "…" lists.
   const layout = (side: Side) => {
     const c = side === ctx.side ? ctx : { ...ctx, side }, f = frame(c);
-    const inline = f.kind === "inline";
+    const move = movable(c);
     const tabbed = placesAsTabs(side);
     const burger = !!p.menu && p.menu.burger !== false && !tabbed;
-    const always = folded.length + destructive.length + (inline ? 1 : 0) + (p.menu && !burger && !tabbed ? 1 : 0);
+    const always = folded.length + destructive.length + (move ? 1 : 0) + (p.menu && !burger && !tabbed ? 1 : 0);
     const a = template(f, { room: p.menu?.tabs ? landingRoom(c) : undefined, close: !!p.close, menu: burger, places: tabbed ? menuItems.length : 0, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar !== "closed" && !tabbed }), placed = a.placed;
     // No burger (the preview): the app's places close "…" under "Menu".
     const places = p.menu && !tabbed && !placed.some((g) => g.group.some((s) => s.kind === "menu")) ? menuItems : [];
@@ -544,7 +552,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     // Sharing a capsule with "…", the primary is in the capsule that turns into the list, so the list leads with it.
     const list: DuetItem[] = [
       ...(askAt && askAt === moreAt ? [p.primary!] : []), ...actions.slice(a.shown), ...(p.primary && !a.primary ? [p.primary] : []), ...folded,
-      ...(inline ? [{ id: "duet-side", label: `Move controls ${side === "left" ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
+      ...(move ? [{ id: "duet-side", label: `Move controls ${side === "left" ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
         setMore("closed");
         if (nav.current) switchSide(nav.current, side === "left" ? "right" : "left");
       } }] : []),
@@ -556,6 +564,8 @@ export function Duet<T extends string = string, U extends string = string>(props
   };
 
   const reserve = p.reserve !== false;
+  // Before paint, so a remembered side lands with the first frame of an app that offers the move.
+  useLayout(() => { if (sideChoice !== !!p.moveControls) { sideChoice = !!p.moveControls; refresh(); listeners.forEach((f) => f()); } }, [!!p.moveControls]);
   useEffect(() => {
     // The page spans the window and the controls float over it; these insets are how far text and buttons keep
     // clear on each edge (layout.ts). In Safari's column the scroller runs on under the column (an emulated
@@ -630,7 +640,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     addEventListener("pointerdown", close);
     return () => { removeEventListener("pointerdown", close); if (columnMiss === dismiss) columnMiss = null; };
   }, [open, nav, nav2]); // eslint-disable-line react-hooks/exhaustive-deps -- dismiss only sets state
-  useSideDrag(ctx.mode === "inline" ? ctx.side : null, nav, () => { setMore("closed"); setArmed(false); setAsk("closed"); });
+  useSideDrag(movable(ctx) ? ctx.side : null, nav, () => { setMore("closed"); setArmed(false); setAsk("closed"); });
   const pressCtx = useRef(ctx);
   pressCtx.current = ctx;
   useEffect(() => listenPress(() => [nav.current, nav2.current], (el) => {

@@ -595,9 +595,25 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** a `menu.tabs` app without actions, full-screen Safari at 951x543 with 9 places or at 669x825 with 15: a burger and "…", where the table in the docs said tabs fit.
 - **Cause:** the table counted those windows with no "…". Inline windows, which include a Home Screen app's, always list "Move controls" there, so "…" always takes a slot.
-- **Duet does:** nothing changes, the capsule keeps "…" so the controls can still be moved. The table now gives 8 and 14, 6 for Home Screen wide and closed, and 15 for Home Screen tall, whatever the page's actions. A test holds it to the chrome's count.
-- **You do:** nothing. Plan on the "With actions" column unless the window is Safari's column or a split pane.
+- **Duet does:** superseded, see "A \"…\" with nothing in it but Move controls". "…" no longer counts unless something is in it, and a test holds the table to the rule.
+- **You do:** nothing.
 - **Status:** seen on the Duo simulator without actions, at each limit and one above, in Safari wide and tall, Home Screen wide and tall and closed Home Screen.
+
+## A "…" with nothing in it but Move controls
+
+- **You see:** an app that does not want its controls moved still has a "…" holding only "Move controls left", and that "…" costs a tab its room. A side stored by an earlier visit keeps the controls on that side.
+- **Cause:** every inline window listed the row and honoured the stored side, with no way to opt out.
+- **Duet does:** moving the controls is the `moveControls` prop, off by default. Off, there is no row, no drag and no stored side.
+- **You do:** pass `moveControls` if your users should be able to move the controls.
+- **Status:** seen on the Duo simulator, wide Safari, before and after.
+
+## "Move controls left" that does nothing on a Home Screen app
+
+- **You see:** a Home Screen app, wide on the Duo, with `moveControls`: tap "Move controls left", the menu closes and the controls stay.
+- **Cause:** the row was listed by the frame's kind, and a strip's frame is inline too, but a strip's side comes from its safe-area inset, not from the user's choice.
+- **Duet does:** lists the row and allows the drag only where `canMoveControls` holds: inline and not a strip, including a Home Screen app whose inset has not landed yet.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, Home Screen at 951x669, before and after.
 
 ## Docs describing the removed docked column
 

@@ -126,6 +126,9 @@ export function place(f: Frame, groups: Group[]): Placed[] {
 const stripFrame = (c: Context) => c.duo && c.standalone && !(c.width >= WIDE && c.height > c.width) ? frame({ ...c, mode: "strip", height: DUO_SIZES[0][1], offsetTop: 0 }) : undefined;
 /** The room a menu.tabs app allocates from in this window, where the window's own band would mislead (stripFrame). */
 export const landingRoom = (c: Context) => { const f = stripFrame(c); return f && f.bottom - f.top; };
+/** Whether this window lets the controls change edge (moveControls): inline only. A strip sits on the edge its inset
+ *  gives it, and a Home Screen app reads inline only until that inset lands, so neither may offer a move that cannot happen. */
+export const canMoveControls = (c: Context) => c.mode === "inline" && !stripFrame(c);
 
 /** Whether the app's places go in the capsule as tabs (menu.tabs) rather than behind the burger: all of them in one
  *  capsule, plus "…" when anything else (`rest`: actions, the primary, anything "…" lists) needs folding. Never in the
