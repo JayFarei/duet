@@ -141,9 +141,6 @@ export interface Context {
   /** "wide" when the page has room for two panes side by side (the open Duo, full width), else "narrow"
    *  (closed, split view, closed landscape). From the window width, not the posture. */
   layout: Layout;
-  /** Room for a docked section column (`menu.dock`): the Duo's inner screen at a wide size, in Safari or on the Home
-   *  Screen. Absent on the closed screen, in split view and on every other device. Also `<html data-duet-dock>`. */
-  dock?: true;
   /** Running on an iPhone Duo, in any posture or mode (see isDuo). */
   duo: boolean;
   /** A Safari split-view pane on the open Duo (see isSplit). In column mode nothing tells which pane it is, so
@@ -300,7 +297,7 @@ function unfoldedPreview(s: Signals): "wide" | "tall" | undefined {
 /** Window and screen sizes only the Duo has, as [short, long] sides: the closed screen (Safari's `screen.*` keeps
  *  466x678 after unfolding, so it holds in every Safari state), the open screen, and a split-view pane's window.
  *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
-const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
+export const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
 export const isDuo = (s: Signals) => isIOS(s) !== false && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
 
@@ -390,14 +387,13 @@ export const keyboardUp = (s: Signals) => s.editing !== false && (shortView(s) |
 /** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
  *  caller holds a sticky one (stable()). */
 export function detect(s: Signals, preferred?: Side, allowColumn = true, preview = isPreview(s)): Context {
-  const c = detectMode(s, preferred, allowColumn, preview);
-  return dockRoom(s, c) ? { ...c, dock: true } : c;
+  return detectMode(s, preferred, allowColumn, preview);
 }
 
-/** Room for a docked section column: a Duo's inner screen, wide, whatever Safari or the Home Screen makes of it. The
- *  closed screen (678 wide on the Home Screen, turned) and split panes keep the burger, and so does the in-app preview.
- *  The screen's short side rules out an iPad window that happens to be the open Duo's size (deviceOf). */
-const dockRoom = (s: Signals, c: Context) => c.device === "duo" && !c.preview && !c.split && (s.innerWidth >= WIDE || launching(s))
+/** The Duo's inner screen with room, for the boot script: the server's controls stand at the closed screen's places
+ *  there, so they wait for the mounted chrome. Not the closed screen (678 wide on the Home Screen, turned), a split pane
+ *  or the in-app preview. The screen's short side rules out an iPad window the open Duo's size (deviceOf). */
+export const openRoom = (s: Signals, c: Context) => c.device === "duo" && !c.preview && !c.split && (s.innerWidth >= WIDE || launching(s))
   && Math.max(s.outerWidth, s.outerHeight) > 679 && Math.min(s.screenWidth, s.screenHeight) < 700;
 
 /** A Home Screen app starting on the inner screen: iOS already reports the open screen's outer size, but the page is

@@ -1,11 +1,10 @@
-// A Home Screen launch on the Duo's inner screen and a forced appearance, before the page has settled. iOS first
+// A Home Screen launch on the Duo's inner screen, before the page has settled. iOS first
 // reports the closed screen's window inside the open screen's outer size, in both orientations, with insets 0, then
 // lands (measured on the Duo simulator, iOS 27.1). Everything here is the window before the landing.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { detect, stable, PREVIEW_RISE } from "../src/geometry.ts";
+import { stable, PREVIEW_RISE } from "../src/geometry.ts";
 
 const bootScript = await (await import("../scripts/boot.mjs")).bundle();
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
@@ -34,10 +33,10 @@ function boot(s) {
   return Object.fromEntries(attrs);
 }
 
-test("web app launch, both ways up: the rail in place and the controls waiting from the first paint", () => {
+test("web app launch, both ways up: the controls waiting from the first paint", () => {
   for (const s of [LAUNCH_WIDE, LAUNCH_TALL, sig(466, 669, 951, 669)]) {
     const a = boot(s);
-    assert.ok("data-duet-dock" in a && "data-duet-pending" in a, JSON.stringify(a));
+    assert.ok("data-duet-pending" in a, JSON.stringify(a));
     assert.ok(!("data-duet-mode" in a));
   }
 });
@@ -52,9 +51,7 @@ test("not a launch: the first paint is what it was", () => {
     desktop: sig(466, 678, 951, 669, { userAgent: MAC, touchPoints: 0, screenWidth: 1512, screenHeight: 982 }),
   };
   for (const [name, s] of Object.entries(untouched)) {
-    assert.ok(!detect(s).dock, name);
     assert.ok(!("data-duet-pending" in boot(s)) || name === "closed Safari tab", name);
-    assert.ok(!("data-duet-dock" in boot(s)), name);
   }
 });
 
@@ -94,12 +91,4 @@ test("only the first reading counts: a running app whose inset goes away is not 
 
 test("full screen fit none keeps inner 867 inside outer 951: not a launch", () => {
   assert.notEqual(stable({}, sig(867, 669, 951, 669), undefined, 0).hidden, "pending");
-});
-
-test("a forced appearance reaches the rail before GlassProvider has mounted, and only then", () => {
-  const css = readFileSync(new URL("../src/duet.css", import.meta.url), "utf8");
-  const chrome = readFileSync(new URL("../src/chrome.tsx", import.meta.url), "utf8");
-  assert.match(chrome, /duet-sidebar" data-appearance=\{glassTheme\(p\.appearance, p\.dark\)\}/);
-  for (const [a, solid] of [["dark", "#000"], ["light", "rgb\\(242 242 247\\)"]])
-    assert.match(css, new RegExp(`:root:not\\(\\[data-lg-theme\\]\\) \\.duet-sidebar\\[data-appearance="${a}"\\] \\{[^}]*--duet-solid: ${solid};`));
 });

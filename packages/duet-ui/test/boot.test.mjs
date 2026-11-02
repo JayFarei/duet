@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 
 const bootScript = await (await import("../scripts/boot.mjs")).bundle();
-const BUDGET = 10_000; // 8.1KB before the dock
+const BUDGET = 10_000;
 const SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
 
 function run({ inner, outer, screen, ua = SAFARI, standalone = false, framed = false }) {
@@ -33,7 +33,7 @@ test("Safari's column on the closed Duo: the column mode and its width before th
   assert.deepEqual(vars, { "--duet-column": "84px", "--duet-vh": "580px", "--duet-inset-bottom": "98px" });
 });
 
-test("the Duo's inner screen with room: the dock attribute and the controls held back, no cookie, no mode", () => {
+test("the Duo's inner screen with room: the controls held back, no cookie, no mode", () => {
   const cases = {
     "safari landscape": { inner: [951, 589], outer: [951, 669], screen: [466, 678] },
     "safari portrait": { inner: [669, 871], outer: [669, 951], screen: [466, 678] },
@@ -41,12 +41,11 @@ test("the Duo's inner screen with room: the dock attribute and the controls held
     "home screen landscape": { inner: [951, 648], outer: [951, 669], screen: [466, 678], standalone: true },
   };
   for (const [name, c] of Object.entries(cases))
-    assert.deepEqual(run(c), { attrs: { "data-duet-dock": "", "data-duet-pending": "" }, vars: {} }, name);
+    assert.deepEqual(run(c), { attrs: { "data-duet-pending": "" }, vars: {} }, name);
 });
 
-test("split view has no dock: the column and the burger's sidebar, as ever", () => {
+test("split view: the column, as ever", () => {
   const { attrs } = run({ inner: [385, 571], outer: [469, 669], screen: [466, 678] });
-  assert.equal(attrs["data-duet-dock"], undefined);
   assert.equal(attrs["data-duet-mode"], "column");
 });
 

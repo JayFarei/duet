@@ -116,6 +116,28 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 - **What does not fit folds into "…"**: actions from the last, then `primary`. "…" shows whenever something is in it. Items marked `folded` or `destructive` always sit in "…", after the ones that did not fit.
 - **Safari's column buttons are an exclusion zone for menus too.** Native chrome always paints over the page, so z-index can't help. A menu that reaches into the column keeps its top at or below `columnTop` (the reader button's worst-case bottom plus 11pt) and its bottom above Safari's pill, opening flush with the column like Safari's own menus. A menu too tall for that band opens wholly over the page, beside the column, where it may rise to the top of the page. One too tall even there caps its height and scrolls inside. Duet sets `--duet-safe-top-column` on `<html>` for your own popovers (0 outside `column` mode).
 
+## Tabs or burger
+
+With `menu.tabs`, `placesFit` decides the whole set. The places fit when `groupHeight(places + 1)` (with "…") or `groupHeight(places)` (nothing else to show) is within the mode's band, plus the 12pt a lone column group may take. A group is 49pt plus 51.7pt per further button. "…" counts when anything else needs it, so a page with actions or a primary can read burger at the margin where one without reads tabs.
+
+The band is the same one every control uses, so forward history and Live Activities need no run-time signal: Safari's column already assumes the back slot and two activities. A Home Screen app on the Duo reads its strip's room from the start, 389pt in any window, because its insets land up to 600ms late and reading them then would show tabs and then a burger. The inner screen held upright is the exception, since it runs inline.
+
+Measured on the Duo simulator, largest count that fits, of a page with "…":
+
+| Window | Tabs fit | Burger from |
+| --- | --- | --- |
+| Safari full screen, wide 951x543, with or without forward history | 7 or more | not reached at 7 |
+| Safari full screen, tall 669x825, with or without forward history | 7 or more | not reached at 7 |
+| Home Screen, wide 951x669 | 6 | 7 |
+| Home Screen, tall 669x869 | 7 or more | not reached at 7 |
+| Split View, left, 385x571, with or without forward history | 6 | 7 |
+| Split View, right | 2 | 3 |
+| Closed Safari, 382x580, with or without forward history | 2 | 3 |
+| Closed Safari, turned, 594x368 | none | 2 |
+| Closed Home Screen, 466x657 | 6 | 7 |
+
+Live Activities cannot be started on the simulator, so their effect is the modelled worst case in the band, not a measurement.
+
 ## Limitations
 
 - **Duo detection is a heuristic** from screen and window sizes plus the user agent (see above). It can misfire on devices with matching sizes and miss a Duo whose reported sizes differ.
