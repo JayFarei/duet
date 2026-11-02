@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { detect } from "../src/geometry.ts";
-import { allocate, canMoveControls, frame, landingRoom, menuBox, morphHeight, placesFit, tabsPitch, TEMPLATE, TIGHTEST_TAB_PITCH, template } from "../src/template.ts";
+import { allocate, canMoveControls, frame, landingRoom, menuBox, morphHeight, placesFit, placeTabs, FEWEST_TABS, TEMPLATE, TIGHTEST_TAB_PITCH, template } from "../src/template.ts";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -27,16 +27,65 @@ test("placesFit: all of them in one capsule, with room for \"…\" when anything
   assert.equal(placesFit(closed, 2, false), true);
 });
 
-test("tabsPitch: the normal pitch while it fits, then tighter down to the floor, then the burger", () => {
+test("placeTabs: the normal pitch while it fits, then tighter down to the floor, then the rest fold into \"…\"", () => {
   const wide = detect(sig(669, 543, 669, 951));
-  const pitches = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => tabsPitch(wide, n, true));
-  assert.equal(tabsPitch(wide, 8, true), TEMPLATE.item, "exactly what it was while it fits");
-  assert.ok(pitches[8] < TEMPLATE.item && pitches[8] >= TIGHTEST_TAB_PITCH, "9 tighten");
-  assert.equal(pitches[10], undefined, "11 go behind the burger");
+  assert.deepEqual(placeTabs(wide, 8, true), { shown: 8, pitch: TEMPLATE.item }, "exactly what it was while it fits");
+  const nine = placeTabs(wide, 9, true);
+  assert.equal(nine.shown, 9);
+  assert.ok(nine.pitch < TEMPLATE.item && nine.pitch >= TIGHTEST_TAB_PITCH, "9 tighten");
+  assert.equal(placeTabs(wide, 11, true).shown, 10, "the 11th folds");
+  assert.deepEqual(placeTabs(wide, 20, true), placeTabs(wide, 11, true), "however many there are");
+});
+
+test("placeTabs: 9 places on a wide Home Screen are 7 tabs and \"…\" at 48.6", () => {
+  const wide = detect(sig(951, 648, 951, 669, { standalone: true, insetRight: 84 }));
+  assert.deepEqual(placeTabs(wide, 9, false), { shown: 7, pitch: 48.6 });
+  assert.deepEqual(placeTabs(wide, 8, false), { shown: 8, pitch: 48.6 }, "8 fit without \"…\"");
+  assert.deepEqual(placeTabs(wide, 8, true), { shown: 7, pitch: 48.6 }, "beside \"…\", the 8th folds");
+});
+
+test("placeTabs: the widest pitch that holds them, never past the normal one", () => {
+  const left = { ...split, side: "left" };
+  const most = placeTabs(left, 20, false);
+  assert.equal(most.shown, 6);
+  assert.ok(most.pitch <= TEMPLATE.item && most.pitch >= TIGHTEST_TAB_PITCH);
+  for (let n = 1; n <= 30; n++) for (const rest of [true, false]) {
+    const t = placeTabs(left, n, rest);
+    if (t.shown < n) assert.deepEqual(t, most, `n=${n}`);
+  }
+});
+
+test("placeTabs: the burger only where fewer than three would show", () => {
+  const right = { ...split, side: "right" }, turned = detect(sig(594, 368, 678, 466, { angle: 90 }));
+  assert.equal(FEWEST_TABS, 3);
+  for (const c of [closed, right, turned]) for (const n of [3, 4, 9]) assert.equal(placeTabs(c, n, true), undefined);
+  assert.equal(placeTabs(closed, 3, false), undefined, "two places and \"…\" is not worth it");
+  assert.deepEqual(placeTabs(closed, 2, false), { shown: 2, pitch: TEMPLATE.item }, "all of them still fit");
+  assert.deepEqual(placeTabs(closed, 1, true), { shown: 1, pitch: TEMPLATE.item }, "all of them still fit");
+  assert.equal(placeTabs({ ...closed, preview: true }, 9, true), undefined);
+});
+
+test("template: overflow is the shown tabs and \"…\", whatever the actions, at any pitch", () => {
+  const f = frame(detect(sig(669, 543, 669, 951)));
+  for (const tabPitch of [TEMPLATE.item, 47]) {
+    const { placed, primary, shown } = template(f, { places: 4, actions: 3, primary: true, rest: true, tabPitch, overflow: true });
+    assert.deepEqual(placed.map((g) => g.group.map((s) => s.kind)), [["place", "place", "place", "place", "more"]]);
+    assert.deepEqual(placed[0].group.slice(0, 4).map((s) => s.index), [0, 1, 2, 3], "the app's order");
+    assert.equal(placed[0].pitch, tabPitch);
+    assert.equal(shown, 0, "every action is in the list"); assert.equal(primary, false);
+  }
+});
+
+test("chrome: \"…\" lists only the folded places, first, and takes the bubble when the selected one is there", () => {
+  assert.match(chrome, /tabbed \? menuItems\.slice\(tabbed\.shown\)/);
+  assert.match(chrome, /overflow && places\.some\(\(m\) => m\.id === p\.menu!\.selected\)/);
+  assert.match(chrome, /s\.kind === "more" && moreSelected\) \? "page"/);
+  assert.match(chrome, /role="menuitemradio" aria-checked=\{m\.id === selected\}/);
+  assert.match(chrome, /list\.length > 0 \|\| !placesFirst/);
 });
 
 test("template: tight tabs are one capsule with \"…\", every button at the one pitch, inside the band", () => {
-  const wide = detect(sig(669, 543, 669, 951)), f = frame(wide), tabPitch = tabsPitch(wide, 9, true);
+  const wide = detect(sig(669, 543, 669, 951)), f = frame(wide), tabPitch = placeTabs(wide, 9, true).pitch;
   const { placed, primary, shown } = template(f, { places: 9, actions: 2, primary: true, rest: true, tabPitch });
   assert.equal(placed.length, 1);
   assert.deepEqual(placed[0].group.map((s) => s.kind), [...Array(9).fill("place"), "more"]);
@@ -101,7 +150,7 @@ test("the dock is gone: no public option, attribute or variable", () => {
 });
 
 test("chrome: a place without an icon stays behind the burger, for callers the types do not reach", () => {
-  assert.match(chrome, /p\.menu\?\.tabs && menuItems\.every\(\(i\) => i\.icon\) \? tabsPitch\(/);
+  assert.match(chrome, /p\.menu\?\.tabs && menuItems\.every\(\(i\) => i\.icon\) \? placeTabs\(/);
 });
 
 test("placesFit: a Duo Home Screen app reads the strip's room while its inset is still landing", () => {
@@ -174,6 +223,7 @@ test("one button of room in a tabs app: the places lead \"…\"", () => {
 
 test("the docs' table is the rule", () => {
   const most = (c, rest) => { let k = 0; while (k < 20 && placesFit(c, k + 1, rest)) k++; return k; };
+  const overflow = (c) => placeTabs(c, 30, false)?.shown ?? "burger";
   const standalone = { standalone: true };
   const windows = {
     "Safari full screen, wide": detect(sig(951, 543, 951, 669)),
@@ -189,9 +239,9 @@ test("the docs' table is the rule", () => {
   assert.match(chrome, /hasRest = \(c: Context\) => .*\|\| movable\(c\);/);
   const doc = readFileSync(new URL("../../../docs/how-duet-decides.md", import.meta.url), "utf8");
   for (const [name, c] of Object.entries(windows)) {
-    const row = doc.match(new RegExp(`^\\| ${name}[^|]*\\| ([^|]+) \\| ([^|]+) \\|$`, "m"));
+    const row = doc.match(new RegExp(`^\\| ${name}[^|]*\\| ([^|]+) \\| ([^|]+) \\| ([^|]+) \\|$`, "m"));
     assert.ok(row, name);
-    assert.deepEqual([row[1], row[2]].map((x) => +x), [most(c, true), most(c, false)], name);
+    assert.deepEqual([row[1], row[2], row[3]].map((x) => x === "burger" ? x : +x), [most(c, true), most(c, false), overflow(c)], name);
   }
 });
 
