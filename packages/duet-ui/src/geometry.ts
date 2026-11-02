@@ -297,7 +297,7 @@ function unfoldedPreview(s: Signals): "wide" | "tall" | undefined {
 /** Window and screen sizes only the Duo has, as [short, long] sides: the closed screen (Safari's `screen.*` keeps
  *  466x678 after unfolding, so it holds in every Safari state), the open screen, and a split-view pane's window.
  *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
-const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
+export const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
 export const isDuo = (s: Signals) => isIOS(s) !== false && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
 
@@ -387,6 +387,27 @@ export const keyboardUp = (s: Signals) => s.editing !== false && (shortView(s) |
 /** preferred: the side the user picked for inline controls, if any. preview: the in-app preview verdict, when the
  *  caller holds a sticky one (stable()). */
 export function detect(s: Signals, preferred?: Side, allowColumn = true, preview = isPreview(s)): Context {
+  return detectMode(s, preferred, allowColumn, preview);
+}
+
+/** The Duo's inner screen with room, for the boot script: the server's controls stand at the closed screen's places
+ *  there, so they wait for the mounted chrome. Not the closed screen (678 wide on the Home Screen, turned), a split pane
+ *  or the in-app preview. The screen's short side rules out an iPad window the open Duo's size (deviceOf). */
+export const openRoom = (s: Signals, c: Context) => c.device === "duo" && !c.preview && !c.split && (s.innerWidth >= WIDE || launching(s))
+  && Math.max(s.outerWidth, s.outerHeight) > 679 && Math.min(s.screenWidth, s.screenHeight) < 700;
+
+/** A Home Screen app starting on the inner screen: iOS already reports the open screen's outer size, but the page is
+ *  still the closed screen's width (~200ms, both ways up), then in landscape the full width before its 84pt band lands
+ *  (iOS 27.1, Duo sim). Controls placed from these readings stand at the closed screen's places over half-width content.
+ *  fit none's 867 inside 951 stays what it is. */
+const launching = (s: Signals) => {
+  const near = (a: number, b: number) => Math.abs(a - b) <= 1, [w, h] = DUO_SIZES[1];
+  return s.standalone && isIOS(s) !== false && near(Math.min(s.outerWidth, s.outerHeight), w) && near(Math.max(s.outerWidth, s.outerHeight), h)
+    && Math.min(s.screenWidth, s.screenHeight) < 700
+    && (near(s.innerWidth, DUO_SIZES[0][0]) || (near(s.innerWidth, h) && s.insetLeft < STRIP_INSET && s.insetRight < STRIP_INSET));
+};
+
+function detectMode(s: Signals, preferred: Side | undefined, allowColumn: boolean, preview: boolean): Context {
   const duo = isDuo(s), browser = browserOf(s.userAgent), device = deviceOf(s), standalone = s.standalone;
   // Only a Home Screen app owns the strip: a Safari tab reports the column as an 84pt inset for a frame while folding.
   const keyboard = keyboardUp(s);
@@ -558,7 +579,9 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   if ((s.scale ?? 1) !== 1 && d.last) {
     if (d.lastKey === key) {
       const keyboard = keyboardUp(s) || undefined;
-      return { ...d.last, keyboard, confidence: "held" };
+      // A Home Screen launch passes through a scale of 2.04, its closed width drawn across the open screen.
+      if (d.pendingUntil !== undefined && now >= d.pendingUntil) d.pendingUntil = undefined;
+      return { ...d.last, keyboard, confidence: "held", ...(d.pendingUntil === undefined ? {} : { hidden: "pending" as const }) };
     }
     s = { ...s, scale: 1 };
   }
@@ -577,7 +600,7 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   const [cw, ch] = DUO_SIZES[0];
   const handedBack = raw && !isPreview(s) && (s.innerWidth > s.innerHeight) === (s.outerWidth > s.outerHeight)
     && Math.min(s.outerWidth, s.outerHeight) <= cw + 1 && Math.max(s.outerWidth, s.outerHeight) <= ch + 1;
-  const pending = !handedBack && previewPending(s);
+  const pending = (!handedBack && previewPending(s)) || launching(s);
   if (d.bornAt === undefined) [d.bornAt, d.pendingAt] = [now, pending ? now : undefined];
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
@@ -604,6 +627,10 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     if (now < d.landUntil!) return moving();
   }
   Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
+  // Turning an open Home Screen app to wide: the wide window comes ~370ms before the strip's inset, and read as inline
+  // its burger sits over the status bar. Hidden, and nothing committed, so the inset landing is taken at once, in place.
+  // Only a window not shown yet: if no strip comes, inline commits at the settle and stays.
+  if (settling && d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight) return moving();
   // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once. Safari's column
   // never leaves a tab on drift alone, so column to inline is held after the settle too: a real Duo's bar and
   // keyboard read outside every range measured on the simulator (#132), and a wrong inline verdict committed once the
@@ -693,6 +720,14 @@ export function pageInsets(o: {
     shift: 0,
   };
 }
+
+/** How far the burger's sidebar keeps its rows in from the document's left edge: what the page keeps clear of there,
+ *  whether by its inset or by being shifted across Safari's column. On a Duo only: elsewhere the sidebar is as it was. */
+/** What the burger's open sheet was laid out for, on a Duo: the sheet closes when this changes, since a window resized
+ *  across a split pane's width or folded leaves it pushing a page it no longer fits. Constant on other devices. */
+export const sheetLayout = (c: Context) => c.device === "duo" ? `${c.mode}${c.split ? " split" : ""}` : "";
+
+export const sidebarInset = (o: { device: Device; left: string; shift: number }) => o.device !== "duo" ? "0px" : o.shift ? `${o.shift}px` : o.left;
 
 /** Closed landscape Safari tab: its column's buttons sit apart from portrait's (SAFARI.landscape). */
 const landscapeColumn = (c: Context) => !c.split && !c.preview && c.screenWidth > c.screenHeight;

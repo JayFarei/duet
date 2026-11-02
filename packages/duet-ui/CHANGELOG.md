@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.0-rc.3
+
+- Turning an open Duo's Home Screen app to wide no longer leaves the burger over the status clock and glides it into the strip: the controls stay hidden until the strip's inset lands, then appear in place.
+- `menu.tabs`: the app's places are tabs in the capsule when all of them fit, and the burger with its sidebar when they do not. Icons required, all or nothing, actions and primary fold first. Correct from the first paint, an open sidebar closes when tabs take over. Other apps are unchanged.
+- Docs: the tabs table counts "…" in every inline window, since "Move controls" is always listed there: 8 and 14 in full-screen Safari, not 9 and 15, with Home Screen rows corrected too.
+- Docs: `server-rendering.md` no longer describes the removed docked column.
+- `placesFit(context, places, rest)`: the rule behind `menu.tabs`, pure and exported.
+- `menu.tabs`: the "…" list ends at its own height from a capsule taller than it, so it stays in the page. Other apps keep the height they had, on every device.
+- On a Duo, a new mode or window width closes "…", so a Home Screen app does not keep it open off the screen after a fold.
+- One button of room in a `menu.tabs` app: the places lead the "…" list. Docs: the tabs table gives the count with and without "…", tested against the rule.
+- A Home Screen `menu.tabs` app allocates its actions from the strip's room too, so an action does not fold after the first paint.
+- A Home Screen tabs app on a Duo reads its strip's room from the start, so a launch does not show tabs and then a burger.
+- A Home Screen app launching on an unfolded Duo keeps its burger and controls hidden until the window lands, instead of painting them at the closed screen's places.
+- Split view on a Duo: the open sidebar keeps clear of Safari's floating buttons and the burger, by the page's left inset (`--duet-sidebar-inset`).
+- Split view on a Duo, right pane: the open sidebar no longer leaves Safari's column white beside it, and the moving page card falls back to the sidebar's colour instead of `Canvas`.
+- On a Duo, the burger's open sheet closes when the window crosses a layout (split pane to full, or folding), so the page is not left pushed beside it.
+- Column mode: the open sidebar's colour carries on to the screen's foot behind Safari's bar.
+- Docs: pad top content by `calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px))`, which clears the status bar in a Home Screen app rotated to tall, and use the `default` status bar style. `--duet-inset-top` is unchanged.
+- Docs: `useDuet()` keeps its server snapshot until hydration, how to recognise that, and `allowedDevOrigins` for `next dev` over a LAN or VPN name.
+
 ## 0.8.0-rc.2
 
 - Light mode column buttons and capsule match native glass on the Duo: no pale seam at the caps, an edge line that darkens the page colour, and fill that keeps saturated colours (#256). Dark mode is unchanged.

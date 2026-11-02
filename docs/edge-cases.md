@@ -4,6 +4,25 @@
 
 Every iOS and Safari quirk Duet handles, what you would see without the handling, and what is left for you to do. Most need nothing from you. "Without children" means a page that renders `<Duet>` without `children`, so the document itself scrolls.
 
+- [The "…" list past the screen's foot in a tall capsule](#the--list-past-the-screens-foot-in-a-tall-capsule)
+- [The "…" list in an app that has not opted in to tabs](#the--list-in-an-app-that-has-not-opted-in-to-tabs)
+- [The "…" list off the screen after folding a Home Screen app](#the--list-off-the-screen-after-folding-a-home-screen-app)
+- [Places below the fold of "…" with one button of room](#places-below-the-fold-of--with-one-button-of-room)
+- [An action folding after a Home Screen tabs app paints](#an-action-folding-after-a-home-screen-tabs-app-paints)
+- [A burger one place before the tabs table said](#a-burger-one-place-before-the-tabs-table-said)
+- [Docs describing the removed docked column](#docs-describing-the-removed-docked-column)
+- [Five places behind a burger with room for tabs](#five-places-behind-a-burger-with-room-for-tabs)
+- [Tabs then a burger while a Home Screen app launches](#tabs-then-a-burger-while-a-home-screen-app-launches)
+- [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
+- [Controls at the closed screen's places while a Home Screen app launches](#controls-at-the-closed-screens-places-while-a-home-screen-app-launches)
+- [Burger over the clock while a Home Screen app turns to wide](#burger-over-the-clock-while-a-home-screen-app-turns-to-wide)
+- [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
+- [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
+- [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
+- [White strip beside the open sidebar in the right split pane](#white-strip-beside-the-open-sidebar-in-the-right-split-pane)
+- [Header in the status bar after rotating a Home Screen app](#header-in-the-status-bar-after-rotating-a-home-screen-app)
+- [Blank strip below a Home Screen app](#blank-strip-below-a-home-screen-app)
+- [Burger mid-page on a wide window](#burger-mid-page-on-a-wide-window)
 - [Split view pane, or the closed Duo turned left](#split-view-pane-or-the-closed-duo-turned-left)
 - [Right split pane holds two buttons](#right-split-pane-holds-two-buttons)
 - [Rubber band at the top or bottom of the page](#rubber-band-at-the-top-or-bottom-of-the-page)
@@ -530,3 +549,155 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** ends the stack at the foot of the band: 23.7pt above the screen's bottom in full screen, like native capsules, whatever the home indicator inset, and just above Safari's +/tabs pill in a split pane. A lone burger stays at the head of the page. Safari's column on the closed Duo stays centred, and a stack too tall for its band still centres.
 - **You do:** nothing. The room is unchanged from the [#110](https://github.com/JayFarei/duet/issues/110) contract, only the position inside it moved.
 - **Status:** [#254](https://github.com/JayFarei/duet/issues/254). Verified on the Duo in full screen and split left, with the capsule open under a press. Split right and the burger plus capsule layout are covered by unit tests only.
+
+## The "…" list past the screen's foot in a tall capsule
+
+- **You see:** a `menu.tabs` capsule holding five places and "…": the open list runs off the foot of the page, over Safari's buttons in Split View.
+- **Cause:** the morph kept the capsule's height when that was taller than the list. It only ever grew before tabs made a capsule that tall.
+- **Duet does:** in a `menu.tabs` app, the morph ends at the list's height, from a taller capsule as from a shorter one.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, see the release's evidence: Safari wide, Home Screen tall, Split View left. A capsule shorter than its list has the path it had.
+
+## The "…" list in an app that has not opted in to tabs
+
+- **You see:** without the handling, upgrading changes an app that did not ask for anything: its open "…" list is shorter on iPhone, iPad and desktop, 82pt instead of the capsule's 152pt, and sits somewhere else.
+- **Cause:** the fix for a tall `menu.tabs` capsule changed the morph for every app.
+- **Duet does:** only `menu.tabs` apps end at the list's height. Any other app keeps the capsule's height when that is taller, as in 0.8.0-rc.2, on every device, the Duo included. So its list can still leave blank room, or reach past the page's foot on a small screen.
+- **You do:** nothing. To get the shorter list, opt in with `menu.tabs`.
+- **Status:** same list rectangle as 0.8.0-rc.2 on the Duo simulator in Safari wide and tall, with and without a `tabs` capsule, and in Playwright WebKit at phone, iPad and desktop sizes, not on those devices.
+
+## The "…" list off the screen after folding a Home Screen app
+
+- **You see:** "…" open in a closed Home Screen app, then unfold: the list stays open at its old place, clipped by the right edge, and again on folding back.
+- **Cause:** an open list's geometry is fixed when it opens. Safari's fold changed tabs to burger and so closed it. A Home Screen app reads the same room in both windows, so nothing closed it.
+- **Duet does:** on a Duo, a new mode or window width closes "…" and any open confirmation. A height change does not, so Safari's bar collapsing leaves it open. Other devices keep what they did.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, unfolding and folding.
+
+## Places below the fold of "…" with one button of room
+
+- **You see:** closed Safari turned, a `menu.tabs` app with actions: only "…", and its list opens with the actions, so a fifth place is below the fold.
+- **Cause:** the band holds one button. A burger there would lose the actions, so "…" holds everything.
+- **Duet does:** a `menu.tabs` app lists the places first in that one button, since they are what the burger would have been. Without actions the burger shows. Other apps keep "This page" first.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator at 594x368.
+
+## An action folding after a Home Screen tabs app paints
+
+- **You see:** a Home Screen tabs app wide, after a rotation or launch: the capsule shows two actions and "…", then one action folds into "…" about 700ms later.
+- **Cause:** the places decision read the strip's room from the start, the action allocation read the inline band that holds until the inset lands.
+- **Duet does:** a `menu.tabs` app allocates from the strip's room as well, in the same windows. An app without `menu.tabs` keeps its allocation.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, rotation and cold launches, by a frame trail.
+
+## A burger one place before the tabs table said
+
+- **You see:** a `menu.tabs` app without actions, full-screen Safari at 951x543 with 9 places or at 669x825 with 15: a burger and "…", where the table in the docs said tabs fit.
+- **Cause:** the table counted those windows with no "…". Inline windows, which include a Home Screen app's, always list "Move controls" there, so "…" always takes a slot.
+- **Duet does:** nothing changes, the capsule keeps "…" so the controls can still be moved. The table now gives 8 and 14, 6 for Home Screen wide and closed, and 15 for Home Screen tall, whatever the page's actions. A test holds it to the chrome's count.
+- **You do:** nothing. Plan on the "With actions" column unless the window is Safari's column or a split pane.
+- **Status:** seen on the Duo simulator without actions, at each limit and one above, in Safari wide and tall, Home Screen wide and tall and closed Home Screen.
+
+## Docs describing the removed docked column
+
+- **You see:** [Pre-paint boot](server-rendering.md#pre-paint-boot) linked to a section that no longer exists and named an attribute the boot script no longer sets.
+- **Cause:** the column's removal missed that page.
+- **Duet does:** the page describes what `bootScript` does now, and a test keeps the removed names out of the docs.
+- **You do:** nothing. Remove any CSS you keyed on the old attribute.
+- **Status:** `test/places-tabs.test.mjs`. The boot's `data-duet-pending` was seen on the Duo simulator.
+
+## Five places behind a burger with room for tabs
+
+- **You see:** without the handling, an app chooses `tabs` or `menu` once. Tabs fold into "…" one at a time where room runs out, and a burger hides five places on a screen with room for all of them.
+- **Cause:** tabs merged into the actions, so nothing could turn them into a burger.
+- **Duet does:** with `menu.tabs`, `placesFit` shows every place as a tab or none: a burger with its sidebar otherwise. Actions and primary fold first. An item without an icon keeps the burger. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the measured counts.
+- **You do:** pass `tabs: true` with an icon on every item, and inline `bootScript`.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator at 2, 3, 5, 6 and 7 places in Safari wide and tall, Home Screen wide and tall, Split View both sides, closed Safari and closed Home Screen. An open sidebar closes on unfolding into tabs. A rotation at the margin (7 places on the Home Screen) shows the old form for one frame, under 5ms, as the window lands. Live Activities are modelled. Not yet seen on a device.
+
+## Tabs then a burger while a Home Screen app launches
+
+- **You see:** without the handling, a Home Screen app with 7 places shows tabs for about 600ms, then a burger.
+- **Cause:** the strip's insets land late. The first readings are inline with more room, and `stable()` holds that mode for 550 to 600ms.
+- **Duet does:** on a Duo Home Screen app, except the inner screen upright, `placesFit` reads the strip's room from the start, from the screen's fixed height, so it gives the same answer at launch, after rotation and once the insets land.
+- **You do:** nothing.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: first visible at t=153-190ms in the final form, closed and open, with the same rects when the strip commits at about 800ms.
+
+## Wrong layout on a fresh origin's first paint
+
+- **You see:** without the handling, a first visit paints the closed Duo's layout until hydration, or until `<DuoCookie>` reloads.
+- **Cause:** the server cannot measure the window, so it renders a closed snapshot, and a cookie only helps from the second visit.
+- **Duet does:** `bootScript` reads the window, screen and user agent before the first paint and sets `data-duet-pending` on the inner screen, so the controls wait for the mounted chrome. With `menu.tabs` the nav also waits for hydration everywhere, so neither a burger nor tabs show before the right one.
+- **You do:** inline `bootScript` as the first child of `<body>`.
+- **Status:** tested against stubbed browsers (8.7KB, budget 10KB in `test/boot.test.mjs`), and on the Duo simulator on fresh host names in closed Safari, and in Home Screen launches with no cookie. Not yet seen on a device.
+
+## Burger over the clock while a Home Screen app turns to wide
+
+- **You see:** without the handling, turning an open Duo's Home Screen app from tall to wide leaves the burger at the inline top, over the status clock and Wi-Fi, for about 900ms, then glides it to its strip place over about 450ms.
+- **Cause:** the wide window comes about 370ms before the strip's 84pt inset, and without the inset the page reads as inline. Inline committed in that window, so the inset landing was held to the settle, and the commit at the settle was "sure", which turned transitions back on.
+- **Duet does:** hides the controls, committing nothing, while a window not yet shown reads inline in a turn of a Duo's wide Home Screen app. The inset landing commits the strip at once, while transitions are still off. If no inset comes, inline commits at the settle, at most 2s, and later events do not hide it again. The match needs standalone, a Duo, and a window wider than tall and at least 600pt wide, so Safari, the iPad, phones and desktop are unchanged.
+- **You do:** nothing.
+- **Status:** `test/first-paint.test.mjs`, and on the Duo simulator at 30fps, burger and tabs forms, both directions: controls absent for 12 frames (390ms) going to wide, 8 of them the rotation itself, then in place with no movement. Going to tall was already at once. Not fixed, because iOS sets it: the rest of the wait for the inset. A launch in wide was not exercised on the simulator here, only in the tests. Not yet seen on a device.
+
+## Controls at the closed screen's places while a Home Screen app launches
+
+- **You see:** without the handling, an unfolded Duo's Home Screen app first paints the burger and controls at the closed screen's places, over content at half width, for about 200 to 300ms, in landscape and portrait.
+- **Cause:** iOS starts the app with a 466x678 viewport inside an open outer window (951x669 or 669x951), then reports `visualViewport.scale` 2.04 at 466x669 with the insets landed, then 951x669, then the strip inset. The boot script and `stable()` read the first of these as a closed screen, and a reading held at scale 2.04 dropped the hidden state.
+- **Duet does:** treats those launch readings as pending, so the controls stay hidden until the window lands. A reading held at another scale keeps the hidden state until the 1000ms cap. The match needs standalone, an open outer window, a screen under 700pt on its short side, and an inner width near 466 or 951 with no side inset yet, so a closed Duo, an iPad, Safari and desktop are unchanged.
+- **You do:** nothing.
+- **Status:** `test/first-paint.test.mjs`, and on the Duo simulator: controls hidden until t=196-247ms, then in place. Not fixed, because iOS sets it: page content is still laid out at half width for about 200ms, a launch with no band can wait up to the 1s cap, and the white launch splash comes before the document loads. Not yet seen on a device.
+
+## Sidebar under Safari's floating buttons in split view
+
+- **You see:** without the handling, in a split pane the burger's sidebar opens from the document's left edge, so Safari's buttons in its left column, and the burger, sit over its rows.
+- **Cause:** the document spans the left column and is scrolled across it, and the sidebar started at document x 0. The page keeps clear by an inset, the sidebar did not.
+- **Duet does:** on a Duo, sets `--duet-sidebar-inset` to the page's left inset, pads the rows by it and widens the sidebar to match, so they keep their width.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator: sidebar from x -84, burger clear of the rows. Other devices are unchanged.
+
+## Page stuck pushed after resizing with the menu open
+
+- **You see:** without the handling, open the burger in Split View and drag the divider to full: the page stays pushed 340pt to the right beside a menu that no longer belongs, and the actions capsule is gone.
+- **Cause:** the open state outlived the layout it was opened in. The window crossed the 600pt split width, and the push is only right for that layout.
+- **Duet does:** on a Duo, closes the sheet when the layout changes (`sheetLayout`: mode and split). The bar compacting, or a resize within one layout, leaves it open.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, left and right pane, 951x543 after the drag: scroller x 340 before, 0 after, title x 356 before, 16 after, capsule back. Other devices are unchanged, the sheet stays open across their resizes.
+
+## Open sidebar ends short of the screen in split view
+
+- **You see:** without the handling, the open sidebar stops at the viewport's foot, 571pt, with a band of page colour down to the screen's foot behind Safari's URL pill.
+- **Cause:** a split pane's viewport ends above the bar, the bar floats over the page, and the sidebar is only as tall as the viewport.
+- **Duet does:** in a column, the open sidebar carries its colour 240pt further down with a box shadow. Its height stays the viewport's, so the last rows stay above the bar, and a shadow adds no scrollable overflow.
+- **You do:** nothing. After scrolling, Safari compacts its bar and paints it itself from 589pt down, in the page's `theme-color`. Forcing the root background to the sidebar's colour did not change it, so a theme colour unlike the sidebar's shows as a band there.
+- **Status:** seen on the Duo simulator, both panes: the pixels at 580pt and 660pt are the sidebar's colour, before they were the page's. The compacted bar's band remains. The closed screen's column has the same rule, not checked with the sidebar open there.
+
+## White strip beside the open sidebar in the right split pane
+
+- **You see:** without the handling, with Safari in the right pane, the open sidebar leaves Safari's 84pt column beside it white, on a dark page too.
+- **Cause:** not the canvas. The document spans a column on each side, starting 84pt left of the viewport, and the page cannot tell which pane it is in. The page slid by the screen's width landed at x 385, still over the strip, carrying its card background, `Canvas`, which is white without a dark `color-scheme`.
+- **Duet does:** in a column, the page also slides by the left inset, `--duet-sidebar-inset`, the sidebar's shadow carries its colour across the right edge by the same inset, and the moving card takes `--duet-page`, falling back to the sidebar's colour instead of `Canvas`. The inset is 0 outside a split pane, so those columns paint as before, apart from the card's fallback colour while it leaves.
+- **You do:** nothing. Set `--duet-page` if the moving card should be your page's colour.
+- **Status:** seen on the Duo simulator, both panes, dark and light: (875,300) was white, it is now the sidebar's colour, and the burger closes the sheet. The strip no longer holds a tappable card in the right pane. A frame scan of the slide shows the fallback colour during the move; a closed screen column with the sheet open was not reached.
+
+## Header in the status bar after rotating a Home Screen app
+
+- **You see:** launched wide then rotated to tall, a page's header sits in the clock and Wi-Fi row, blurred by iOS. The burger is clear, and a relaunch looks right.
+- **Cause:** the rotated app has a safe top of 61pt (82 with `black-translucent`), launched tall it has 0. `--duet-inset-top` stays 0 there, because it holds only the blur iOS does not report, so a page padding by it alone gets 0.
+- **Duet does:** nothing changes: the burger follows the safe area, and `--duet-inset-top` keeps adding to it. Putting the safe top in the variable would double it for pages and the pane bar that add the two (title at y 134 instead of 73).
+- **You do:** pad by `calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px))` with `viewport-fit=cover`. See [Keeping the top clear](layout.md#keeping-the-top-clear).
+- **Status:** observed on the Duo simulator: variable alone, title y 12; the sum, title y 73, below the status bar, y 12 launched tall.
+
+## Blank strip below a Home Screen app
+
+- **You see:** an empty strip below the page that does not scroll: 82pt launched tall, 21pt rotated to tall or wide.
+- **Cause:** the icon was added with `black-translucent`. The viewport starts at the screen's top and ends short of its foot. The other styles do not do this.
+- **Duet does:** nothing it can: the style is read when the icon is added, and it is not Duet's meta.
+- **You do:** use `default` and add the icon again. If you keep `black-translucent`, the `html` and `body` background paints the strip. See [Status bar style](layout.md#status-bar-style-for-home-screen-apps).
+- **Status:** observed on the Duo simulator, bare page and fixture. Manifest display modes through a real Add to Home Screen were not tested.
+
+## Burger mid-page on a wide window
+
+- **You see:** on an unfolded Duo, the burger at the closed screen's position, about 393pt across, with no error.
+- **Cause:** the page has not hydrated, so `useDuet()` still holds its server snapshot. `next dev` causes this over a LAN or VPN name without `allowedDevOrigins`.
+- **Duet does:** with `bootScript`, hides those controls until the chrome mounts, so a page stuck there shows none.
+- **You do:** fix hydration. See [Server rendering](server-rendering.md).
+- **Status:** the hiding is tested against stubbed browsers.
