@@ -404,6 +404,16 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
  *  interruptible either way with its velocity kept. The capsule hides (data-morphing) and this blob takes its place,
  *  starting as the capsule (its glass, its icons on .duet-face) and ending as the menu. Driven from rAF on refs, so
  *  React renders it once per open. */
+/** The tap that dismissed a menu only dismisses it: its click stops here rather than reaching the page under the finger.
+ *  Over when that click has gone, at the next touch (a scroll has none) or after a second. */
+function swallowClick() {
+  const click = (e: MouseEvent) => { e.stopPropagation(); e.preventDefault(); done(); };
+  const done = () => { removeEventListener("click", click, true); removeEventListener("pointerdown", done, true); clearTimeout(t); };
+  const t = setTimeout(done, 1000);
+  addEventListener("click", click, true);
+  queueMicrotask(() => addEventListener("pointerdown", done, true));
+}
+
 function Morph({ open, from, pitch, slots, box, fit, onClosed, children, role = "menu", label }: { open: boolean; from: Rect; pitch: number; slots: ReactNode[]; box: Rect; fit: boolean; onClosed: () => void; children: ReactNode; role?: string; label?: string }) {
   const blob = useRef<HTMLDivElement>(null), fill = useRef<HTMLDivElement>(null), body = useRef<HTMLDivElement>(null), face = useRef<HTMLDivElement>(null);
   const st = useRef({ s: 0, v: 0, raf: 0, last: 0, clear: 0 });
@@ -634,7 +644,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     // Any touch outside the chrome closes "…" and disarms the primary, like a native context menu.
     if (!open) return;
     const close = (e: PointerEvent) => {
-      if (![nav, nav2].some((n) => n.current?.contains(e.target as Node)) && e.clientX >= 0 && e.clientX < innerWidth) dismiss();
+      if (![nav, nav2].some((n) => n.current?.contains(e.target as Node)) && e.clientX >= 0 && e.clientX < innerWidth) { dismiss(); swallowClick(); }
     };
     columnMiss = dismiss;
     addEventListener("pointerdown", close);
