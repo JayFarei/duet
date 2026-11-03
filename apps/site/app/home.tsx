@@ -172,7 +172,7 @@ function Page({ installs }: { installs: InstallStats | null }) {
 // draws: the skeleton app's nine places, the first selected, and its Share action.
 type Cap = "tab" | "on" | "more" | "burger" | "share";
 const RULES: { id: "fit" | "fold" | "burger"; k: string; h: string; p: string; caps: Cap[][] }[] = [
-  { id: "fit", k: "Every place fits", h: "Tabs", p: "Where there is room for every place, each one is a tab. Unfolded Safari holds all nine tabs.", caps: [["on", ...Array<Cap>(8).fill("tab")]] },
+  { id: "fit", k: "Every place fits", h: "Tabs", p: "Where there is room for every place, each one is a tab. Wide unfolded Safari holds all nine, and More keeps the actions.", caps: [["on", ...Array<Cap>(8).fill("tab"), "more"]] },
   { id: "fold", k: "Some places fit", h: "Tabs and More", p: "Tabs tighten to fit as many places as a comfortable tap allows. The rest go in the More button, with the actions. On the closed Duo's Home Screen, nine places show as seven tabs and More, so put primary places first.", caps: [["on", ...Array<Cap>(6).fill("tab"), "more"]] },
   { id: "burger", k: "Fewer than three fit", h: "Burger", p: "When fewer than three tabs would show, a burger opens a sidebar with every place. That happens in closed Safari upright and on the right of Split View.", caps: [["burger", "share"]] },
 ];
