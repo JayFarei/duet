@@ -572,7 +572,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     // No burger in a tabs app: the places are what it would have been, so they lead the list, a primary sharing "…" too.
     const placesFirst = !!p.menu?.tabs;
     // The selected place folded: "…" holds the bubble a tab would.
-    const moreSelected = overflow && places.some((m) => m.id === p.menu!.selected);
+    const moreSelected = (overflow && places.some((m) => m.id === p.menu!.selected)) || actions.slice(a.shown).some((t) => t.tab && t.selected);
     return { f, placed, places, list, moreAt, askAt, placesFirst, moreSelected };
   };
 

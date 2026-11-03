@@ -81,6 +81,8 @@ test("chrome: \"…\" lists only the folded places, first, and takes the bubble 
   assert.match(chrome, /tabbed \? menuItems\.slice\(tabbed\.shown\)/);
   assert.match(chrome, /overflow && places\.some\(\(m\) => m\.id === p\.menu!\.selected\)/);
   assert.match(chrome, /s\.kind === "more" && moreSelected\) \? "page"/);
+  // A selected tab from the tabs prop folded into "…" lights it too: "…" wears the selected state tabs wear.
+  assert.match(chrome, /\|\| actions\.slice\(a\.shown\)\.some\(\(t\) => t\.tab && t\.selected\)/);
   assert.match(chrome, /role="menuitemradio" aria-checked=\{m\.id === selected\}/);
   assert.match(chrome, /list\.length > 0 \|\| !placesFirst/);
 });
