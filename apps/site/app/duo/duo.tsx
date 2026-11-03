@@ -9,5 +9,5 @@ import { WebDuo } from "./web-duo";
 export function Duo(props: ComponentProps<typeof WebDuo>) {
   const [three, setThree] = useState(false);
   useEffect(() => setThree(!!document.createElement("canvas").getContext("webgl2")), []);
-  return three ? <Duo3D embed={props.embed} /> : <WebDuo {...props} />;
+  return three ? <Duo3D embed={props.embed} src={props.src} /> : <WebDuo {...props} />;
 }

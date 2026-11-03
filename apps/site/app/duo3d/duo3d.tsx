@@ -17,7 +17,7 @@ export const MOMENTS = [
   { id: "fit", label: "Tabs", state: { posture: "open", app: "safari" }, selected: "home", caption: "Unfolded, all nine places fit as tabs." },
   { id: "fold", label: "Tabs and More", state: { posture: "closed", app: "home" }, selected: "home", caption: "Room for seven: seven stay tabs, the rest go in More." },
   { id: "folded", label: "Selected", state: { posture: "closed", app: "home" }, selected: "settings", caption: "More shows Settings selected, then its list marks it." },
-  { id: "burger", label: "Burger", state: { posture: "closed", app: "safari" }, selected: "home", caption: "Fewer than three tabs fit, so a burger opens a sidebar." },
+  { id: "burger", label: "Menu", state: { posture: "closed", app: "safari" }, selected: "home", caption: "Fewer than three tabs fit, so a burger opens a sidebar." },
 ] as const satisfies readonly { id: string; label: string; state: Partial<State>; selected: string; caption: string }[];
 export type MomentId = (typeof MOMENTS)[number]["id"];
 
@@ -53,7 +53,7 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
 /** embed: the landing page's stage, no card, sized to its container. The
  *  device takes no touches until the reader asks to try it, so a swipe over it still scrolls the page, and the lock
  *  under it puts it back that way. */
-export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
+export function Duo3D({ embed = false, src: home = "/skeleton" }: { embed?: boolean; src?: string } = {}) {
   // The landing page opens on a Moment: the closed Home Screen, seven tabs and "…".
   const [s, setS] = useState<State>(embed ? { ...TOUR[0], app: "home" } : TOUR[0]);
   const [selected, setSelected] = useState<Sync["selected"]>();
@@ -67,7 +67,9 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
   // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
-  const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : "/skeleton";
+  // An example from the landing page (`duet:example`), shown in place of the skeleton until the next Moment.
+  const [site, setSite] = useState<string | null>(null);
+  const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : site ?? home;
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
   const url = useSyncExternalStore(() => () => {}, () => {
     const screens = `${location.origin}/duo3d/screen?id=${ID}`;
@@ -151,6 +153,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const moment = (id: MomentId) => {
     const m = MOMENTS.find((x) => x.id === id)!;
     setPage("");
+    setSite(null);
     setDuet(true);
     go({ ...m.state, turn: 0, upside: false }, "flat");
     // Selected shows More holding the selection for a beat, then opens its list (skeleton-app.tsx).
@@ -160,11 +163,14 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   momentRef.current = moment;
   useEffect(() => {
     const on = (e: Event) => { const id = (e as CustomEvent<MomentId>).detail; if (MOMENTS.some((m) => m.id === id)) momentRef.current(id); };
+    // An example: its posture from a Moment, then its page.
+    const ex = (e: Event) => { const { src, moment: id } = (e as CustomEvent<{ src: string; moment: MomentId }>).detail; momentRef.current(id); setSite(src); };
     addEventListener("duet:moment", on);
-    return () => removeEventListener("duet:moment", on);
+    addEventListener("duet:example", ex);
+    return () => { removeEventListener("duet:moment", on); removeEventListener("duet:example", ex); };
   }, []);
   const picked = selected?.id ?? "home";
-  const at = MOMENTS.find((m) => stand === "flat" && !s.turn && !s.upside && !page && duet && m.state.posture === s.posture && m.state.app === s.app && (m.id === "folded") === (picked === "settings"));
+  const at = MOMENTS.find((m) => stand === "flat" && !s.turn && !s.upside && !page && !site && duet && m.state.posture === s.posture && m.state.app === s.app && (m.id === "folded") === (picked === "settings"));
 
   const safari = s.app === "safari" || s.app === "split", preview = s.app === "sheet";
   const split = s.app === "split";

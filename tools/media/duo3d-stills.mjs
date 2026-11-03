@@ -11,8 +11,13 @@ import { chromium } from "@playwright/test";
 const PORT = process.argv[2] ?? "3500";
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "../../apps/site/public/media");
 const TMP = mkdtempSync(join(tmpdir(), "duo3d-"));
-// Moment id on the stage, file name on the site.
-const SHOTS = [["fit", "form-tabs"], ["folded", "form-more"], ["burger", "form-menu"]];
+// The event the stage takes, its detail, and the file name on the site: the three forms, then the example pages.
+const SHOTS = [
+  ["duet:moment", "fit", "form-tabs"], ["duet:moment", "folded", "form-more"], ["duet:moment", "burger", "form-menu"],
+  ["duet:example", { src: "/panes", moment: "fit" }, "example-panes"],
+  ["duet:example", { src: "/sheet", moment: "burger" }, "example-sheet"],
+  ["duet:example", { src: "/book", moment: "fold" }, "example-book"],
+];
 
 const clear = "html,body,main,section,.stage,.duet-scroller{background:transparent!important}";
 const b = await chromium.launch({ args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
@@ -30,8 +35,8 @@ await p.addStyleTag({ content: `${clear} .moments{display:none!important}` });
 // The undo, redo, unfold and lock bar over the device.
 await p.evaluate(() => { const bar = document.querySelector(".stage input[type=range]")?.parentElement; if (bar) bar.style.visibility = "hidden"; });
 await (await frame.elementHandle()).contentFrame().then((f) => f.addStyleTag({ content: "html,body{background:transparent!important}" }));
-for (const [moment, name] of SHOTS) {
-  await p.evaluate((m) => dispatchEvent(new CustomEvent("duet:moment", { detail: m })), moment);
+for (const [type, detail, name] of SHOTS) {
+  await p.evaluate(([t, d]) => dispatchEvent(new CustomEvent(t, { detail: d })), [type, detail]);
   await p.waitForTimeout(4500);
   const png = join(TMP, `${name}.png`);
   await p.screenshot({ path: png, omitBackground: true, clip: await frame.boundingBox() });

@@ -135,10 +135,10 @@ function Page({ installs }: { installs: InstallStats | null }) {
         <Duo embed src="/skeleton" />
       </section>
 
-      <Section id="rules" title="How it works" lede="Three steps, and only the first one is yours.">
+      <Section id="rules" title="How it works" lede="You list your places. Duet does the rest.">
         <Steps />
         <h3 className="h3">Where the controls go</h3>
-        <p className="lede lede-l">Duet picks one of three places from the device, the browser and the window. Your app does not choose.</p>
+        <p className="lede lede-l">Duet picks the spot from the device and the browser.</p>
         <div className="tiles">
           {ISLANDS.map(([where, mode, text, clip]) => (
             <div key={mode} className="tile">
@@ -150,20 +150,21 @@ function Page({ installs }: { installs: InstallStats | null }) {
           ))}
         </div>
         <h3 className="h3">How big they are</h3>
-        <p className="lede lede-l">Duet draws the biggest of three forms that fits the room it measured. Less room, smaller controls.</p>
+        <p className="lede lede-l">The biggest form that fits. Less room, smaller controls.</p>
         <Rules />
       </Section>
 
-      <Section id="docs" title="Docs and examples" lede="Wrap your app and pass your places, primary places first. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
+      <Section id="docs" title="Docs" lede="Wrap your app and list your places, most used first.">
         <Integrate />
-        <div className="ctas" style={{ justifyContent: "flex-start" }}>
-          <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
-          <a href="/panes" className="pill">Panes example</a>
-          <a href="/sheet" className="pill">Sheets example</a>
-          <a href="/book" className="pill">Call to action example</a>
-        </div>
-        <h3 className="h3">What's in duet-ui</h3>
+        <h3 className="h3">Examples</h3>
+        <p className="lede lede-l">Real pages, played on the Duo above.</p>
+        <Examples />
+        <h3 className="h3">What's included</h3>
+        <p className="lede lede-l">Each one links to its docs.</p>
         <Library />
+        <div className="ctas ctas-l">
+          <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
+        </div>
       </Section>
 
       <Footer />
@@ -171,18 +172,48 @@ function Page({ installs }: { installs: InstallStats | null }) {
   );
 }
 
-// Everything the library ships, each with the prop or export that turns it on (docs/api.md, docs/layout.md).
+// The example pages, each played on the stage's 3D Duo at a Moment (duo3d.tsx `duet:example`). Stills from
+// tools/media/duo3d-stills.mjs.
+const EXAMPLES = [
+  { id: "panes", moment: "fit", k: "Panes", h: "Mail", p: "Mailboxes, list and message side by side when unfolded." },
+  { id: "sheet", moment: "burger", k: "Sheets", h: "Notes", p: "A sheet over the page. Its close button moves into Safari's column." },
+  { id: "book", moment: "fold", k: "Main button", h: "Classes", p: "Book a class from one tinted button, always on screen." },
+] as const;
+
+function Examples() {
+  const play = (id: string, moment: string) => {
+    dispatchEvent(new CustomEvent("duet:example", { detail: { src: `/${id}`, moment } }));
+    document.querySelector(".stage")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  return (
+    <div className="tiles">
+      {EXAMPLES.map((x) => (
+        <div key={x.id} className="tile rule example">
+          <div className="rule-shot"><img src={`/media/example-${x.id}.webp`} alt={`The ${x.h} example on the Duo`} loading="lazy" /></div>
+          <p className="tile-k">{x.k}</p>
+          <h3 className="tile-h">{x.h}</h3>
+          <p className="tile-p">{x.p}</p>
+          <div className="rule-row">
+            <button className="rule-show" onClick={() => play(x.id, x.moment)}>Play on the Duo</button>
+            <a className="rule-link" href={`/${x.id}`}>Open</a>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Everything the library ships, in plain names, each linking to its docs (docs/api.md).
 const DOC = `${REPO}/blob/main/docs`;
 const LIBRARY = [
-  { h: "Tabs and More", code: "menu={{ items, tabs: true }}", p: "Your places as tabs while they fit, the rest in “…”.", href: `${DOC}/api.md#tabs-or-burger` },
-  { h: "Menu", code: "menu={{ items }}", p: "A burger that opens a sidebar with every place, each keeping its scroll.", href: `${DOC}/api.md#duet` },
-  { h: "Actions and “…”", code: "actions={[…]}", p: "Round buttons while they fit, then “…”. Destructive ones go last, in red.", href: `${DOC}/api.md#the-template` },
-  { h: "Call to action", code: "primary={…}", p: "One tinted button always on screen. A tap opens a confirmation.", href: "/book" },
-  { h: "Panes", code: "<DuetPanes>", p: "One pane closed, two side by side unfolded, such as a chat beside its artifact.", href: "/panes" },
-  { h: "Sheets and modals", code: "column mode", p: "Sheets that stay clear of the controls in Safari's column.", href: "/sheet" },
-  { h: "useDuet()", code: "useDuet()", p: "The device, browser, layout and room Duet decided on, for your own code.", href: `${DOC}/api.md#useduet` },
-  { h: "Theme", code: "tint, appearance, icons", p: "Your accent and icon sizes, light and dark, like iOS's tintColor.", href: `${DOC}/api.md#theming` },
-  { h: "Server rendering", code: "pre-paint boot", p: "The controls in place on first paint, no flash.", href: `${DOC}/server-rendering.md` },
+  { h: "Tabs", p: "Your places as tabs. What doesn't fit goes in “…”.", href: `${DOC}/api.md#tabs-or-burger` },
+  { h: "Menu", p: "One button that opens a sidebar with every place.", href: `${DOC}/api.md#duet` },
+  { h: "Buttons", p: "Actions such as Share, as round buttons beside the tabs.", href: `${DOC}/api.md#the-template` },
+  { h: "Main button", p: "One tinted button that stays on screen, such as Book.", href: "/book" },
+  { h: "Panes", p: "One pane closed, two side by side unfolded.", href: "/panes" },
+  { h: "Sheets", p: "Sheets and modals that stay clear of the controls.", href: "/sheet" },
+  { h: "useDuet", p: "The device, browser and layout, for your own code.", href: `${DOC}/api.md#useduet` },
+  { h: "Colors", p: "Your accent color, light and dark.", href: `${DOC}/api.md#theming` },
 ];
 
 function Library() {
@@ -190,7 +221,6 @@ function Library() {
     <div className="tiles lib">
       {LIBRARY.map((x) => (
         <a key={x.h} href={x.href} className="tile lib-item">
-          <code className="lib-code">{x.code}</code>
           <h3 className="tile-h">{x.h}</h3>
           <p className="tile-p">{x.p}</p>
         </a>
@@ -228,9 +258,9 @@ function Steps() {
 // The three forms, each pictured by the stage's 3D Duo at its moment (duo3d.tsx, tools/media/duo3d-stills.mjs), with a
 // button that plays that moment on the stage.
 const FORMS = [
-  { id: "tabs", moment: "fit", k: "Unfolded Safari", h: "Every place is a tab", p: "Each place is one tap away. “…” holds your actions, here Share." },
-  { id: "more", moment: "folded", k: "Closed, from the Home Screen", h: "Tabs and More", p: "As many places as fit stay tabs, the rest go in “…” above your actions. So put primary places first." },
-  { id: "menu", moment: "burger", k: "Closed Safari, and Split View", h: "A menu", p: "Fewer than three tabs would fit, so one button opens a sidebar with every place." },
+  { id: "tabs", moment: "fit", k: "Unfolded Safari", h: "Tabs", p: "Every place is one tap away." },
+  { id: "more", moment: "folded", k: "Closed, Home Screen", h: "Tabs and More", p: "What doesn't fit goes in “…”, with your actions." },
+  { id: "menu", moment: "burger", k: "Closed Safari", h: "Menu", p: "One button opens a sidebar with every place." },
 ] as const;
 
 function Rules() {
@@ -239,24 +269,17 @@ function Rules() {
     document.querySelector(".stage")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
   return (
-    <>
-      <div className="tiles">
+    <div className="tiles">
         {FORMS.map((f) => (
           <div key={f.id} className="tile rule">
-            <div className="rule-shot"><img src={`/media/form-${f.id}.webp`} alt={`The Duo with ${f.h.toLowerCase()}`} loading="lazy" /></div>
+            <div className="rule-shot"><img src={`/media/form-${f.id}.webp`} alt={`The Duo showing ${f.h}`} loading="lazy" /></div>
             <p className="tile-k">{f.k}</p>
             <h3 className="tile-h">{f.h}</h3>
             <p className="tile-p">{f.p}</p>
             <button className="rule-show" onClick={() => show(f.moment)}>Show on the Duo</button>
           </div>
         ))}
-      </div>
-      <ul className="rule-notes">
-        <li>When the selected place is in More, the More button shows the selection. Nothing reorders.</li>
-        <li>More lists the places it holds first, then your actions, then destructive ones.</li>
-        <li>Moving the controls to the other side is opt-in, with <code>moveControls</code>.</li>
-      </ul>
-    </>
+    </div>
   );
 }
 
