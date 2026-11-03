@@ -9,7 +9,7 @@
 - A tap that dismisses "…" no longer also presses what lies under it.
 - `bootScript` sets the 84pt inset of a wide or tall Safari page on the open Duo before the first paint, so its content does not jump on mount.
 - With `moveControls`, a Home Screen app in a strip no longer lists a "Move controls" row that did nothing: `canMoveControls` is true only where the controls can change edge.
-- Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place at once, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
+- Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place after about 0.5s, once the tall status clock has faded, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
 - Closed Duo, Home Screen app turned sideways: the capsule stays on the screen. It used to run 61pt past the foot of the screen with 9 places, hiding the last tabs and "…".
 - Closed Duo turned sideways, same window at 5 places: the capsule used to end 16pt past the foot of the window, cutting the fifth tab. It now ends inside it.
 - `menu.tabs`: the places lead the "…" list also when the primary shares the capsule with "…", as on closed Safari upright with actions. The primary used to come first, ahead of the places.
