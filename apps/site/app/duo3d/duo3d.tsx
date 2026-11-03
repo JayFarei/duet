@@ -14,10 +14,10 @@ const SWAP = 450; // the interface turns upright this far into the device's turn
  *  controls are the docs' table (how-duet-decides.md, Tabs or burger). home.tsx's rule cards send the same ids as a
  *  `duet:moment` window event. */
 export const MOMENTS = [
-  { id: "fit", label: "All fit", state: { posture: "open", app: "safari" }, selected: "home", caption: "Unfolded, there is room for all nine places as tabs." },
-  { id: "fold", label: "Fold into …", state: { posture: "closed", app: "home" }, selected: "home", caption: "Room for seven: the first seven stay tabs, the rest fold into …" },
-  { id: "folded", label: "Selected is folded", state: { posture: "closed", app: "home" }, selected: "settings", caption: "Pick a folded place and … takes the selection. Nothing reorders." },
-  { id: "burger", label: "Burger", state: { posture: "closed", app: "safari" }, selected: "home", caption: "Fewer than three tabs would show, so the burger opens a sidebar." },
+  { id: "fit", label: "Tabs", state: { posture: "open", app: "safari" }, selected: "home", caption: "Unfolded, there is room for all nine places as tabs." },
+  { id: "fold", label: "Tabs and More", state: { posture: "closed", app: "home" }, selected: "home", caption: "Room for seven: the first seven stay tabs, the rest go in the More button." },
+  { id: "folded", label: "Selected in More", state: { posture: "closed", app: "home" }, selected: "settings", caption: "Settings sits in More, so the More button shows the selection and its list marks Settings. Nothing reorders." },
+  { id: "burger", label: "Burger", state: { posture: "closed", app: "safari" }, selected: "home", caption: "Fewer than three tabs would show, so a burger opens a sidebar with every place." },
 ] as const satisfies readonly { id: string; label: string; state: Partial<State>; selected: string; caption: string }[];
 export type MomentId = (typeof MOMENTS)[number]["id"];
 
@@ -56,7 +56,7 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
 export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   // The landing page opens on a Moment: the closed Home Screen, seven tabs and "…".
   const [s, setS] = useState<State>(embed ? { ...TOUR[0], app: "home" } : TOUR[0]);
-  const [selected, setSelected] = useState<{ id: string; at: number }>();
+  const [selected, setSelected] = useState<Sync["selected"]>();
   const [deg, setDeg] = useState(0);
   const [stand, setStand] = useState<Stand>("flat");
   const [upright, setUpright] = useState<Turn>(0);
@@ -153,7 +153,8 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     setPage("");
     setDuet(true);
     go({ ...m.state, turn: 0, upside: false }, "flat");
-    setSelected({ id: m.selected, at: Date.now() });
+    // Selected in More opens the More list too, so the folded selection shows at stage scale.
+    setSelected({ id: m.selected, at: Date.now(), open: id === "folded" });
   };
   const momentRef = useRef(moment);
   momentRef.current = moment;
@@ -265,7 +266,9 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
         {MOMENTS.map((m) => <button key={m.id} className="moment" aria-pressed={at?.id === m.id} onClick={() => moment(m.id)}>{m.label}</button>)}
       </div>
       <p className="moments-cap" aria-live="polite">{at?.caption ?? "Duet measures the room and picks the largest controls that fit."}</p>
-      <p className="moments-hint">Unlock, then press and drag across the tabs and …</p>
+      {manual
+        ? <p className="moments-hint">Press and drag along the tabs to see the lens. Drag the device to turn it.</p>
+        : <button className="moments-try" onClick={() => setManual(true)}><Lock size={14} aria-hidden />Unlock to try the controls</button>}
     </div>
   );
 

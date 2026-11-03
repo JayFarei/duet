@@ -212,3 +212,7 @@ html[data-duet-close] .sheet-x { display: none; }
 .rule-notes { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font: 400 16px/1.5 -apple-system, system-ui; }
 .rule-notes li + li { margin-top: 6px; }
 .rule-notes code { color: var(--ink); }
+.moments-try { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 0; border-radius: 99px; background: none; box-shadow: 0 0 0 1px var(--dim); color: var(--ink); font: 600 13px/1 -apple-system, system-ui; cursor: pointer; }
+.moments-try:hover { box-shadow: 0 0 0 1.5px var(--ink); }
+/* Four chips in a 2 by 2 grid on a phone, so none is left alone on a second row. */
+@media (max-width: 480px) { .moments-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 340px; } .moment { padding: 0 8px; } }

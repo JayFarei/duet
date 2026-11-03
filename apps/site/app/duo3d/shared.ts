@@ -2,8 +2,9 @@ import type { State, Turn } from "../duo/web-duo";
 
 /** What the host tells both displays: the device state, the interface's turn once it has swung upright, and
  *  whether the page runs Duet (off: the same site as a plain mobile site, the before of a before and after).
- *  selected: a place a Moment picks in the skeleton app, `at` telling one pick from the next. */
-export interface Sync { s: State; upright: Turn; src: string; duet: boolean; selected?: { id: string; at: number } }
+ *  selected: a place a Moment picks in the skeleton app, `at` telling one pick from the next,
+ *  `open` opening the More list. */
+export interface Sync { s: State; upright: Turn; src: string; duet: boolean; selected?: { id: string; at: number; open?: boolean } }
 /** Host and displays are one origin, so a BroadcastChannel joins them through duo's frame. Each host
  *  page has its own, named by an id it hands its displays (`?id=`), so two tabs of it don't drive each other's. */
 export const channel = (id: string) => `duo3d:${id}`;

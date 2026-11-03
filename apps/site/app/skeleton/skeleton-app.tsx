@@ -120,6 +120,11 @@ export function SkeletonApp() {
         // The host may also pick the selected place, to show one folded into "…".
         const pick = TABS.find((t) => t.id === e.data.selected?.id);
         if (pick) setTab(pick.id);
+        // ...and open the More list once the device has settled, so the folded selection reads at stage scale.
+        if (e.data.selected?.open) setTimeout(() => {
+          const more = document.querySelector<HTMLButtonElement>('button.duet-btn[aria-label="More"]');
+          if (more && more.getAttribute("aria-expanded") !== "true") more.click();
+        }, 1600);
         const to = !!e.data.on, swap = () => flushSync(() => setDuet(to));
         if (to === now.current) return;
         now.current = to;

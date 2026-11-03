@@ -60,7 +60,7 @@ export function Screen() {
   }, [sync?.src]);
 
   // Duet off and on: the page swaps layouts itself, morphing each control (skeleton-app.tsx). A Moment's selected
-  // place rides along.
+  // place rides along, and whether to open the More list.
   const selected = sync?.selected;
   useEffect(() => {
     const post = () => frame.current?.contentWindow?.postMessage({ type: "skeleton:duet", on: duet, selected }, location.origin);
