@@ -38,7 +38,7 @@ const quick = (tint?: string) => `import { Duet } from "duet-ui";
 const ISLANDS: [string, string, string, string][] = [
   ["Home Screen", "Strip", "In the strip iOS gives the app, beside the page.", "strip"],
   ["Safari", "Column", "In the empty part of Safari's column. The page keeps its full width.", "column"],
-  ["Everywhere else", "Inline", "A slim strip inside the page, beside the content.", "inline-drag"],
+  ["Everywhere else", "Inline", "A slim strip inside the page, beside the content.", "inline"],
 ];
 
 /** One page for every screen, navigated by its own Duet controls, with the web Duo playing on a stage. On a Duo too:
