@@ -10,6 +10,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Places below the fold of "…" with one button of room](#places-below-the-fold-of--with-one-button-of-room)
 - [An action folding after a Home Screen tabs app paints](#an-action-folding-after-a-home-screen-tabs-app-paints)
 - [A burger one place before the tabs table said](#a-burger-one-place-before-the-tabs-table-said)
+- [A press soon after a tap reading the capsule's swollen size](#a-press-soon-after-a-tap-reading-the-capsules-swollen-size)
 - [Docs describing the removed docked column](#docs-describing-the-removed-docked-column)
 - [Five places behind a burger with room for tabs](#five-places-behind-a-burger-with-room-for-tabs)
 - [Tabs then a burger while a Home Screen app launches](#tabs-then-a-burger-while-a-home-screen-app-launches)
@@ -786,3 +787,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** `detect` measures this window from the long side, as upright, whichever way `screen.*` reads. The room is 389pt as upright, from y 32 to 421.
 - **You do:** nothing.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator in both rotations: 9 places give 7 tabs and "…" at y 32 to 421, 5 places end at the same foot, and turning back upright restores the place.
+
+## A press soon after a tap reading the capsule's swollen size
+
+- **You see:** without the handling, a drag started within about 150ms of a tap opens a taller capsule than a later one, so the same finger position can name a different item near a boundary. On a 9 place wide Home Screen app the capsule reached 420pt tall against 411pt once settled, and the release that flips from the last tab to "…" moved from 590pt to 596pt.
+- **Cause:** the press read the capsule's resting place from its current box, and a tap holds its swell for 150ms and then falls, so the new press took those swollen sizes as rest.
+- **Duet does:** `restOf` reads the rest from the layout's inline values, which a press never changes. The shape no longer depends on how soon the press follows the last one.
+- **You do:** nothing.
+- **Status:** `test/press.test.mjs`, and on the Duo simulator: the flip stays at 590pt, and height stays 411 to 412pt, at 0.1s and 0.5s after a tap. An overshoot into "…" at the last tab's centre, reported once by a verifier, did not reproduce before or after this fix (60 drags before, 24 + 18 after).

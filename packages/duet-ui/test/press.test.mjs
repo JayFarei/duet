@@ -1,7 +1,7 @@
 // The capsule under a finger (#251): its open shape stays in the band, and the lens names the right item.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HOP, LENS, PRESS, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
+import { HOP, LENS, PRESS, lensAt, lensStep, pressShape, refractMap, restOf, swellShape } from "../src/press.ts";
 import { TEMPLATE, spring } from "../src/template.ts";
 
 const rest = { x: 400, y: 400, w: 46, h: 104 };
@@ -137,4 +137,13 @@ test("open: a press whose item is already under the finger keeps the native shap
   const r = { x: 300, y: 400, w: 49, h: 49 + 51.7 };
   const free = pressShape(r, 2), held = pressShape(r, 2, undefined, { index: 0, y: free.y + PRESS.inset + LENS.centre });
   assert.deepEqual(held, free);
+});
+
+test("a press reads the capsule's rest from the layout, not the swollen box a recent press left", () => {
+  const group = { style: { left: "0px", top: "261px", width: "49px", height: "389.2px" }, offsetTop: 249, offsetHeight: 412 };
+  const buttons = [0, 1].map((i) => ({ style: { top: `${i * 48.6}px` }, offsetTop: i * 51.5 }));
+  const { rest, pitch } = restOf(group, buttons);
+  assert.deepEqual(rest, { x: 0, y: 261, w: 49, h: 389.2 });
+  assert.ok(Math.abs(pitch - 48.6) < 1e-9);
+  assert.equal(restOf(group, buttons.slice(0, 1)).pitch, 0);
 });

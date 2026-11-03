@@ -18,6 +18,13 @@ export const HOP = { size: { w: 60, h: 80 }, end: { w: 44, h: 49 }, travel: [324
 
 export type PressShape = { x: number; y: number; w: number; h: number; top: number; pitch: number; labels: boolean };
 
+/** The capsule's place and pitch at rest, from what the layout asks for (`style`) and not the box it has now: a press
+ *  soon after another finds it still swollen or falling, and the shape of the new press must not depend on that. */
+export function restOf(group: { style: { left: string; top: string; width: string; height: string } }, buttons: { style: { top: string } }[]): { rest: Rect; pitch: number } {
+  const { left, top, width, height } = group.style;
+  return { rest: { x: parseFloat(left), y: parseFloat(top), w: parseFloat(width), h: parseFloat(height) }, pitch: buttons.length > 1 ? parseFloat(buttons[1].style.top) - parseFloat(buttons[0].style.top) : 0 };
+}
+
 /** The capsule under a still finger: native scales it about its centre, the items spreading with it, so a tall capsule
  *  grows more than a short one. Geometry rather than `scale`, so it runs straight on into the open shape. */
 export function swellShape(rest: Rect, restPitch: number = TEMPLATE.item): PressShape {
@@ -239,7 +246,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     if (p || (e.pointerType === "mouse" && e.button)) return;
     const h = hit(e.clientX, e.clientY);
     if (!h) return;
-    const g = h.group, rest = { x: g.offsetLeft, y: g.offsetTop, w: g.offsetWidth, h: g.offsetHeight };
+    const g = h.group, { rest, pitch } = restOf(g, h.buttons);
     const n = h.buttons.length;
     const move = (t: TouchEvent) => { if (t.cancelable) t.preventDefault(); }; // the column must not scroll the page
     addEventListener("touchmove", move, { passive: false });
@@ -249,7 +256,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     clearTimeout(lifting);
     fading?.stop(); fading = null;
     if (n > 1) {
-      vars(g, swellShape(rest, h.buttons[1].offsetTop - h.buttons[0].offsetTop));
+      vars(g, swellShape(rest, pitch));
       h.buttons.forEach((b, i) => b.style.setProperty("--duet-j", `${i}`));
       p.lens = mountLens(g, h.buttons, h.index, still(), selected >= 0 ? selected : h.index);
     }
