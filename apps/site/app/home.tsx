@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, CodeXml, ListTree, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
+import { Check, CodeXml, Ellipsis, ListTree, Menu, Moon, PanelBottom, PanelRight, Share, Sun, TabletSmartphone } from "lucide-react";
 import { Duet, column, useDuet, type DuetItem } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
@@ -136,7 +136,7 @@ function Page({ installs }: { installs: InstallStats | null }) {
         <Duo embed src="/skeleton" />
       </section>
 
-      <Section id="rules" title="How Duet picks" lede="Duet sizes the controls to the room it measures, then picks the largest form that fits.">
+      <Section id="rules" title="How Duet picks" lede="Duet measures the room and picks the largest of three forms that fits: tabs, tabs and More, or a burger.">
         <Rules />
       </Section>
 
@@ -168,12 +168,24 @@ function Page({ installs }: { installs: InstallStats | null }) {
   );
 }
 
-// The three forms, each with the Moment that shows it on the stage (duo3d.tsx).
-const RULES: { id: "fit" | "fold" | "burger"; k: string; h: string; p: string; bar: ReactNode }[] = [
-  { id: "fit", k: "Every place fits", h: "Tabs", p: "Where there is room for every place, each one is a tab. Unfolded Safari holds nine.", bar: <>{[1, 0, 0, 0, 0, 0].map((on, i) => <i key={i} data-on={on || undefined} />)}</> },
-  { id: "fold", k: "Some fit", h: "Tabs and …", p: "Tabs shrink from 51.7pt to 44pt first. Past that, the leading places stay tabs and the rest fold into the … button. In a wide Home Screen, nine places show as seven tabs plus …, so put primary places first.", bar: <>{[1, 0, 0, 0].map((on, i) => <i key={i} data-on={on || undefined} />)}<b>…</b></> },
-  { id: "burger", k: "Fewer than three fit", h: "Burger", p: "When fewer than three tabs would show, one button opens a sidebar with every place: closed Safari upright and the right side of Split View.", bar: <b aria-hidden>≡</b> },
+// The three forms, each with the Moment of the same name that shows it on the stage (duo3d.tsx), and the capsule it
+// draws: the skeleton app's nine places, the first selected, and its Share action.
+type Cap = "tab" | "on" | "more" | "burger" | "share";
+const RULES: { id: "fit" | "fold" | "burger"; k: string; h: string; p: string; caps: Cap[][] }[] = [
+  { id: "fit", k: "Every place fits", h: "Tabs", p: "Where there is room for every place, each one is a tab. Unfolded Safari holds all nine, and the More button keeps the actions.", caps: [["on", ...Array<Cap>(8).fill("tab"), "more"]] },
+  { id: "fold", k: "Some places fit", h: "Tabs and More", p: "Tabs tighten to fit as many places as a comfortable tap allows. The rest go in the More button, with the actions. In a wide Home Screen, nine places show as seven tabs and More, so put primary places first.", caps: [["on", ...Array<Cap>(6).fill("tab"), "more"]] },
+  { id: "burger", k: "Fewer than three fit", h: "Burger", p: "When fewer than three tabs would show, a burger opens a sidebar with every place. That happens in closed Safari upright and on the right of Split View.", caps: [["burger", "share"]] },
 ];
+
+/** A rule's capsule, upright like the real one, at its proportions: one dot per tab. */
+function Capsule({ caps }: { caps: Cap[][] }) {
+  const icon = (c: Cap) => c === "more" ? <Ellipsis size={13} /> : c === "burger" ? <Menu size={13} /> : c === "share" ? <Share size={12} /> : null;
+  return (
+    <div className="cap-stack">
+      {caps.map((g, i) => <span key={i} className="cap">{g.map((c, j) => <span key={j} className="cap-b" data-c={c}>{icon(c)}</span>)}</span>)}
+    </div>
+  );
+}
 
 function Rules() {
   const show = (id: string) => {
@@ -185,7 +197,7 @@ function Rules() {
       <div className="tiles">
         {RULES.map((r) => (
           <div key={r.id} className="tile rule">
-            <div className="rule-bar" aria-hidden>{r.bar}</div>
+            <div className="rule-bar" aria-hidden><Capsule caps={r.caps} /></div>
             <p className="tile-k">{r.k}</p>
             <h3 className="tile-h">{r.h}</h3>
             <p className="tile-p">{r.p}</p>
@@ -194,8 +206,8 @@ function Rules() {
         ))}
       </div>
       <ul className="rule-notes">
-        <li>When the selected place is folded, … takes the selection. Nothing reorders.</li>
-        <li>… lists the folded places first, then your actions, then destructive ones.</li>
+        <li>When the selected place is in More, the More button shows the selection. Nothing reorders. <button className="rule-link" onClick={() => show("folded")}>Show on the Duo</button></li>
+        <li>More lists the places it holds first, then your actions, then destructive ones.</li>
         <li>Moving the controls to the other side is opt-in, with <code>moveControls</code>.</li>
       </ul>
     </>
