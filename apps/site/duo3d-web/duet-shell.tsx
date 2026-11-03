@@ -111,7 +111,7 @@ function build(found: Optimized, list: Candidate[], els: Map<number, HTMLElement
     const best = tabs.filter((c) => c.href && path(c) !== "/" && at.startsWith(path(c))).sort((a, b) => path(b).length - path(a).length)[0];
     const selected = best ? `c${best.id}` : at === "/" ? (items[0].id) : "";
     const tabItems = items.slice(0, 5);
-    props.menu = { items: tabItems, selected, onSelect: (id: string) => tabItems.find((t) => t.id === id)?.onPress?.() };
+    props.menu = { items: tabItems, selected, onSelect: (id: string) => tabItems.find((t) => t.id === id)?.onPress?.(), tabs: true };
   }
   return props;
 }
