@@ -203,16 +203,58 @@ html[data-duet-close] .sheet-x { display: none; }
 /* Two by two on a phone, each label on one line. */
 @media (max-width: 480px) { .moments-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; max-width: 300px; } .moment { padding: 0 8px; } }
 
-/* How Duet picks (home.tsx): three rule cards, each drawn as the bar it shows. */
+/* How it works (home.tsx): three numbered steps, then the three forms drawn on a device (forms.tsx). */
+.h3 { margin: clamp(48px, 7vw, 80px) 0 0; font: 400 clamp(32px, 4.6vw, 48px)/1.05 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 0; padding: 0; list-style: none; }
+@media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+.step { display: flex; flex-direction: column; padding: 22px 14px 22px; }
+.step .tile-h { margin-top: 14px; }
+.step .tile-p { flex: 1; }
+.step-n { display: grid; place-items: center; width: 32px; height: 32px; margin: 0 8px; border-radius: 99px; background: var(--cta); color: #fff; font: 600 15px/1 -apple-system, system-ui; }
+.step-code { margin: 16px 8px 0; padding: 12px 14px; border-radius: 14px; background: var(--code); font-size: 13px; line-height: 1.5; }
+.step-room { display: grid; place-items: center; height: 46px; margin: 16px 8px 0; border: 1.5px dashed color-mix(in srgb, var(--cta) 55%, transparent); border-radius: 14px; color: var(--cta); font: 600 14px/1 -apple-system, system-ui; }
+.step-forms { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 8px 0; }
+.step-forms span { padding: 8px 12px; border-radius: 99px; background: var(--bg); font: 600 13px/1 -apple-system, system-ui; }
 .rule { display: flex; flex-direction: column; }
 .rule .tile-p { flex: 1; }
-.rule-bar { display: grid; place-items: center; height: 300px; border-radius: 18px; background: var(--bg); }
-/* The capsule upright at the real proportions (44pt wide, 51.7pt pitch, scaled), in the mock's glass colours. */
-.cap-stack { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.cap { display: flex; flex-direction: column; align-items: center; width: 26px; padding: 3px 0; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 1px var(--line), 0 6px 18px rgb(0 0 0 / 0.14); }
-.cap-b { display: grid; place-items: center; width: 26px; height: 30px; color: var(--ink); }
-.cap-b[data-c="tab"]::before, .cap-b[data-c="on"]::before { content: ""; width: 8px; height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 60%, transparent); }
-.cap-b[data-c="on"]::before { width: 10px; height: 10px; background: var(--cta, var(--ink)); box-shadow: 0 0 0 6px color-mix(in srgb, var(--cta, var(--ink)) 18%, transparent); }
+.rule-bar { display: flex; align-items: center; justify-content: center; min-height: 480px; padding: 0 12px; border-radius: 18px; background: var(--bg); }
+@media (max-width: 760px) { .rule-bar { min-height: 0; padding: 24px 12px; } }
+/* The device (forms.tsx): a screen of --room height, the page on the left, Duet's strip on the right with the room it measured dashed and the capsule it drew. */
+.dev { position: relative; display: flex; box-sizing: content-box; width: 100%; max-width: 260px; height: var(--room); border: 10px solid #1c1c1e; border-radius: 32px; background: var(--card); overflow: hidden; transition: height 0.2s ease; }
+.dev-page { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px 10px 16px 16px; overflow: hidden; }
+.dev-page i, .dev-page b { flex: none; display: block; height: 10px; border-radius: 6px; background: var(--line); }
+.dev-page b { height: 56px; border-radius: 12px; background: var(--bg); }
+.dev-title { margin: 0; font: 700 18px/1.2 -apple-system, system-ui; }
+.dev-strip { position: relative; flex: none; display: flex; align-items: center; justify-content: center; width: 60px; background: var(--bg); }
+.dev-room { position: absolute; inset: 8px 4px; border: 1.5px dashed color-mix(in srgb, var(--cta) 50%, transparent); border-radius: 16px; }
+.dev-cap { position: relative; display: flex; flex-direction: column; padding: 4px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line), 0 2px 12px rgb(0 0 0 / 0.12); }
+.dev-b { display: grid; place-items: center; width: 44px; height: 40px; border-radius: 99px; color: var(--ink); }
+.dev-b[data-on] { background: var(--cta); color: #fff; }
+.dev-more { position: absolute; right: 66px; width: 150px; padding: 4px; border-radius: 14px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line), 0 8px 28px rgb(0 0 0 / 0.18); }
+.dev-more p, .dev-side p { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 10px; font: 400 14px/1.2 -apple-system, system-ui; }
+.dev-more hr { margin: 4px 8px; border: 0; border-top: 0.5px solid var(--line); }
+.dev-side { position: absolute; top: 0; bottom: 0; right: 60px; left: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: center; gap: 2px; padding: 8px 6px; background: var(--card); box-shadow: -6px 0 20px rgb(0 0 0 / 0.12); }
+.dev-side p { flex-direction: column; gap: 3px; min-width: 0; padding: 5px 2px; border-radius: 10px; font-size: 10px; line-height: 1.1; }
+.dev-side p span { max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dev-side p svg { flex: none; }
+.dev-side p[data-on] { background: color-mix(in srgb, var(--cta) 14%, transparent); color: var(--cta); font-weight: 600; }
+/* Drag the room (forms.tsx): the text and slider beside the device, stacked on a phone. */
+.room { display: grid; grid-template-columns: 1fr 300px; gap: clamp(24px, 5vw, 56px); align-items: center; margin-top: 16px; padding: clamp(20px, 4vw, 40px); }
+.room .tile-h, .room .tile-p, .room .tile-k { margin-left: 0; margin-right: 0; }
+.room-label { display: flex; justify-content: space-between; margin-top: 22px; font: 600 15px/1 -apple-system, system-ui; }
+.room-range { width: 100%; height: 44px; margin: 6px 0 0; accent-color: var(--cta); }
+.room-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.room-result { margin-top: 18px; padding: 18px; border-radius: 18px; background: var(--bg); }
+.room-result .tile-k { margin-top: 0; color: var(--cta); }
+.room-form { margin: 0 0 6px; font: 600 22px/1.2 -apple-system, system-ui; }
+.room-device { display: flex; justify-content: center; align-items: center; min-height: 500px; }
+/* On a phone the device sits right under the slider, so the controls change in view while you drag. */
+@media (max-width: 760px) {
+  .room { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+  .room-text { display: contents; }
+  .room-device { order: 1; min-height: 0; margin-top: 18px; }
+  .room-result { order: 2; }
+}
 .rule-show { align-self: flex-start; margin: 16px 8px 0; height: 36px; padding: 0 14px; border: 0; border-radius: 99px; background: var(--bg); box-shadow: 0 0 0 0.5px var(--line); color: var(--ink); font: 600 14px/1 -apple-system, system-ui; cursor: pointer; }
 .rule-show:hover { box-shadow: 0 0 0 1px var(--dim); }
 .rule-notes { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font: 400 16px/1.5 -apple-system, system-ui; }

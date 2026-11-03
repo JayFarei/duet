@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, CodeXml, Ellipsis, ListTree, Menu, Moon, PanelBottom, PanelRight, Share, Sun, TabletSmartphone } from "lucide-react";
+import { Check, CodeXml, ListTree, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
 import { Duet, column, useDuet, type DuetItem } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
 import { ClaudeGlyph, CodexGlyph, GrokGlyph, PiGlyph } from "./agent-glyphs";
 import { Duo } from "./duo/duo";
+import { Device, FORMS, RoomSlider, type Form } from "./forms";
 import { TINTS, useTheme, useTint } from "./theme";
 
 const REPO = "https://github.com/JayFarei/duet";
@@ -22,7 +23,7 @@ function DuetMark() {
 }
 const SECTIONS: DuetItem[] = [
   { id: "top", label: "Duet", icon: <DuetMark /> },
-  { id: "rules", label: "How it picks", icon: <ListTree size={24} /> },
+  { id: "rules", label: "How it works", icon: <ListTree size={24} /> },
   { id: "code", label: "Integrate", icon: <CodeXml size={24} /> },
   { id: "examples", label: "Examples", icon: <TabletSmartphone size={24} /> },
 ];
@@ -120,9 +121,9 @@ function Page({ installs }: { installs: InstallStats | null }) {
     <main>
       <section id="top" className="hero" style={column(980, 20)}>
         <h1 className="display">
-          Native-feeling controls for web apps on the <em>iPhone Duo.</em>
+          Native side controls for your web app on the <em>iPhone Duo.</em>
         </h1>
-        <p className="lede">Pass your places and actions. Duet measures the room and shows the largest controls that fit. Your app carries no device logic.</p>
+        <p className="lede">You pass the places in your app. Duet measures the free space beside your page and draws the biggest controls that fit. No device checks in your code.</p>
         <div className="actions">
           <div className="ctas">
             <AgentPrompt />
@@ -136,8 +137,12 @@ function Page({ installs }: { installs: InstallStats | null }) {
         <Duo embed src="/skeleton" />
       </section>
 
-      <Section id="rules" title="How Duet picks" lede="Duet measures the room and picks the largest of three forms that fits: tabs, tabs and More, or a burger.">
+      <Section id="rules" title="How it works" lede="Three steps, and only the first one is yours.">
+        <Steps />
+        <h3 className="h3">Less room, smaller controls</h3>
+        <p className="lede lede-l">Duet always draws the biggest of three forms that fits the room it measured.</p>
         <Rules />
+        <RoomSlider />
       </Section>
 
       <Section id="code" title="Integrate" lede="Wrap your app and pass your places, primary places first. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
@@ -168,24 +173,34 @@ function Page({ installs }: { installs: InstallStats | null }) {
   );
 }
 
-// The three forms, each with the Moment of the same name that shows it on the stage (duo3d.tsx), and the capsule it
-// draws: the skeleton app's nine places, the first selected, and its Share action.
-type Cap = "tab" | "on" | "more" | "burger" | "share";
-const RULES: { id: "fit" | "fold" | "burger"; k: string; h: string; p: string; caps: Cap[][] }[] = [
-  { id: "fit", k: "Every place fits", h: "Tabs", p: "Where there is room for every place, each one is a tab. Wide unfolded Safari holds all nine, and More keeps the actions.", caps: [["on", ...Array<Cap>(8).fill("tab"), "more"]] },
-  { id: "fold", k: "Some places fit", h: "Tabs and More", p: "Tabs tighten to fit as many places as a comfortable tap allows. The rest go in the More button, with the actions. On the closed Duo's Home Screen, nine places show as seven tabs and More, so put primary places first.", caps: [["on", ...Array<Cap>(6).fill("tab"), "more"]] },
-  { id: "burger", k: "Fewer than three fit", h: "Burger", p: "When fewer than three tabs would show, a burger opens a sidebar with every place. That happens in closed Safari upright and on the right of Split View.", caps: [["burger", "share"]] },
-];
-
-/** A rule's capsule, upright like the real one, at its proportions: one dot per tab. */
-function Capsule({ caps }: { caps: Cap[][] }) {
-  const icon = (c: Cap) => c === "more" ? <Ellipsis size={16} /> : c === "burger" ? <Menu size={16} /> : c === "share" ? <Share size={15} /> : null;
+/** How it works: what the app passes, what Duet measures, what it draws. */
+function Steps() {
   return (
-    <div className="cap-stack">
-      {caps.map((g, i) => <span key={i} className="cap">{g.map((c, j) => <span key={j} className="cap-b" data-c={c}>{icon(c)}</span>)}</span>)}
-    </div>
+    <ol className="steps">
+      <li className="tile step">
+        <span className="step-n">1</span>
+        <h3 className="tile-h">You list your places</h3>
+        <p className="tile-p">The sections of your app, primary ones first, and any actions such as Share.</p>
+        <pre className="step-code"><code>{"items: [Home, Inbox,\n  Calendar, …]"}</code></pre>
+      </li>
+      <li className="tile step">
+        <span className="step-n">2</span>
+        <h3 className="tile-h">Duet measures the room</h3>
+        <p className="tile-p">The free strip beside your page, from the device, the browser and the window. It changes when you fold, turn or split the screen.</p>
+        <div className="step-room" aria-hidden><span>8 taps</span></div>
+      </li>
+      <li className="tile step">
+        <span className="step-n">3</span>
+        <h3 className="tile-h">Duet draws the controls</h3>
+        <p className="tile-p">The biggest form that fits: every place as a tab, tabs and More, or a menu.</p>
+        <div className="step-forms" aria-hidden><span>Tabs</span><span>Tabs and More</span><span>Menu</span></div>
+      </li>
+    </ol>
   );
 }
+
+// The three forms at the Duo's real rooms, each with the Moment of the same name that shows it on the stage (duo3d.tsx).
+const ROOMS: [Form, number][] = [["tabs", 440], ["more", 350], ["menu", 150]];
 
 function Rules() {
   const show = (id: string) => {
@@ -195,15 +210,18 @@ function Rules() {
   return (
     <>
       <div className="tiles">
-        {RULES.map((r) => (
-          <div key={r.id} className="tile rule">
-            <div className="rule-bar" aria-hidden><Capsule caps={r.caps} /></div>
-            <p className="tile-k">{r.k}</p>
-            <h3 className="tile-h">{r.h}</h3>
-            <p className="tile-p">{r.p}</p>
-            <button className="rule-show" onClick={() => show(r.id)}>Show on the Duo</button>
-          </div>
-        ))}
+        {ROOMS.map(([form, room]) => {
+          const r = FORMS[form];
+          return (
+            <div key={form} className="tile rule">
+              <div className="rule-bar"><Device room={room} open={form !== "tabs"} /></div>
+              <p className="tile-k">{r.k}</p>
+              <h3 className="tile-h">{r.h}</h3>
+              <p className="tile-p">{r.p}</p>
+              <button className="rule-show" onClick={() => show(r.moment)}>Show on the Duo</button>
+            </div>
+          );
+        })}
       </div>
       <ul className="rule-notes">
         <li>When the selected place is in More, the More button shows the selection. Nothing reorders. <button className="rule-link" onClick={() => show("folded")}>Show on the Duo</button></li>
