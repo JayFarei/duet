@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.8.0
+
+Since 0.7.1, Duet shows the largest form of controls that fits, from its own measure of the space; apps carry no device logic.
+
+- `menu.tabs`: the app's places are tabs in the capsule. Where they do not all fit, the tabs tighten from 51.7pt down to 44pt, then the first ones stay tabs and the rest fold into "…". The burger only where fewer than three tabs would show. `placesFit` and `placeTabs` expose the rule.
+- Moving the controls is an option, `moveControls`, off by default.
+- Column press rebuilt from Safari's own column: a lens follows the finger and release runs the item under it. Buttons fire on release, not on touch down.
+- Action capsule at the foot of the room on the open Duo, full screen Safari and split panes.
+- Light mode capsule and buttons match native glass. Dark mode is unchanged.
+- A page with `children` in a split pane is no longer clipped by Safari's column.
+- Home Screen launch, fold and rotation fixes on the Duo, with no flash of the wrong form.
+
+Everything from 0.8.0-rc.1 to 0.8.0-rc.3 and the entries below.
 
 - **Behaviour change:** a page with `children` in a split pane, or on the closed Duo turned left, no longer has its left 84pt cut off by Safari's column. The inner scroller is moved beside the column, like a page without children, and the insets there are 0. `reserve={false}` keeps the old layout, the scroller under both columns and padded by `--duet-inset-left` / `--duet-inset-right`.
 - **Behaviour change:** `menu.tabs` is no longer all or nothing, so the burger is rarer. Where the places do not all fit, the first ones stay tabs and the rest go in "…", at the widest pitch from 51.7pt down to 44pt (`placeTabs`): 9 places on a wide Home Screen are 7 tabs and "…" at 48.6pt. The burger only where fewer than three tabs would show, closed Safari and the right of Split View. Places that all fit are pixel identical. Put the primary places first.
@@ -14,8 +26,9 @@
 - Closed Duo, Home Screen app turned sideways: the capsule stays on the screen. It used to run 61pt past the foot of the screen with 9 places, hiding the last tabs and "…".
 - Closed Duo turned sideways, same window at 5 places: the capsule used to end 16pt past the foot of the window, cutting the fifth tab. It now ends inside it.
 - `menu.tabs`: the places lead the "…" list also when the primary shares the capsule with "…", as on closed Safari upright with actions. The primary used to come first, ahead of the places.
-
 - Press lens: releasing on a tab, or holding still on it, names that tab. On a long capsule it used to name the one below, after a drag up or held still, as with P5 of 12 places in tall Safari or the first tab of a wide one. The open capsule now grows about its middle item, at up to 57pt, about 55pt for 13 items.
+
+Known issue: on the open Duo, in Safari's right Split View pane, places show only behind the menu button, even where tabs fit (the left pane of the same size shows tabs). The menu lists every place and action, so all stay reachable.
 
 ## 0.8.0-rc.3
 
