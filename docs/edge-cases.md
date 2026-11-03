@@ -770,3 +770,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** `placeTabs` keeps as many leading places as fit beside "…", at the widest pitch down to 44pt, and "…" lists the others ahead of folded actions and destructive items. If the selected place is folded, "…" shows the selected bubble and the list marks the place. The burger only below three tabs. Order never changes.
 - **You do:** put the primary places first.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: 9 places in wide Home Screen give 7 tabs and "…" (8 give 8 tabs), 12 in wide Safari give 10 and "…", closed Home Screen 7 and "…", Split left 6 and "…", closed Safari and Split right the burger. Selecting a folded place, the mark in the list and the press lens over "…" checked in wide Safari.
+
+## A held tab selected the one below it
+
+- **You see:** without the handling, press and hold still on a tab in a long capsule, 8 places or more on a wide Home Screen, and release: the next tab is selected. On the seventh of 9, the "…" list opens.
+- **Cause:** the open capsule spreads to a 57pt pitch and rises by a fixed share, so with many items a later one lands under a finger that never moved.
+- **Duet does:** `pressShape` takes the held item and the finger's position, and gives up pitch and rise until the finger is within a third of a pitch of that item. A short capsule, where that is already true, keeps the native shape.
+- **You do:** nothing.
+- **Status:** `test/press.test.mjs` checks every item for many lengths and windows. On the Duo simulator: hold and release on each tab names that tab on wide Home Screen with 8, 9, 12 and 20 places, 9 with actions and a primary, and tall with 9.

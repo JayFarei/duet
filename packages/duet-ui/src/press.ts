@@ -27,13 +27,23 @@ export function swellShape(rest: Rect, restPitch: number = TEMPLATE.item): Press
 
 /** The open capsule: wider, its items further apart, rising more than it falls as native does. It stays in `band`
  *  (a little of the gap to Safari's buttons may go), giving up pitch when the band is short, never below rest, and its
- *  labels when a label would touch the next icon. */
-export function pressShape(rest: Rect, n: number, band?: { top: number; bottom: number }): PressShape {
+ *  labels when a label would touch the next icon. `held`: the item under the finger and where the finger is. A long
+ *  capsule opening natively would slide another item under a still finger, so it gives up pitch and rise to keep
+ *  the finger within a third of a pitch of that item, what a tap names it stays named. */
+export function pressShape(rest: Rect, n: number, band?: { top: number; bottom: number }, held?: { index: number; y: number }): PressShape {
   const top = (band?.top ?? -Infinity) - PRESS.overflow, bottom = (band?.bottom ?? Infinity) + PRESS.overflow;
-  const room = Math.max(rest.h, bottom - top);
-  const h = Math.min(room, TEMPLATE.control + (n - 1) * PRESS.pitch + PRESS.pad);
-  const y = Math.min(Math.max(top, rest.y - (h - rest.h) * PRESS.up), Math.max(top, bottom - h));
-  const pitch = n > 1 ? (h - TEMPLATE.control - PRESS.pad) / (n - 1) : 0;
+  const room = Math.max(rest.h, bottom - top), fixed = TEMPLATE.control + PRESS.pad, span = n > 1 ? n - 1 : 1;
+  let h = Math.min(room, fixed + (n - 1) * PRESS.pitch);
+  let pitch = n > 1 ? (h - fixed) / span : 0, free = rest.y - (h - rest.h) * PRESS.up;
+  if (held && n > 1) {
+    const first = held.y - PRESS.inset - LENS.centre, above = held.index, below = n - 1 - held.index;
+    const fits = Math.min(pitch, above ? (first - top) / above : Infinity, below ? (bottom - first - fixed) / below : Infinity);
+    pitch = Math.max(fits, (rest.h - fixed) / span, 0);
+    h = fixed + (n - 1) * pitch;
+    const under = first - held.index * pitch, give = pitch / 3;
+    free = Math.min(under + give, Math.max(under - give, rest.y - (h - rest.h) * PRESS.up));
+  }
+  const y = Math.min(Math.max(top, free), Math.max(top, bottom - h));
   return { x: rest.x + (rest.w - PRESS.width) / 2, y, w: PRESS.width, h, top: PRESS.inset, pitch, labels: pitch >= PRESS.labelled };
 }
 
@@ -234,7 +244,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     const move = (t: TouchEvent) => { if (t.cancelable) t.preventDefault(); }; // the column must not scroll the page
     addEventListener("touchmove", move, { passive: false });
     const selected = h.buttons[h.index].hasAttribute("data-tab") ? h.buttons.findIndex((b) => b.hasAttribute("aria-current")) : -1;
-    p = { id: e.pointerId, touch: e.pointerType === "touch", group: g, buttons: h.buttons, rest, shape: pressShape(rest, n, band(h.nav)), x0: e.clientX, y0: e.clientY, index: h.index, fx: e.clientX, fy: e.clientY, left: 0, top: 0, lens: null, hold: 0, dog: 0, born: performance.now(), hop: selected >= 0, move };
+    p = { id: e.pointerId, touch: e.pointerType === "touch", group: g, buttons: h.buttons, rest, shape: pressShape(rest, n, band(h.nav), { index: h.index, y: e.clientY - g.getBoundingClientRect().top + g.offsetTop }), x0: e.clientX, y0: e.clientY, index: h.index, fx: e.clientX, fy: e.clientY, left: 0, top: 0, lens: null, hold: 0, dog: 0, born: performance.now(), hop: selected >= 0, move };
     muted = Infinity;
     clearTimeout(lifting);
     fading?.stop(); fading = null;

@@ -116,3 +116,25 @@ test("hop: no overshoot past the tapped item, and it ends bubble sized", () => {
   for (let i = 0; i < 120; i++) { s = lensStep(s, { y: 100, ...HOP.end }, HOP.fall, 1 / 60, HOP.travel); most = Math.max(most, s.y); }
   assert.ok(most <= 100.5); assert.ok(Math.abs(s.w - HOP.end.w) < 0.01 && Math.abs(s.h - HOP.end.h) < 0.01);
 });
+
+test("open: a still finger keeps naming the item it pressed, for any length and window", () => {
+  for (const [top, bottom, control] of [[16, 653, 49], [16, 853, 49], [16, 429, 49], [16, 555, 49], [40, 500, 49]]) {
+    for (const n of [2, 3, 5, 6, 8, 9, 10, 12, 17]) {
+      for (const pitch of [51.7, 48.6, 44]) {
+        const h = control + (n - 1) * pitch, y = Math.max(top, bottom - h);
+        if (y + h > bottom + 1) continue;
+        for (let k = 0; k < n; k++) {
+          const at = y + control / 2 + k * pitch, s = pressShape({ x: 300, y, w: control, h }, n, { top, bottom }, { index: k, y: at });
+          assert.equal(lensAt(at - s.y, n, s.pitch).index, k, `n ${n} pitch ${pitch} item ${k} in ${top}..${bottom}`);
+          assert.ok(s.h >= h - 0.01, "never below rest");
+        }
+      }
+    }
+  }
+});
+
+test("open: a press whose item is already under the finger keeps the native shape", () => {
+  const r = { x: 300, y: 400, w: 49, h: 49 + 51.7 };
+  const free = pressShape(r, 2), held = pressShape(r, 2, undefined, { index: 0, y: free.y + PRESS.inset + LENS.centre });
+  assert.deepEqual(held, free);
+});
