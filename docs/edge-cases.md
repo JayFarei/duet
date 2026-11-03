@@ -795,3 +795,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** in a `menu.tabs` app the places always lead "…", then "This page" with the primary and the actions. Other apps keep their order.
 - **You do:** nothing.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: closed Safari upright with 5 places, 2 actions and a primary lists P1 to P5, then Book, Act 0, Act 1. Each action fires from it and the primary row arms in place.
+
+## A press released on a tab named the one below
+
+- **You see:** on the open Duo, pressing a long tabs capsule and releasing on a tab, or holding still on it, selects the next tab down. Worst on the way up and on tall and closed Home Screen apps, and on the first tab of a wide Safari capsule.
+- **Cause:** the open capsule spreads its items to 57pt and rose from its top, so items drifted from where they rested, about half a place by the fifth tab of 13. The lens also named items around the icon, 10pt above the button's centre. Where the band pushed the open capsule up, the first tab drifted down a place.
+- **Duet does:** the open capsule grows about its middle item and names items around the button's centre. It gives up the pitch it must, after any push from the band, so the first and last items open inside their own half pitch (13 items at about 55pt). Five items still open at native's 301pt.
+- **You do:** nothing.
+- **Status:** `test/press.test.mjs` checks every tab's resting centre in seven Duo windows, at the normal pitch, tightened and with places in "…". On the Duo simulator, every tab held still, dragged up and dragged down: 12 places with actions and a primary in tall Safari, 8 places and 12 with actions in wide Safari. Home Screen apps are covered by the unit test only.

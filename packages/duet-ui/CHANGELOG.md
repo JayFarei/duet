@@ -14,6 +14,8 @@
 - Closed Duo turned sideways, same window at 5 places: the capsule used to end 16pt past the foot of the window, cutting the fifth tab. It now ends inside it.
 - `menu.tabs`: the places lead the "…" list also when the primary shares the capsule with "…", as on closed Safari upright with actions. The primary used to come first, ahead of the places.
 
+- Press lens: releasing on a tab, or holding still on it, names that tab. On a long capsule it used to name the one below, after a drag up or held still, as with P5 of 12 places in tall Safari or the first tab of a wide one. The open capsule now grows about its middle item, at up to 57pt, about 55pt for 13 items.
+
 ## 0.8.0-rc.3
 
 - Turning an open Duo's Home Screen app to wide no longer leaves the burger over the status clock and glides it into the strip: the controls stay hidden until the strip's inset lands, then appear in place.
