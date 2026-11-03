@@ -14,9 +14,6 @@ const TMP = mkdtempSync(join(tmpdir(), "duo3d-"));
 // The event the stage takes, its detail, the file name on the site, and what to tap on the page first (CSS selectors, in order).
 const SHOTS = [
   ["duet:moment", "fit", "form-tabs"], ["duet:moment", "folded", "form-more"], ["duet:moment", "burger", "form-menu"],
-  ["duet:example", { src: "/panes", moment: "fit" }, "example-panes"],
-  ["duet:example", { src: "/sheet", moment: "burger" }, "example-sheet"],
-  ["duet:example", { src: "/book", moment: "fold" }, "example-book"],
   // The controls, each caught in use: the sidebar open, the main button's confirmation, a sheet's X in the column.
   ["duet:example", { src: "/skeleton", moment: "burger" }, "control-menu", ['.duet-btn[aria-label="Menu"]']],
   ["duet:example", { src: "/book", moment: "fold" }, "control-main", ['.duet-btn[aria-label="Book"]']],

@@ -7,24 +7,12 @@ test("the home page has three sections, in order", async ({ page }) => {
   expect(ids).toEqual(["top", "rules", "docs"]);
 });
 
-// The docs show the real examples on the 3D Duo, then what the library ships, in plain one-word names.
-test("each example plays on the stage's Duo", async ({ page }) => {
+// After the demo, each thing is said once: where the controls go, the controls, then the code and what else ships.
+// The controls already play the book and sheet pages, so there is no separate examples block repeating them.
+test("after the demo, each part appears once", async ({ page }) => {
   await page.goto("/");
-  const cards = page.locator("#docs .example");
-  await expect(cards).toHaveCount(3);
-  for (const [i, name] of ["panes", "sheet", "book"].entries()) {
-    const img = cards.nth(i).locator("img");
-    await expect(img).toHaveAttribute("src", `/media/example-${name}.webp`);
-    await img.scrollIntoViewIfNeeded();
-    await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth)).toBeGreaterThan(0);
-  }
-  const seen = await page.evaluate(() => {
-    const out: string[] = [];
-    addEventListener("duet:example", (e) => out.push((e as CustomEvent<{ src: string }>).detail.src));
-    document.querySelectorAll<HTMLButtonElement>("#docs .example button").forEach((b) => b.click());
-    return out;
-  });
-  expect(seen).toEqual(["/panes", "/sheet", "/book"]);
+  expect(await page.locator("main .h3").allTextContents()).toEqual(["Where the controls go", "The controls", "Also included"]);
+  await expect(page.locator("#docs .example")).toHaveCount(0);
 });
 
 test("the docs list what else is included, in plain names", async ({ page }) => {

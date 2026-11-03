@@ -156,10 +156,8 @@ function Page({ installs }: { installs: InstallStats | null }) {
 
       <Section id="docs" title="Docs" lede="Wrap your app and list your places, most used first.">
         <Integrate />
-        <h3 className="h3">Examples</h3>
-        <p className="lede lede-l">Real pages, played on the Duo above.</p>
-        <Examples />
         <h3 className="h3">Also included</h3>
+        <p className="lede lede-l">Beyond the controls.</p>
         <Library />
         <div className="ctas ctas-l">
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
@@ -168,37 +166,6 @@ function Page({ installs }: { installs: InstallStats | null }) {
 
       <Footer />
     </main>
-  );
-}
-
-// The example pages, each played on the stage's 3D Duo at a Moment (duo3d.tsx `duet:example`). Stills from
-// tools/media/duo3d-stills.mjs.
-const EXAMPLES = [
-  { id: "panes", moment: "fit", k: "Panes", h: "Mail", p: "Mailboxes, list and message side by side when unfolded." },
-  { id: "sheet", moment: "burger", k: "Sheets", h: "Notes", p: "A sheet over the page. Its close button moves into Safari's column." },
-  { id: "book", moment: "fold", k: "Main button", h: "Classes", p: "Book a class from one tinted button, always on screen." },
-] as const;
-
-function Examples() {
-  const play = (id: string, moment: string) => {
-    dispatchEvent(new CustomEvent("duet:example", { detail: { src: `/${id}`, moment } }));
-    document.querySelector(".stage")?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-  return (
-    <div className="tiles">
-      {EXAMPLES.map((x) => (
-        <div key={x.id} className="tile rule example">
-          <div className="rule-shot"><img src={`/media/example-${x.id}.webp`} alt={`The ${x.h} example on the Duo`} loading="lazy" /></div>
-          <p className="tile-k">{x.k}</p>
-          <h3 className="tile-h">{x.h}</h3>
-          <p className="tile-p">{x.p}</p>
-          <div className="rule-row">
-            <button className="rule-show" onClick={() => play(x.id, x.moment)}>Play on the Duo</button>
-            <a className="rule-link" href={`/${x.id}`}>Open</a>
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 
