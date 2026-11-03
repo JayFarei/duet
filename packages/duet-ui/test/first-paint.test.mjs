@@ -76,6 +76,20 @@ test("the launch's mid-way scale (2.04, closed width scaled up to the open scree
   assert.equal(d.pendingUntil, undefined, "no timer left re-reading");
 });
 
+// rc4 round 4, 1 of 5 tall cold launches after folding wide to tall: the first reading was not yet a launch, then the
+// closed width inside the open screen showed a 7-tab capsule mid-screen for ~0.2s before the tall window landed.
+test("a launch whose first reading is not one yet still waits: the first launch reading starts it", () => {
+  for (const first of [sig(980, 1424, 669, 951), sig(466, 678, 466, 678)]) {
+    const d = {};
+    stable(d, first, undefined, 0);
+    assert.equal(stable(d, sig(466, 678, 669, 951, { insetBottom: 34 }), undefined, 55).hidden, "pending");
+    assert.equal(stable(d, sig(669, 869, 669, 951, { insetBottom: 34 }), undefined, 110).hidden, undefined, "the tall window lands");
+  }
+  const late = {};
+  stable(late, sig(466, 678, 466, 678), undefined, 0);
+  assert.notEqual(stable(late, sig(466, 678, 669, 951), undefined, PREVIEW_RISE + 1).hidden, "pending", "a running app is not held");
+});
+
 test("a launch that never lands shows the controls after the cap", () => {
   const d = {};
   assert.equal(stable(d, LAUNCH_WIDE, undefined, 0).hidden, "pending");

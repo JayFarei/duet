@@ -607,8 +607,12 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   const [cw, ch] = DUO_SIZES[0];
   const handedBack = raw && !isPreview(s) && (s.innerWidth > s.innerHeight) === (s.outerWidth > s.outerHeight)
     && Math.min(s.outerWidth, s.outerHeight) <= cw + 1 && Math.max(s.outerWidth, s.outerHeight) <= ch + 1;
-  const pending = (!handedBack && previewPending(s)) || launching(s);
+  const launch = launching(s), pending = (!handedBack && previewPending(s)) || launch;
   if (d.bornAt === undefined) [d.bornAt, d.pendingAt] = [now, pending ? now : undefined];
+  // A launch whose first reading does not read as one yet (1 of 5 tall cold launches after folding wide to tall, Duo
+  // simulator): the inner 466 window then showed a 7-tab capsule mid-screen for ~0.2s. A launch reading in the page's
+  // first PREVIEW_RISE starts the wait; after that it is a running app, not held.
+  if (launch && d.pendingAt === undefined && now - d.bornAt < PREVIEW_RISE) d.pendingAt = now;
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
   if (d.preview === undefined || !raw || stableKey !== d.previewKey || rising) d.preview = raw;
