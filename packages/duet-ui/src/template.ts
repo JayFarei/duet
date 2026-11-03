@@ -158,7 +158,7 @@ export function placeTabs(c: Context, places: number, rest: boolean): { shown: n
   }
   return undefined;
 }
-/** Whether every place fits as a tab. */
+/** Whether every place fits as a tab, so none folds into "…". */
 export const placesFit = (c: Context, places: number, rest: boolean) => placeTabs(c, places, rest)?.shown === places;
 
 /** The "…" list: beside the column (or strip), aligned to the button's top, or its bottom when the button is in the

@@ -1,5 +1,6 @@
-// menu.tabs: the app's places are tabs in the capsule when every one fits, and the burger when they do not. All or
-// nothing, decided from the window alone. Windows measured on the Duo simulator (iOS 27.1).
+// menu.tabs: the app's places are tabs in the capsule when every one fits. Otherwise the first ones stay tabs and the
+// rest go in "…", and the burger only when fewer than 3 would show. Decided from the window alone (placeTabs). Windows
+// measured on the Duo simulator (iOS 27.1).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
