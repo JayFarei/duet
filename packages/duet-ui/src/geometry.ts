@@ -302,6 +302,9 @@ function unfoldedPreview(s: Signals): "wide" | "tall" | undefined {
  *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
 export const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
+/** A Home Screen window turned on the closed Duo. `screen.*` may read either way round, so the strip's band is measured from
+ *  the screen's long side as upright: the same room as upright, ending inside the 466pt the window has. */
+const closedTurned = (s: Signals) => s.innerWidth > s.innerHeight && s.innerWidth <= DUO_SIZES[0][1] + 1;
 export const isDuo = (s: Signals) => isIOS(s) !== false && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
 
 /** iOS has no model in its UA, so the sizes above say Duo; the UA says iPhone. Safari's "Request Desktop Website"
@@ -417,7 +420,7 @@ function detectMode(s: Signals, preferred: Side | undefined, allowColumn: boolea
   const keyboard = keyboardUp(s);
   const kb = keyboard ? { keyboard } : shortView(s) ? { visualBottom: s.visualHeight } : {};
   if (s.standalone && duo && (s.insetRight >= STRIP_INSET || s.insetLeft >= STRIP_INSET)) {
-    return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+    return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, (closedTurned(s) ? DUO_SIZES[0][1] : s.screenHeight) - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
   const base = { ...kb, duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
   // Closed landscape: the column is on the side the Duo is turned to, and the turn is the only signal for it.

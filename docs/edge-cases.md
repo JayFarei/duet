@@ -778,3 +778,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** `pressShape` takes the held item and the finger's position, and gives up pitch and rise until the finger is within a third of a pitch of that item. A short capsule, where that is already true, keeps the native shape.
 - **You do:** nothing.
 - **Status:** `test/press.test.mjs` checks every item for many lengths and windows. On the Duo simulator: hold and release on each tab names that tab on wide Home Screen with 8, 9, 12 and 20 places, 9 with actions and a primary, and tall with 9.
+
+## Tabs off the foot of the closed screen, turned
+
+- **You see:** without the handling, a Home Screen app on the closed Duo turned sideways draws 7 tabs and "…" from y 138 to 527 on a 466pt screen, so the last tabs and "…" are out of reach.
+- **Cause:** a strip's top is measured from the screen's height, and in this window that read 466pt, not the 678pt the strip's band assumes. The band shrank to 178pt and the capsule centred on it, overflowing both ways. Its count came from the strip's 389pt, so it did not shrink.
+- **Duet does:** `detect` measures this window from the long side, as upright, whichever way `screen.*` reads. The room is 389pt as upright, from y 32 to 421.
+- **You do:** nothing.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator in both rotations: 9 places give 7 tabs and "…" at y 32 to 421, 5 places end at the same foot, and turning back upright restores the place.

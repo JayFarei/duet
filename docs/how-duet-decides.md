@@ -135,6 +135,7 @@ The most places that fit in each window, from the rule. Closed Safari, turned, S
 | Closed Safari, upright, 382x580, with or without forward history | 1 | 2 | burger |
 | Closed Safari, turned, 594x368 | 0 | 1 | burger |
 | Closed Home Screen, 466x657 | 7 | 8 | 7 |
+| Closed Home Screen, turned, 678x445 | 7 | 8 | 7 |
 
 Two places on closed Safari upright, with actions: burger and "…". Where the band holds a single button, closed Safari turned, a page with actions shows only "…", because a burger there would lose the actions. In a `menu.tabs` app the places lead that list, then "This page". The same window without actions shows the burger.
 

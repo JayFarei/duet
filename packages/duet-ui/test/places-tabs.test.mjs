@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { detect } from "../src/geometry.ts";
-import { allocate, canMoveControls, frame, landingRoom, menuBox, morphHeight, placesFit, placeTabs, FEWEST_TABS, TEMPLATE, TIGHTEST_TAB_PITCH, template } from "../src/template.ts";
+import { allocate, canMoveControls, frame, landingRoom, menuBox, morphHeight, place, placesFit, placeTabs, FEWEST_TABS, TEMPLATE, TIGHTEST_TAB_PITCH, template } from "../src/template.ts";
 
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
 const sig = (iw, ih, ow, oh, o = {}) => ({
@@ -261,5 +261,18 @@ test("the docs do not describe the removed docked column", () => {
   for (const f of ["server-rendering", "api", "how-duet-decides", "edge-cases"]) {
     const doc = readFileSync(new URL(`../../../docs/${f}.md`, import.meta.url), "utf8");
     assert.doesNotMatch(doc, /data-duet-dock|--duet-dock|\(api\.md#docked-column/, f);
+  }
+});
+
+test("closed Home Screen turned: the capsule stays on the 466pt screen, whichever way screen.* reads", () => {
+  for (const [sw, sh] of [[466, 678], [678, 466]]) {
+    const c = detect(sig(678, 445, 466, 678, { standalone: true, insetRight: 84, insetBottom: 34, screenWidth: sw, screenHeight: sh }));
+    assert.equal(c.mode, "strip");
+    assert.deepEqual(placeTabs(c, 9, true), { shown: 7, pitch: 48.6 });
+    assert.equal(placesFit(c, 8, false), true);
+    const f = frame(c);
+    assert.equal(Math.round(f.bottom - f.top), 389, "the same room as upright");
+    const [{ rect }] = place(f, [[{ kind: "place", index: 0 }, ...Array(7).fill({ kind: "more" })]], 48.6);
+    assert.ok(rect.y >= 0 && rect.y + rect.h <= 445, "on the screen");
   }
 });
