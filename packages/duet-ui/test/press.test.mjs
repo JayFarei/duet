@@ -1,8 +1,10 @@
 // The capsule under a finger (#251): its open shape stays in the band, and the lens names the right item.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HOP, LENS, PRESS, lensAt, lensStep, pressShape, refractMap, restOf, swellShape } from "../src/press.ts";
-import { TEMPLATE, spring } from "../src/template.ts";
+import { readFileSync } from "node:fs";
+import { HOP, LENS, PRESS, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
+import { TEMPLATE, frame, landingRoom, placeTabs, spring, template } from "../src/template.ts";
+import { columnBand, detect } from "../src/geometry.ts";
 
 const rest = { x: 400, y: 400, w: 46, h: 104 };
 
@@ -117,33 +119,26 @@ test("hop: no overshoot past the tapped item, and it ends bubble sized", () => {
   assert.ok(most <= 100.5); assert.ok(Math.abs(s.w - HOP.end.w) < 0.01 && Math.abs(s.h - HOP.end.h) < 0.01);
 });
 
-test("open: a still finger keeps naming the item it pressed, for any length and window", () => {
-  for (const [top, bottom, control] of [[16, 653, 49], [16, 853, 49], [16, 429, 49], [16, 555, 49], [40, 500, 49]]) {
-    for (const n of [2, 3, 5, 6, 8, 9, 10, 12, 17]) {
-      for (const pitch of [51.7, 48.6, 44]) {
-        const h = control + (n - 1) * pitch, y = Math.max(top, bottom - h);
-        if (y + h > bottom + 1) continue;
-        for (let k = 0; k < n; k++) {
-          const at = y + control / 2 + k * pitch, s = pressShape({ x: 300, y, w: control, h }, n, { top, bottom }, { index: k, y: at });
-          assert.equal(lensAt(at - s.y, n, s.pitch).index, k, `n ${n} pitch ${pitch} item ${k} in ${top}..${bottom}`);
-          assert.ok(s.h >= h - 0.01, "never below rest");
-        }
-      }
+// The overflow rule (placeTabs) must leave a layout where every place fits as it was, press lens included: a drag from
+// the first tab to the last names the last. Windows measured on the Duo simulator (iOS 27.1).
+test("lens: a drag from the first tab to the last names the last, where every place fits at the normal pitch", () => {
+  const ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
+  const sig = (iw, ih, ow, oh, o = {}) => ({ innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih, insetTop: 0, insetBottom: 0, insetLeft: 0, insetRight: 0, screenWidth: 466, screenHeight: 678, userAgent: ua, touchPoints: 5, pixelRatio: 3, standalone: false, ...o });
+  const windows = { "tall Safari": sig(669, 871, 669, 951), "tall Home Screen": sig(669, 869, 669, 951, { standalone: true, insetBottom: 34 }), "wide Safari": sig(951, 543, 951, 669), "wide Home Screen": sig(951, 648, 951, 669, { standalone: true, insetRight: 84 }), "Split left": sig(385, 571, 469, 669) };
+  let checked = 0;
+  for (const [name, s] of Object.entries(windows)) {
+    const c = detect(s), f = frame(c), band = c.mode === "column" ? columnBand(c) : undefined;
+    for (const [actions, primary] of [[0, false], [2, true]]) for (let n = 2; n <= 20; n++) {
+      const tabs = placeTabs(c, n, actions > 0 || primary);
+      if (tabs?.shown !== n || tabs.pitch !== TEMPLATE.item) continue;
+      const g = template(f, { room: landingRoom(c), places: n, actions, primary, tabPitch: tabs.pitch }).placed.find((p) => p.group[0].kind === "place");
+      const at = (k) => g.rect.y + TEMPLATE.control / 2 + k * g.pitch, shape = pressShape(g.rect, g.group.length, band);
+      assert.equal(lensAt(at(n - 1) - shape.y, g.group.length, shape.pitch).index, n - 1, `${name} ${n}${primary ? " with actions and a primary" : ""} last`);
+      checked++;
     }
   }
-});
-
-test("open: a press whose item is already under the finger keeps the native shape", () => {
-  const r = { x: 300, y: 400, w: 49, h: 49 + 51.7 };
-  const free = pressShape(r, 2), held = pressShape(r, 2, undefined, { index: 0, y: free.y + PRESS.inset + LENS.centre });
-  assert.deepEqual(held, free);
-});
-
-test("a press reads the capsule's rest from the layout, not the swollen box a recent press left", () => {
-  const group = { style: { left: "0px", top: "261px", width: "49px", height: "389.2px" }, offsetTop: 249, offsetHeight: 412 };
-  const buttons = [0, 1].map((i) => ({ style: { top: `${i * 48.6}px` }, offsetTop: i * 51.5 }));
-  const { rest, pitch } = restOf(group, buttons);
-  assert.deepEqual(rest, { x: 0, y: 261, w: 49, h: 389.2 });
-  assert.ok(Math.abs(pitch - 48.6) < 1e-9);
-  assert.equal(restOf(group, buttons.slice(0, 1)).pitch, 0);
+  assert.ok(checked > 30, "covers the long capsules, 12 places with actions and a primary in tall Safari among them");
+  // and the press opens exactly this shape, from the rest, the count and the band alone
+  const src = readFileSync(new URL("../src/press.ts", import.meta.url), "utf8");
+  assert.match(src, /shape: pressShape\(rest, n, band\(h\.nav\)\)/);
 });

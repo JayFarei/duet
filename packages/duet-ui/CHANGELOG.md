@@ -10,9 +10,7 @@
 - `bootScript` sets the 84pt inset of a wide or tall Safari page on the open Duo before the first paint, so its content does not jump on mount.
 - With `moveControls`, a Home Screen app in a strip no longer lists a "Move controls" row that did nothing: `canMoveControls` is true only where the controls can change edge.
 - Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place at once, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
-- A long capsule pressed and held still keeps naming the item under the finger. It used to open taller and slide the next item under the finger, so release on a tab selected the one below it, and release on the seventh of 9 opened "…". Short capsules keep their native shape.
 - Closed Duo, Home Screen app turned sideways: the capsule stays on the screen. It used to run 61pt past the foot of the screen with 9 places, hiding the last tabs and "…".
-- A press right after a tap opens the same capsule as one later: it read the swollen size the tap left as the capsule's rest, which shifted the tab under the finger near a boundary.
 
 ## 0.8.0-rc.3
 
