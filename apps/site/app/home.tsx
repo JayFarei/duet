@@ -152,6 +152,9 @@ function Page({ installs }: { installs: InstallStats | null }) {
         <h3 className="h3">The controls</h3>
         <p className="lede lede-l">The biggest that fit. What doesn't fit goes in “…”.</p>
         <Controls />
+        <h3 className="h3">In real apps</h3>
+        <p className="lede lede-l">Three of our apps, on the same Duo.</p>
+        <Apps />
       </Section>
 
       <Section id="docs" title="Docs" lede="Wrap your app and list your places, most used first.">
@@ -244,6 +247,28 @@ function Controls() {
             <button className="rule-show" onClick={() => show(c)}>Show on the Duo</button>
             <a className="rule-link" href={c.href}>Docs</a>
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Our own apps on the stage's 3D Duo (tools/media/duo3d-apps.mjs). The private ones run on mock data.
+const APPS = [
+  { h: "RegTail", k: "Demo data", p: "Car checks. Unfolded, the report's sections are tabs, the rest go in “More”.", still: "app-regtail" },
+  { h: "Dashboard", k: "Mock data", p: "Server monitoring. Unfolded, its five pages are tabs in the column.", still: "app-dashboard" },
+  { h: "Wealth", k: "Mock data", p: "Personal finance. Folded, its nine sections go in the Menu.", still: "app-wealth" },
+];
+
+function Apps() {
+  return (
+    <div className="tiles">
+      {APPS.map((a) => (
+        <div key={a.still} className="tile rule app">
+          <div className="rule-shot"><img src={`/media/${a.still}.webp`} alt={`${a.h} on the Duo`} loading="lazy" /></div>
+          <p className="tile-k">{a.k}</p>
+          <h3 className="tile-h">{a.h}</h3>
+          <p className="tile-p">{a.p}</p>
         </div>
       ))}
     </div>

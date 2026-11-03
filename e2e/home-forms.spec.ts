@@ -11,7 +11,7 @@ test("the home page has three sections, in order", async ({ page }) => {
 // The controls already play the book and sheet pages, so there is no separate examples block repeating them.
 test("after the demo, each part appears once", async ({ page }) => {
   await page.goto("/");
-  expect(await page.locator("main .h3").allTextContents()).toEqual(["Where the controls go", "The controls", "Also included"]);
+  expect(await page.locator("main .h3").allTextContents()).toEqual(["Where the controls go", "The controls", "In real apps", "Also included"]);
   await expect(page.locator("#docs .example")).toHaveCount(0);
 });
 
@@ -43,4 +43,20 @@ test("each control shows on the 3D Duo and plays on the stage", async ({ page })
     return seen;
   });
   expect(played).toEqual(["fit", "folded", "burger", "burger", "/book", "/sheet"]);
+});
+
+// "In real apps": three of our apps on the real 3D Duo, RegTail on its demo data, the dashboard and wealth on mock data.
+test("real apps show on the 3D Duo, private ones on mock data", async ({ page }) => {
+  await page.goto("/");
+  const apps = page.locator("#rules .app");
+  await expect(apps).toHaveCount(3);
+  expect(await apps.locator(".tile-h").allTextContents()).toEqual(["RegTail", "Dashboard", "Wealth"]);
+  for (const [i, name] of ["regtail", "dashboard", "wealth"].entries()) {
+    const img = apps.nth(i).locator(".rule-shot img");
+    await expect(img).toHaveAttribute("src", `/media/app-${name}.webp`);
+    await img.scrollIntoViewIfNeeded();
+    await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth)).toBeGreaterThan(0);
+  }
+  await expect(apps.nth(1).locator(".tile-k")).toHaveText("Mock data");
+  await expect(apps.nth(2).locator(".tile-k")).toHaveText("Mock data");
 });
