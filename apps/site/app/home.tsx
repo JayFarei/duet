@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, CodeXml, ListTree, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
+import { BookOpen, Check, ListTree, Moon, PanelBottom, PanelRight, Sun } from "lucide-react";
 import { Duet, column, useDuet, type DuetItem } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
 import { ClaudeGlyph, CodexGlyph, GrokGlyph, PiGlyph } from "./agent-glyphs";
 import { Duo } from "./duo/duo";
-import { Device, FORMS, RoomSlider, type Form } from "./forms";
 import { TINTS, useTheme, useTint } from "./theme";
 
 const REPO = "https://github.com/JayFarei/duet";
@@ -24,8 +23,7 @@ function DuetMark() {
 const SECTIONS: DuetItem[] = [
   { id: "top", label: "Duet", icon: <DuetMark /> },
   { id: "rules", label: "How it works", icon: <ListTree size={24} /> },
-  { id: "code", label: "Integrate", icon: <CodeXml size={24} /> },
-  { id: "examples", label: "Examples", icon: <TabletSmartphone size={24} /> },
+  { id: "docs", label: "Docs", icon: <BookOpen size={24} /> },
 ];
 
 const quick = (tint?: string) => `import { Duet } from "duet-ui";
@@ -139,23 +137,8 @@ function Page({ installs }: { installs: InstallStats | null }) {
 
       <Section id="rules" title="How it works" lede="Three steps, and only the first one is yours.">
         <Steps />
-        <h3 className="h3">Less room, smaller controls</h3>
-        <p className="lede lede-l">Duet always draws the biggest of three forms that fits the room it measured.</p>
-        <Rules />
-        <RoomSlider />
-      </Section>
-
-      <Section id="code" title="Integrate" lede="Wrap your app and pass your places, primary places first. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
-        <Integrate />
-        <div className="ctas" style={{ justifyContent: "flex-start" }}>
-          <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
-          <a href="/panes" className="pill">Panes example</a>
-          <a href="/sheet" className="pill">Sheets example</a>
-          <a href="/book" className="pill">Call to action example</a>
-        </div>
-      </Section>
-
-      <Section id="examples" title="Where the controls go" lede="Duet picks one of three places from the device, the browser and the window. Your app does not choose.">
+        <h3 className="h3">Where the controls go</h3>
+        <p className="lede lede-l">Duet picks one of three places from the device, the browser and the window. Your app does not choose.</p>
         <div className="tiles">
           {ISLANDS.map(([where, mode, text, clip]) => (
             <div key={mode} className="tile">
@@ -165,6 +148,19 @@ function Page({ installs }: { installs: InstallStats | null }) {
               <p className="tile-p">{text}</p>
             </div>
           ))}
+        </div>
+        <h3 className="h3">How big they are</h3>
+        <p className="lede lede-l">Duet draws the biggest of three forms that fits the room it measured. Less room, smaller controls.</p>
+        <Rules />
+      </Section>
+
+      <Section id="docs" title="Docs and examples" lede="Wrap your app and pass your places, primary places first. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
+        <Integrate />
+        <div className="ctas" style={{ justifyContent: "flex-start" }}>
+          <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
+          <a href="/panes" className="pill">Panes example</a>
+          <a href="/sheet" className="pill">Sheets example</a>
+          <a href="/book" className="pill">Call to action example</a>
         </div>
       </Section>
 
@@ -199,8 +195,13 @@ function Steps() {
   );
 }
 
-// The three forms at the Duo's real rooms, each with the Moment of the same name that shows it on the stage (duo3d.tsx).
-const ROOMS: [Form, number][] = [["tabs", 440], ["more", 350], ["menu", 150]];
+// The three forms, each pictured by the stage's 3D Duo at its moment (duo3d.tsx, tools/media/duo3d-stills.mjs), with a
+// button that plays that moment on the stage.
+const FORMS = [
+  { id: "tabs", moment: "fit", k: "Unfolded Safari", h: "Every place is a tab", p: "Each place is one tap away. “…” holds your actions, here Share." },
+  { id: "more", moment: "folded", k: "Closed, from the Home Screen", h: "Tabs and More", p: "As many places as fit stay tabs, the rest go in “…” above your actions. So put primary places first." },
+  { id: "menu", moment: "burger", k: "Closed Safari, and Split View", h: "A menu", p: "Fewer than three tabs would fit, so one button opens a sidebar with every place." },
+] as const;
 
 function Rules() {
   const show = (id: string) => {
@@ -210,21 +211,18 @@ function Rules() {
   return (
     <>
       <div className="tiles">
-        {ROOMS.map(([form, room]) => {
-          const r = FORMS[form];
-          return (
-            <div key={form} className="tile rule">
-              <div className="rule-bar"><Device room={room} open={form !== "tabs"} /></div>
-              <p className="tile-k">{r.k}</p>
-              <h3 className="tile-h">{r.h}</h3>
-              <p className="tile-p">{r.p}</p>
-              <button className="rule-show" onClick={() => show(r.moment)}>Show on the Duo</button>
-            </div>
-          );
-        })}
+        {FORMS.map((f) => (
+          <div key={f.id} className="tile rule">
+            <div className="rule-shot"><img src={`/media/form-${f.id}.webp`} alt={`The Duo with ${f.h.toLowerCase()}`} loading="lazy" /></div>
+            <p className="tile-k">{f.k}</p>
+            <h3 className="tile-h">{f.h}</h3>
+            <p className="tile-p">{f.p}</p>
+            <button className="rule-show" onClick={() => show(f.moment)}>Show on the Duo</button>
+          </div>
+        ))}
       </div>
       <ul className="rule-notes">
-        <li>When the selected place is in More, the More button shows the selection. Nothing reorders. <button className="rule-link" onClick={() => show("folded")}>Show on the Duo</button></li>
+        <li>When the selected place is in More, the More button shows the selection. Nothing reorders.</li>
         <li>More lists the places it holds first, then your actions, then destructive ones.</li>
         <li>Moving the controls to the other side is opt-in, with <code>moveControls</code>.</li>
       </ul>

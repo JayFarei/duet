@@ -1,27 +1,30 @@
 import { expect, test } from "@playwright/test";
 
-// The home page's "Less room, smaller controls": three devices, one per form, and a slider that steps through them.
-test("the room slider steps through the three forms", async ({ page }) => {
+// The home page is three parts: the hero with the live Duo, how it works, then docs and examples.
+test("the home page has three sections, in order", async ({ page }) => {
   await page.goto("/");
-  const slider = page.locator("#room");
-  await slider.scrollIntoViewIfNeeded();
-  const form = page.getByTestId("room-form");
-  await expect(form).toHaveText("Tabs and More");
-  await page.getByRole("button", { name: "Unfolded Safari" }).click();
-  await expect(form).toHaveText("Every place is a tab");
-  await expect(page.getByTestId("room-value")).toHaveText("470 pt, 11 taps");
-  await slider.fill("150");
-  await expect(form).toHaveText("A menu");
-  await slider.fill("300");
-  await expect(page.getByTestId("room-value")).toHaveText("300 pt, 6 taps");
-  await expect(page.locator(".room .dev-cap [role=img]")).toHaveCount(6); // five tabs and More
+  const ids = await page.locator("main > section[id]").evaluateAll((s) => s.map((e) => e.id));
+  expect(ids).toEqual(["top", "rules", "docs"]);
 });
 
-test("each form card draws its device", async ({ page }) => {
+// "How big they are": each form is a picture of the real 3D Duo, and its button plays that moment on the stage.
+test("each form card shows the 3D Duo and plays its moment", async ({ page }) => {
   await page.goto("/");
   const cards = page.locator(".rule");
   await expect(cards).toHaveCount(3);
-  await expect(cards.nth(0).locator(".dev-cap [role=img]")).toHaveCount(10); // nine tabs and More
-  await expect(cards.nth(1).locator(".dev-more")).toBeVisible();
-  await expect(cards.nth(2).locator(".dev-side")).toBeVisible();
+  for (const [i, form] of ["tabs", "more", "menu"].entries()) {
+    const img = cards.nth(i).locator(".rule-shot img");
+    await expect(img).toHaveAttribute("src", `/media/form-${form}.webp`);
+    await img.scrollIntoViewIfNeeded();
+    await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth)).toBeGreaterThan(0);
+  }
+  const moments = await page.evaluate(() => {
+    const seen: string[] = [];
+    addEventListener("duet:moment", (e) => seen.push((e as CustomEvent<string>).detail));
+    return new Promise<string[]>((done) => {
+      document.querySelectorAll<HTMLButtonElement>(".rule-show").forEach((b) => b.click());
+      setTimeout(() => done(seen), 50);
+    });
+  });
+  expect(moments).toEqual(["fit", "folded", "burger"]);
 });
