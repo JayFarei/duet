@@ -778,7 +778,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** a strip's top is measured from the screen's height, and in this window that read 466pt, not the 678pt the strip's band assumes. The band shrank to 178pt and the capsule centred on it, overflowing both ways. Its count came from the strip's 389pt, so it did not shrink.
 - **Duet does:** `detect` measures this window from the long side, as upright, whichever way `screen.*` reads. The room is 389pt as upright, from y 32 to 421.
 - **You do:** nothing.
-- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator in both rotations: 9 places give 7 tabs and "…" at y 32 to 421, 5 places end at the same foot, and turning back upright restores the place.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator in both rotations: 9 places give 7 tabs and "…" at y 32 to 421, 5 places end at the same foot, and turning back upright restores the place. At 50a8cc5, before overflow, the same window already lost its foot: 5 places drew from y 205 to 461 in a 445pt window, the fifth tab cut by the screen's edge (Duo e2e 4, side by side with this build, which draws them from 166 to 421). So this changes an all-fit layout on purpose, in this window only.
 
 ## Closed Safari turned showing tabs where the docs said burger
 
