@@ -4,7 +4,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
-import { stable, PREVIEW_RISE } from "../src/geometry.ts";
+import { stable, PREVIEW_RISE, LAND_HOLD } from "../src/geometry.ts";
 
 const bootScript = await (await import("../scripts/boot.mjs")).bundle();
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
@@ -26,7 +26,7 @@ function boot(s) {
     innerWidth: s.innerWidth, innerHeight: s.innerHeight, outerWidth: s.outerWidth, outerHeight: s.outerHeight, devicePixelRatio: 3,
     screen: { width: s.screenWidth, height: s.screenHeight, orientation: { angle: 0 } },
     navigator: { userAgent: s.userAgent, maxTouchPoints: s.touchPoints, standalone: s.standalone }, matchMedia: () => ({ matches: false }),
-    document: { documentElement: html }, visualViewport: { height: s.innerHeight, scale: 1 },
+    document: { documentElement: html, querySelector: () => null }, visualViewport: { height: s.innerHeight, scale: 1 },
   };
   g.window = g; g.top = g;
   vm.runInNewContext(bootScript, g);
@@ -34,7 +34,7 @@ function boot(s) {
 }
 
 test("web app launch, both ways up: the controls waiting from the first paint", () => {
-  for (const s of [LAUNCH_WIDE, LAUNCH_TALL, sig(466, 669, 951, 669)]) {
+  for (const s of [LAUNCH_WIDE, LAUNCH_TALL, sig(466, 669, 951, 669), sig(867, 648, 951, 669)]) {
     const a = boot(s);
     assert.ok("data-duet-pending" in a, JSON.stringify(a));
     assert.ok(!("data-duet-mode" in a));
@@ -76,6 +76,20 @@ test("the launch's mid-way scale (2.04, closed width scaled up to the open scree
   assert.equal(d.pendingUntil, undefined, "no timer left re-reading");
 });
 
+// rc4 round 4, 1 of 5 tall cold launches after folding wide to tall: the first reading was not yet a launch, then the
+// closed width inside the open screen showed a 7-tab capsule mid-screen for ~0.2s before the tall window landed.
+test("a launch whose first reading is not one yet still waits: the first launch reading starts it", () => {
+  for (const first of [sig(980, 1424, 669, 951), sig(466, 678, 466, 678)]) {
+    const d = {};
+    stable(d, first, undefined, 0);
+    assert.equal(stable(d, sig(466, 678, 669, 951, { insetBottom: 34 }), undefined, 55).hidden, "pending");
+    assert.equal(stable(d, sig(669, 869, 669, 951, { insetBottom: 34 }), undefined, 110).hidden, undefined, "the tall window lands");
+  }
+  const late = {};
+  stable(late, sig(466, 678, 466, 678), undefined, 0);
+  assert.notEqual(stable(late, sig(466, 678, 669, 951), undefined, PREVIEW_RISE + 1).hidden, "pending", "a running app is not held");
+});
+
 test("a launch that never lands shows the controls after the cap", () => {
   const d = {};
   assert.equal(stable(d, LAUNCH_WIDE, undefined, 0).hidden, "pending");
@@ -89,8 +103,34 @@ test("only the first reading counts: a running app whose inset goes away is not 
   assert.notEqual(stable(d, LAUNCH_WIDE, undefined, 9000).hidden, "pending");
 });
 
-test("full screen fit none keeps inner 867 inside outer 951: not a launch", () => {
-  assert.notEqual(stable({}, sig(867, 669, 951, 669), undefined, 0).hidden, "pending");
+test("a page that opts out of viewport-fit=cover keeps inner 867 inside outer 951: not a launch", () => {
+  assert.notEqual(stable({}, sig(867, 669, 951, 669, { uncovered: true }), undefined, 0).hidden, "pending");
+});
+
+// A wide launch of a page with cover, or that Duet will give cover (Duo simulator, 30fps, 9 of 9 launches): 867 with insets
+// 0 or 84, then 951 with 84. Shown at 867, the controls hop 84pt in the launch fade, and 4 of 9 showed the inline burger first.
+test("a wide launch waits out the 867 window, whichever way its inset reads", () => {
+  for (const first of [{}, { insetRight: 84, insetBottom: 34 }]) {
+    const d = {};
+    assert.equal(stable(d, sig(867, 648, 951, 669, first), undefined, 0).hidden, "pending");
+    assert.equal(stable(d, sig(867, 648, 951, 669, { insetRight: 84, insetBottom: 34 }), undefined, 60).hidden, "pending");
+    const landed = stable(d, sig(951, 648, 951, 669, { insetRight: 84, insetBottom: 34 }), undefined, 110);
+    assert.equal(landed.hidden, undefined);
+    assert.equal(landed.mode, "strip");
+    assert.equal(landed.width, 951);
+  }
+});
+
+test("a wide launch stuck at 867 shows the controls after the cap", () => {
+  const d = {}, stuck = sig(867, 648, 951, 669, { insetRight: 84, insetBottom: 34 });
+  assert.equal(stable(d, stuck, undefined, 0).hidden, "pending");
+  assert.notEqual(stable(d, stuck, undefined, PREVIEW_RISE + 1).hidden, "pending");
+});
+
+test("a running app is not held at 867: the launch wait reads only the first window", () => {
+  const d = {};
+  stable(d, sig(951, 648, 951, 669, { insetRight: 84, insetBottom: 34 }), undefined, 0);
+  assert.notEqual(stable(d, sig(867, 648, 951, 669), undefined, 5000).hidden, "pending");
 });
 
 // A live turn of an open Duo's Home Screen app from tall to wide (Duo simulator, 30fps): the wide window comes ~30ms in,
@@ -124,6 +164,30 @@ test("a wide Home Screen window whose strip never lands shows inline at the sett
   assert.equal(settled.mode, "inline");
   assert.equal(settled.hidden, undefined);
   assert.equal(stable(d, TURN_TO_WIDE[2], undefined, 2200, true).hidden, undefined, "a later event does not hide it again");
+});
+
+// viewport-fit=auto or contain: no inset ever comes. iOS narrows the page to 867 inside 951 ~380ms into the turn (Duo simulator).
+test("a page that opts out of cover turns to wide: inline commits in place at 867, not at the settle where it glides", () => {
+  const d = {}, opts = { uncovered: true };
+  stable(d, sig(669, 930, 669, 951, opts), undefined, 0);
+  assert.equal(stable(d, sig(951, 648, 951, 669, opts), undefined, 100, true).hidden, "moving", "before the page narrows, it would stand 84pt off");
+  assert.equal(stable(d, sig(867, 648, 951, 669, opts), undefined, 480, true).hidden, "moving", "the tall status clock is still fading: the burger would sit over it");
+  assert.equal(d.landUntil, 480 + LAND_HOLD, "the caller re-reads then, no resize may follow");
+  const c = stable(d, sig(867, 648, 951, 669, opts), undefined, 480 + LAND_HOLD, true);
+  assert.equal(c.mode, "inline");
+  assert.equal(c.hidden, undefined);
+  assert.equal(c.width, 867);
+  assert.equal(c.confidence, "settling", "no transition");
+  const sure = stable(d, sig(867, 648, 951, 669, opts), undefined, 1100);
+  assert.equal(sure.width, 867);
+  assert.equal(sure.confidence, "sure");
+});
+
+test("a page that opts out of cover, narrowed by its first wide reading, still waits out the clock's fade", () => {
+  const d = {}, opts = { uncovered: true };
+  stable(d, sig(669, 930, 669, 951, opts), undefined, 0);
+  assert.equal(stable(d, sig(867, 648, 951, 669, opts), undefined, 400, true).hidden, "moving");
+  assert.equal(stable(d, sig(867, 648, 951, 669, opts), undefined, 400 + LAND_HOLD, true).hidden, undefined);
 });
 
 test("turning back to tall does not hide: the inline place is taken at once", () => {

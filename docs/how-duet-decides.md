@@ -79,7 +79,7 @@ A Safari split-view pane (469x669 window, 385x571 page) has Safari's column on t
 
 ## Side
 
-`useDuet().side` is the edge the controls are on. It is only detected in `strip` mode (from which safe-area inset is large). In `column` mode it is Safari's column on the closed Duo: `"right"` in portrait; turned sideways, the side the camera is on, `"left"` at angle 90 (turned anticlockwise) and `"right"` at 270. A left column widens the document on the left and keeps it scrolled across, as in split view. In a split pane it is nominal, since both edges are drawn. In `inline` mode it is the user's choice: drag the controls across the middle of the page, or use "Move controls" in "…". The choice is stored in `localStorage` per site (`duet-side`, or `duet-side-split` in split view). Without one, it is `"right"`. In the in-app preview turned sideways (`strip`) it is the side of the safe-area inset: `"left"` at angle 90, `"right"` at 270.
+`useDuet().side` is the edge the controls are on. It is only detected in `strip` mode (from which safe-area inset is large). In `column` mode it is Safari's column on the closed Duo: `"right"` in portrait; turned sideways, the side the camera is on, `"left"` at angle 90 (turned anticlockwise) and `"right"` at 270. A left column widens the document on the left and keeps it scrolled across, as in split view. In a split pane it is nominal, since both edges are drawn. In `inline` mode it is `"right"`, unless the app passes `moveControls`: then it is the user's choice, by dragging the controls across the middle of the page or by "Move controls" in "…", stored in `localStorage` per site (`duet-side`, or `duet-side-split` in split view). Without `moveControls` a stored side is ignored. A Home Screen app in a strip offers no move, since its strip sits on the edge its inset gives it. In the in-app preview turned sideways (`strip`) it is the side of the safe-area inset: `"left"` at angle 90, `"right"` at 270.
 
 ## In-app preview
 
@@ -118,25 +118,29 @@ Each mode has a band the controls may use, and Duet keeps every control inside i
 
 ## Tabs or burger
 
-With `menu.tabs`, `placesFit` decides the whole set. The places fit when `groupHeight(places + 1)` (with "…") or `groupHeight(places)` (nothing else to show) is within the mode's band, plus the 12pt a lone column group may take. A group is 49pt plus 51.7pt per further button. "…" counts when anything else needs it. Safari's column and a split pane can have nothing else, so a page with actions or a primary can read burger at the margin where one without reads tabs. Every other window, full-screen Safari and a Home Screen app included, always lists "Move controls" in "…", so "…" always counts there and actions change nothing.
+With `menu.tabs`, `placeTabs` decides how many places are tabs and at what pitch, and `placesFit` is whether all of them are. The places fit when `groupHeight(places + 1)` (with "…") or `groupHeight(places)` (nothing else to show) is within the mode's band, plus the 12pt a lone column group may take. A group is 49pt plus 51.7pt per further button. When that does not fit, the tabs group alone tightens its pitch to what the room allows, down to 44pt, so buttons stay 49pt tall and their icons clear, and the capsule, the "…" morph and the press lens all read that one pitch. When they do not fit at 44pt either, as many leading places as fit beside "…" stay tabs, at the widest pitch from 51.7pt down to 44pt, and the others go in "…", in the app's order. The burger only when that leaves fewer than three tabs, where a tab or two and "…" would not be useful. Order is the app's, so the first places are the primary ones, and selecting a folded place swaps nothing: "…" takes the selected bubble and its list marks the place. Tabs at 51.7pt are unchanged, and action groups always keep it. "…" counts when anything else needs it. With `moveControls`, a window that can change edge lists "Move controls" in "…", so "…" always counts there and the table's With actions column applies.
 
 The band is the same one every control uses, so forward history and Live Activities need no run-time signal: Safari's column already assumes the back slot and two activities. A Home Screen app on the Duo reads its strip's room from the start, 389pt in any window, because its insets land up to 600ms late and reading them then would show tabs and then a burger. The inner screen held upright is the exception, since it runs inline.
 
-The most places that fit in each window, from the rule. Closed Safari, turned, Split View left and the capsules a left pane draws for the right were checked at the edge on the Duo simulator, and Home Screen wide and closed at 6 and 7. The counts in full-screen Safari and Home Screen tall were checked at the edge without actions, the counts with actions there follow from the same "…". A test holds this table to `placesFit`. With actions is a page with actions or a primary, without is a page with neither. The burger starts one place above the count.
+The most places that fit in each window, from the rule. Closed Safari, turned, Split View left and the capsules a left pane draws for the right were checked at the edge on the Duo simulator, and Home Screen wide and closed at 6 and 7. The counts in full-screen Safari and Home Screen tall were checked at the edge without actions, the counts with actions there follow from the same "…". A test holds this table to `placeTabs`. With actions and Without are the most places that are all tabs, on a page with actions or a primary, and on a page with neither. Past those counts is Overflow: the tabs that show beside "…" however many places there are, on any page, or the burger.
 
-| Window | With actions | Without |
-| --- | --- | --- |
-| Safari full screen, wide 951x543, with or without forward history | 8 | 8 |
-| Safari full screen, tall 669x825, with or without forward history | 14 | 14 |
-| Home Screen, wide 951x669 | 6 | 6 |
-| Home Screen, tall 669x869 | 15 | 15 |
-| Split View, left, 385x571, with or without forward history | 5 | 6 |
-| Split View, right | 1 | 2 |
-| Closed Safari, upright, 382x580, with or without forward history | 1 | 2 |
-| Closed Safari, turned, 594x368 | 0 | 1 |
-| Closed Home Screen, 466x657 | 6 | 6 |
+| Window | With actions | Without | Overflow |
+| --- | --- | --- | --- |
+| Safari full screen, wide 951x543, with or without forward history | 10 | 11 | 10 |
+| Safari full screen, tall 669x825, with or without forward history | 16 | 17 | 16 |
+| Home Screen, wide 951x669 | 7 | 8 | 7 |
+| Home Screen, tall 669x869 | 17 | 18 | 17 |
+| Split View, left, 385x571, with or without forward history | 6 | 7 | 6 |
+| Split View, right | 1 | 2 | burger |
+| Closed Safari, upright, 382x580, with or without forward history | 1 | 2 | burger |
+| Closed Safari, turned, 594x368, Safari's column | 0 | 1 | burger |
+| Closed Safari, turned, 678x384, toolbar on top | 6 | 7 | 6 |
+| Closed Home Screen, 466x657 | 7 | 8 | 7 |
+| Closed Home Screen, turned, 678x445 | 7 | 8 | 7 |
 
-Two places on closed Safari upright, with actions: burger and "…". Where the band holds a single button, closed Safari turned, a page with actions shows only "…", because a burger there would lose the actions. In a `menu.tabs` app the places lead that list, then "This page". The same window without actions shows the burger.
+Two places on closed Safari upright, with actions: burger and "…". Where the band holds a single button, closed Safari turned in Safari's column, a page with actions shows only "…", because a burger there would lose the actions. In a `menu.tabs` app the places lead that list, then "This page". The same window without actions shows the burger.
+
+Closed Safari turned is two windows, and the rule reads whichever the frame gives: 594x368 beside the camera when Safari draws its column, a single button of room, and 678x384 under a full width toolbar, where the page runs inline and holds 6 tabs and "…". The Duo simulator draws the second.
 
 Live Activities cannot be started on the simulator, so their effect is the modelled worst case in the band, not a measurement.
 
@@ -146,7 +150,7 @@ Live Activities cannot be started on the simulator, so their effect is the model
 - **Column mode depends on unsupported WebKit behaviour** (painting in-document content outside the layout viewport) and on measured positions of Safari's buttons. A Safari or iOS update can break or shift it. Duet falls back to `inline` whenever any column check fails, but it cannot detect a Safari layout that still passes the checks while its buttons moved.
 - **Column taps are routed by coordinates** on `pointerdown`: they fire on touch down and show no native press state.
 - **Live Activities and the Dynamic Island are invisible to the page**, so the top band always reserves the worst case, which leaves empty space when no activity runs.
-- **Split-view panes can't tell their side**: column mode draws both edges, inline mode relies on the user's choice.
+- **Split-view panes can't tell their side**: column mode draws both edges, inline mode sits on the right unless the app passes `moveControls` and the user moves it.
 - **Server rendering** starts from a fixed Duo snapshot (see [Server rendering](server-rendering.md#server-rendering-and-hydration)).
 - Other iOS browsers, in-app web views, iframes, landscape other than the closed Safari tab and the open screen at full width all get `inline`.
 - Measured on the iPhone Duo simulator (iOS 27.1) and checked on a device in October 2026.

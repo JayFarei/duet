@@ -7,6 +7,11 @@ import { DUO, DUO_SIZES, RAIL, WIDE, columnBand, type Context, type Side } from 
 export const TEMPLATE = { control: DUO.control, item: DUO.groupItem, gap: DUO.gap, edge: DUO.centerFromEdge, row: 44, pad: 6, head: 26, menuWidth: 232 } as const;
 const T = TEMPLATE;
 
+/** The tightest pitch tabs may take to stay tabs, below it the burger. Buttons stay T.control tall and their icons clear. */
+export const TIGHTEST_TAB_PITCH = 44;
+/** The fewest tabs worth showing beside "…" when some places fold into it, below it the burger. */
+export const FEWEST_TABS = 3;
+
 /** A group of n buttons in one capsule. */
 export const groupHeight = (n: number) => T.control + (n - 1) * T.item;
 
@@ -38,7 +43,7 @@ export type Group = Slot[];
  *  is all that fits. Most actions shown wins.
  *  `split`: a lone menu button breaks ties (inline; in the column a second capsule's gap would push the stack toward
  *  Safari's own buttons). `rest`: the list holds items whatever fits, so "…" always shows. `extra`: what a lone group
- *  may take beyond `h`. `places`: the app's places as tabs, heading the group and always shown (placesFit decided they
+ *  may take beyond `h`. `places`: the app's places as tabs, heading the group and always shown (placeTabs decided they
  *  fit), so only the actions and the primary fold. */
 export function allocate(h: number, n: number, o: { menu?: boolean; primary?: boolean; split?: boolean; rest?: boolean; extra?: number; places?: number } = {}): { groups: Group[]; shown: number; primary: boolean } {
   const places = o.places ?? 0;
@@ -99,12 +104,13 @@ export const extra = (f: Frame) => f.kind === "column" ? 2 * T.gap - 2 * RAIL.ga
 
 export interface Rect { x: number; y: number; w: number; h: number }
 /** `primary`: the primary's own capsule, placed at the strip's foot (in either form only its button is tinted). */
-export interface Placed { group: Group; rect: Rect; primary: boolean }
+export interface Placed { group: Group; rect: Rect; primary: boolean; pitch: number }
 
 /** The closed column centres the stack in its band, as does any band it overfills. Elsewhere the stack ends at the
  *  band's foot, under the thumb, with the primary lowest; inline, a lone burger stays at the head of the strip. */
-export function place(f: Frame, groups: Group[]): Placed[] {
-  const heights = groups.map((g) => groupHeight(g.length));
+export function place(f: Frame, groups: Group[], tabPitch: number = T.item): Placed[] {
+  const pitchOf = (g: Group) => g[0]?.kind === "place" ? tabPitch : T.item;
+  const heights = groups.map((g) => T.control + (g.length - 1) * pitchOf(g));
   const total = heights.reduce((s, h) => s + h, 0) + (groups.length - 1) * T.gap;
   const x = f.cx - T.control / 2;
   const head = f.kind === "inline" && groups[0]?.length === 1 && groups[0][0].kind === "menu";
@@ -115,7 +121,7 @@ export function place(f: Frame, groups: Group[]): Placed[] {
     const primary = group.length === 1 && group[0].kind === "primary";
     const top = head && !i ? f.top : y;
     y += heights[i] + T.gap;
-    return { group, rect: { x, y: top, w: T.control, h: heights[i] }, primary };
+    return { group, rect: { x, y: top, w: T.control, h: heights[i] }, primary, pitch: pitchOf(group) };
   });
 }
 
@@ -126,15 +132,34 @@ export function place(f: Frame, groups: Group[]): Placed[] {
 const stripFrame = (c: Context) => c.duo && c.standalone && !(c.width >= WIDE && c.height > c.width) ? frame({ ...c, mode: "strip", height: DUO_SIZES[0][1], offsetTop: 0 }) : undefined;
 /** The room a menu.tabs app allocates from in this window, where the window's own band would mislead (stripFrame). */
 export const landingRoom = (c: Context) => { const f = stripFrame(c); return f && f.bottom - f.top; };
+/** Whether this window lets the controls change edge (moveControls): inline only. A strip sits on the edge its inset
+ *  gives it, and a Home Screen app reads inline only until that inset lands, so neither may offer a move that cannot happen. */
+export const canMoveControls = (c: Context) => c.mode === "inline" && !stripFrame(c);
 
-/** Whether the app's places go in the capsule as tabs (menu.tabs) rather than behind the burger: all of them in one
- *  capsule, plus "…" when anything else (`rest`: actions, the primary, anything "…" lists) needs folding. Never in the
- *  in-app preview, whose gap holds one button. From the smallest height at this window (stableHeight), so Safari's bar
- *  collapsing on a scroll cannot flip it. Pure, and the only place this is decided. */
-export function placesFit(c: Context, places: number, rest: boolean): boolean {
-  const f = stripFrame(c) ?? frame({ ...c, height: c.stableHeight });
-  return places > 0 && !f.preview && groupHeight(places + (rest ? 1 : 0)) <= f.bottom - f.top + extra(f);
+/** How the app's places show as tabs (menu.tabs), undefined when they go behind the burger. `shown` leading places at
+ *  `pitch`: all of them in one capsule, plus "…" when anything else (`rest`: actions, the primary, anything "…" lists)
+ *  needs folding; else as many as fit beside "…", which lists the others, if that is at least FEWEST_TABS. The normal
+ *  pitch while that fits, tighter down to TIGHTEST_TAB_PITCH when it does not. Never in the in-app preview, whose gap
+ *  holds one button. From the smallest height at this window (stableHeight), so Safari's bar collapsing on a scroll
+ *  cannot flip it. Pure, and the only place this is decided. */
+export function placeTabs(c: Context, places: number, rest: boolean): { shown: number; pitch: number } | undefined {
+  const f = stripFrame(c) ?? frame({ ...c, height: c.stableHeight }), room = f.bottom - f.top + extra(f);
+  if (places <= 0 || f.preview) return undefined;
+  const pitchOf = (n: number) => {
+    if (groupHeight(n) <= room) return T.item;
+    const pitch = n > 1 ? Math.floor((room - T.control) / (n - 1) * 10) / 10 : 0;
+    return pitch >= TIGHTEST_TAB_PITCH ? pitch : undefined;
+  };
+  const whole = pitchOf(places + (rest ? 1 : 0));
+  if (whole !== undefined) return { shown: places, pitch: whole };
+  for (let shown = places - 1; shown >= FEWEST_TABS; shown--) {
+    const pitch = pitchOf(shown + 1);
+    if (pitch !== undefined) return { shown, pitch };
+  }
+  return undefined;
 }
+/** Whether every place fits as a tab, so none folds into "…". */
+export const placesFit = (c: Context, places: number, rest: boolean) => placeTabs(c, places, rest)?.shown === places;
 
 /** The "…" list: beside the column (or strip), aligned to the button's top, or its bottom when the button is in the
  *  page's lower half, kept 12pt inside the page. `heads`: section headers. A list taller than the page scrolls. */
@@ -158,12 +183,15 @@ export const primaryTap = (armed: boolean, confirm?: string | false): "arm" | "r
 
 /** The whole template for one frame: a sheet's lone close (when the band has room; the preview's gap holds one), the preview's lone "…", the
  *  open sidebar's lone burger, else allocate. `rest`: items "…" lists whatever fits (folded, destructive, the side
- *  switch). `room`: allocate from this height rather than the frame's band (landingRoom). */
-export function template(f: Frame, o: { room?: number; close?: boolean; menu?: boolean; places?: number; actions: number; primary?: boolean; rest?: boolean; sidebar?: boolean }) {
+ *  switch). `room`: allocate from this height rather than the frame's band (landingRoom). `places`, `tabPitch`: the tabs
+ *  (placeTabs). `overflow`: some places fold into "…". Then, or tighter than normal, nothing else has room, so they and
+ *  "…" are the whole template. */
+export function template(f: Frame, o: { room?: number; close?: boolean; menu?: boolean; places?: number; actions: number; primary?: boolean; rest?: boolean; sidebar?: boolean; tabPitch?: number; overflow?: boolean }) {
   const none = (groups: Group[]) => ({ groups, shown: 0, primary: false });
   const a = o.close ? none(f.preview || f.bottom - f.top + extra(f) >= T.control ? [[{ kind: "close" }]] : [])
     : f.preview ? none(o.menu || o.places || o.actions || o.primary || o.rest ? [[{ kind: "more" }]] : [])
     : o.sidebar ? none([[{ kind: "menu" }]])
+    : o.places && (o.overflow || (o.tabPitch !== undefined && o.tabPitch < T.item)) ? none([[...Array.from({ length: o.places }, (_, index): Slot => ({ kind: "place", index })), ...(o.overflow || o.actions || o.primary || o.rest ? [{ kind: "more" } as Slot] : [])]])
     : allocate(o.room ?? f.bottom - f.top, o.actions, { menu: o.menu, places: o.places, primary: o.primary, split: f.kind === "inline", rest: o.rest, extra: extra(f) });
-  return { ...a, placed: place(f, a.groups) };
+  return { ...a, placed: place(f, a.groups, o.tabPitch) };
 }

@@ -1,8 +1,10 @@
 // The capsule under a finger (#251): its open shape stays in the band, and the lens names the right item.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { HOP, LENS, PRESS, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
-import { TEMPLATE, spring } from "../src/template.ts";
+import { TEMPLATE, frame, landingRoom, placeTabs, spring, template } from "../src/template.ts";
+import { columnBand, detect } from "../src/geometry.ts";
 
 const rest = { x: 400, y: 400, w: 46, h: 104 };
 
@@ -40,8 +42,9 @@ test("open: a short band gives up pitch, never below the resting height", () => 
 });
 
 test("open: five items match native's width and height", () => {
-  assert.equal(pressShape(rest, 5).w, PRESS.width);
-  assert.ok(Math.abs(pressShape(rest, 5).h - 301) < 1, "native measures 302, ours adds a 1pt rim");
+  const five = { ...rest, h: TEMPLATE.control + 4 * TEMPLATE.item };
+  assert.equal(pressShape(five, 5).w, PRESS.width);
+  assert.ok(Math.abs(pressShape(five, 5).h - 301) < 1, "native measures 302, ours adds a 1pt rim");
 });
 
 test("swell: scales about the capsule's centre, its items spreading with it", () => {
@@ -63,9 +66,11 @@ test("open: labels only where they clear the next icon", () => {
 
 test("lens: names the nearest item, and gives way a little past the ends", () => {
   const pitch = PRESS.pitch, first = PRESS.inset + LENS.centre, last = first + 2 * pitch;
+  const centre = PRESS.inset + TEMPLATE.control / 2;
   assert.deepEqual(lensAt(first, 3, pitch), { y: first, index: 0 });
-  assert.equal(lensAt(first + pitch * 0.6, 3, pitch).index, 1);
-  assert.equal(lensAt(first + pitch * 0.4, 3, pitch).index, 0);
+  assert.equal(lensAt(centre + pitch * 0.6, 3, pitch).index, 1);
+  assert.equal(lensAt(centre + pitch * 0.4, 3, pitch).index, 0);
+  assert.equal(lensAt(centre + pitch * 1.45, 3, pitch).index, 1, "an item's label names it, not the next one");
   const up = lensAt(-1000, 3, pitch), down = lensAt(1000, 3, pitch);
   assert.equal(up.index, 0); assert.equal(down.index, 2);
   assert.ok(Math.abs(first - LENS.past - up.y) < 0.01); assert.ok(Math.abs(last + LENS.past - down.y) < 0.01);
@@ -115,4 +120,32 @@ test("hop: no overshoot past the tapped item, and it ends bubble sized", () => {
   let s = { y: 0, vy: 0, w: HOP.end.w, vw: 0, h: HOP.end.h, vh: 0, q: 0, vq: 0 }, most = 0;
   for (let i = 0; i < 120; i++) { s = lensStep(s, { y: 100, ...HOP.end }, HOP.fall, 1 / 60, HOP.travel); most = Math.max(most, s.y); }
   assert.ok(most <= 100.5); assert.ok(Math.abs(s.w - HOP.end.w) < 0.01 && Math.abs(s.h - HOP.end.h) < 0.01);
+});
+
+// Wherever placeTabs leaves the tabs, a finger released on any tab's resting centre names that tab, after a drag up or
+// down or held still. Windows measured on the
+// Duo simulator (iOS 27.1). The verifier saw a drag up to P3 name P4 in tall and closed Home Screen, and a held P5 named P6.
+test("lens: a release on any tab's resting centre names that tab, at the normal pitch, tightened, or with places in \"…\"", () => {
+  const ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 27_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/27.1 Mobile/15E148 Safari/604.1";
+  const sig = (iw, ih, ow, oh, o = {}) => ({ innerWidth: iw, innerHeight: ih, outerWidth: ow, outerHeight: oh, visualHeight: ih, insetTop: 0, insetBottom: 0, insetLeft: 0, insetRight: 0, screenWidth: 466, screenHeight: 678, userAgent: ua, touchPoints: 5, pixelRatio: 3, standalone: false, ...o });
+  const windows = { "tall Safari": sig(669, 871, 669, 951), "tall Home Screen": sig(669, 869, 669, 951, { standalone: true, insetBottom: 34 }), "closed Home Screen": sig(466, 657, 466, 678, { standalone: true, insetBottom: 21 }), "closed Safari": sig(466, 595, 466, 678), "wide Safari": sig(951, 543, 951, 669), "wide Home Screen": sig(951, 648, 951, 669, { standalone: true, insetRight: 84 }), "Split left": sig(385, 571, 469, 669) };
+  let checked = 0;
+  for (const [name, s] of Object.entries(windows)) {
+    const c = detect(s), f = frame(c), b = c.mode === "column" ? columnBand(c) : undefined;
+    const band = b ? { top: b.top - b.reach, bottom: b.bottom } : { top: 16, bottom: s.innerHeight - 16 };
+    for (const [actions, primary] of [[0, false], [2, true]]) for (let n = 2; n <= 20; n++) {
+      const tabs = placeTabs(c, n, actions > 0 || primary);
+      if (!tabs) continue;
+      const g = template(f, { room: landingRoom(c), places: tabs.shown, actions, primary, overflow: tabs.shown < n, tabPitch: tabs.pitch }).placed.find((p) => p.group[0].kind === "place");
+      const rest = { ...g.rect, h: TEMPLATE.control + (g.group.length - 1) * g.pitch };
+      const at = (k) => g.rect.y + TEMPLATE.control / 2 + k * g.pitch, shape = pressShape(rest, g.group.length, band);
+      for (let k = 0; k < g.group.length; k++) assert.equal(lensAt(at(k) - shape.y, g.group.length, shape.pitch).index, k, `${name} ${n}${primary ? " with actions and a primary" : ""} item ${k}`);
+      assert.ok(shape.h >= rest.h - 1e-9, `${name} ${n} opens no shorter than rest`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 30, "covers the long capsules, 12 places with actions and a primary in tall Safari among them");
+  // and the press opens exactly this shape, from the rest, the count and the band alone
+  const src = readFileSync(new URL("../src/press.ts", import.meta.url), "utf8");
+  assert.match(src, /shape: pressShape\(rest, n, band\(h\.nav\)\)/);
 });

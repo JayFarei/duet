@@ -10,12 +10,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Places below the fold of "…" with one button of room](#places-below-the-fold-of--with-one-button-of-room)
 - [An action folding after a Home Screen tabs app paints](#an-action-folding-after-a-home-screen-tabs-app-paints)
 - [A burger one place before the tabs table said](#a-burger-one-place-before-the-tabs-table-said)
+- [A press soon after a tap reading the capsule's swollen size](#a-press-soon-after-a-tap-reading-the-capsules-swollen-size)
 - [Docs describing the removed docked column](#docs-describing-the-removed-docked-column)
 - [Five places behind a burger with room for tabs](#five-places-behind-a-burger-with-room-for-tabs)
 - [Tabs then a burger while a Home Screen app launches](#tabs-then-a-burger-while-a-home-screen-app-launches)
 - [Wrong layout on a fresh origin's first paint](#wrong-layout-on-a-fresh-origins-first-paint)
 - [Controls at the closed screen's places while a Home Screen app launches](#controls-at-the-closed-screens-places-while-a-home-screen-app-launches)
 - [Burger over the clock while a Home Screen app turns to wide](#burger-over-the-clock-while-a-home-screen-app-turns-to-wide)
+- [Controls glide or hop on a wide Home Screen app](#controls-glide-or-hop-on-a-wide-home-screen-app)
 - [Sidebar under Safari's floating buttons in split view](#sidebar-under-safaris-floating-buttons-in-split-view)
 - [Page stuck pushed after resizing with the menu open](#page-stuck-pushed-after-resizing-with-the-menu-open)
 - [Open sidebar ends short of the screen in split view](#open-sidebar-ends-short-of-the-screen-in-split-view)
@@ -77,6 +79,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Light capsule with a white band](#light-capsule-with-a-white-band)
 - [Light capsule edge reads as a seam](#light-capsule-edge-reads-as-a-seam)
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
+- [Tabs a little too tall for the room](#tabs-a-little-too-tall-for-the-room)
+- [Tapping away from "…" pressed what was underneath](#tapping-away-from--pressed-what-was-underneath)
+- [A dark circle as "…" comes back](#a-dark-circle-as--comes-back)
+- [Page content jumps 84pt on an inline Duo page](#page-content-jumps-84pt-on-an-inline-duo-page)
+- [Page with children clipped in the right split pane](#page-with-children-clipped-in-the-right-split-pane)
 
 ## Split view pane, or the closed Duo turned left
 
@@ -576,7 +583,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 ## Places below the fold of "…" with one button of room
 
-- **You see:** closed Safari turned, a `menu.tabs` app with actions: only "…", and its list opens with the actions, so a fifth place is below the fold.
+- **You see:** closed Safari turned, in Safari's column, a `menu.tabs` app with actions: only "…", and its list opens with the actions, so a fifth place is below the fold.
 - **Cause:** the band holds one button. A burger there would lose the actions, so "…" holds everything.
 - **Duet does:** a `menu.tabs` app lists the places first in that one button, since they are what the burger would have been. Without actions the burger shows. Other apps keep "This page" first.
 - **You do:** nothing.
@@ -594,9 +601,25 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** a `menu.tabs` app without actions, full-screen Safari at 951x543 with 9 places or at 669x825 with 15: a burger and "…", where the table in the docs said tabs fit.
 - **Cause:** the table counted those windows with no "…". Inline windows, which include a Home Screen app's, always list "Move controls" there, so "…" always takes a slot.
-- **Duet does:** nothing changes, the capsule keeps "…" so the controls can still be moved. The table now gives 8 and 14, 6 for Home Screen wide and closed, and 15 for Home Screen tall, whatever the page's actions. A test holds it to the chrome's count.
-- **You do:** nothing. Plan on the "With actions" column unless the window is Safari's column or a split pane.
+- **Duet does:** superseded, see "A \"…\" with nothing in it but Move controls". "…" no longer counts unless something is in it, and a test holds the table to the rule.
+- **You do:** nothing.
 - **Status:** seen on the Duo simulator without actions, at each limit and one above, in Safari wide and tall, Home Screen wide and tall and closed Home Screen.
+
+## A "…" with nothing in it but Move controls
+
+- **You see:** an app that does not want its controls moved still has a "…" holding only "Move controls left", and that "…" costs a tab its room. A side stored by an earlier visit keeps the controls on that side.
+- **Cause:** every inline window listed the row and honoured the stored side, with no way to opt out.
+- **Duet does:** moving the controls is the `moveControls` prop, off by default. Off, there is no row, no drag and no stored side.
+- **You do:** pass `moveControls` if your users should be able to move the controls.
+- **Status:** seen on the Duo simulator, wide Safari, before and after.
+
+## "Move controls left" that does nothing on a Home Screen app
+
+- **You see:** a Home Screen app, wide on the Duo, with `moveControls`: tap "Move controls left", the menu closes and the controls stay.
+- **Cause:** the row was listed by the frame's kind, and a strip's frame is inline too, but a strip's side comes from its safe-area inset, not from the user's choice.
+- **Duet does:** lists the row and allows the drag only where `canMoveControls` holds: inline and not a strip, including a Home Screen app whose inset has not landed yet.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator, Home Screen at 951x669, before and after.
 
 ## Docs describing the removed docked column
 
@@ -610,7 +633,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, an app chooses `tabs` or `menu` once. Tabs fold into "…" one at a time where room runs out, and a burger hides five places on a screen with room for all of them.
 - **Cause:** tabs merged into the actions, so nothing could turn them into a burger.
-- **Duet does:** with `menu.tabs`, `placesFit` shows every place as a tab or none: a burger with its sidebar otherwise. Actions and primary fold first. An item without an icon keeps the burger. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the measured counts.
+- **Duet does:** with `menu.tabs`, `placeTabs` keeps the places as tabs, folding the last ones into "…" when the window is short, and the burger with its sidebar only below three tabs. Actions and primary fold first. An item without an icon keeps the burger. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the measured counts.
 - **You do:** pass `tabs: true` with an icon on every item, and inline `bootScript`.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator at 2, 3, 5, 6 and 7 places in Safari wide and tall, Home Screen wide and tall, Split View both sides, closed Safari and closed Home Screen. An open sidebar closes on unfolding into tabs. A rotation at the margin (7 places on the Home Screen) shows the old form for one frame, under 5ms, as the window lands. Live Activities are modelled. Not yet seen on a device.
 
@@ -618,7 +641,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, a Home Screen app with 7 places shows tabs for about 600ms, then a burger.
 - **Cause:** the strip's insets land late. The first readings are inline with more room, and `stable()` holds that mode for 550 to 600ms.
-- **Duet does:** on a Duo Home Screen app, except the inner screen upright, `placesFit` reads the strip's room from the start, from the screen's fixed height, so it gives the same answer at launch, after rotation and once the insets land.
+- **Duet does:** on a Duo Home Screen app, except the inner screen upright, `placeTabs` reads the strip's room from the start, from the screen's fixed height, so it gives the same answer at launch, after rotation and once the insets land.
 - **You do:** nothing.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: first visible at t=153-190ms in the final form, closed and open, with the same rects when the strip commits at about 800ms.
 
@@ -634,9 +657,17 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, turning an open Duo's Home Screen app from tall to wide leaves the burger at the inline top, over the status clock and Wi-Fi, for about 900ms, then glides it to its strip place over about 450ms.
 - **Cause:** the wide window comes about 370ms before the strip's 84pt inset, and without the inset the page reads as inline. Inline committed in that window, so the inset landing was held to the settle, and the commit at the settle was "sure", which turned transitions back on.
-- **Duet does:** hides the controls, committing nothing, while a window not yet shown reads inline in a turn of a Duo's wide Home Screen app. The inset landing commits the strip at once, while transitions are still off. If no inset comes, inline commits at the settle, at most 2s, and later events do not hide it again. The match needs standalone, a Duo, and a window wider than tall and at least 600pt wide, so Safari, the iPad, phones and desktop are unchanged.
+- **Duet does:** hides the controls, committing nothing, while a window not yet shown reads inline in a turn of a Duo's wide Home Screen app. The inset landing commits the strip at once, while transitions are still off. If no inset comes, inline commits at the settle, at most 2s, and later events do not hide it again. A page that opts out of `viewport-fit=cover` never gets an inset, see [Controls glide or hop on a wide Home Screen app](#controls-glide-or-hop-on-a-wide-home-screen-app). The match needs standalone, a Duo, and a window wider than tall and at least 600pt wide, so Safari, the iPad, phones and desktop are unchanged.
 - **You do:** nothing.
 - **Status:** `test/first-paint.test.mjs`, and on the Duo simulator at 30fps, burger and tabs forms, both directions: controls absent for 12 frames (390ms) going to wide, 8 of them the rotation itself, then in place with no movement. Going to tall was already at once. Not fixed, because iOS sets it: the rest of the wait for the inset. A launch in wide was not exercised on the simulator here, only in the tests. Not yet seen on a device.
+
+## Controls glide or hop on a wide Home Screen app
+
+- **You see:** without the handling, two things on an open Duo. A page with `viewport-fit=auto` or `contain` turned from tall to wide hides its controls for about 1s, then the tall tabs capsule morphs to the burger over about 480ms. A wide launch shows the controls at x=794 for 1 or 2 frames of the launch fade, sometimes as the inline burger at the top, then they hop 84pt to x=878.
+- **Cause:** the turn's hold waits for a strip inset that never comes to a page that opts out of cover, so inline committed only at the settle, which turns transitions back on. On a launch of any other page, iOS reads 867 inside the 951 window for 60 to 90ms, with inset 0 or 84, and that reading was taken as the final window.
+- **Duet does:** reads the viewport meta. With an explicit `viewport-fit=auto` or `contain`, it ends the hold 150ms after iOS narrows the page to 867, still settling, so the controls appear in place with no transition and after the tall status clock has faded, and a launch shows at 867 as before. Without that, a wide launch waits at 867 for the 951 window, capped at 1s. A viewport meta with no `viewport-fit` counts as cover, since Duet adds it at mount. The match needs a standalone Duo, so Safari, the iPad, phones and desktop are unchanged, and final places are unchanged.
+- **You do:** nothing.
+- **Status:** `test/first-paint.test.mjs`, and on the Duo simulator, 30fps recordings. Turn with `viewport-fit=auto`: hidden about 530ms, then in place at [794,11], no glide and no burger over the fading clock. Before, about 1s and a 480ms glide. Wide launch with cover: 9 of 9 show the controls once at [878,265], no hop. Before, 9 of 9 showed a reading at x=794 first. Tall launches, and the wide to tall turn, are unchanged. A launch that stays at 867 on a page with cover has its controls hidden for up to 1s; that case is covered by tests only, since it was not seen on the simulator. Not yet seen on a device.
 
 ## Controls at the closed screen's places while a Home Screen app launches
 
@@ -701,3 +732,83 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** with `bootScript`, hides those controls until the chrome mounts, so a page stuck there shows none.
 - **You do:** fix hydration. See [Server rendering](server-rendering.md).
 - **Status:** the hiding is tested against stubbed browsers.
+
+## Tabs a little too tall for the room
+
+- **You see:** a burger on a wide Duo although the places nearly fit at the normal spacing.
+- **Cause:** the all or nothing test at 51.7pt per button ignored how much room was really left.
+- **Duet does:** `placeTabs` tightens the tabs group alone, down to 44pt, and the capsule, the "…" morph and the press lens read that one pitch. Below 44pt, the last places fold into "…".
+- **You do:** nothing.
+- **Status:** unit tested, and checked on the Duo simulator.
+
+## Tapping away from "…" pressed what was underneath
+
+- **You see:** closing "…" by tapping the page also opened whatever the finger landed on.
+- **Cause:** the menu closed on pointerdown, and the same tap's click then reached the page.
+- **Duet does:** the click of the dismissing tap stops at the window, once. A scroll or a later tap is unaffected.
+- **You do:** nothing.
+- **Status:** reproduced and checked on the Duo simulator.
+
+## A dark circle as "…" comes back
+
+- **You see:** closing the sidebar, the "…" arrives dark and vanishes or pops before it settles.
+- **Cause:** fading the group's host makes it the glass's backdrop root, so the glass sees nothing and its color-dodge rim paints dark. "…" also waited for the sidebar to finish closing.
+- **Duet does:** fades the glass layers and scales the host, and brings "…" back as closing starts, so it is one motion.
+- **You do:** nothing.
+- **Status:** cause proven by CSS variants, checked frame by frame on the Duo simulator.
+
+## Page content jumps 84pt on an inline Duo page
+
+- **You see:** the first frame of a wide Safari page on the open Duo lays out under the controls, then shifts on mount.
+- **Cause:** the boot script set nothing for inline pages, the inset arrived with React about 100ms in.
+- **Duet does:** the boot script sets the inset on the controls' side before the first paint, the mounted chrome overwrites it.
+- **You do:** use `bootScript`, and pad with `--duet-inset-*`.
+- **Status:** checked on the Duo simulator.
+
+## One place too many hid every tab
+
+- **You see:** without the handling, 9 places on a wide Home Screen are all behind a burger, in a window that holds 7 tabs and "…".
+- **Cause:** the tabs rule was all or nothing.
+- **Duet does:** `placeTabs` keeps as many leading places as fit beside "…", at the widest pitch down to 44pt, and "…" lists the others ahead of folded actions and destructive items. If the selected place is folded, "…" shows the selected bubble and the list marks the place. The burger only below three tabs. Order never changes.
+- **You do:** put the primary places first.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: 9 places in wide Home Screen give 7 tabs and "…" (8 give 8 tabs), 12 in wide Safari give 10 and "…", closed Home Screen 7 and "…", Split left 6 and "…", closed Safari and Split right the burger. Selecting a folded place, the mark in the list and the press lens over "…" checked in wide Safari.
+
+## Tabs off the foot of the closed screen, turned
+
+- **You see:** without the handling, a Home Screen app on the closed Duo turned sideways draws 7 tabs and "…" from y 138 to 527 on a 466pt screen, so the last tabs and "…" are out of reach.
+- **Cause:** a strip's top is measured from the screen's height, and in this window that read 466pt, not the 678pt the strip's band assumes. The band shrank to 178pt and the capsule centred on it, overflowing both ways. Its count came from the strip's 389pt, so it did not shrink.
+- **Duet does:** `detect` measures this window from the long side, as upright, whichever way `screen.*` reads. The room is 389pt as upright, from y 32 to 421.
+- **You do:** nothing.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator in both rotations: 9 places give 7 tabs and "…" at y 32 to 421, 5 places end at the same foot, and turning back upright restores the place. At 50a8cc5, before overflow, the same window already lost its foot: 5 places drew from y 205 to 461 in a 445pt window, the fifth tab cut by the screen's edge (Duo e2e 4, side by side with this build, which draws them from 166 to 421). So this changes an all-fit layout on purpose, in this window only.
+
+## Closed Safari turned showing tabs where the docs said burger
+
+- **You see:** closed Safari turned on the Duo simulator, a `menu.tabs` app with 9 places: 6 tabs and "…", while the fit table listed this window as a burger.
+- **Cause:** closed Safari turned is two windows. Safari's column leaves 594x368 beside the camera, one button of room. Under a full width toolbar the page is 678x384 and runs inline. The table named only the first.
+- **Duet does:** nothing different. `placeTabs` reads the frame, so the column gets the burger and the inline window 6 tabs and "…". The table now lists both, and its test holds each row to the rule.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator at 678x384, 6 tabs and "…" with 9 places.
+
+## The primary heading "…" in a tabs app
+
+- **You see:** closed Safari upright, a `menu.tabs` app with actions and a primary: "…" opens with the primary and the actions, and the places come last, though everywhere else in a tabs app they lead.
+- **Cause:** the places led only when the primary had its own capsule. When it shared one with "…", the list kept the primary's lead.
+- **Duet does:** in a `menu.tabs` app the places always lead "…", then "This page" with the primary and the actions. Other apps keep their order.
+- **You do:** nothing.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: closed Safari upright with 5 places, 2 actions and a primary lists P1 to P5, then Book, Act 0, Act 1. Each action fires from it and the primary row arms in place.
+
+## A press released on a tab named the one below
+
+- **You see:** on the open Duo, pressing a long tabs capsule and releasing on a tab, or holding still on it, selects the next tab down. Worst on the way up and on tall and closed Home Screen apps, and on the first tab of a wide Safari capsule.
+- **Cause:** the open capsule spreads its items to 57pt and rose from its top, so items drifted from where they rested, about half a place by the fifth tab of 13. The lens also named items around the icon, 10pt above the button's centre. Where the band pushed the open capsule up, the first tab drifted down a place.
+- **Duet does:** the open capsule grows about its middle item and names items around the button's centre. It gives up the pitch it must, after any push from the band, so the first and last items open inside their own half pitch (13 items at about 55pt). Five items still open at native's 301pt.
+- **You do:** nothing.
+- **Status:** `test/press.test.mjs` checks every tab's resting centre in seven Duo windows, at the normal pitch, tightened and with places in "…". On the Duo simulator, every tab held still, dragged up and dragged down: 12 places with actions and a primary in tall Safari, 8 places and 12 with actions in wide Safari. Home Screen apps are covered by the unit test only.
+
+## Page with children clipped in the right split pane
+
+- **You see:** Safari in the right pane of Split View on the wide Duo, a page with `children`: its left 84pt is cut off (a title "Overview" reads "iew"), and in the left pane the controls draw over its first column of content.
+- **Cause:** the document spans a column on each side of a split pane and Duet keeps it scrolled one column across. The inner scroller ran from the document's left edge under both columns, 553pt wide in a 385pt pane, and relied on the page padding by `--duet-inset-left` / `--duet-inset-right`. A page that did not pad started under the column.
+- **Duet does:** what it does without children: where the document spans a column on the left (a split pane, the closed Duo turned left), the scroller is moved right by that column (`--duet-shift` on `<html>`, `left` on `.duet-scroller`) and the insets are 0, so it fills exactly the visible pane. `<html data-duet-reserve>` marks this as before. A right column alone keeps the scroller running under it with the 84pt inset.
+- **You do:** nothing. `<Duet reserve={false}>` keeps the old layout, the scroller under both columns and padded by the insets.
+- **Status:** `test/page.test.mjs`, and on the Duo simulator, Safari in the right pane at 385x571: with 5, 20 and 12 places plus actions the title sits at x 16 in the pane (it was -68), the scroller fills the pane and the column shows the burger or Book and "…" as before.
