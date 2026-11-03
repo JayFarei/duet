@@ -14,10 +14,10 @@ const SWAP = 450; // the interface turns upright this far into the device's turn
  *  controls are the docs' table (how-duet-decides.md, Tabs or burger). home.tsx's rule cards send the same ids as a
  *  `duet:moment` window event. */
 export const MOMENTS = [
-  { id: "fit", label: "Tabs", state: { posture: "open", app: "safari" }, selected: "home", caption: "Unfolded, there is room for all nine places as tabs." },
-  { id: "fold", label: "Tabs and More", state: { posture: "closed", app: "home" }, selected: "home", caption: "Room for seven: the first seven stay tabs, the rest go in the More button." },
-  { id: "folded", label: "Selected in More", state: { posture: "closed", app: "home" }, selected: "settings", caption: "Settings sits in More, so the More button shows the selection and its list marks Settings. Nothing reorders." },
-  { id: "burger", label: "Burger", state: { posture: "closed", app: "safari" }, selected: "home", caption: "Fewer than three tabs would show, so a burger opens a sidebar with every place." },
+  { id: "fit", label: "Tabs", state: { posture: "open", app: "safari" }, selected: "home", caption: "Unfolded, all nine places fit as tabs." },
+  { id: "fold", label: "Tabs and More", state: { posture: "closed", app: "home" }, selected: "home", caption: "Room for seven: seven stay tabs, the rest go in More." },
+  { id: "folded", label: "Selected", state: { posture: "closed", app: "home" }, selected: "settings", caption: "More shows Settings selected, then its list marks it." },
+  { id: "burger", label: "Burger", state: { posture: "closed", app: "safari" }, selected: "home", caption: "Fewer than three tabs fit, so a burger opens a sidebar." },
 ] as const satisfies readonly { id: string; label: string; state: Partial<State>; selected: string; caption: string }[];
 export type MomentId = (typeof MOMENTS)[number]["id"];
 
@@ -131,7 +131,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   useEffect(() => {
     if (!embed) return;
     const el = stage.current!;
-    const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, Math.min(el.clientWidth * 0.85, 600, innerHeight * 0.62)) });
+    const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, Math.min(el.clientWidth * 0.85, 680, innerHeight * 0.7)) });
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
@@ -153,7 +153,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     setPage("");
     setDuet(true);
     go({ ...m.state, turn: 0, upside: false }, "flat");
-    // Selected in More opens the More list too, so the folded selection shows at stage scale.
+    // Selected shows More holding the selection for a beat, then opens its list (skeleton-app.tsx).
     setSelected({ id: m.selected, at: Date.now(), open: id === "folded" });
   };
   const momentRef = useRef(moment);
@@ -194,7 +194,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
       { id: "forward", label: "Navigation", icon: <ArrowLeftRight size={18} />, on: !!s.forward, off: !safari, pick: () => go({ forward: !s.forward }), hint: "Forward history (Safari)" },
     ] },
   ];
-  const fold = <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ flex: 1, minWidth: 90, accentColor: "var(--accent)" }} />;
+  const fold = <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ flex: 1, minWidth: 40, accentColor: "var(--accent)" }} />;
   const turns = ([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
     <Square42 key={by} label={label} onClick={() => go(rotate(s, by), "flat")}><Icon size={18} /></Square42>
   ));
@@ -237,21 +237,21 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   // Rotate, fold and the camera act on the device itself, so they sit right under it. Reset view is always in reach,
   // since a stray drag or swipe orbits the model; on the landing page it also locks the stage, so the page scrolls again.
   const handle = (
-    <div style={{ alignSelf: "center", width: list ? "calc(100% - 24px)" : "min(380px, calc(100% - 32px))", margin: list ? "4px 0 6px" : "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
+    <div style={{ alignSelf: "center", width: list ? "100%" : "min(380px, calc(100% - 32px))", margin: list ? "4px 0 6px" : "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
       {turns}<span style={{ width: 8 }} />{fold}<span style={{ width: 8 }} />{embed ? <Square42 label={manual ? "Lock, reset view" : "Unlock to drag the device"} on={manual} onClick={() => manual ? lock() : setManual(true)}>{manual ? <LockOpen size={18} /> : <Lock size={18} />}</Square42> : <Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>}
     </div>
   );
 
-  // Narrow: every question open at once, one row each, its title over what is chosen and the icons beside it.
+  // Narrow: every question open at once, one row each, its title over what is chosen and the icons beside it. Too narrow for both, the icons wrap under the title.
   const rows = list && (
-    <div style={{ display: "grid", gap: 6, padding: "0 12px 14px" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 6, padding: "0 0 14px" }}>
       {sections.map((x) => (
-        <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 6px 6px 14px", borderRadius: 16, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 4, padding: "6px 6px 6px 14px", borderRadius: 16, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
+          <div style={{ flex: "1 0 52px", minWidth: 0 }}>
             <div style={caption}>{x.title}</div>
             <div style={{ font: "600 14px/1.3 -apple-system, system-ui", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.one ? x.opts.find((o) => o.on)?.label : x.opts.filter((o) => o.on).map((o) => o.label).join(", ") || "None"}</div>
           </div>
-          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
+          <div style={{ display: "flex", gap: 4, marginLeft: "auto", justifyContent: "flex-end", minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
             {x.opts.map((o) => <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
           </div>
         </div>
@@ -266,11 +266,14 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
         {MOMENTS.map((m) => <button key={m.id} className="moment" aria-pressed={at?.id === m.id} onClick={() => moment(m.id)}>{m.label}</button>)}
       </div>
       <p className="moments-cap" aria-live="polite">{at?.caption ?? "Duet measures the room and picks the largest controls that fit."}</p>
-      {manual
-        ? <p className="moments-hint">Press and drag along the tabs to see the lens. Drag the device to turn it.</p>
-        : <button className="moments-try" onClick={() => setManual(true)}><Lock size={14} aria-hidden />Unlock to try the controls</button>}
+      <p className="moments-hint">{manual ? "Press and drag along the tabs." : "Unlock below to try the press lens."}</p>
     </div>
   );
+
+  // duo fits a 17 by 14.9 box (any turn of the open device) inside 16px margins; flat and upright the device is
+  // only 11.25 tall, so the controls under it move up into the empty band below it, and back for a turn or a stand.
+  const scale = Math.min((box.w - 32) / 17, ((box.h || 260) - 32) / 14.9);
+  const crop = stand === "flat" && Math.abs(hw) % 180 === 0 ? Math.max(0, Math.floor((scale * (14.9 - 11.25)) / 2) - 8) : 0;
 
   // On the landing page: the device, its controls under it.
   if (embed) return (
@@ -278,7 +281,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
       {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
           document gets an opaque white backdrop instead of showing the page through. */}
       {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
-        style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
+        style={{ width: "100%", height: box.h || 260, marginBottom: -crop, transition: "margin-bottom 0.45s ease", border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
       <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{moments}{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
         <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>
     </div>
