@@ -35,7 +35,7 @@ Pass `tabs: true` on `menu` and the app's places are tabs at the head of the cap
 ```
 
 - Put the primary places first: the order is yours, and tabs never reorder or swap on selection. 9 places on a wide Home Screen are 7 tabs and "…" holding the other 2.
-- "…" lists only the folded places, in a section ahead of folded actions and destructive items. When the selected place is folded, "…" shows the selected bubble and the list marks the place. The set never splits between tabs and sidebar.
+- "…" lists only the folded places, in a section ahead of folded actions and destructive items. That second section is headed "This page" in Safari's column and "More" elsewhere. When the selected place is folded, "…" shows the selected bubble and the list marks the place. The set never splits between tabs and sidebar.
 - The app's actions and primary fold into "…" first. The burger takes over only where fewer than three tabs would show, closed Safari and the right of Split View.
 - Where the band holds one button (closed Safari turned), a page with actions shows only "…", with the places first in its list. Without actions it shows the burger.
 - Tabs behave like the `tabs` prop: the selected one sits in a bubble in `tint`, with the same press.
