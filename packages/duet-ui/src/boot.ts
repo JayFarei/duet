@@ -1,8 +1,9 @@
 // Before the first paint (an inline script at the top of <body>, see ./boot): a page in Safari's column on the Duo
 // carries data-duet-mode="column" and the column's width from its first frame, where React would only set them once
 // mounted, so CSS keyed on the column (a band bled into it, controls moved there) never flashes the plain layout.
+// An inline page on the Duo gets its inset the same way, so its content does not jump 84pt on mount.
 // Every other browser and device is left untouched: no attribute, no variable. useDuet() hands over once mounted.
-import { detect, isPreview, openRoom, previewPending } from "./geometry.ts";
+import { INLINE_WIDTH, detect, isPreview, openRoom, previewPending } from "./geometry.ts";
 import { measure } from "./measure.ts";
 
 /** The attributes and variables boot() may set, so the mounted chrome can take them back (unboot). */
@@ -15,6 +16,7 @@ export function boot(): void {
   if (isPreview(s) || previewPending(s)) h.toggleAttribute("data-duet-pending", true);
   // The inner screen: the server-rendered controls stand at the closed screen's places, so they wait for the mounted chrome.
   if (openRoom(s, c)) h.toggleAttribute("data-duet-pending", true);
+  if (openRoom(s, c) && c.mode === "inline" && !c.standalone) h.style.setProperty(`--duet-inset-${c.side}`, `${INLINE_WIDTH}px`);
   if (c.mode !== "column") return;
   h.dataset.duetMode = "column";
   h.toggleAttribute("data-duet-boot", true);

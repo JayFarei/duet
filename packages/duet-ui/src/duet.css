@@ -316,7 +316,7 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    fixed box reaches it: a fixed box stops at the viewport edge, and one covering the middle of that edge has its
    colour painted over the column instead (the guard below). So there the scroller is an in-document box that runs
    on under the column. The document still never scrolls, so the chrome layer never moves. */
-html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left, 0px) + var(--duet-inset-right, 0px)); bottom: auto; height: calc(100% + var(--duet-inset-bottom, 0px)); }
+html[data-duet-mode="column"] .duet-scroller { position: absolute; left: var(--duet-shift, 0px); width: calc(100% + var(--duet-inset-left, 0px) + var(--duet-inset-right, 0px)); bottom: auto; height: calc(100% + var(--duet-inset-bottom, 0px)); }
 /* That overflow widens the document, and touch-action on <html> stops at this scroll container, so without its own
    a sideways swipe pans the whole page, chrome and all, into the column. Carousels inside are scrollers of their own
    and still pan. */
@@ -325,7 +325,8 @@ html[data-duet-mode="column"] .duet-scroller { touch-action: pan-y; }
    the last content scroll clear of it. */
 .duet-scroller::after { content: ""; display: block; height: var(--duet-inset-bottom, 0px); }
 /* A column on the left (closed landscape turned left, or a split pane, which spans one on each side since its own
-   is on its outer edge, which the page cannot see): the document is scrolled one column across (chrome.tsx). */
+   is on its outer edge, which the page cannot see): the document is scrolled one column across (chrome.tsx) and the
+   scroller is moved right by that column (--duet-shift, insets 0), so it fills the visible pane exactly. */
 /* Emulated (the site's web Duo): the frame already spans the column and runs under the pill. */
 html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; height: 100%; }
 
@@ -452,20 +453,24 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 
 /* Page changes (Presence in chrome.tsx). A slot that arrives pops out of nothing on the spring, its ink unblurring as
    it lands; one that goes stays put while it shrinks into itself and fades, so the slots that stay can slide into its
-   place at once. The first paint, a fold and a side switch skip both (data-settling, data-drag="switch"). */
+   place at once. The first paint, a fold and a side switch skip both (data-settling, data-drag="switch").
+   Only the host scales: opacity on it would make it the glass's backdrop root, the glass would see nothing, and its
+   color-dodge rim would paint a dark disc for the whole fade. So the glass layers fade, not the host. */
 .duet-group[data-enter] { animation: duet-enter 0.5s var(--duet-spring-out) backwards; }
+.duet-group[data-enter]::before, .duet-group[data-enter]::after, .duet-group[data-enter] > .duet-edge, .duet-group[data-enter] > .duet-rim { animation: duet-appear 0.25s ease-out backwards; }
 .duet-group[data-enter] > button { animation: duet-ink-in 0.35s ease-out backwards; }
 .duet-group[data-leaving] { animation: duet-leave 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; pointer-events: none; }
 .duet-group[data-leaving] > button { animation: duet-ink-out 0.2s ease-in forwards; }
-@keyframes duet-enter { from { opacity: 0; scale: 0.6; } }
-@keyframes duet-leave { to { opacity: 0; scale: 0.6; } }
+.duet-group[data-leaving]::before, .duet-group[data-leaving]::after, .duet-group[data-leaving] > .duet-edge, .duet-group[data-leaving] > .duet-rim { animation: duet-vanish 0.3s ease-in forwards; }
+@keyframes duet-enter { from { scale: 0.6; } }
+@keyframes duet-leave { to { scale: 0.6; } }
 @keyframes duet-ink-in { from { opacity: 0; filter: blur(6px); } }
 @keyframes duet-ink-out { to { opacity: 0; filter: blur(6px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .duet-group[data-enter] { animation: duet-appear 0.2s ease-out backwards; }
-  .duet-group[data-leaving] { animation: duet-vanish 0.2s ease-in forwards; }
-  .duet-group[data-enter] > button, .duet-group[data-leaving] > button { animation: none; }
+  .duet-group[data-enter], .duet-group[data-leaving] { animation: none; }
+  .duet-group[data-enter]::before, .duet-group[data-enter]::after, .duet-group[data-enter] > .duet-edge, .duet-group[data-enter] > .duet-rim, .duet-group[data-enter] > button { animation: duet-appear 0.2s ease-out backwards; }
+  .duet-group[data-leaving]::before, .duet-group[data-leaving]::after, .duet-group[data-leaving] > .duet-edge, .duet-group[data-leaving] > .duet-rim, .duet-group[data-leaving] > button { animation: duet-vanish 0.2s ease-in forwards; }
   .duet-group, .duet-group[data-press], .duet .duet-btn, .duet-group[data-press] > .duet-btn, .duet-btn > *, .duet-label, .duet-sidebar, .duet-scroller { transition: none !important; }
   .duet-lens, .duet-lens-ink { transition: none; }
   .duet-lens-rail > .duet-btn { scale: 1; }

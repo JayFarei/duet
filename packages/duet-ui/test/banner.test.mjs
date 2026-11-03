@@ -88,7 +88,7 @@ test("pre-paint boot: the scroller's bottom inset is the URL bar alone", async (
   const g = {
     innerWidth: 382, innerHeight: 540, outerWidth: 466, outerHeight: 678, devicePixelRatio: 3,
     screen: { width: 466, height: 678, orientation: { angle: 0 } }, navigator: { userAgent: UA, maxTouchPoints: 5, standalone: false },
-    matchMedia: () => ({ matches: false }), document: { documentElement: html }, visualViewport: { height: 540, scale: 1 },
+    matchMedia: () => ({ matches: false }), document: { documentElement: html, querySelector: () => null }, visualViewport: { height: 540, scale: 1 },
   };
   g.window = g; g.top = g;
   vm.runInNewContext(code, g);

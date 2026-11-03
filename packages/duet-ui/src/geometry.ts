@@ -60,6 +60,9 @@ export const RAIL = { gap: 5 } as const;
 export interface Signals {
   innerWidth: number;
   innerHeight: number;
+  /** The viewport meta asks for viewport-fit=auto or contain, so Duet leaves it alone: on an open Duo a Home Screen page
+   *  gets no strip and no inset, it stands 867 wide inside the 951 window. Absent, the key counts as cover: Duet adds it. */
+  uncovered?: boolean;
   /** Safari window incl. its column. Lags rotation by ~400ms; `screen.*` is stale, never use it for Safari. */
   outerWidth: number;
   outerHeight: number;
@@ -299,6 +302,9 @@ function unfoldedPreview(s: Signals): "wide" | "tall" | undefined {
  *  Other phones and desktops never match, so apps can switch to a Duo layout on it alone. */
 export const DUO_SIZES = [[466, 678], [669, 951], [469, 669]] as const;
 const duoSize = (w: number, h: number) => DUO_SIZES.some(([a, b]) => Math.abs(Math.min(w, h) - a) <= 1 && Math.abs(Math.max(w, h) - b) <= 1);
+/** A Home Screen window turned on the closed Duo. `screen.*` may read either way round, so the strip's band is measured from
+ *  the screen's long side as upright: the same room as upright, ending inside the 466pt the window has. */
+const closedTurned = (s: Signals) => s.innerWidth > s.innerHeight && s.innerWidth <= DUO_SIZES[0][1] + 1;
 export const isDuo = (s: Signals) => isIOS(s) !== false && (duoSize(s.screenWidth, s.screenHeight) || duoSize(s.outerWidth, s.outerHeight));
 
 /** iOS has no model in its UA, so the sizes above say Duo; the UA says iPhone. Safari's "Request Desktop Website"
@@ -399,12 +405,13 @@ export const openRoom = (s: Signals, c: Context) => c.device === "duo" && !c.pre
 /** A Home Screen app starting on the inner screen: iOS already reports the open screen's outer size, but the page is
  *  still the closed screen's width (~200ms, both ways up), then in landscape the full width before its 84pt band lands
  *  (iOS 27.1, Duo sim). Controls placed from these readings stand at the closed screen's places over half-width content.
- *  fit none's 867 inside 951 stays what it is. */
+ *  A launch also reads 867 inside 951 for ~60-90ms, inset or not, before that full width. Only a page that opts out of
+ *  cover stays at 867. */
 const launching = (s: Signals) => {
   const near = (a: number, b: number) => Math.abs(a - b) <= 1, [w, h] = DUO_SIZES[1];
   return s.standalone && isIOS(s) !== false && near(Math.min(s.outerWidth, s.outerHeight), w) && near(Math.max(s.outerWidth, s.outerHeight), h)
     && Math.min(s.screenWidth, s.screenHeight) < 700
-    && (near(s.innerWidth, DUO_SIZES[0][0]) || (near(s.innerWidth, h) && s.insetLeft < STRIP_INSET && s.insetRight < STRIP_INSET));
+    && (near(s.innerWidth, DUO_SIZES[0][0]) || (near(s.innerWidth, h - 84) && !s.uncovered) || (near(s.innerWidth, h) && s.insetLeft < STRIP_INSET && s.insetRight < STRIP_INSET));
 };
 
 function detectMode(s: Signals, preferred: Side | undefined, allowColumn: boolean, preview: boolean): Context {
@@ -413,7 +420,7 @@ function detectMode(s: Signals, preferred: Side | undefined, allowColumn: boolea
   const keyboard = keyboardUp(s);
   const kb = keyboard ? { keyboard } : shortView(s) ? { visualBottom: s.visualHeight } : {};
   if (s.standalone && duo && (s.insetRight >= STRIP_INSET || s.insetLeft >= STRIP_INSET)) {
-    return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, s.screenHeight - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
+    return { ...kb, mode: "strip", duo, browser, device, standalone, layout: layoutOf(s.innerWidth), side: s.insetRight >= STRIP_INSET ? "right" : "left", width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: Math.max(0, (closedTurned(s) ? DUO_SIZES[0][1] : s.screenHeight) - s.innerHeight), screenWidth: s.screenWidth, screenHeight: s.screenHeight, insetTop: s.insetTop, insetBottom: s.insetBottom };
   }
   const base = { ...kb, duo, browser, device, standalone, width: s.innerWidth, height: s.innerHeight, stableHeight: s.innerHeight, offsetTop: 0, insetTop: s.insetTop, insetBottom: s.insetBottom };
   // Closed landscape: the column is on the side the Duo is turned to, and the turn is the only signal for it.
@@ -600,8 +607,12 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   const [cw, ch] = DUO_SIZES[0];
   const handedBack = raw && !isPreview(s) && (s.innerWidth > s.innerHeight) === (s.outerWidth > s.outerHeight)
     && Math.min(s.outerWidth, s.outerHeight) <= cw + 1 && Math.max(s.outerWidth, s.outerHeight) <= ch + 1;
-  const pending = (!handedBack && previewPending(s)) || launching(s);
+  const launch = launching(s), pending = (!handedBack && previewPending(s)) || launch;
   if (d.bornAt === undefined) [d.bornAt, d.pendingAt] = [now, pending ? now : undefined];
+  // A launch whose first reading does not read as one yet (1 of 5 tall cold launches after folding wide to tall, Duo
+  // simulator): the inner 466 window then showed a 7-tab capsule mid-screen for ~0.2s. A launch reading in the page's
+  // first PREVIEW_RISE starts the wait; after that it is a running app, not held.
+  if (launch && d.pendingAt === undefined && now - d.bornAt < PREVIEW_RISE) d.pendingAt = now;
   if (stableKey !== d.previewKey) d.previewAt = now;
   const rising = now - (d.previewAt ?? now) < PREVIEW_RISE;
   if (d.preview === undefined || !raw || stableKey !== d.previewKey || rising) d.preview = raw;
@@ -621,16 +632,20 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     Object.assign(d, { moving: true, landKey: undefined, landUntil: undefined });
     return moving();
   }
+  // Turning an open Home Screen app to wide: the wide window comes ~370ms before the strip's inset, and read as inline
+  // its burger sits over the status bar. A page that opts out of cover gets no strip: iOS narrows it to 867 while the tall
+  // status clock still fades, so it lands like a transit, LAND_HOLD after that, still settling, so in place with no glide.
+  const toWide = settling && !!d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight;
+  if (toWide && s.uncovered) d.moving = true;
   // Landed after a transit: hidden until the landing holds LAND_HOLD (the caller re-reads at landUntil).
   if (settling && d.moving) {
     if (d.landKey !== stableKey) Object.assign(d, { landKey: stableKey, landAt: now, landUntil: now + LAND_HOLD });
     if (now < d.landUntil!) return moving();
   }
   Object.assign(d, { moving: undefined, landKey: undefined, landUntil: undefined });
-  // Turning an open Home Screen app to wide: the wide window comes ~370ms before the strip's inset, and read as inline
-  // its burger sits over the status bar. Hidden, and nothing committed, so the inset landing is taken at once, in place.
-  // Only a window not shown yet: if no strip comes, inline commits at the settle and stays.
-  if (settling && d.last && c.mode === "inline" && s.standalone && stableKey !== d.stableKey && isDuo(s) && s.outerWidth >= WIDE && s.outerWidth > s.outerHeight) return moving();
+  // Hidden, and nothing committed, so the inset landing is taken at once, in place. Only a window not shown yet: if no
+  // strip comes, inline commits at the settle and stays.
+  if (toWide && !(s.uncovered && s.innerWidth < s.outerWidth)) return moving();
   // The preview verdict counts as stable: a preview handed to a tab (Open in Safari) moves at once. Safari's column
   // never leaves a tab on drift alone, so column to inline is held after the settle too: a real Duo's bar and
   // keyboard read outside every range measured on the simulator (#132), and a wrong inline verdict committed once the
@@ -700,14 +715,17 @@ export const INLINE_WIDTH = 84;
  *  <html>) and lands exactly in the visible viewport, beside the controls, with nothing to keep clear (insets 0).
  *  Before, a page that ignored the insets ran under the controls on the left and left a column-wide gap on the
  *  right (RegTail, split pane, 2026-10-27). With `reserve: false` the page runs under the column and keeps clear by
- *  the insets itself. With children the scroller runs on under the column and pads by the insets; an emulated
+ *  the insets itself. With children the scroller is moved the same way (chrome.tsx, --duet-shift) when the document
+ *  spans a column on the left, so a page that ignores the insets is no longer clipped by a column in a right split
+ *  pane (verifier, rc.4, 2026-11-03); beside a right column alone the scroller runs on under it and pads by the
+ *  insets; an emulated
  *  column (the site's web Duo) already frames both columns and is never scrolled across. */
 export function pageInsets(o: {
   mode: Mode; side: Side; split: boolean; screenWidth: number; width: number; hiddenPreview: boolean;
   inner: boolean; emulated: boolean; reserve: boolean; env: (side: Side) => string;
 }): { left: string; right: string; shift: number } {
   const column = o.screenWidth - o.width, split = o.mode === "column" && o.split;
-  if (o.mode === "column" && !o.inner && !o.emulated && o.reserve)
+  if (o.mode === "column" && !o.emulated && o.reserve && (!o.inner || split || o.side === "left"))
     return { left: "0px", right: "0px", shift: split || o.side === "left" ? column : 0 };
   const inset = o.hiddenPreview ? "0px" : o.mode === "strip" ? o.env(o.side) : o.mode === "inline" ? `${INLINE_WIDTH}px` : `${column}px`;
   const other = (side: Side) => o.mode === "column" ? "0px" : o.env(side);

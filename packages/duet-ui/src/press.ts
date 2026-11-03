@@ -5,7 +5,7 @@
 import { spring, TEMPLATE, type Rect } from "./template.ts";
 
 /** Fitted to a 60fps recording of Safari's own column: rise overshoots about 15%, fall about 3%, on one spring per phase. */
-export const PRESS = { rise: spring(204, 14.6), fall: spring(204, 22.8), swell: 1.06, hold: 205, slop: 8, width: 78.8, pitch: 57, inset: 13.7, pad: 23.5, labelled: 44, up: 0.65, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000, tapHold: 150 } as const;
+export const PRESS = { rise: spring(204, 14.6), fall: spring(204, 22.8), swell: 1.06, hold: 205, slop: 8, width: 78.8, pitch: 57, inset: 13.7, pad: 23.5, labelled: 44, aim: 6, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000, tapHold: 150 } as const;
 
 /** The lens in points, on [stiffness, damping] springs, fitted to the same recording: at a touch, open and let go. Native
  *  narrows as it speeds up and widens as it slows (area kept), ringing at about 0.6s, and runs a little past the ends. */
@@ -20,28 +20,42 @@ export type PressShape = { x: number; y: number; w: number; h: number; top: numb
 
 /** The capsule under a still finger: native scales it about its centre, the items spreading with it, so a tall capsule
  *  grows more than a short one. Geometry rather than `scale`, so it runs straight on into the open shape. */
-export function swellShape(rest: Rect): PressShape {
+export function swellShape(rest: Rect, restPitch: number = TEMPLATE.item): PressShape {
   const k = PRESS.swell, w = rest.w * k, h = rest.h * k;
-  return { x: rest.x - (w - rest.w) / 2, y: rest.y - (h - rest.h) / 2, w, h, top: (k - 1) * TEMPLATE.control / 2, pitch: TEMPLATE.item * k, labels: false };
+  return { x: rest.x - (w - rest.w) / 2, y: rest.y - (h - rest.h) / 2, w, h, top: (k - 1) * TEMPLATE.control / 2, pitch: restPitch * k, labels: false };
 }
 
-/** The open capsule: wider, its items further apart, rising more than it falls as native does. It stays in `band`
- *  (a little of the gap to Safari's buttons may go), giving up pitch when the band is short, never below rest, and its
- *  labels when a label would touch the next icon. */
+/** The open capsule: wider, its items further apart, never below rest. It grows about its middle item, which stays where
+ *  it was, so every item opens within reach of where it rested: a finger released on an item's resting centre, or held
+ *  still on it, names that item, for the first and last of a long capsule too. It stays in `band` (a little of the gap
+ *  to Safari's buttons may go). Where that or the band moves it off its middle, or the capsule is long, it gives up the
+ *  pitch it must for every item to stay in reach (13 items open at about 55pt), and its labels when a label would touch
+ *  the next icon. */
 export function pressShape(rest: Rect, n: number, band?: { top: number; bottom: number }): PressShape {
   const top = (band?.top ?? -Infinity) - PRESS.overflow, bottom = (band?.bottom ?? Infinity) + PRESS.overflow;
-  const room = Math.max(rest.h, bottom - top);
-  const h = Math.min(room, TEMPLATE.control + (n - 1) * PRESS.pitch + PRESS.pad);
-  const y = Math.min(Math.max(top, rest.y - (h - rest.h) * PRESS.up), Math.max(top, bottom - h));
-  const pitch = n > 1 ? (h - TEMPLATE.control - PRESS.pad) / (n - 1) : 0;
-  return { x: rest.x + (rest.w - PRESS.width) / 2, y, w: PRESS.width, h, top: PRESS.inset, pitch, labels: pitch >= PRESS.labelled };
+  const room = Math.max(rest.h, bottom - top), fixed = TEMPLATE.control + PRESS.pad;
+  const restPitch = n > 1 ? (rest.h - TEMPLATE.control) / (n - 1) : 0;
+  const at = (want: number) => {
+    const h = Math.min(room, fixed + (n - 1) * want), pitch = n > 1 ? (h - fixed) / (n - 1) : 0;
+    const free = rest.y + ((n - 1) / 2) * (restPitch - pitch) - PRESS.inset;
+    const y = Math.min(Math.max(top, free), Math.max(top, bottom - h));
+    // How far the first and last item open from their resting centres; each must stay inside its own half pitch.
+    const drift = Math.max(Math.abs(rest.y - y - PRESS.inset), Math.abs(rest.y - y - PRESS.inset + (n - 1) * (restPitch - pitch)));
+    return { h, pitch, y, fits: drift <= pitch / 2 - PRESS.aim };
+  };
+  let s = at(Math.max(restPitch, PRESS.pitch));
+  for (let want = s.pitch - 0.25; !s.fits && want >= restPitch; want -= 0.25) s = at(want);
+  if (!s.fits) s = at(restPitch);
+  return { x: rest.x + (rest.w - PRESS.width) / 2, y: s.y, w: PRESS.width, h: s.h, top: PRESS.inset, pitch: s.pitch, labels: s.pitch >= PRESS.labelled };
 }
 
-/** The lens centre for a finger at `fy` (the capsule's coordinates) and the item it names. Past the first and last item
- *  it gives way, up to LENS.past, and still names that item. */
+/** The lens centre for a finger at `fy` (the capsule's coordinates) and the item it names: the nearest item's centre,
+ *  as the item at rest is hit. The lens rides a little higher, over the icon. Past the first and last item it gives
+ *  way, up to LENS.past, and still names that item. */
 export function lensAt(fy: number, n: number, pitch: number) {
   const first = PRESS.inset + LENS.centre, y = Math.min(first + (n - 1) * pitch, Math.max(first, fy)), over = fy - y;
-  return { y: y + Math.sign(over) * LENS.past * (1 - Math.exp(-Math.abs(over) / LENS.pastOver)), index: Math.round((y - first) / (pitch || 1)) };
+  const index = Math.min(n - 1, Math.max(0, Math.round((fy - PRESS.inset - TEMPLATE.control / 2) / (pitch || 1))));
+  return { y: y + Math.sign(over) * LENS.past * (1 - Math.exp(-Math.abs(over) / LENS.pastOver)), index };
 }
 
 export type LensState = { y: number; vy: number; w: number; vw: number; h: number; vh: number; q: number; vq: number };
@@ -239,7 +253,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     clearTimeout(lifting);
     fading?.stop(); fading = null;
     if (n > 1) {
-      vars(g, swellShape(rest));
+      vars(g, swellShape(rest, h.buttons[1].offsetTop - h.buttons[0].offsetTop));
       h.buttons.forEach((b, i) => b.style.setProperty("--duet-j", `${i}`));
       p.lens = mountLens(g, h.buttons, h.index, still(), selected >= 0 ? selected : h.index);
     }

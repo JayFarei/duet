@@ -49,7 +49,7 @@ In `column` mode the controls sit in Safari's column, outside the layout viewpor
 - Where the document spans a left column (split view, the closed Duo turned to 90), Duet keeps it scrolled across and gives `<html>` `margin-left` of the column width and the matching negative `margin-right`, so the page lands in the visible part of the window instead of under the column. `<html data-duet-reserve>` marks this. Do not set `margin` on `<html>` yourself, and do not reset `scrollX`: Duet owns it.
 - `<Duet reserve={false}>` opts out: the page runs under the column as before, and `--duet-inset-left` / `--duet-inset-right` hold the column's width for `column()`, `bleed()` or your own padding.
 
-With `children`, in `inline` and `strip` mode and in the emulated column, the page still runs under the controls and keeps clear through the insets above.
+With `children` the same holds where the document spans a left column: the scroller is moved beside the column (`--duet-shift`) and the insets are 0. Beside a right column alone, in `inline` and `strip` mode and in the emulated column, the page still runs under the controls and keeps clear through the insets above.
 
 ## Panes
 

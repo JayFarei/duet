@@ -35,5 +35,6 @@ export function measure(probe?: Element): Signals {
     scale: visualViewport?.scale ?? 1,
     canGoForward: (window as Window & { navigation?: { canGoForward?: boolean } }).navigation?.canGoForward === true,
     editing: editing(),
+    uncovered: /viewport-fit\s*=\s*(auto|contain)/i.test(document.querySelector('meta[name="viewport"]')?.getAttribute("content") ?? ""),
   };
 }

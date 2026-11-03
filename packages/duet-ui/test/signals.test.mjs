@@ -6,7 +6,7 @@ const observers = new Set();
 const win = new EventTarget(), doc = new EventTarget(), orientation = new EventTarget(), viewport = new EventTarget();
 Object.assign(orientation, { angle: 90 });
 Object.assign(viewport, { height: 368 });
-Object.assign(doc, { visibilityState: "visible", body: { appendChild() {} }, createElement: () => ({ style: {} }) });
+Object.assign(doc, { visibilityState: "visible", body: { appendChild() {} }, createElement: () => ({ style: {} }), querySelector: () => null });
 Object.assign(globalThis, {
   window: globalThis, top: globalThis, document: doc, visualViewport: viewport, devicePixelRatio: 3,
   innerWidth: 594, innerHeight: 368, outerWidth: 678, outerHeight: 466,
