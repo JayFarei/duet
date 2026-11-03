@@ -149,9 +149,9 @@ function Page({ installs }: { installs: InstallStats | null }) {
             </div>
           ))}
         </div>
-        <h3 className="h3">How big they are</h3>
-        <p className="lede lede-l">The biggest form that fits. Less room, smaller controls.</p>
-        <Rules />
+        <h3 className="h3">The controls</h3>
+        <p className="lede lede-l">The biggest that fit. What doesn't fit goes in “…”.</p>
+        <Controls />
       </Section>
 
       <Section id="docs" title="Docs" lede="Wrap your app and list your places, most used first.">
@@ -159,8 +159,7 @@ function Page({ installs }: { installs: InstallStats | null }) {
         <h3 className="h3">Examples</h3>
         <p className="lede lede-l">Real pages, played on the Duo above.</p>
         <Examples />
-        <h3 className="h3">What's included</h3>
-        <p className="lede lede-l">Each one links to its docs.</p>
+        <h3 className="h3">Also included</h3>
         <Library />
         <div className="ctas ctas-l">
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
@@ -203,17 +202,13 @@ function Examples() {
   );
 }
 
-// Everything the library ships, in plain names, each linking to its docs (docs/api.md).
+// What the library ships beyond the controls, each linking to its docs.
 const DOC = `${REPO}/blob/main/docs`;
 const LIBRARY = [
-  { h: "Tabs", p: "Your places as tabs. What doesn't fit goes in “…”.", href: `${DOC}/api.md#tabs-or-burger` },
-  { h: "Menu", p: "One button that opens a sidebar with every place.", href: `${DOC}/api.md#duet` },
-  { h: "Buttons", p: "Actions such as Share, as round buttons beside the tabs.", href: `${DOC}/api.md#the-template` },
-  { h: "Main button", p: "One tinted button that stays on screen, such as Book.", href: "/book" },
   { h: "Panes", p: "One pane closed, two side by side unfolded.", href: "/panes" },
-  { h: "Sheets", p: "Sheets and modals that stay clear of the controls.", href: "/sheet" },
   { h: "useDuet", p: "The device, browser and layout, for your own code.", href: `${DOC}/api.md#useduet` },
   { h: "Colors", p: "Your accent color, light and dark.", href: `${DOC}/api.md#theming` },
+  { h: "Server rendering", p: "The right controls on first paint, no flash.", href: `${DOC}/server-rendering.md` },
 ];
 
 function Library() {
@@ -248,37 +243,42 @@ function Steps() {
       <li className="tile step">
         <span className="step-n">3</span>
         <h3 className="tile-h">Duet draws the controls</h3>
-        <p className="tile-p">The biggest form that fits: every place as a tab, tabs and More, or a menu.</p>
-        <div className="step-forms" aria-hidden><span>Tabs</span><span>Tabs and More</span><span>Menu</span></div>
+        <p className="tile-p">The biggest controls that fit: tabs, “…” for the rest, or a menu.</p>
+        <div className="step-forms" aria-hidden><span>Tabs</span><span>“…”</span><span>Menu</span></div>
       </li>
     </ol>
   );
 }
 
-// The three forms, each pictured by the stage's 3D Duo at its moment (duo3d.tsx, tools/media/duo3d-stills.mjs), with a
-// button that plays that moment on the stage.
-const FORMS = [
-  { id: "tabs", moment: "fit", k: "Unfolded Safari", h: "Tabs", p: "Every place is one tap away." },
-  { id: "more", moment: "folded", k: "Closed, Home Screen", h: "Tabs and More", p: "What doesn't fit goes in “…”, with your actions." },
-  { id: "menu", moment: "burger", k: "Closed Safari", h: "Menu", p: "One button opens a sidebar with every place." },
-] as const;
+// Each part of duet-ui, credited by name: a still of it on the stage's 3D Duo (tools/media/duo3d-stills.mjs), a
+// button that plays it on the stage (a Moment, or an example page at one), and its docs.
+const CONTROLS = [
+  { h: "Tabs", p: "Your places in a column, one tap each.", still: "form-tabs", play: "fit", href: `${DOC}/api.md#tabs-or-burger` },
+  { h: "“…”", p: "Whatever doesn't fit, in one list.", still: "form-more", play: "folded", href: `${DOC}/api.md#tabs-or-burger` },
+  { h: "Menu", p: "One button opens a sidebar with every place.", still: "control-menu", play: "burger", href: `${DOC}/api.md#duet` },
+  { h: "Buttons", p: "Your actions, such as Share, as round icons.", still: "form-menu", play: "burger", href: `${DOC}/api.md#the-template` },
+  { h: "Main button", p: "One tinted button, such as Book. A tap asks to confirm.", still: "control-main", play: "fold", src: "/book", href: `${DOC}/api.md#call-to-action` },
+  { h: "Close", p: "A sheet is open: the controls hold just an X.", still: "control-close", play: "burger", src: "/sheet", href: "/sheet" },
+];
 
-function Rules() {
-  const show = (id: string) => {
-    dispatchEvent(new CustomEvent("duet:moment", { detail: id }));
+function Controls() {
+  const show = (c: (typeof CONTROLS)[number]) => {
+    dispatchEvent(c.src ? new CustomEvent("duet:example", { detail: { src: c.src, moment: c.play } }) : new CustomEvent("duet:moment", { detail: c.play }));
     document.querySelector(".stage")?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
   return (
     <div className="tiles">
-        {FORMS.map((f) => (
-          <div key={f.id} className="tile rule">
-            <div className="rule-shot"><img src={`/media/form-${f.id}.webp`} alt={`The Duo showing ${f.h}`} loading="lazy" /></div>
-            <p className="tile-k">{f.k}</p>
-            <h3 className="tile-h">{f.h}</h3>
-            <p className="tile-p">{f.p}</p>
-            <button className="rule-show" onClick={() => show(f.moment)}>Show on the Duo</button>
+      {CONTROLS.map((c) => (
+        <div key={c.still} className="tile rule control">
+          <div className="rule-shot"><img src={`/media/${c.still}.webp`} alt={`${c.h} on the Duo`} loading="lazy" /></div>
+          <h3 className="tile-h">{c.h}</h3>
+          <p className="tile-p">{c.p}</p>
+          <div className="rule-row">
+            <button className="rule-show" onClick={() => show(c)}>Show on the Duo</button>
+            <a className="rule-link" href={c.href}>Docs</a>
           </div>
-        ))}
+        </div>
+      ))}
     </div>
   );
 }

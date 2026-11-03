@@ -12,14 +12,14 @@ On desktop the page scrolls inside `.duet-scroller`, not the window, and section
 |---|---|---|
 | Hero | `#top` | Title, lede, copy prompt, install line, stats. |
 | Stage | `.stage` | The live 3D Duo running the skeleton app. Moments are driven by a `duet:moment` CustomEvent with detail `fit`, `fold`, `folded` or `burger`. A `duet:example` CustomEvent with detail `{src, moment}` loads that page on the Duo at that moment. |
-| How it works | `#rules .steps` | Three tiles: your places, Duet measures the room, Duet draws the largest controls that fit. |
+| How it works | `#rules .steps` | Three tiles: your places, Duet measures the room, Duet draws the largest controls that fit (chips: Tabs, “…”, Menu). |
 | Where the controls go | `#rules .tiles` (first) | Strip, Column, Inline: Duo simulator recordings from `tools/media/compose.sh`. |
-| How big they are | `#rules .rule` (3) | Tabs, Tabs and More, Menu. Each shows `/media/form-{tabs,more,menu}.webp`, a still of the stage's 3D Duo, and a `.rule-show` button that plays `fit`, `folded` or `burger` on the stage. |
+| The controls | `#rules .control` (6) | Tabs, “…”, Menu, Buttons, Main button, Close, credited by name. Each shows a 3D Duo still (`/media/form-{tabs,more,menu}.webp`, `/media/control-{menu,main,close}.webp`), a `.rule-show` button that plays it on the stage (`duet:moment`, or `duet:example` for `/book` and `/sheet`), and a `.rule-link` to the docs. |
 | Docs | `#docs` | Code sample with tint picker, then examples, then what's included, then "Read the docs". |
 | Examples | `#docs .example` (3) | Mail (panes), Notes (sheets), Classes (main button). Each shows `/media/example-{panes,sheet,book}.webp`, a "Play on the Duo" button that fires `duet:example`, and an "Open" link to the page. |
-| What's included | `#docs .lib-item` (8) | One linked card per feature, in plain names: Tabs, Menu, Buttons, Main button, Panes, Sheets, useDuet, Colors. |
+| Also included | `#docs .lib-item` (4) | One linked card each: Panes, useDuet, Colors, Server rendering. |
 
-The form and example stills come from `node tools/media/duo3d-stills.mjs [port]` against a local `pnpm start`. Rerun it when the stage, the skeleton app, the example pages or duet-ui's controls change.
+The form, control and example stills come from `node tools/media/duo3d-stills.mjs [port]` against a local `pnpm start`. The `control-*` stills tap the page inside the Duo first (open the menu, the confirm box, a sheet). Rerun it when the stage, the skeleton app, the example pages or duet-ui's controls change.
 
 The example pages (`/panes`, `/sheet`, `/book`) render `<Duo src>`, so they show the 3D Duo when WebGL 2 is available.
 

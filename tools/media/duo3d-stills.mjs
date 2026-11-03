@@ -11,12 +11,16 @@ import { chromium } from "@playwright/test";
 const PORT = process.argv[2] ?? "3500";
 const OUT = join(dirname(fileURLToPath(import.meta.url)), "../../apps/site/public/media");
 const TMP = mkdtempSync(join(tmpdir(), "duo3d-"));
-// The event the stage takes, its detail, and the file name on the site: the three forms, then the example pages.
+// The event the stage takes, its detail, the file name on the site, and what to tap on the page first (CSS selectors, in order).
 const SHOTS = [
   ["duet:moment", "fit", "form-tabs"], ["duet:moment", "folded", "form-more"], ["duet:moment", "burger", "form-menu"],
   ["duet:example", { src: "/panes", moment: "fit" }, "example-panes"],
   ["duet:example", { src: "/sheet", moment: "burger" }, "example-sheet"],
   ["duet:example", { src: "/book", moment: "fold" }, "example-book"],
+  // The controls, each caught in use: the sidebar open, the main button's confirmation, a sheet's X in the column.
+  ["duet:example", { src: "/skeleton", moment: "burger" }, "control-menu", ['.duet-btn[aria-label="Menu"]']],
+  ["duet:example", { src: "/book", moment: "fold" }, "control-main", ['.duet-btn[aria-label="Book"]']],
+  ["duet:example", { src: "/sheet", moment: "burger" }, "control-close", ["main button"]],
 ];
 
 const clear = "html,body,main,section,.stage,.duet-scroller{background:transparent!important}";
@@ -35,9 +39,14 @@ await p.addStyleTag({ content: `${clear} .moments{display:none!important}` });
 // The undo, redo, unfold and lock bar over the device.
 await p.evaluate(() => { const bar = document.querySelector(".stage input[type=range]")?.parentElement; if (bar) bar.style.visibility = "hidden"; });
 await (await frame.elementHandle()).contentFrame().then((f) => f.addStyleTag({ content: "html,body{background:transparent!important}" }));
-for (const [type, detail, name] of SHOTS) {
+for (const [type, detail, name, taps = []] of SHOTS) {
   await p.evaluate(([t, d]) => dispatchEvent(new CustomEvent(t, { detail: d })), [type, detail]);
   await p.waitForTimeout(4500);
+  // The page shows on each of the Duo's screens, so the tap goes to every copy of it.
+  for (const sel of taps) {
+    for (const f of p.frames().filter((f) => new URL(f.url()).pathname === detail.src)) await f.evaluate((s) => document.querySelector(s)?.click(), sel);
+    await p.waitForTimeout(2500);
+  }
   const png = join(TMP, `${name}.png`);
   await p.screenshot({ path: png, omitBackground: true, clip: await frame.boundingBox() });
   execFileSync("magick", [png, "-trim", "+repage", "-bordercolor", "none", "-border", "24", "-resize", "1200x1200>", png]);

@@ -27,33 +27,32 @@ test("each example plays on the stage's Duo", async ({ page }) => {
   expect(seen).toEqual(["/panes", "/sheet", "/book"]);
 });
 
-test("the docs list every feature of duet-ui, in plain names", async ({ page }) => {
+test("the docs list what else is included, in plain names", async ({ page }) => {
   await page.goto("/");
   const names = await page.locator("#docs .lib-item h3").allTextContents();
-  expect(names).toEqual(["Tabs", "Menu", "Buttons", "Main button", "Panes", "Sheets", "useDuet", "Colors"]);
-  await expect(page.locator("#docs .lib-code")).toHaveCount(0);
+  expect(names).toEqual(["Panes", "useDuet", "Colors", "Server rendering"]);
   for (const href of await page.locator("#docs .lib-item").evaluateAll((a) => a.map((e) => e.getAttribute("href")))) expect(href).toBeTruthy();
 });
 
-// "How big they are": each form is a picture of the real 3D Duo, and its button plays that moment on the stage.
-test("each form card shows the 3D Duo and plays its moment", async ({ page }) => {
+// "The controls": each part of duet-ui, credited by name with a picture of it on the real 3D Duo, playable on the stage.
+test("each control shows on the 3D Duo and plays on the stage", async ({ page }) => {
   await page.goto("/");
-  const cards = page.locator("#rules .rule");
-  await expect(cards).toHaveCount(3);
-  expect(await cards.locator(".tile-h").allTextContents()).toEqual(["Tabs", "Tabs and More", "Menu"]);
-  for (const [i, form] of ["tabs", "more", "menu"].entries()) {
+  const cards = page.locator("#rules .control");
+  await expect(cards).toHaveCount(6);
+  expect(await cards.locator(".tile-h").allTextContents()).toEqual(["Tabs", "“…”", "Menu", "Buttons", "Main button", "Close"]);
+  for (const [i, still] of ["form-tabs", "form-more", "control-menu", "form-menu", "control-main", "control-close"].entries()) {
     const img = cards.nth(i).locator(".rule-shot img");
-    await expect(img).toHaveAttribute("src", `/media/form-${form}.webp`);
+    await expect(img).toHaveAttribute("src", `/media/${still}.webp`);
     await img.scrollIntoViewIfNeeded();
     await expect.poll(() => img.evaluate((e: HTMLImageElement) => e.complete && e.naturalWidth)).toBeGreaterThan(0);
+    expect(await cards.nth(i).locator("a.rule-link").getAttribute("href")).toBeTruthy();
   }
-  const moments = await page.evaluate(() => {
+  const played = await page.evaluate(() => {
     const seen: string[] = [];
     addEventListener("duet:moment", (e) => seen.push((e as CustomEvent<string>).detail));
-    return new Promise<string[]>((done) => {
-      document.querySelectorAll<HTMLButtonElement>("#rules .rule-show").forEach((b) => b.click());
-      setTimeout(() => done(seen), 50);
-    });
+    addEventListener("duet:example", (e) => seen.push((e as CustomEvent<{ src: string }>).detail.src));
+    document.querySelectorAll<HTMLButtonElement>("#rules .control .rule-show").forEach((b) => b.click());
+    return seen;
   });
-  expect(moments).toEqual(["fit", "folded", "burger"]);
+  expect(played).toEqual(["fit", "folded", "burger", "burger", "/book", "/sheet"]);
 });
