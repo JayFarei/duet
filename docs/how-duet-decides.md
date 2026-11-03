@@ -133,11 +133,14 @@ The most places that fit in each window, from the rule. Closed Safari, turned, S
 | Split View, left, 385x571, with or without forward history | 6 | 7 | 6 |
 | Split View, right | 1 | 2 | burger |
 | Closed Safari, upright, 382x580, with or without forward history | 1 | 2 | burger |
-| Closed Safari, turned, 594x368 | 0 | 1 | burger |
+| Closed Safari, turned, 594x368, Safari's column | 0 | 1 | burger |
+| Closed Safari, turned, 678x384, toolbar on top | 6 | 7 | 6 |
 | Closed Home Screen, 466x657 | 7 | 8 | 7 |
 | Closed Home Screen, turned, 678x445 | 7 | 8 | 7 |
 
-Two places on closed Safari upright, with actions: burger and "…". Where the band holds a single button, closed Safari turned, a page with actions shows only "…", because a burger there would lose the actions. In a `menu.tabs` app the places lead that list, then "This page". The same window without actions shows the burger.
+Two places on closed Safari upright, with actions: burger and "…". Where the band holds a single button, closed Safari turned in Safari's column, a page with actions shows only "…", because a burger there would lose the actions. In a `menu.tabs` app the places lead that list, then "This page". The same window without actions shows the burger.
+
+Closed Safari turned is two windows, and the rule reads whichever the frame gives: 594x368 beside the camera when Safari draws its column, a single button of room, and 678x384 under a full width toolbar, where the page runs inline and holds 6 tabs and "…". The Duo simulator draws the second.
 
 Live Activities cannot be started on the simulator, so their effect is the modelled worst case in the band, not a measurement.
 

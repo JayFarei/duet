@@ -582,7 +582,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 ## Places below the fold of "…" with one button of room
 
-- **You see:** closed Safari turned, a `menu.tabs` app with actions: only "…", and its list opens with the actions, so a fifth place is below the fold.
+- **You see:** closed Safari turned, in Safari's column, a `menu.tabs` app with actions: only "…", and its list opens with the actions, so a fifth place is below the fold.
 - **Cause:** the band holds one button. A burger there would lose the actions, so "…" holds everything.
 - **Duet does:** a `menu.tabs` app lists the places first in that one button, since they are what the burger would have been. Without actions the burger shows. Other apps keep "This page" first.
 - **You do:** nothing.
@@ -779,3 +779,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** `detect` measures this window from the long side, as upright, whichever way `screen.*` reads. The room is 389pt as upright, from y 32 to 421.
 - **You do:** nothing.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator in both rotations: 9 places give 7 tabs and "…" at y 32 to 421, 5 places end at the same foot, and turning back upright restores the place.
+
+## Closed Safari turned showing tabs where the docs said burger
+
+- **You see:** closed Safari turned on the Duo simulator, a `menu.tabs` app with 9 places: 6 tabs and "…", while the fit table listed this window as a burger.
+- **Cause:** closed Safari turned is two windows. Safari's column leaves 594x368 beside the camera, one button of room. Under a full width toolbar the page is 678x384 and runs inline. The table named only the first.
+- **Duet does:** nothing different. `placeTabs` reads the frame, so the column gets the burger and the inline window 6 tabs and "…". The table now lists both, and its test holds each row to the rule.
+- **You do:** nothing.
+- **Status:** seen on the Duo simulator at 678x384, 6 tabs and "…" with 9 places.

@@ -234,7 +234,8 @@ test("the docs' table is the rule", () => {
     "Split View, left": { ...split, side: "left" },
     "Split View, right": { ...split, side: "right" },
     "Closed Safari, upright": closed,
-    "Closed Safari, turned": detect(sig(594, 368, 678, 466, { angle: 90 })),
+    "Closed Safari, turned, 594x368": detect(sig(594, 368, 678, 466, { angle: 90 })),
+    "Closed Safari, turned, 678x384": detect(sig(678, 384, 678, 466, { insetBottom: 34 })),
     "Closed Home Screen": detect(sig(466, 657, 466, 678, { ...standalone, insetRight: 84 })),
   };
   assert.match(chrome, /hasRest = \(c: Context\) => .*\|\| movable\(c\);/);

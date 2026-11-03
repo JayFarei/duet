@@ -37,7 +37,7 @@ Pass `tabs: true` on `menu` and the app's places are tabs at the head of the cap
 - Put the primary places first: the order is yours, and tabs never reorder or swap on selection. 9 places on a wide Home Screen are 7 tabs and "…" holding the other 2.
 - "…" lists only the folded places, in a section ahead of folded actions and destructive items. That second section is headed "This page" in Safari's column and "More" elsewhere. When the selected place is folded, "…" shows the selected bubble and the list marks the place. The set never splits between tabs and sidebar.
 - The app's actions and primary fold into "…" first. The burger takes over only where fewer than three tabs would show, closed Safari and the right of Split View.
-- Where the band holds one button (closed Safari turned), a page with actions shows only "…", with the places first in its list. Without actions it shows the burger.
+- Where the band holds one button (closed Safari turned, in Safari's column), a page with actions shows only "…", with the places first in its list. Without actions it shows the burger.
 - Tabs behave like the `tabs` prop: the selected one sits in a bubble in `tint`, with the same press.
 - `placeTabs(context, places, rest)` is the rule, pure and exported, `rest` meaning something else needs "…". It returns `{ shown, pitch }`, or undefined for the burger. `placesFit` is whether every place is shown. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the room each mode has.
 - On the Duo, inline `bootScript`: the controls stay hidden until the chrome has mounted, so neither form shows before the right one, with no cookie or reload. See [Pre-paint boot](server-rendering.md#pre-paint-boot). On every device the nav stays hidden until hydration.
