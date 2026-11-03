@@ -794,4 +794,4 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Cause:** the press read the capsule's resting place from its current box, and a tap holds its swell for 150ms and then falls, so the new press took those swollen sizes as rest.
 - **Duet does:** `restOf` reads the rest from the layout's inline values, which a press never changes. The shape no longer depends on how soon the press follows the last one.
 - **You do:** nothing.
-- **Status:** `test/press.test.mjs`, and on the Duo simulator: the flip stays at 590pt, and height stays 411 to 412pt, at 0.1s and 0.5s after a tap. An overshoot into "…" at the last tab's centre, reported once by a verifier, did not reproduce before or after this fix (60 drags before, 24 + 18 after).
+- **Status:** `test/press.test.mjs`, and on the Duo simulator: the flip stays at 590pt, and height stays 411 to 412pt, at 0.1s and 0.5s after a tap. An overshoot into "…" at the last tab's centre, reported once by a verifier, did not reproduce before or after this fix (66 drags to that centre before, 30 after).
