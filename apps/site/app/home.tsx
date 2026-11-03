@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, CodeXml, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
+import { Check, CodeXml, ListTree, Moon, PanelBottom, PanelRight, Sun, TabletSmartphone } from "lucide-react";
 import { Duet, column, useDuet, type DuetItem } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
@@ -22,13 +22,14 @@ function DuetMark() {
 }
 const SECTIONS: DuetItem[] = [
   { id: "top", label: "Duet", icon: <DuetMark /> },
+  { id: "rules", label: "How it picks", icon: <ListTree size={24} /> },
   { id: "code", label: "Integrate", icon: <CodeXml size={24} /> },
   { id: "examples", label: "Examples", icon: <TabletSmartphone size={24} /> },
 ];
 
 const quick = (tint?: string) => `import { Duet } from "duet-ui";
 
-<Duet menu={{ items: PLACES, selected: place, onSelect: setPlace }}${tint ? `\n  tint="${tint}"` : ""}>
+<Duet menu={{ items: PLACES, selected: place, onSelect: setPlace, tabs: true }}${tint ? `\n  tint="${tint}"` : ""}>
   <App />
 </Duet>`;
 
@@ -37,7 +38,7 @@ const quick = (tint?: string) => `import { Duet } from "duet-ui";
 const ISLANDS: [string, string, string, string][] = [
   ["Home Screen", "Strip", "In the strip iOS gives the app, beside the page.", "strip"],
   ["Safari", "Column", "In the empty part of Safari's column. The page keeps its full width.", "column"],
-  ["Everywhere else", "Inline", "A slim strip in the page, on the side the reader drags it to.", "inline-drag"],
+  ["Everywhere else", "Inline", "A slim strip inside the page, beside the content.", "inline-drag"],
 ];
 
 /** One page for every screen, navigated by its own Duet controls, with the web Duo playing on a stage. On a Duo too:
@@ -60,7 +61,7 @@ function Site({ installs }: { installs: InstallStats | null }) {
   if (portrait && !sides) return <Bars installs={installs} tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
   return (
     <Duet
-      menu={{ items: SECTIONS, selected: tab, onSelect: go, burger: false }}
+      menu={{ items: SECTIONS, selected: tab, onSelect: go, tabs: true, burger: false }}
       actions={[
         { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
         { id: "theme", label: theme.dark ? "Light mode" : "Dark mode", icon: theme.dark ? <Sun size={22} /> : <Moon size={22} />, onPress: theme.toggle },
@@ -121,7 +122,7 @@ function Page({ installs }: { installs: InstallStats | null }) {
         <h1 className="display">
           Native-feeling controls for web apps on the <em>iPhone Duo.</em>
         </h1>
-        <p className="lede">A React library that approximates the Duo&apos;s native side controls.</p>
+        <p className="lede">Pass your places and actions. Duet measures the room and shows the largest controls that fit. Your app carries no device logic.</p>
         <div className="actions">
           <div className="ctas">
             <AgentPrompt />
@@ -135,7 +136,11 @@ function Page({ installs }: { installs: InstallStats | null }) {
         <Duo embed src="/skeleton" />
       </section>
 
-      <Section id="code" title="Integrate" lede="Wrap your app and pass your places. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
+      <Section id="rules" title="How Duet picks" lede="Duet sizes the controls to the room it measures, then picks the largest form that fits.">
+        <Rules />
+      </Section>
+
+      <Section id="code" title="Integrate" lede="Wrap your app and pass your places, primary places first. useDuet() also reports the device, the browser and whether the page runs from the Home Screen.">
         <Integrate />
         <div className="ctas" style={{ justifyContent: "flex-start" }}>
           <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
@@ -145,7 +150,7 @@ function Page({ installs }: { installs: InstallStats | null }) {
         </div>
       </Section>
 
-      <Section id="examples" title="Where the controls go" lede="Duet picks one of three places from the device, the browser and the window.">
+      <Section id="examples" title="Where the controls go" lede="Duet picks one of three places from the device, the browser and the window. Your app does not choose.">
         <div className="tiles">
           {ISLANDS.map(([where, mode, text, clip]) => (
             <div key={mode} className="tile">
@@ -160,6 +165,40 @@ function Page({ installs }: { installs: InstallStats | null }) {
 
       <Footer />
     </main>
+  );
+}
+
+// The three forms, each with the Moment that shows it on the stage (duo3d.tsx).
+const RULES: { id: "fit" | "fold" | "burger"; k: string; h: string; p: string; bar: ReactNode }[] = [
+  { id: "fit", k: "Every place fits", h: "Tabs", p: "Where there is room for every place, each one is a tab. Unfolded Safari holds nine.", bar: <>{[1, 0, 0, 0, 0, 0].map((on, i) => <i key={i} data-on={on || undefined} />)}</> },
+  { id: "fold", k: "Some fit", h: "Tabs and …", p: "Tabs shrink from 51.7pt to 44pt first. Past that, the leading places stay tabs and the rest fold into the … button. In a wide Home Screen, nine places show as seven tabs plus …, so put primary places first.", bar: <>{[1, 0, 0, 0].map((on, i) => <i key={i} data-on={on || undefined} />)}<b>…</b></> },
+  { id: "burger", k: "Fewer than three fit", h: "Burger", p: "When fewer than three tabs would show, one button opens a sidebar with every place: closed Safari upright and the right side of Split View.", bar: <b aria-hidden>≡</b> },
+];
+
+function Rules() {
+  const show = (id: string) => {
+    dispatchEvent(new CustomEvent("duet:moment", { detail: id }));
+    document.querySelector(".stage")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  return (
+    <>
+      <div className="tiles">
+        {RULES.map((r) => (
+          <div key={r.id} className="tile rule">
+            <div className="rule-bar" aria-hidden>{r.bar}</div>
+            <p className="tile-k">{r.k}</p>
+            <h3 className="tile-h">{r.h}</h3>
+            <p className="tile-p">{r.p}</p>
+            <button className="rule-show" onClick={() => show(r.id)}>Show on the Duo</button>
+          </div>
+        ))}
+      </div>
+      <ul className="rule-notes">
+        <li>When the selected place is folded, … takes the selection. Nothing reorders.</li>
+        <li>… lists the folded places first, then your actions, then destructive ones.</li>
+        <li>Moving the controls to the other side is opt-in, with <code>moveControls</code>.</li>
+      </ul>
+    </>
   );
 }
 

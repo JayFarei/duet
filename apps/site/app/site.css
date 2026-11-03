@@ -199,3 +199,16 @@ html[data-duet-close] .sheet-x { display: none; }
 .moment[aria-pressed="true"] { background: var(--ink); color: var(--bg); box-shadow: none; }
 .moments-cap { margin: 2px 0 0; max-width: 520px; color: var(--ink); font: 500 15px/1.4 -apple-system, system-ui; text-wrap: balance; }
 .moments-hint { margin: 0; color: var(--dim); font: 400 13px/1.4 -apple-system, system-ui; }
+
+/* How Duet picks (home.tsx): three rule cards, each drawn as the bar it shows. */
+.rule { display: flex; flex-direction: column; }
+.rule .tile-p { flex: 1; }
+.rule-bar { display: flex; align-items: center; justify-content: center; gap: 6px; height: 120px; border-radius: 18px; background: var(--bg); }
+.rule-bar i { display: block; width: 30px; height: 30px; border-radius: 99px; background: var(--line); }
+.rule-bar i[data-on] { background: var(--ink); }
+.rule-bar b { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 99px; background: var(--line); color: var(--ink); font: 700 13px/1 -apple-system, system-ui; }
+.rule-show { align-self: flex-start; margin: 16px 8px 0; height: 36px; padding: 0 14px; border: 0; border-radius: 99px; background: var(--bg); box-shadow: 0 0 0 0.5px var(--line); color: var(--ink); font: 600 14px/1 -apple-system, system-ui; cursor: pointer; }
+.rule-show:hover { box-shadow: 0 0 0 1px var(--dim); }
+.rule-notes { margin: 20px 0 0; padding: 0 0 0 20px; color: var(--dim); font: 400 16px/1.5 -apple-system, system-ui; }
+.rule-notes li + li { margin-top: 6px; }
+.rule-notes code { color: var(--ink); }
