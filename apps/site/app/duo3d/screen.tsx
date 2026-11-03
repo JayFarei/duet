@@ -59,14 +59,16 @@ export function Screen() {
     return () => removeEventListener("message", on);
   }, [sync?.src]);
 
-  // Duet off and on: the page swaps layouts itself, morphing each control (skeleton-app.tsx).
+  // Duet off and on: the page swaps layouts itself, morphing each control (skeleton-app.tsx). A Moment's selected
+  // place rides along.
+  const selected = sync?.selected;
   useEffect(() => {
-    const post = () => frame.current?.contentWindow?.postMessage({ type: "skeleton:duet", on: duet }, location.origin);
+    const post = () => frame.current?.contentWindow?.postMessage({ type: "skeleton:duet", on: duet, selected }, location.origin);
     const ready = (e: MessageEvent) => { if (e.source === frame.current?.contentWindow && e.data?.type === "skeleton:ready") post(); };
     post();
     addEventListener("message", ready);
     return () => removeEventListener("message", ready);
-  }, [duet, !!sc]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [duet, !!sc, selected?.at]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The mode Duet actually laid out in, so the frame follows it, flip damper included.
   useEffect(() => {

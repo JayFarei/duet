@@ -190,3 +190,12 @@ html[data-duet-close] .sheet-x { display: none; }
 @keyframes sheet-fade { from { opacity: 0; } }
 @keyframes sheet-up { from { transform: translateY(100%); } }
 @media (prefers-reduced-motion: reduce) { .sheet-scrim, .sheet { animation: none; } }
+
+/* The stage's Moments (duo3d.tsx): chips that set the Duo to one of the rules, a caption for the one showing. */
+.moments { display: grid; justify-items: center; gap: 8px; margin: 0 auto 14px; max-width: 100%; text-align: center; }
+.moments-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.moment { height: 34px; padding: 0 14px; border: 0; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); color: var(--ink); font: 600 14px/1 -apple-system, system-ui; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.moment:hover { box-shadow: 0 0 0 1px var(--dim); }
+.moment[aria-pressed="true"] { background: var(--ink); color: var(--bg); box-shadow: none; }
+.moments-cap { margin: 2px 0 0; max-width: 520px; color: var(--ink); font: 500 15px/1.4 -apple-system, system-ui; text-wrap: balance; }
+.moments-hint { margin: 0; color: var(--dim); font: 400 13px/1.4 -apple-system, system-ui; }

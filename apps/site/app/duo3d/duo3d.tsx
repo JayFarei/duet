@@ -10,6 +10,17 @@ const ID = Math.random().toString(36).slice(2);
 
 const SWAP = 450; // the interface turns upright this far into the device's turn
 
+/** One-tap views of the rule Duet follows with the skeleton app's nine places and its Share action: the expected
+ *  controls are the docs' table (how-duet-decides.md, Tabs or burger). home.tsx's rule cards send the same ids as a
+ *  `duet:moment` window event. */
+export const MOMENTS = [
+  { id: "fit", label: "All fit", state: { posture: "open", app: "safari" }, selected: "home", caption: "Unfolded, there is room for all nine places as tabs." },
+  { id: "fold", label: "Fold into …", state: { posture: "closed", app: "home" }, selected: "home", caption: "Room for seven: the first seven stay tabs, the rest fold into …" },
+  { id: "folded", label: "Selected is folded", state: { posture: "closed", app: "home" }, selected: "settings", caption: "Pick a folded place and … takes the selection. Nothing reorders." },
+  { id: "burger", label: "Burger", state: { posture: "closed", app: "safari" }, selected: "home", caption: "Fewer than three tabs would show, so the burger opens a sidebar." },
+] as const satisfies readonly { id: string; label: string; state: Partial<State>; selected: string; caption: string }[];
+export type MomentId = (typeof MOMENTS)[number]["id"];
+
 // Stand poses, the device on a table seen a little from above. Both are landscape with the hinge across: the
 // interface turns with the hardware. Nightstand is a tent on the closed side, the cover display facing you;
 // elevated is a laptop, one half flat and the other raised. duo tips the whole device by `pitch`.
@@ -43,7 +54,9 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
  *  device takes no touches until the reader asks to try it, so a swipe over it still scrolls the page, and the lock
  *  under it puts it back that way. */
 export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
-  const [s, setS] = useState<State>(TOUR[0]);
+  // The landing page opens on a Moment: the closed Home Screen, seven tabs and "…".
+  const [s, setS] = useState<State>(embed ? { ...TOUR[0], app: "home" } : TOUR[0]);
+  const [selected, setSelected] = useState<{ id: string; at: number }>();
   const [deg, setDeg] = useState(0);
   const [stand, setStand] = useState<Stand>("flat");
   const [upright, setUpright] = useState<Turn>(0);
@@ -78,7 +91,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   });
 
   // Both displays follow the state; a display that loads late asks for it.
-  const sync: Sync = { s: { ...s, laptop: stand === "elevated" }, upright, src, duet };
+  const sync: Sync = { s: { ...s, laptop: stand === "elevated" }, upright, src, duet, selected };
   const ch = useRef<BroadcastChannel | null>(null), last = useRef(sync);
   last.current = sync;
   useEffect(() => {
@@ -133,6 +146,24 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     setDeg(d);
     if (posture !== s.posture) setS(fit({ ...s, posture }));
   };
+
+  // A Moment: the device flat and upright in its posture and app, and the place it selects.
+  const moment = (id: MomentId) => {
+    const m = MOMENTS.find((x) => x.id === id)!;
+    setPage("");
+    setDuet(true);
+    go({ ...m.state, turn: 0, upside: false }, "flat");
+    setSelected({ id: m.selected, at: Date.now() });
+  };
+  const momentRef = useRef(moment);
+  momentRef.current = moment;
+  useEffect(() => {
+    const on = (e: Event) => { const id = (e as CustomEvent<MomentId>).detail; if (MOMENTS.some((m) => m.id === id)) momentRef.current(id); };
+    addEventListener("duet:moment", on);
+    return () => removeEventListener("duet:moment", on);
+  }, []);
+  const picked = selected?.id ?? "home";
+  const at = MOMENTS.find((m) => stand === "flat" && !s.turn && !s.upside && !page && duet && m.state.posture === s.posture && m.state.app === s.app && (m.id === "folded") === (picked === "settings"));
 
   const safari = s.app === "safari" || s.app === "split", preview = s.app === "sheet";
   const split = s.app === "split";
@@ -227,6 +258,17 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     </div>
   );
 
+  // The Moments: the rule, one tap each, its caption under them.
+  const moments = (
+    <div className="moments">
+      <div className="moments-row" role="group" aria-label="Moments">
+        {MOMENTS.map((m) => <button key={m.id} className="moment" aria-pressed={at?.id === m.id} onClick={() => moment(m.id)}>{m.label}</button>)}
+      </div>
+      <p className="moments-cap" aria-live="polite">{at?.caption ?? "Duet measures the room and picks the largest controls that fit."}</p>
+      <p className="moments-hint">Unlock, then press and drag across the tabs and …</p>
+    </div>
+  );
+
   // On the landing page: the device, its controls under it.
   if (embed) return (
     <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
@@ -234,7 +276,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
           document gets an opaque white backdrop instead of showing the page through. */}
       {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
         style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
-      <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{moments}{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
         <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>
     </div>
   );
