@@ -787,3 +787,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** nothing different. `placeTabs` reads the frame, so the column gets the burger and the inline window 6 tabs and "…". The table now lists both, and its test holds each row to the rule.
 - **You do:** nothing.
 - **Status:** seen on the Duo simulator at 678x384, 6 tabs and "…" with 9 places.
+
+## The primary heading "…" in a tabs app
+
+- **You see:** closed Safari upright, a `menu.tabs` app with actions and a primary: "…" opens with the primary and the actions, and the places come last, though everywhere else in a tabs app they lead.
+- **Cause:** the places led only when the primary had its own capsule. When it shared one with "…", the list kept the primary's lead.
+- **Duet does:** in a `menu.tabs` app the places always lead "…", then "This page" with the primary and the actions. Other apps keep their order.
+- **You do:** nothing.
+- **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: closed Safari upright with 5 places, 2 actions and a primary lists P1 to P5, then Book, Act 0, Act 1. Each action fires from it and the primary row arms in place.

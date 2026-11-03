@@ -218,7 +218,7 @@ test("one button of room in a tabs app: the places lead \"…\"", () => {
   const turned = detect(sig(594, 368, 678, 466, { angle: 90 }));
   assert.deepEqual(kinds(template(frame(turned), { menu: true, actions: 2 }).groups), [["more"]]);
   assert.deepEqual(kinds(template(frame(turned), { menu: true, actions: 0 }).groups), [["menu"]]);
-  assert.match(chrome, /placesFirst = !!p\.menu\?\.tabs && askAt !== moreAt/);
+  assert.match(chrome, /placesFirst = !!p\.menu\?\.tabs;/);
   assert.ok(chrome.indexOf("{placesFirst && placeRows}") < chrome.indexOf("{!placesFirst && placeRows}"));
 });
 
