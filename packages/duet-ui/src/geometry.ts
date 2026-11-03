@@ -711,14 +711,17 @@ export const INLINE_WIDTH = 84;
  *  <html>) and lands exactly in the visible viewport, beside the controls, with nothing to keep clear (insets 0).
  *  Before, a page that ignored the insets ran under the controls on the left and left a column-wide gap on the
  *  right (RegTail, split pane, 2026-10-27). With `reserve: false` the page runs under the column and keeps clear by
- *  the insets itself. With children the scroller runs on under the column and pads by the insets; an emulated
+ *  the insets itself. With children the scroller is moved the same way (chrome.tsx, --duet-shift) when the document
+ *  spans a column on the left, so a page that ignores the insets is no longer clipped by a column in a right split
+ *  pane (verifier, rc.4, 2026-11-03); beside a right column alone the scroller runs on under it and pads by the
+ *  insets; an emulated
  *  column (the site's web Duo) already frames both columns and is never scrolled across. */
 export function pageInsets(o: {
   mode: Mode; side: Side; split: boolean; screenWidth: number; width: number; hiddenPreview: boolean;
   inner: boolean; emulated: boolean; reserve: boolean; env: (side: Side) => string;
 }): { left: string; right: string; shift: number } {
   const column = o.screenWidth - o.width, split = o.mode === "column" && o.split;
-  if (o.mode === "column" && !o.inner && !o.emulated && o.reserve)
+  if (o.mode === "column" && !o.emulated && o.reserve && (!o.inner || split || o.side === "left"))
     return { left: "0px", right: "0px", shift: split || o.side === "left" ? column : 0 };
   const inset = o.hiddenPreview ? "0px" : o.mode === "strip" ? o.env(o.side) : o.mode === "inline" ? `${INLINE_WIDTH}px` : `${column}px`;
   const other = (side: Side) => o.mode === "column" ? "0px" : o.env(side);

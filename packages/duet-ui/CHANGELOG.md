@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Behaviour change:** a page with `children` in a split pane, or on the closed Duo turned left, no longer has its left 84pt cut off by Safari's column. The inner scroller is moved beside the column, like a page without children, and the insets there are 0. `reserve={false}` keeps the old layout, the scroller under both columns and padded by `--duet-inset-left` / `--duet-inset-right`.
 - **Behaviour change:** `menu.tabs` is no longer all or nothing, so the burger is rarer. Where the places do not all fit, the first ones stay tabs and the rest go in "…", at the widest pitch from 51.7pt down to 44pt (`placeTabs`): 9 places on a wide Home Screen are 7 tabs and "…" at 48.6pt. The burger only where fewer than three tabs would show, closed Safari and the right of Split View. Places that all fit are pixel identical. Put the primary places first.
 - **Behaviour change:** moving the controls is now an option, `moveControls`, off by default. Off: no "Move controls" row, no drag across the page, the default side even if an earlier visit stored another, and no "…" when nothing else needs it, so tabs get its room (9 places in wide Safari, 15 in tall). To keep the old behaviour pass `moveControls`.
 - Tabs use the room: when the places do not fit at the normal 51.7pt pitch, the tabs capsule tightens, down to 44pt (`placeTabs`), before folding any. A wide Safari on the open Duo now holds 11 places, or 10 with "…". Tabs that already fit are pixel identical.

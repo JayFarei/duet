@@ -595,8 +595,11 @@ export function Duet<T extends string = string, U extends string = string>(props
     // The document is scrolled one column across (useColumnLayer): margins on <html> move the page into the visible
     // viewport. <html>'s own margins, so the page's body margins, widths and max-widths are untouched, centred
     // content centres in the visible pane, and position: fixed (already viewport relative) is unaffected.
-    r.marginLeft = shift ? `${shift}px` : "";
-    r.marginRight = shift ? `${-shift}px` : "";
+    // An inner scroller is absolute against the initial containing block, which <html>'s margins do not move: it
+    // takes the shift itself (duet.css, --duet-shift) and the document's margins stay as they are.
+    r.marginLeft = shift && !inner ? `${shift}px` : "";
+    r.marginRight = shift && !inner ? `${-shift}px` : "";
+    r.setProperty("--duet-shift", `${shift}px`);
     document.documentElement.toggleAttribute("data-duet-reserve", !!shift);
     // --duet-edge-*: the window's insets, kept for panes, which set --duet-inset-* to their own.
     r.setProperty("--duet-sidebar-inset", sidebarInset({ device: ctx.device, left, shift }));
@@ -622,7 +625,7 @@ export function Duet<T extends string = string, U extends string = string>(props
   }, [ctx.mode, ctx.side, ctx.hidden === "preview", ctx.screenWidth, ctx.screenHeight, ctx.width, ctx.height, ctx.stableHeight, ctx.offsetTop, split, inner, reserve, ctx.device]);
   useEffect(() => () => {
     const h = document.documentElement;
-    h.style.marginLeft = ""; h.style.marginRight = ""; h.removeAttribute("data-duet-reserve");
+    h.style.marginLeft = ""; h.style.marginRight = ""; h.style.removeProperty("--duet-shift"); h.removeAttribute("data-duet-reserve");
   }, []);
   // data-duet-close: Duet's close button is on screen, in any mode, so a sheet hides its own X and shows one (#135).
   // Only when the template placed it: a band with no room for it leaves the sheet its own X (#142).

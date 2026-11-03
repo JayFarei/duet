@@ -83,6 +83,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Tapping away from "…" pressed what was underneath](#tapping-away-from--pressed-what-was-underneath)
 - [A dark circle as "…" comes back](#a-dark-circle-as--comes-back)
 - [Page content jumps 84pt on an inline Duo page](#page-content-jumps-84pt-on-an-inline-duo-page)
+- [Page with children clipped in the right split pane](#page-with-children-clipped-in-the-right-split-pane)
 
 ## Split view pane, or the closed Duo turned left
 
@@ -803,3 +804,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** the open capsule grows about its middle item and names items around the button's centre. It gives up the pitch it must, after any push from the band, so the first and last items open inside their own half pitch (13 items at about 55pt). Five items still open at native's 301pt.
 - **You do:** nothing.
 - **Status:** `test/press.test.mjs` checks every tab's resting centre in seven Duo windows, at the normal pitch, tightened and with places in "…". On the Duo simulator, every tab held still, dragged up and dragged down: 12 places with actions and a primary in tall Safari, 8 places and 12 with actions in wide Safari. Home Screen apps are covered by the unit test only.
+
+## Page with children clipped in the right split pane
+
+- **You see:** Safari in the right pane of Split View on the wide Duo, a page with `children`: its left 84pt is cut off (a title "Overview" reads "iew"), and in the left pane the controls draw over its first column of content.
+- **Cause:** the document spans a column on each side of a split pane and Duet keeps it scrolled one column across. The inner scroller ran from the document's left edge under both columns, 553pt wide in a 385pt pane, and relied on the page padding by `--duet-inset-left` / `--duet-inset-right`. A page that did not pad started under the column.
+- **Duet does:** what it does without children: where the document spans a column on the left (a split pane, the closed Duo turned left), the scroller is moved right by that column (`--duet-shift` on `<html>`, `left` on `.duet-scroller`) and the insets are 0, so it fills exactly the visible pane. `<html data-duet-reserve>` marks this as before. A right column alone keeps the scroller running under it with the 84pt inset.
+- **You do:** nothing. `<Duet reserve={false}>` keeps the old layout, the scroller under both columns and padded by the insets.
+- **Status:** `test/page.test.mjs`, and on the Duo simulator, Safari in the right pane at 385x571: with 5, 20 and 12 places plus actions the title sits at x 16 in the pane (it was -68), the scroller fills the pane and the column shows the burger or Book and "…" as before.

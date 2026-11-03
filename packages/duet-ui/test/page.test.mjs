@@ -26,9 +26,12 @@ test("reserve:false opts out: page runs under the column, insets apply", () => {
   assert.deepEqual(at({ side: "left", reserve: false }), { left: "84px", right: "0px", shift: 0 });
 });
 
-test("children: inner page owns its insets, no shift", () => {
-  assert.deepEqual(at({ split: true, inner: true }), { left: "84px", right: "84px", shift: 0 });
+test("children: a column on the left shifts the scroller, a right column alone keeps the insets", () => {
+  // A right split pane clipped a page that ignored the insets by a column (rc.4 verifier, 2026-11-03).
+  assert.deepEqual(at({ split: true, inner: true }), { left: "0px", right: "0px", shift: 84 });
+  assert.deepEqual(at({ side: "left", inner: true }), { left: "0px", right: "0px", shift: 84 });
   assert.deepEqual(at({ side: "right", inner: true }), { left: "0px", right: "84px", shift: 0 });
+  assert.deepEqual(at({ split: true, inner: true, reserve: false }), { left: "84px", right: "84px", shift: 0 });
 });
 
 test("emulated column keeps the inset contract", () => {
