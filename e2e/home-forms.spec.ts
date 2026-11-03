@@ -7,6 +7,15 @@ test("the home page has three sections, in order", async ({ page }) => {
   expect(ids).toEqual(["top", "rules", "docs"]);
 });
 
+// The docs end with what the library ships, menu and panes included, each card linking on.
+test("the docs list every feature of duet-ui", async ({ page }) => {
+  await page.goto("/");
+  const items = page.locator("#docs .lib-item");
+  await expect(items).toHaveCount(9);
+  for (const h of ["Menu", "Panes", "Call to action", "useDuet()"]) await expect(items.filter({ has: page.getByRole("heading", { name: h, exact: true }) })).toHaveCount(1);
+  for (const href of await items.evaluateAll((a) => a.map((e) => e.getAttribute("href")))) expect(href).toBeTruthy();
+});
+
 // "How big they are": each form is a picture of the real 3D Duo, and its button plays that moment on the stage.
 test("each form card shows the 3D Duo and plays its moment", async ({ page }) => {
   await page.goto("/");

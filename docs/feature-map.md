@@ -17,6 +17,7 @@ On desktop the page scrolls inside `.duet-scroller`, not the window, and section
 | How big they are | `#rules .rule` (3) | Every place is a tab, Tabs and More, A menu. Each shows `/media/form-{tabs,more,menu}.webp`, a still of the stage's 3D Duo, and a `.rule-show` button that plays `fit`, `folded` or `burger` on the stage. |
 | Rule notes | `.rule-notes` | Selection inside More, the order of More's list, `moveControls`. |
 | Docs and examples | `#docs` | Code sample with tint picker, links to the README and the panes, sheets and call to action examples. |
+| What's in duet-ui | `#docs .lib-item` (9) | One linked card per feature: tabs and More, menu, actions and "…", call to action, panes, sheets, `useDuet()`, theme, server rendering. |
 
 The form stills come from `node tools/media/duo3d-stills.mjs [port]` against a local `pnpm start`. Rerun it when the stage, the skeleton app or duet-ui's controls change.
 

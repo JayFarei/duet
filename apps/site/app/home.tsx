@@ -162,10 +162,40 @@ function Page({ installs }: { installs: InstallStats | null }) {
           <a href="/sheet" className="pill">Sheets example</a>
           <a href="/book" className="pill">Call to action example</a>
         </div>
+        <h3 className="h3">What's in duet-ui</h3>
+        <Library />
       </Section>
 
       <Footer />
     </main>
+  );
+}
+
+// Everything the library ships, each with the prop or export that turns it on (docs/api.md, docs/layout.md).
+const DOC = `${REPO}/blob/main/docs`;
+const LIBRARY = [
+  { h: "Tabs and More", code: "menu={{ items, tabs: true }}", p: "Your places as tabs while they fit, the rest in “…”.", href: `${DOC}/api.md#tabs-or-burger` },
+  { h: "Menu", code: "menu={{ items }}", p: "A burger that opens a sidebar with every place, each keeping its scroll.", href: `${DOC}/api.md#duet` },
+  { h: "Actions and “…”", code: "actions={[…]}", p: "Round buttons while they fit, then “…”. Destructive ones go last, in red.", href: `${DOC}/api.md#the-template` },
+  { h: "Call to action", code: "primary={…}", p: "One tinted button always on screen. A tap opens a confirmation.", href: "/book" },
+  { h: "Panes", code: "<DuetPanes>", p: "One pane closed, two side by side unfolded, such as a chat beside its artifact.", href: "/panes" },
+  { h: "Sheets and modals", code: "column mode", p: "Sheets that stay clear of the controls in Safari's column.", href: "/sheet" },
+  { h: "useDuet()", code: "useDuet()", p: "The device, browser, layout and room Duet decided on, for your own code.", href: `${DOC}/api.md#useduet` },
+  { h: "Theme", code: "tint, appearance, icons", p: "Your accent and icon sizes, light and dark, like iOS's tintColor.", href: `${DOC}/api.md#theming` },
+  { h: "Server rendering", code: "pre-paint boot", p: "The controls in place on first paint, no flash.", href: `${DOC}/server-rendering.md` },
+];
+
+function Library() {
+  return (
+    <div className="tiles lib">
+      {LIBRARY.map((x) => (
+        <a key={x.h} href={x.href} className="tile lib-item">
+          <code className="lib-code">{x.code}</code>
+          <h3 className="tile-h">{x.h}</h3>
+          <p className="tile-p">{x.p}</p>
+        </a>
+      ))}
+    </div>
   );
 }
 
