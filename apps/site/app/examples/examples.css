@@ -1,0 +1,26 @@
+/* The example pages: a heading, a toolbar (posture, Preview or Code, Open in new tab), then the stage. */
+.ex-page { box-sizing: border-box; width: min(1080px, 100%); margin: 0 auto; padding: 32px 16px 64px; color: var(--ink); font: 400 17px/1.45 -apple-system, system-ui; }
+.ex-head { max-width: 680px; }
+.ex-back { color: var(--dim); text-decoration: none; font-size: 15px; }
+.ex-back:hover { color: var(--ink); }
+.ex-title { margin: 8px 0 8px; font: 400 clamp(40px, 7vw, 64px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.ex-intro { margin: 0; color: var(--dim); }
+.ex-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 28px 0 12px; }
+.ex-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
+.ex-seg button { height: 34px; padding: 0 14px; border: 0; border-radius: 99px; background: none; color: var(--ink); font: 500 14px/1 -apple-system, system-ui; cursor: pointer; }
+.ex-seg button[aria-pressed="true"], .ex-seg button[aria-selected="true"] { background: color-mix(in srgb, var(--ink), transparent 88%); }
+.ex-open { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--ink); font: 500 14px/1 -apple-system, system-ui; text-decoration: none; }
+.ex-open:hover { text-decoration: underline; }
+.ex-frame { border-radius: 26px; background: var(--card); overflow: hidden; min-height: 200px; }
+.ex-code { margin: 0; max-height: 70vh; background: var(--code); }
+.ex-loop { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: contain; background: var(--card); }
+.ex-card { padding: 28px 22px; color: var(--dim); }
+.ex-card a { color: var(--ink); font-weight: 600; }
+.ex-wait { height: 420px; }
+/* The examples index. */
+.ex-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 32px; }
+.ex-item { display: block; padding: 22px; border-radius: 26px; background: var(--card); color: inherit; text-decoration: none; }
+.ex-item:hover { box-shadow: 0 0 0 1px var(--line); }
+.ex-item h2 { margin: 0 0 6px; font: 400 30px/1.1 var(--serif), Georgia, serif; }
+.ex-item p { margin: 0; color: var(--dim); font-size: 15px; }
+body:has(.ex-page) { background: var(--bg); }

@@ -23,12 +23,19 @@ export function Screen() {
 
   useEffect(() => {
     const ch = new BroadcastChannel(channel(new URLSearchParams(location.search).get("id") ?? ""));
-    ch.onmessage = (e) => { if (e.data?.s) setSync(e.data); };
+    ch.onmessage = (e) => { if (e.data?.s) setSync(e.data); else if (e.data?.press) press(frame.current, e.data.press); };
     ch.postMessage({ hello: true });
+    // What Duet drew, for the host's captions (free room, fit) and the recorder (rects): only on a change.
+    let last = "";
+    const measure = setInterval(() => {
+      const m = measures(frame.current);
+      const j = JSON.stringify(m);
+      if (m && j !== last) { last = j; ch.postMessage({ measure: { display: new URLSearchParams(location.search).get("display") ?? "inner", ...m } }); }
+    }, 400);
     const size = () => setView({ w: innerWidth, h: innerHeight });
     size();
     addEventListener("resize", size);
-    return () => { ch.close(); removeEventListener("resize", size); };
+    return () => { ch.close(); clearInterval(measure); removeEventListener("resize", size); };
   }, []);
 
   const posture = display === "inner" ? "open" : "closed";
@@ -145,4 +152,27 @@ export function Screen() {
       </div>
     </div>
   );
+}
+
+/** A host's `duet:press`: the control pressed as a finger would, pointer down and up, then the click Duet acts on. */
+function press(el: HTMLIFrameElement | null, p: { id?: string; selector?: string }) {
+  const doc = el?.contentDocument, win = el?.contentWindow as (Window & typeof globalThis) | null;
+  if (!doc || !win) return;
+  const sel = p.selector ?? `.duet-group:not([data-leaving]) [data-duet-control="${p.id}"]`;
+  const t = doc.querySelector<HTMLElement>(sel);
+  if (!t) return;
+  const r = t.getBoundingClientRect(), at = { bubbles: true, cancelable: true, composed: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2, pointerId: 1, pointerType: "touch", isPrimary: true };
+  t.dispatchEvent(new win.PointerEvent("pointerdown", at));
+  setTimeout(() => { t.dispatchEvent(new win.PointerEvent("pointerup", at)); t.click(); }, 90);
+}
+
+/** Duet's column in the page: its fit, the room its groups leave free along it, and each group's box. */
+function measures(el: HTMLIFrameElement | null) {
+  const nav = el?.contentDocument?.querySelector<HTMLElement>("nav.duet:not(.duet-sidebar)");
+  if (!nav) return null;
+  const box = (e: Element) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; };
+  const rects = [...nav.querySelectorAll(".duet-group:not([data-leaving])")].map(box).filter((r) => r.w && r.h);
+  const n = box(nav), down = n.h >= n.w;
+  const free = Math.max(0, Math.round((down ? n.h : n.w) - rects.reduce((a, r) => a + (down ? r.h : r.w), 0)));
+  return { fit: nav.dataset.duetFit ?? null, free, rects };
 }

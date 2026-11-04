@@ -132,7 +132,7 @@ function Page({ installs }: { installs: InstallStats | null }) {
       </section>
 
       <section className="stage">
-        <Duo embed src="/skeleton" />
+        <Duo embed src="/examples/inbox?plain" />
       </section>
 
       <Section id="rules" title="How it works" lede="You list your places. Duet does the rest.">

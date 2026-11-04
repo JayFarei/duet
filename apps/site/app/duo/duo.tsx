@@ -8,6 +8,7 @@ import { WebDuo } from "./web-duo";
 // has WebGL 2, the 2D web Duo where it has not and before hydration.
 export function Duo(props: ComponentProps<typeof WebDuo>) {
   const [three, setThree] = useState(false);
-  useEffect(() => setThree(!!document.createElement("canvas").getContext("webgl2")), []);
+  // The probe canvas is marked, so the tests count only the stage's own context.
+  useEffect(() => { const c = document.createElement("canvas"); c.dataset.probe = ""; setThree(!!c.getContext("webgl2")); }, []);
   return three ? <Duo3D embed={props.embed} src={props.src} /> : <WebDuo {...props} />;
 }

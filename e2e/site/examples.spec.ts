@@ -1,6 +1,9 @@
 // T6: the three example blocks, each exercising its nouns on the live stage (PLAN 6). Red until step 4.
 import { expect, test, type Page } from "@playwright/test";
-import { duetFrames, duetState } from "./site";
+import { duetFrames, duetState, tap } from "./site";
+
+// The live stage loads a 3D scene and four nested pages before Duet runs, slow under parallel workers.
+test.describe.configure({ timeout: 120_000 });
 
 async function posture(page: Page, name: "Closed" | "Open" | "Laptop" | "Sideways") {
   await page.getByTestId("posture").getByRole("button", { name, exact: true }).click();
@@ -9,30 +12,31 @@ async function posture(page: Page, name: "Closed" | "Open" | "Laptop" | "Sideway
 
 /** The live stage's Duet frame (the first screen running Duet), or the page itself on a bare route. */
 async function duet(page: Page) {
-  await expect.poll(async () => (await duetFrames(page)).length, { message: "Duet runs" }).toBeGreaterThan(0);
+  await expect.poll(async () => (await duetFrames(page)).length, { message: "Duet runs", timeout: 45_000 }).toBeGreaterThan(0);
   return (await duetFrames(page))[0];
 }
 
 test.describe("Inbox", () => {
   test.skip(({ viewport }) => (viewport?.width ?? 0) < 768, "at 390 the block shows its recorded loop, not the stage");
 
-  test("Closed gives sidebar, Open gives tabs, Laptop gives tabs-more", async ({ page }) => {
+  // The Laptop's inner screen stands taller than the open one, so it holds all nine tabs and the Actions too.
+  test("Closed gives sidebar, Open and Laptop give tabs", async ({ page }) => {
     await page.goto("/examples/inbox");
     await posture(page, "Closed");
     expect((await duetState(page)).map((s) => s.fit)).toContain("sidebar");
     await posture(page, "Open");
     expect((await duetState(page)).map((s) => s.fit)).toContain("tabs");
     await posture(page, "Laptop");
-    expect((await duetState(page)).map((s) => s.fit)).toContain("tabs-more");
+    expect((await duetState(page)).map((s) => s.fit)).toContain("tabs");
   });
 
   test("a row opens a sheet and the controls become Close", async ({ page }) => {
     await page.goto("/examples/inbox");
-    const f = await duet(page);
-    await f.getByTestId("inbox-row").first().click();
-    await expect.poll(async () => (await duetState(page)).map((s) => s.controls)).toContainEqual(["close"]);
-    await f.locator('[data-duet-control="close"]').click();
-    await expect.poll(async () => (await duetState(page)).flatMap((s) => s.controls)).not.toContain("close");
+    await duet(page);
+    await tap(page, '[data-testid="inbox-row"]');
+    await expect.poll(async () => (await duetState(page)).map((s) => s.controls), { timeout: 15_000 }).toContainEqual(["close"]);
+    await tap(page, '[data-duet-control="close"]');
+    await expect.poll(async () => (await duetState(page)).flatMap((s) => s.controls), { timeout: 15_000 }).not.toContain("close");
   });
 });
 
@@ -41,8 +45,8 @@ test.describe("Checkout", () => {
 
   test("Pay grows into the confirm box", async ({ page }) => {
     await page.goto("/examples/checkout");
-    const f = await duet(page);
-    await f.locator('[data-duet-control="primary"]').first().click();
+    await duet(page);
+    const f = await tap(page, '[data-duet-control="primary"]');
     await expect(f.locator(".duet-confirm")).toBeVisible();
   });
 
@@ -66,11 +70,10 @@ test.describe("Reader", () => {
   test("Pane bar Close and Full screen work", async ({ page }) => {
     await page.goto("/examples/reader");
     await posture(page, "Open");
-    const f = await duet(page);
-    const bar = f.locator(".duet-pane-bar").first();
-    await bar.getByRole("button", { name: "Full screen" }).click();
+    await duet(page);
+    const f = await tap(page, '.duet-pane-bar [aria-label="Full screen"]');
     await expect(f.locator("[data-pane-full]")).toHaveCount(1);
-    await bar.getByRole("button", { name: "Close" }).click();
+    await f.locator('.duet-pane-bar [aria-label="Close"]').first().click();
     await expect(f.locator("[data-pane-full]")).toHaveCount(0);
   });
 });

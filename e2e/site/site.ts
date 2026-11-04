@@ -36,10 +36,22 @@ export const GONE = ["/sheet", "/skeleton"] as const;
 export const BANNED = /\b(burger|main button|call to action|cta|pill|capsule|control strip|this page)\b/i;
 
 /** Scrolls a page top to bottom in viewport steps, giving lazy media and the tour time to react. */
+/** Scrolls the page's scroller to `y` (or its end with `y` < 0) and returns how far it can scroll. Under Duet's column
+ *  mode the page scrolls inside `.duet-scroller`, not the window. */
+export function scrollPage(page: Page, y: number) {
+  return page.evaluate((y) => {
+    const box = document.querySelector<HTMLElement>(".duet-scroller");
+    const el = box && box.scrollHeight > box.clientHeight ? box : document.scrollingElement!;
+    const max = el.scrollHeight - el.clientHeight;
+    el.scrollTo(0, y < 0 ? max : y);
+    return { max, view: el.clientHeight };
+  }, y);
+}
+
 export async function scrollThrough(page: Page, pause = 250) {
-  const steps = await page.evaluate(() => Math.ceil(document.documentElement.scrollHeight / innerHeight));
-  for (let i = 0; i <= steps; i++) {
-    await page.evaluate((y) => scrollTo(0, y), i * (await page.evaluate(() => innerHeight)));
+  const { max, view } = await scrollPage(page, 0);
+  for (let y = 0; y <= max + view; y += view) {
+    await scrollPage(page, y);
     await page.waitForTimeout(pause);
   }
 }
@@ -74,13 +86,42 @@ export async function capLuminance(page: Page, frame: Page | Frame = page) {
   return { cap: rows.reduce((a, b) => a + b) / rows.length, peak: Math.max(...rows), bg: bg.reduce((a, b) => a + b) / bg.length };
 }
 
-/** Every frame running Duet (a nav.duet with a drawn group): the page itself, or the stage's screens. */
+/** Every frame running Duet (a nav.duet with a drawn group): the page itself, or the stage's screens. A display
+ *  the posture hides (its frame laid out at 0 by 0) does not count. */
 export async function duetFrames(page: Page) {
   const out: Frame[] = [];
   for (const f of page.frames()) {
-    try { if (await f.locator("nav.duet:not(.duet-sidebar) .duet-group").count()) out.push(f); } catch { /* detached */ }
+    try {
+      if (!await f.locator("nav.duet:not(.duet-sidebar) .duet-group").count()) continue;
+      // A screen the stage hides keeps its last window size, so judge it by the iframes holding it: every one up the
+      // chain must have a box (a hidden display's container is display: none).
+      let shown = true;
+      for (let p: Frame | null = f; shown && p.parentFrame(); p = p.parentFrame()) {
+        shown = await (await p.frameElement()).evaluate((e) => { const r = e.getBoundingClientRect(); return e.getClientRects().length > 0 && r.width > 0 && r.height > 0; });
+      }
+      if (shown) out.push(f);
+    } catch { /* detached */ }
   }
   return out;
+}
+
+/** Taps `selector` in the first shown Duet frame where a real tap reaches it, and returns that frame. The stage draws
+ *  the open inner display as two clipped copies of the page, so an element can sit in the half a copy does not show. */
+export async function tap(page: Page, selector: string) {
+  let last = "";
+  for (let round = 0; round < 4; round++) {
+    for (const f of await duetFrames(page)) {
+      const el = f.locator(selector).first();
+      try {
+        if (!await el.count()) continue;
+        await el.click({ trial: true, timeout: 3000 });
+        await el.click({ timeout: 5000 });
+        return f;
+      } catch (e) { last = String(e).split("\n").slice(-12).join(" | "); /* hidden in this copy, try the next */ }
+    }
+    await page.waitForTimeout(500);
+  }
+  throw new Error(`no shown Duet frame lets a tap reach ${selector}: ${last}`);
 }
 
 /** Navigation's fit and the set of control kinds Duet shows, per frame running Duet. */
@@ -96,15 +137,22 @@ export async function duetState(page: Page) {
   return out;
 }
 
-/** Counts WebGL contexts created in the top frame (install before goto). */
+/** Counts WebGL contexts created in every same-origin frame into the top frame's `__webgl` (install before goto).
+ *  Feature probes (`canvas[data-probe]`) do not count. */
 export const COUNT_WEBGL = () => {
-  if (window.top !== window) return;
-  const seen = new WeakSet<object>();
-  (window as unknown as { __webgl: number }).__webgl = 0;
+  type W = { __webgl: number; __webglHook?: true };
+  const w = window as unknown as W;
+  if (w.__webglHook) return; // WebKit can run an init script twice in one frame: wrap getContext once
+  w.__webglHook = true;
+  if (window.top === window) w.__webgl = 0;
+  const seen = new WeakSet<HTMLCanvasElement>();
   const orig = HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.getContext = function (this: HTMLCanvasElement, type: string, ...rest: unknown[]) {
     const ctx = (orig as (...a: unknown[]) => RenderingContext | null).call(this, type, ...rest);
-    if (ctx && /^(webgl2?|experimental-webgl)$/.test(type) && !seen.has(ctx)) { seen.add(ctx); (window as unknown as { __webgl: number }).__webgl++; }
+    if (ctx && /^(webgl2?|experimental-webgl)$/.test(type) && !seen.has(this) && !this.hasAttribute("data-probe")) {
+      seen.add(this);
+      try { (window.top as unknown as W).__webgl++; } catch { /* a cross-origin top: not ours */ }
+    }
     return ctx;
   } as typeof orig;
 };
