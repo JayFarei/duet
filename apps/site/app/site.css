@@ -158,7 +158,7 @@ html[data-duet-close] .sheet-x { display: none; }
 
 .h3 { margin: clamp(56px, 7vw, 88px) 0 0; font: 400 clamp(32px, 4.6vw, 48px)/1.05 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
 
-/* The site pages (home.tsx, components): one column 1080 wide at most, 20px clear of each edge. */
+/* The site pages (home.tsx, examples): one column 1080 wide at most, 20px clear of each edge. */
 .wrap { box-sizing: border-box; width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 20px; }
 .duo-wait { width: 100%; height: min(85vw, 680px, 70vh); }
 
@@ -173,66 +173,58 @@ html[data-duet-close] .sheet-x { display: none; }
 .nav-icon:hover { background: var(--card); }
 @media (max-width: 520px) { .nav { gap: 12px; } .nav-brand { font-size: 0; gap: 0; } .nav-links { gap: 14px; } }
 
-/* The hero: the title, then the tour's stage right under it. */
-/* The title, the lede and the buttons fill the first window under the top bar, no more. */
-.hero-copy { box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; min-height: calc(100vh - 60px); min-height: calc(100svh - 60px); text-align: center; padding-top: clamp(16px, 4vh, 64px); padding-bottom: clamp(16px, 4vh, 64px); }
-.hero-copy .actions { gap: 12px; }
+/* The intro: title, lede, install and stats. Not a full window, so the simulator shows right under it. */
+.intro { padding-top: clamp(40px, 8vh, 96px); text-align: center; }
+.intro .actions { gap: 12px; }
 @media (max-width: 760px) {
-  .hero-copy .display { font-size: clamp(38px, min(10.5vw, 6vh), 52px); }
-  .hero-copy .lede { margin-top: 14px; font-size: 17px; }
-  .hero-copy .actions { margin-top: 22px; gap: 10px; }
-  .hero-copy .ctas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .hero-copy .pill { justify-content: center; padding: 0 12px; font-size: 16px; }
-  .hero-copy .npm code { font-size: 13px; }
-  .hero-copy .npm .npm-hint { display: none; }
+  .intro .display { font-size: clamp(38px, 10.5vw, 52px); }
+  .intro .lede { margin-top: 14px; font-size: 17px; }
+  .intro .actions { margin-top: 22px; gap: 10px; }
+  .intro .ctas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .intro .pill { justify-content: center; padding: 0 12px; font-size: 16px; }
+  .intro .npm code { font-size: 13px; }
+  .intro .npm .npm-hint { display: none; }
 }
 
-/* The tour (tour.tsx): the stage sticks for the tour's whole height while empty steps of one window each
-   scroll past under it (one per step); the step holding the window's middle sets the scene. */
-.tour { position: relative; }
-.tour-stage { position: sticky; top: 0; z-index: 1; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: center; gap: 32px; height: 100vh; height: 100svh; max-width: 1120px; margin: 0 auto; padding: 0 20px; }
-.tour-stage .duo3d { min-width: 0; }
-.tour-steps { margin-top: -100vh; margin-top: -100svh; pointer-events: none; }
-.tour-step { height: 100vh; height: 100svh; }
-/* The stage centres the Duo in a full-height box, so its lower margin already spaces the tour from the next section. */
-.section:has(> .tour) + .section { padding-top: 0; }
-.tour-side { display: grid; gap: 14px; align-content: center; }
-.tour-ticks { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 0 0 8px; padding: 0; list-style: none; }
-.tour-ticks button { padding: 6px 0; border: 0; background: none; color: var(--dim); font: 500 15px/1.2 -apple-system, system-ui; cursor: pointer; text-align: left; }
-.tour-ticks button::before { content: ""; display: inline-block; width: 14px; height: 2px; margin-right: 10px; vertical-align: middle; border-radius: 1px; background: currentColor; opacity: 0.5; transition: width 0.25s ease; }
-.tour-ticks button[aria-current="step"] { color: var(--ink); font-weight: 600; }
-.tour-ticks button[aria-current="step"]::before { width: 28px; opacity: 1; background: linear-gradient(90deg, var(--cta) calc(var(--p, 0) * 100%), color-mix(in srgb, var(--cta), transparent 70%) 0); transition: none; }
-.tour-caption { margin: 0; font: 400 clamp(36px, 4vw, 52px)/1.05 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
-.tour-text { margin: 0; max-width: 34em; color: var(--dim); font: 500 17px/1.45 -apple-system, system-ui; min-height: 4.4em; }
-.tour-meters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
-.tour-meters span { padding: 6px 10px; border-radius: 8px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); font: 500 13px/1 ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
-/* A phone: the device on top, the caption under it, the steps as one wrapping row. */
-@media (max-width: 760px) {
-  .tour-stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 6px; padding-top: 4px; padding-inline: 16px; }
-  .tour-side { gap: 6px; }
-  .tour-ticks { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; margin: 0; }
-  .tour-ticks button { padding: 4px 0; font-size: 13px; }
-  .tour-ticks button::before { display: none; }
-  .tour-ticks button[aria-current="step"] { color: var(--cta); }
-  .tour-caption { font-size: 28px; }
-  .tour-text { font-size: 14px; line-height: 1.4; min-height: 0; }
-  .tour-meters { flex-wrap: wrap; gap: 6px; }
-  .tour-meters span { padding: 5px 8px; font-size: 12px; }
-}
+/* The simulator: the app picker, then the live Duo with its own controls. */
+.sim { padding-top: clamp(48px, 8vw, 96px); scroll-margin-top: 8px; }
+.sim-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.stage { max-width: 1120px; margin: 0 auto; padding-inline: 20px; }
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
+.seg button { height: 34px; padding: 0 16px; border: 0; border-radius: 99px; background: none; color: var(--ink); font: 500 15px/1 -apple-system, system-ui; cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: color-mix(in srgb, var(--ink), transparent 88%); }
+@media (max-width: 760px) { .stage { padding-inline: 16px; } .sim-head { padding-inline: 16px; } }
 
-/* Cards: the examples, the real apps, the modes. */
+/* How it works: four numbered steps, then the glossary. */
+.how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 32px 0 0; padding: 0; list-style: none; }
+.how li { padding: 20px; border-radius: 22px; background: var(--card); }
+.how-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 99px; background: var(--ink); color: var(--bg); font: 600 14px/1 -apple-system, system-ui; }
+.how h3 { margin: 14px 0 6px; font: 400 26px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.how p { margin: 0; color: var(--dim); font: 400 15px/1.45 -apple-system, system-ui; }
+@media (max-width: 960px) { .how { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .how { grid-template-columns: minmax(0, 1fr); } }
+.glossary { width: 100%; margin-top: 32px; border-collapse: collapse; font: 400 16px/1.45 -apple-system, system-ui; }
+.glossary th, .glossary td { padding: 12px 16px 12px 0; border-bottom: 0.5px solid var(--line); text-align: left; vertical-align: top; }
+.glossary th { width: 9em; font-weight: 600; white-space: nowrap; }
+.glossary td { color: var(--dim); }
+
+/* Examples: one card each, Try it loads it in the simulator, Show code opens its one file. */
+.exs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .exs { grid-template-columns: minmax(0, 1fr); } }
+.ex { padding: 12px 12px 16px; min-width: 0; }
+.ex .card-h { margin-top: 8px; }
+.ex-acts { display: flex; gap: 8px; margin: 16px 6px 0; }
+.ex-src { margin: 14px 6px 0; }
+.ex-src summary { color: var(--dim); font: 500 14px/1.2 -apple-system, system-ui; cursor: pointer; }
+.ex-src .code { max-height: 420px; margin-top: 10px; border-radius: 14px; background: var(--code); }
+
+/* Cards. */
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 760px) { .cards { grid-template-columns: minmax(0, 1fr); } }
 .cards .card { display: block; padding: 12px 12px 20px; color: inherit; }
 .ex-card-link:hover { box-shadow: 0 0 0 1px var(--line); }
 .card-h { display: flex; align-items: center; gap: 6px; margin: 14px 6px 4px; font: 400 28px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
 .card-p { margin: 0 6px; color: var(--dim); font: 400 15px/1.45 -apple-system, system-ui; }
-.modes { display: grid; gap: 16px; }
-.mode { display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr); align-items: center; gap: 20px; padding: 12px; border-radius: 22px; background: var(--card); }
-@media (max-width: 560px) { .mode { grid-template-columns: minmax(0, 1fr); } }
-.mode-k { margin: 0 6px; color: var(--dim); font: 600 13px/1.2 -apple-system, system-ui; }
-.mode .card-h { margin-top: 4px; }
-.card-k { margin-left: auto; padding: 4px 9px; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; letter-spacing: 0; }
 
 /* A recorded loop (loop-video.tsx): poster first, or a plain box until the clip is recorded. */
 .loop { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; background: var(--bg); }
@@ -241,38 +233,3 @@ html[data-duet-close] .sheet-x { display: none; }
 .loop:not([data-ready])::after { content: ""; position: absolute; inset: 22% 30%; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--line); }
 .loop-play { position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 99px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .loop-count { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 4px 10px; border-radius: 99px; background: var(--card); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; font-variant-numeric: tabular-nums; }
-
-/* /components: the nouns down a sidebar (a row of chips on a phone), each with Preview | Code and its variants. */
-.cmp { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 40px; padding-top: 24px; }
-.cmp-nav { position: sticky; top: 16px; align-self: start; display: flex; flex-direction: column; gap: 2px; }
-.cmp-nav a { padding: 7px 10px; border-radius: 8px; color: var(--dim); font: 500 15px/1.2 -apple-system, system-ui; }
-.cmp-nav a:hover { color: var(--ink); background: var(--card); }
-.cmp-h1 { margin: 0; font: 400 clamp(40px, 5vw, 60px)/1.05 var(--serif), Georgia, serif; letter-spacing: -0.015em; }
-.cmp-lede { margin: 12px 0 0; color: var(--dim); font: 500 18px/1.4 -apple-system, system-ui; max-width: 40em; }
-.cmp-sec { padding-top: 56px; scroll-margin-top: 16px; }
-.cmp-sec h2 { margin: 0; font: 400 36px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
-.cmp-sec > p { margin: 8px 0 0; color: var(--dim); font: 400 16px/1.45 -apple-system, system-ui; max-width: 40em; }
-.cmp-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
-.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
-.seg button { height: 32px; padding: 0 14px; border: 0; border-radius: 99px; background: none; color: var(--ink); font: 500 14px/1 -apple-system, system-ui; cursor: pointer; white-space: nowrap; }
-.seg button[aria-selected="true"] { background: color-mix(in srgb, var(--ink), transparent 88%); }
-.cmp-frame { margin-top: 12px; border-radius: 22px; background: var(--card); padding: 12px; }
-.cmp-frame .loop { max-width: 640px; margin: 0 auto; }
-.cmp-frame .code { margin: 0; background: var(--code); border-radius: 14px; }
-.cmp-cue { margin: 10px 4px 0; color: var(--dim); font: 500 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; text-align: center; }
-.cmp-sec h3 { margin: 24px 0 8px; font: 600 15px/1.2 -apple-system, system-ui; }
-.props { width: 100%; border-collapse: collapse; font: 400 14px/1.45 -apple-system, system-ui; }
-.props th, .props td { padding: 8px 10px 8px 0; border-bottom: 0.5px solid var(--line); text-align: left; vertical-align: top; }
-.props th { color: var(--dim); font-weight: 600; }
-.props code { font-size: 13px; }
-.cmp-live { display: inline-flex; align-items: center; gap: 4px; margin-top: 14px; color: var(--cta); font: 600 15px/1 -apple-system, system-ui; }
-.cmp-pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 28px; padding-top: 16px; border-top: 0.5px solid var(--line); }
-.cmp-pager a { color: var(--ink); font: 500 15px/1.2 -apple-system, system-ui; }
-@media (max-width: 760px) {
-  .cmp { grid-template-columns: minmax(0, 1fr); gap: 0; padding-top: 8px; }
-  .cmp-nav { position: sticky; top: 0; z-index: 2; flex-direction: row; gap: 6px; margin: 0 -20px; padding: 10px 20px; overflow-x: auto; background: var(--bg); scrollbar-width: none; }
-  .cmp-nav a { flex: none; background: var(--card); border-radius: 99px; padding: 7px 12px; font-size: 14px; }
-  .cmp-sec { scroll-margin-top: 60px; }
-  .props { display: block; overflow-x: auto; font-size: 13px; }
-  .props td:nth-child(2) code { white-space: nowrap; }
-}

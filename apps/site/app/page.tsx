@@ -1,9 +1,5 @@
-import { clips } from "./clip";
+import { source } from "./examples/source";
 import { Home, type InstallStats } from "./home";
-
-// The tour's steps (tour.tsx STEPS[].clip, its loops without WebGL 2), then the cards' loops.
-const TOUR = ["navigation-tabs", "navigation-tabs-more", "navigation-sidebar", "more", "actions", "primary-confirm", "close"];
-const CLIPS = [...TOUR, "example-inbox", "example-checkout", "example-reader", "app-regtail", "app-dashboard", "app-wealth", "mode-strip", "mode-column", "mode-inline"];
 
 const METRICS = "https://opentraces-metrics.fareiunastrage.workers.dev/v1/projects/duet";
 
@@ -26,5 +22,7 @@ async function installs(): Promise<InstallStats | null> {
 }
 
 export default async function Page() {
-  return <Home installs={await installs()} clips={clips(CLIPS)} />;
+  // Named here, not taken from home.tsx: a server component gets only a client reference from a "use client" module.
+  const sources = { inbox: source("inbox"), checkout: source("checkout"), reader: source("reader") };
+  return <Home installs={await installs()} sources={sources} />;
 }

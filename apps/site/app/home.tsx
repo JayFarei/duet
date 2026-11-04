@@ -1,14 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Check, Sparkles } from "lucide-react";
 import { column } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
-import { LoopVideo } from "./loop-video";
+import { Duo } from "./duo/duo";
 import { GitHub, REPO, SiteNav } from "./site-nav";
-import { Tour } from "./tour";
 
 const DOC = `${REPO}/blob/main/docs`;
 
@@ -23,97 +22,111 @@ const QUICK = `import { Duet } from "duet-ui";
 </Duet>`;
 
 export type InstallStats = { total: number; daily: number[] };
-/** Which recorded clips are on disk (app/clip.ts, read on the server). */
-export type Clips = Record<string, boolean>;
 
-/** The examples, each a real app in one file at /examples/<name>. */
-const EXAMPLES = [
-  { name: "inbox", title: "Inbox", text: "Nine folders as Navigation in all three fits, Actions, and Close over a message." },
-  { name: "checkout", title: "Checkout", text: "Pay as a Primary that asks to confirm, the order as a sheet." },
-  { name: "reader", title: "Reader", text: "A book with a Pane bar, and Next book as a Direct Primary." },
-];
-/** Our own apps on the Duo, on demo or mock data. */
-const APPS = [
-  { name: "regtail", title: "RegTail", data: "Demo data", text: "Car checks. Open, the report's sections are tabs." },
-  { name: "dashboard", title: "Dashboard", data: "Mock data", text: "Server monitoring. Its five pages fit as tabs." },
-  { name: "wealth", title: "Wealth", data: "Mock data", text: "Personal finance. Closed, nine sections go in the Sidebar." },
-];
-/** Where Duet puts its controls. */
-const MODES = [
-  { name: "strip", title: "Strip", where: "Home Screen app", text: "In the strip iOS gives the app beside the page." },
-  { name: "column", title: "Column", where: "Safari", text: "In the empty part of Safari's column. The page keeps its full width." },
-  { name: "inline", title: "Inline", where: "Everywhere else", text: "A slim strip inside the page, beside the content." },
-];
+/** The examples, each a real app in one file at /examples/<name>. The simulator loads `?plain`: the app alone. */
+export const EXAMPLES = [
+  { name: "inbox", title: "Inbox", text: "Nine folders as Navigation: Tabs open, Tabs + More or Sidebar closed. Actions, and Close over a message." },
+  { name: "checkout", title: "Checkout", text: "Pay as a Primary that asks to confirm. Turned sideways, Pay folds into More." },
+  { name: "reader", title: "Reader", text: "Two panes with a Pane bar, and Next book as a Primary with no confirm." },
+] as const;
+type Name = (typeof EXAMPLES)[number]["name"];
 
-/** The home page: the live Duo and its tour, the examples, the docs. */
-export function Home({ installs, clips }: { installs: InstallStats | null; clips: Clips }) {
+/** How Duet decides, in order. */
+const STEPS = [
+  ["Wrap your app", "Pass your places (most used first), your actions, and at most one primary action. No device checks."],
+  ["Duet measures", "It finds the free space beside your page: the strip iOS gives a Home Screen app, the empty part of Safari's column, or a slim strip inside the page elsewhere."],
+  ["It draws what fits", "The largest controls that fit that space: all places as Tabs, some as Tabs with the rest in More, or one Sidebar button. Actions and Primary sit beside them."],
+  ["It steps aside", "When a sheet or a page opens over yours, the controls shrink to Close."],
+] as const;
+
+/** The glossary, one word per thing. */
+const NOUNS = [
+  ["Group", "One glass bar holding a set of controls."],
+  ["Navigation", "Your places. Shown as Tabs, Tabs + More, or a Sidebar, whichever is largest that fits."],
+  ["More", "The … button. Its list holds the Places and Actions that did not fit."],
+  ["Actions", "Buttons that do something on the current place, like Share or Archive."],
+  ["Primary", "The one main action, like Pay. It can ask to confirm first."],
+  ["Close", "What the controls become while something is open over your page."],
+  ["Pane bar", "Close and Full screen for a second pane beside your page."],
+] as const;
+
+/** The home page: the live simulator, how Duet works, the examples, install. */
+export function Home({ installs, sources }: { installs: InstallStats | null; sources: Record<Name, string> }) {
+  const [app, setApp] = useState<Name>("inbox");
+  const sim = useRef<HTMLElement>(null);
+  // The screens tell which app they run, so a Moment (always the Inbox) moves the picker back.
+  useEffect(() => {
+    const on = (e: Event) => { const src = String((e as CustomEvent<string>).detail); const hit = EXAMPLES.find((x) => src.includes(`/examples/${x.name}`)); if (hit) setApp(hit.name); };
+    addEventListener("duet:screen", on);
+    return () => removeEventListener("duet:screen", on);
+  }, []);
+  const load = (name: Name, scroll = false) => {
+    setApp(name);
+    dispatchEvent(new CustomEvent("duet:example", { detail: { src: `/examples/${name}?plain`, moment: "fit" } }));
+    if (scroll) sim.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  };
   return (
     <>
       <SiteNav />
       <main className="home">
-        <section className="hero" data-testid="hero">
-          <div className="hero-copy wrap">
-            <h1 className="display">Native side controls for your web app on the <em>iPhone Duo.</em></h1>
-            <p className="lede">You pass the places in your app. Duet measures the free space beside your page and draws the largest controls that fit. No device checks in your code.</p>
-            <div className="actions">
-              <div className="ctas">
-                <a href="#docs" className="pill pill-solid">Get started</a>
-                <a href={REPO} className="pill" target="_blank" rel="noreferrer"><GitHub />GitHub</a>
-              </div>
-              <div className="ctas"><AgentPrompt /><Npm /></div>
-              <Stats installs={installs} />
+        <header className="intro wrap" data-testid="hero">
+          <h1 className="display">Native side controls for your web app on the <em>iPhone Duo.</em></h1>
+          <p className="lede">You pass the places in your app. Duet measures the free space beside your page and draws the largest controls that fit.</p>
+          <div className="actions">
+            <div className="ctas"><Npm /><AgentPrompt /></div>
+            <Stats installs={installs} />
+          </div>
+        </header>
+
+        <section id="simulator" ref={sim} className="sim" data-testid="simulator">
+          <div className="wrap sim-head">
+            <h2 className="h2">Try it</h2>
+            <div className="seg" role="group" aria-label="App" data-testid="app-picker">
+              {EXAMPLES.map((e) => <button key={e.name} type="button" aria-pressed={app === e.name} onClick={() => load(e.name)}>{e.title}</button>)}
             </div>
           </div>
-          <Tour clips={clips} />
+          <div className="stage"><Duo embed src="/examples/inbox?plain" /></div>
+        </section>
+
+        <section id="how" className="section wrap">
+          <h2 className="h2">How it works</h2>
+          <ol className="how">
+            {STEPS.map(([h, p], i) => <li key={h}><span className="how-n">{i + 1}</span><h3>{h}</h3><p>{p}</p></li>)}
+          </ol>
+          <table className="glossary">
+            <tbody>{NOUNS.map(([n, d]) => <tr key={n}><th scope="row">{n}</th><td>{d}</td></tr>)}</tbody>
+          </table>
         </section>
 
         <section id="examples" className="section wrap">
           <h2 className="h2">Examples</h2>
-          <p className="lede lede-l">Three small apps, one file each. Open one to try it on the 3D Duo in every posture.</p>
-          <div className="cards">
+          <p className="lede lede-l">Three small apps, one file each.</p>
+          <div className="exs">
             {EXAMPLES.map((e) => (
-              <a key={e.name} className="card ex-card-link" href={`/examples/${e.name}`}>
-                <LoopVideo name={`example-${e.name}`} available={!!clips[`example-${e.name}`]} label={`${e.title} on the iPhone Duo`} />
-                <h3 className="card-h">{e.title}<ArrowUpRight size={18} aria-hidden /></h3>
+              <article key={e.name} className="card ex">
+                <h3 className="card-h">{e.title}</h3>
                 <p className="card-p">{e.text}</p>
-              </a>
-            ))}
-          </div>
-          <h3 className="h3">In real apps</h3>
-          <p className="lede lede-l">Three of our apps, on the same Duo.</p>
-          <div className="cards">
-            {APPS.map((a) => (
-              <div key={a.name} className="card">
-                <LoopVideo name={`app-${a.name}`} available={!!clips[`app-${a.name}`]} label={`${a.title} on the iPhone Duo`} />
-                <h3 className="card-h">{a.title}<span className="card-k">{a.data}</span></h3>
-                <p className="card-p">{a.text}</p>
-              </div>
+                <div className="ex-acts">
+                  <button type="button" className="pill pill-sm pill-solid" onClick={() => load(e.name, true)}>Try it</button>
+                  <a className="pill pill-sm" href={`/examples/${e.name}`}>Open<ArrowUpRight size={14} aria-hidden /></a>
+                </div>
+                <details className="ex-src">
+                  <summary>Show code</summary>
+                  <pre className="code"><code dangerouslySetInnerHTML={{ __html: sources[e.name] }} /></pre>
+                </details>
+              </article>
             ))}
           </div>
         </section>
 
-        <section id="docs" className="section wrap">
-          <h2 className="h2">Docs</h2>
-          <p className="lede lede-l">Install, wrap your app, list your places most used first.</p>
-          <h3 className="h3">Install</h3>
+        <section id="install" className="section wrap">
+          <h2 className="h2">Install</h2>
           <div className="ctas ctas-l"><Npm /><AgentPrompt /></div>
-          <h3 className="h3">Usage</h3>
-          <Integrate />
-          <h3 className="h3">Modes</h3>
-          <p className="lede lede-l">Duet picks where the controls go from the device and the browser.</p>
-          <div className="modes">
-            {MODES.map((m) => (
-              <div key={m.name} className="mode">
-                <LoopVideo name={`mode-${m.name}`} available={!!clips[`mode-${m.name}`]} label={`${m.title} mode on the iPhone Duo`} />
-                <div><p className="mode-k">{m.where}</p><h3 className="card-h">{m.title}</h3><p className="card-p">{m.text}</p></div>
-              </div>
-            ))}
-          </div>
-          <h3 className="h3">Reference</h3>
-          <p className="lede lede-l">Every control, its variants and its props, then the full API.</p>
+          <pre className="card code"><code dangerouslySetInnerHTML={{ __html: highlight(QUICK) }} /></pre>
           <div className="ctas ctas-l">
-            <a href="/components" className="pill pill-solid">Components</a>
-            <a href={`${DOC}/api.md`} className="pill" target="_blank" rel="noreferrer">API reference</a>
+            <a href={`${DOC}/api.md`} className="pill" target="_blank" rel="noreferrer">API reference<ArrowUpRight size={16} aria-hidden /></a>
+            <a href={`${DOC}/how-duet-decides.md`} className="pill" target="_blank" rel="noreferrer">How Duet decides<ArrowUpRight size={16} aria-hidden /></a>
+            <a href={REPO} className="pill" target="_blank" rel="noreferrer"><GitHub />GitHub</a>
           </div>
         </section>
       </main>
@@ -163,17 +176,8 @@ function Footer() {
   );
 }
 
-/** The quick start. */
-function Integrate() {
-  return <Snippet code={QUICK} />;
-}
-
-function Snippet({ code }: { code: string }) {
-  return <pre className="card code"><code dangerouslySetInnerHTML={{ __html: highlight(code) }} /></pre>;
-}
-
-/** The hero's call to action for agents: copies a prompt that has a coding agent make the reader's app Duo-ready. The
- *  label flips to a check once the prompt is on the clipboard. */
+/** Copies a prompt that has a coding agent make the reader's app Duo-ready. The label flips to a check once the prompt
+ *  is on the clipboard. */
 function AgentPrompt() {
   const [copied, setCopied] = useState(false);
   const timer = useRef(0);

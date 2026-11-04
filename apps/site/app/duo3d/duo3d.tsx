@@ -336,6 +336,8 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
     addEventListener("duet:example", ex);
     return () => { removeEventListener("duet:moment", on); removeEventListener("duet:example", ex); };
   }, []);
+  // Tells the page which app the screens run, so the home app picker follows a Moment back to the Inbox.
+  useEffect(() => { dispatchEvent(new CustomEvent("duet:screen", { detail: src })); }, [src]);
   const picked = selected?.id ?? "home";
   const at = MOMENTS.find((m) => stand === "flat" && !s.turn && !s.upside && !page && !site && duet && m.state.posture === s.posture && m.state.app === s.app && (m.id === "folded") === (picked === "settings"));
 

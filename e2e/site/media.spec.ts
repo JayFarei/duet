@@ -29,7 +29,8 @@ for (const path of PAGES) {
     await scrollThrough(page, 400);
 
     const videos = page.locator("video");
-    expect(await videos.count(), "the page shows its recorded loops").toBeGreaterThan(0);
+    // The home page has the live simulator and no loops; each example page shows the other examples' loops.
+    if (path !== "/") expect(await videos.count(), "the page shows its recorded loops").toBeGreaterThan(0);
     for (let i = 0; i < (await videos.count()); i++) {
       const v = videos.nth(i);
       await v.scrollIntoViewIfNeeded();

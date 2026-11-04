@@ -3,7 +3,7 @@
 import { expect, test } from "@playwright/test";
 import { GPU, PAGES, scrollThrough } from "./site";
 
-// The home page scrolls the live stage through every step: drawn in software it starves the main thread past the timeout.
+// The pages carry the live stage: drawn in software it starves the main thread past the timeout.
 test.use(GPU);
 
 for (const path of PAGES) {
@@ -28,16 +28,3 @@ for (const path of PAGES) {
     await info.attach(`${path.replace(/\//g, "_") || "home"}-${info.project.name}.png`, { body: shot, contentType: "image/png" });
   });
 }
-
-test("the sticky stage does not cover the tour caption", async ({ page }) => {
-  await page.goto("/");
-  await page.evaluate(() => document.getElementById("tour-navigation")!.scrollIntoView({ block: "center" }));
-  await page.waitForTimeout(800);
-  const overlap = await page.evaluate(() => {
-    const stage = document.querySelector('[data-testid="tour-stage"] canvas, [data-testid="tour-stage"] .duo3d')?.getBoundingClientRect();
-    const cap = document.querySelector('[data-testid="tour-caption"]')?.getBoundingClientRect();
-    if (!stage || !cap) return "missing";
-    return Math.max(0, Math.min(stage.bottom, cap.bottom) - Math.max(stage.top, cap.top)) * Math.max(0, Math.min(stage.right, cap.right) - Math.max(stage.left, cap.left));
-  });
-  expect(overlap).toBe(0);
-});

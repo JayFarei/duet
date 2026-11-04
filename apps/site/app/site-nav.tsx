@@ -22,7 +22,7 @@ export function GitHub() {
   );
 }
 
-/** The site's top bar: the name, the three pages, GitHub and the theme toggle. Plain links, no Duet: the site pages
+/** The site's top bar: the name, the home sections, GitHub and the theme toggle. Plain links, no Duet: the site pages
  *  scroll the window. */
 export function SiteNav() {
   const theme = useTheme();
@@ -30,9 +30,9 @@ export function SiteNav() {
     <header className="nav">
       <a href="/" className="nav-brand"><DuetMark />Duet</a>
       <nav className="nav-links" aria-label="Site">
-        <a href="/components">Components</a>
-        <a href="/examples">Examples</a>
-        <a href="/#docs">Docs</a>
+        <a href="/#how">How it works</a>
+        <a href="/#examples">Examples</a>
+        <a href="/#install">Install</a>
       </nav>
       <div className="nav-end">
         <a className="nav-icon" href={REPO} target="_blank" rel="noreferrer" aria-label="GitHub"><GitHub /></a>

@@ -2,23 +2,12 @@
 // same in nav, headings, captions, data-duet-control / data-duet-fit values, test ids and media filenames.
 import type { Frame, Page } from "@playwright/test";
 
-/** The nouns, in order: the /components sidebar and its h2s. */
+/** The nouns, in order: the home glossary table. */
 export const NOUNS = ["Group", "Navigation", "More", "Actions", "Primary", "Close", "Pane bar"] as const;
 /** data-duet-fit values (Navigation's three forms) and their display names. */
 export const FITS = { tabs: "Tabs", "tabs-more": "Tabs + More", sidebar: "Sidebar" } as const;
 /** data-duet-control values, one per button kind Duet draws. */
 export const CONTROLS = ["navigation", "sidebar", "more", "actions", "primary", "close"] as const;
-/** The home tour: caption, anchor id (#tour-<slug>), and what the screen shows at the step's end. */
-export const TOUR = [
-  { caption: "Places", slug: "places" },
-  { caption: "Free space", slug: "free-space" },
-  { caption: "Navigation", slug: "navigation", fit: "tabs-more" },
-  { caption: "More", slug: "more" },
-  { caption: "Actions + Sidebar", slug: "actions", fit: "sidebar" },
-  { caption: "Primary", slug: "primary" },
-  { caption: "Close", slug: "close", only: ["close"] },
-  { caption: "Modes", slug: "modes", mode: "column" },
-] as const;
 /** Every recorded clip's base name (apps/site/public/media/clip/<name>-<light|dark>.{mp4,webp,cues.json}). */
 export const CLIPS = [
   "group", "navigation-tabs", "navigation-tabs-more", "navigation-sidebar", "more", "actions",
@@ -28,11 +17,11 @@ export const CLIPS = [
 ] as const;
 export const EXAMPLES = ["/examples/inbox", "/examples/checkout", "/examples/reader"] as const;
 /** Every public page of the site. */
-export const PAGES = ["/", "/components", ...EXAMPLES] as const;
+export const PAGES = ["/", ...EXAMPLES] as const;
 /** Routes the Duo e2e harness and tools use: kept, never linked from the site. */
 export const HARNESS = ["/lab", "/mockup", "/workbench", "/scroll", "/probe", "/column", "/panes", "/book", "/sheet"] as const;
 /** Routes that are gone. */
-export const GONE = ["/skeleton"] as const;
+export const GONE = ["/skeleton", "/components"] as const;
 /** Words retired from every user-facing surface. */
 export const BANNED = /\b(burger|main button|call to action|cta|pill|capsule|control strip|this page)\b/i;
 
@@ -126,14 +115,20 @@ export async function tap(page: Page, selector: string) {
 }
 
 /** For specs that drive the 3D stage: headless Chromium draws WebGL in software (SwiftShader) unless told to use the
- *  GPU, and the stage then takes ~8 s instead of ~1 s to boot, so the tour's steps time out. A visitor's browser has a
+ *  GPU, and the stage then takes ~8 s instead of ~1 s to boot, so the simulator's checks time out. A visitor's browser has a
  *  GPU; on a Mac use Metal. Per spec, not in the config: the GPU rasterizes the glass rim a few levels dimmer (T1). */
 export const GPU = process.platform === "darwin" ? { launchOptions: { args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] } } : {};
 
-/** Waits until the home tour's stage has its screens up and measuring. Headless Chromium draws the 3D Duo in
- *  software, so its first measure can take several seconds after load. */
+/** Waits until the home simulator has a screen running Duet. Headless Chromium draws the 3D Duo in software, so its
+ *  first screen can take several seconds after load. */
 export async function stageReady(page: Page) {
-  await page.locator('[data-testid="tour-stage"][data-ready]').waitFor({ state: "attached", timeout: 30_000 });
+  await page.getByTestId("simulator").scrollIntoViewIfNeeded();
+  await expectPoll(() => duetFrames(page).then((f) => f.length), 30_000);
+}
+
+async function expectPoll(read: () => Promise<number>, timeout: number) {
+  for (const end = Date.now() + timeout; Date.now() < end; await new Promise((r) => setTimeout(r, 250))) if (await read() > 0) return;
+  throw new Error("the simulator never showed a screen running Duet");
 }
 
 /** Navigation's fit and the set of control kinds Duet shows, per frame running Duet. */

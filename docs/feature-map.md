@@ -2,52 +2,27 @@
 
 Where each screen and control of the site lives, and how to reach it in a test. Update the entry when you change a screen. Names are the glossary: Group, Navigation (Tabs, Tabs + More, Sidebar), More, Actions, Primary, Close, Pane bar, and the modes Strip, Column, Inline.
 
-Public pages: `/`, `/components`, `/examples` (index), `/examples/inbox`, `/examples/checkout`, `/examples/reader`. The site suite is `playwright.site.config.ts` (`e2e/site/*.spec.ts`, WebKit and Chromium at 390x844 and 1440x900, port 3510); its shared names and probes are in `e2e/site/site.ts`.
+Public pages: `/`, `/examples` (index), `/examples/inbox`, `/examples/checkout`, `/examples/reader`. The site suite is `playwright.site.config.ts` (`e2e/site/*.spec.ts`, WebKit and Chromium at 390x844 and 1440x900, port 3510); its shared names and probes are in `e2e/site/site.ts`.
 
 ## Nav (`apps/site/app/site-nav.tsx`)
 
 | Part | Selector | What it does |
 |---|---|---|
-| Top bar | `header.nav` | Duet mark, links to Components, Examples and Docs (`/#docs`), GitHub. Plain links, no Duet controls. |
-| Theme toggle | `header.nav button[aria-label="Dark mode"]` (or `"Light mode"`) | Flips light and dark, stored in `localStorage` `duet-theme`. Every loop then loads its `-dark` or `-light` file and the stage's screens follow. |
+| Top bar | `header.nav` | Duet mark, links to How it works (`/#how`), Examples (`/#examples`) and Install (`/#install`), GitHub. Plain links, no Duet controls. |
+| Theme toggle | `header.nav button[aria-label="Dark mode"]` (or `"Light mode"`) | Flips light and dark, stored in `localStorage` `duet-theme`. The simulator's screens follow. |
 
-## Home page (`apps/site/app/home.tsx`, `tour.tsx`)
+## Home page (`apps/site/app/home.tsx`)
 
-Four parts: the hero with the live stage and its tour, the examples, our apps, then the docs. The page scrolls the window.
-
-| Part | Selector | What it does |
-|---|---|---|
-| Hero | `[data-testid="hero"]` | Title, lede, copy prompt for coding agents, install line, install stats. |
-| Stage | `[data-testid="tour-stage"]` | The live 3D Duo (`Duo` with `idle`), sticky while the tour scrolls under it. It sways slowly while idle (`window.__duoYaw`), stops drawing off screen (`window.__duoFrames` stops), and takes no touches until the reader unlocks it, so a swipe over it scrolls the page; the lock button resets the view. `data-ready` is set once a screen has sent its first measure. Without WebGL 2 it falls back to the flat WebDuo (`[data-testid="web-duo"]`). |
-| Tour | `#tour`, steps `#tour-<slug>` | Seven steps, each puts the stage in a scene (page, posture, Safari or Home Screen, an optional press). Ticks `[data-testid="tour-tick"]` jump to a step and mark the current one with `aria-current="step"`. Caption `[data-testid="tour-caption"]`. Counters `[data-testid="tour-free"]` and `[data-testid="tour-fit"]` show the free space and the fit the stage's screens measure (`duet:measure` events). |
-| Examples | `#examples .cards` (first) | Inbox, Checkout, Reader: each card plays its `example-<name>` loop and links to `/examples/<name>`. |
-| In real apps | `#examples .cards` (second) | RegTail (badge "Demo data"), Dashboard and Wealth (badge "Mock data") in `.card-k`: loops `app-{regtail,dashboard,wealth}` recorded from each app's local mock server only. |
-| Docs | `#docs` | Install, usage code with a tint picker, Modes (Strip, Column, Inline, each a `mode-<name>` loop), then links to `/components` and the API reference. |
-
-The tour steps, in order (`STEPS` in `tour.tsx`, `TOUR` in `e2e/site/site.ts`):
-
-| # | Caption | Anchor | Stage | What it shows |
-|---|---|---|---|---|
-| 1 | Places | `#tour-places` | Inbox, open, Safari | Nine folders, all of them Tabs on the open Duo (fit `tabs`). |
-| 2 | Free space | `#tour-free-space` | Inbox, closed, Home Screen | The column gets short; the free space counter drops. |
-| 3 | Navigation | `#tour-navigation` | Inbox, closed, Home Screen | Some folders stay Tabs, the rest wait in More (fit `tabs-more`). |
-| 4 | More | `#tour-more` | Inbox, closed, Home Screen, More pressed | More opens its list: Places, then Actions. Leaving the step closes it. |
-| 5 | Actions + Sidebar | `#tour-actions` | Inbox, closed, Safari | The folders move into the Sidebar, Compose, Archive and Flag stay as Actions (fit `sidebar`). |
-| 6 | Primary | `#tour-primary` | Checkout, open, Safari, Primary pressed | Pay grows into its confirm box. |
-| 7 | Close, Modes | `#tour-close` | Inbox, closed, Safari, a row pressed | A message opens and the controls shrink to Close only. Leaving the step presses Close. |
-
-## `/components` (`apps/site/app/components/components.tsx`)
-
-One page, one section per noun in glossary order: Group, Navigation, More, Actions, Primary, Close, Pane bar. Sidebar `[data-testid="components-nav"]`, sections `section#<id>` with an `h2` each.
+One short page, four sections in order under an intro (`main > section[id]`): the simulator, how it works, the examples, install. No videos. The page scrolls the window.
 
 | Part | Selector | What it does |
 |---|---|---|
-| Preview and Code | `.cmp-bar [role="tablist"]` | Preview plays the variant's recorded loop with a free space counter (`.loop-count`, read from the clip's `.cues.json` against the video time) and a cue line (`.cmp-cue`). Code shows the props that produce it. |
-| Variants | `[data-testid="variant-navigation"]`, `[data-testid="variant-primary"]` | Navigation: Tabs, Tabs + More, Sidebar. Primary: Confirm, Direct, Folded. Each picks its own clip. |
-| Props | `table.props` | The props of that noun. |
-| See it live | `.cmp-live` | Jumps to the noun's tour step on `/`, or to `/examples/reader` for the Pane bar. |
-
-No live stage here: every preview is a recorded loop, so the page has no WebGL context.
+| Intro | `[data-testid="hero"]` | Title, lede, install line, copy prompt for coding agents, version and install stats. |
+| Simulator | `#simulator`, `[data-testid="simulator"]` | The live 3D Duo (`Duo embed`) with its own controls: Moments (Tabs, Tabs + More, Selected, Sidebar), With or Without Duet, posture, fold and lock. It stops drawing off screen (`window.__duoFrames` stops). Without WebGL 2 it falls back to the flat WebDuo (`[data-testid="web-duo"]`). |
+| App picker | `[data-testid="app-picker"]` | Inbox, Checkout, Reader. A press sends `duet:example` with `/examples/<name>?plain`; the button reads `aria-pressed="true"`. The simulator sends `duet:screen` with the page it runs, so a Moment (always the Inbox) moves the picker back. |
+| How it works | `#how` | Four steps (`ol.how`): wrap your app, Duet measures, it draws what fits, it steps aside. Then the glossary `table.glossary`, one row per noun in glossary order. |
+| Examples | `#examples article` | One card per example. Try it loads it in the simulator and scrolls there, Open goes to `/examples/<name>`, Show code (`details.ex-src`) opens its one source file. |
+| Install | `#install` | Install line, copy prompt, the usage code, links to the API reference, How Duet decides and GitHub. |
 
 ## Examples (`apps/site/app/examples/`)
 

@@ -3,15 +3,13 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { BANNED, CLIPS, CONTROLS, FITS, NOUNS, PAGES, TOUR } from "./site";
+import { BANNED, CLIPS, CONTROLS, FITS, NOUNS, PAGES } from "./site";
 
 test.describe("site", () => {
-  test("/components lists the glossary in order", async ({ page }) => {
-    await page.goto("/components");
-    await expect(page.getByTestId("components-nav").getByRole("link")).toHaveText([...NOUNS]);
-    await expect(page.locator("main h2")).toHaveText([...NOUNS]);
-    await expect(page.getByTestId("variant-navigation").getByRole("tab")).toHaveText(Object.values(FITS));
-    await expect(page.getByTestId("variant-primary").getByRole("tab")).toHaveText(["Confirm", "Direct", "Folded"]);
+  test("the home glossary lists the nouns in order", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator("#how table.glossary tbody th")).toHaveText([...NOUNS]);
+    for (const fit of Object.values(FITS)) await expect(page.locator("#how")).toContainText(fit);
   });
 
   test("media basenames are the clip list", () => {
@@ -89,9 +87,8 @@ test.describe("docs", () => {
 
   test("feature map covers the site and nothing retired", () => {
     const map = readFileSync(join(ROOT, "docs/feature-map.md"), "utf8");
-    for (const s of TOUR) expect(map, `tour step ${s.caption}`).toContain(s.caption);
     for (const n of NOUNS) expect(map, `noun ${n}`).toContain(n);
     for (const p of [...PAGES, "/duo3d?clip=", "record.mjs", "compose.sh", "check-media.mjs"]) expect(map, p).toContain(p);
-    for (const gone of ["/skeleton", "form-", "control-", "duo3d-stills", "duo3d-apps", "#rules"]) expect(map, gone).not.toContain(gone);
+    for (const gone of ["/skeleton", "form-", "control-", "duo3d-stills", "duo3d-apps", "#rules", "/components", "#tour"]) expect(map, gone).not.toContain(gone);
   });
 });

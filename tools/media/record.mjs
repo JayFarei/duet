@@ -34,7 +34,7 @@ for (const m of src.matchAll(/^\s+"?([a-z-]+)"?: \{ src: [^\n]*?posture: "(\w+)"
 }
 const names = Object.keys(CLIPS).filter((n) => !pick.length || pick.includes(n));
 if (!names.length) throw new Error("no clips match");
-// Cards on the home page and the example pages are narrower than the /components sections.
+// Cards on the home page and the example pages are narrower than the old full-width sections.
 const width = (n) => (/^(example|app|mode)-/.test(n) ? 720 : 1080);
 mkdirSync(RAW, { recursive: true }); mkdirSync(OUT, { recursive: true });
 
