@@ -3,7 +3,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { ChevronRight, Home, Search, Settings, Share, X } from "lucide-react";
 import { Duet, bleed } from "duet-ui";
-import { WebDuo, useDesktop } from "../duo/web-duo";
+import { Duo } from "../duo/duo";
+import { useDesktop } from "../duo/web-duo";
 
 const ROWS = ["Weekend in Lisbon", "Hinge stress test", "Fold diary", "Column notes", "Split view sketches", "Release checklist", "Lunch on Thursday", "Trip photos"];
 const TABS = [
@@ -19,7 +20,7 @@ const row: CSSProperties = { display: "flex", alignItems: "center", gap: 12, wid
 
 export function SheetDemo() {
   const desktop = useDesktop();
-  return desktop ? <WebDuo src="/sheet" title="Sheets" intro="A sheet over a full-screen scrim. In Safari's column on the closed Duo its close button moves into the column." />
+  return desktop ? <Duo src="/sheet" title="Sheets" intro="A sheet over a full-screen scrim. In Safari's column on the closed Duo its close button moves into the column." />
     : <div className={desktop === null ? "ssr-site" : undefined}><Sheets /></div>;
 }
 

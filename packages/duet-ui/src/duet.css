@@ -23,7 +23,8 @@
    is the sharp layer, ::after the base blended over it (darken, lighten). The open menu is darker in dark mode
    (--duet-glass-lg). Not matched: native refracts a ~5pt band at the rim, which WebKit cannot displace. In dark that
    band (.duet-rim) is blurred, with soft 1pt rims top and bottom and a 0.5pt dark keyline on the sides. In light native
-   keeps colour at the edge, so .duet-rim colour-dodges (caps only, none on the sides, grey sources not white) and
+   keeps colour at the edge, so on iOS .duet-rim colour-dodges (caps only, none on the sides, grey sources not white;
+   white highlights at normal blend elsewhere, see the @supports block below) and
    .duet-edge, a ring under the inset glass, tone maps the page itself into a saturated line, weaker on the caps. */
 .duet {
   -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
@@ -39,7 +40,9 @@
   --duet-badge: #ff3b30; --duet-badge-neutral: #6e6e73; --duet-badge-ink: #fff;
   --duet-glass-lg: transparent; --duet-glass-sharp: contrast(0.25) brightness(1.3925) saturate(2.2); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
   --duet-glass-edge: 0 0 0 0 transparent; --duet-edge-filter: contrast(1.75) brightness(0.505); --duet-glass-inset: 0.6px;
-  --duet-glass-rim: inset 0 2.2px 1.4px -1.5px rgb(72 72 72), inset 0 -2.2px 1.4px -1.5px rgb(48 48 48), inset 0 17px 10px -8px rgb(17 17 17), inset 0 -15px 10px -8px rgb(11 11 11); --duet-rim-filter: none; --duet-rim-blend: color-dodge; --duet-rim-band: 16px;
+  --duet-glass-rim-white: inset 0 1px 0.5px rgb(255 255 255 / 0.7), inset 0 -1px 0.5px rgb(255 255 255 / 0.35), inset 0 12px 8px -8px rgb(255 255 255 / 0.16), inset 0 -10px 8px -8px rgb(255 255 255 / 0.08);
+  --duet-glass-rim-light: var(--duet-glass-rim-white); --duet-rim-blend-light: normal;
+  --duet-glass-rim: var(--duet-glass-rim-light); --duet-rim-filter: none; --duet-rim-blend: var(--duet-rim-blend-light); --duet-rim-band: 16px;
   --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.02); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.12);
   color: var(--duet-ink);
   -webkit-tap-highlight-color: transparent;
@@ -70,7 +73,7 @@
     --duet-ink: #000; --duet-lens-accent: var(--duet-tint); --duet-lens-rim: rgb(0 0 0 / 0.16); --duet-tab-sel: rgb(0 0 0 / 0.07); --duet-tab-rim: rgb(0 0 0 / 0.14); --duet-tab-line: rgb(0 0 0 / 0.05);
     --duet-glass-sharp: contrast(0.25) brightness(1.3925) saturate(2.2); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten; --duet-glass-press: var(--duet-glass-base); --duet-press-lift: var(--duet-lift);
     --duet-glass-edge: 0 0 0 0 transparent; --duet-edge-filter: contrast(1.75) brightness(0.505); --duet-glass-inset: 0.6px;
-    --duet-glass-rim: inset 0 2.2px 1.4px -1.5px rgb(72 72 72), inset 0 -2.2px 1.4px -1.5px rgb(48 48 48), inset 0 17px 10px -8px rgb(17 17 17), inset 0 -15px 10px -8px rgb(11 11 11); --duet-rim-filter: none; --duet-rim-blend: color-dodge; --duet-rim-band: 16px;
+    --duet-glass-rim: var(--duet-glass-rim-light); --duet-rim-filter: none; --duet-rim-blend: var(--duet-rim-blend-light); --duet-rim-band: 16px;
   }
 }
 @media (prefers-color-scheme: dark) {
@@ -80,6 +83,18 @@
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
     --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --duet-rim-filter: blur(2.5px) brightness(1.08); --duet-rim-blend: normal; --duet-rim-band: 5px; --duet-edge-filter: none; --duet-glass-inset: 0px;
   }
+}
+/* The light rim's colour dodge only works in iOS WebKit, which dodges against the blurred backdrop. Desktop Safari,
+   Chromium and Chrome paint its near-black sources as they are: black caps. So off iOS the light rim is white
+   highlights at normal blend, and only iOS (the one engine with -webkit-touch-callout) keeps the dodge tuned in #256. */
+@supports (-webkit-touch-callout: none) {
+  .duet {
+    --duet-glass-rim-light: inset 0 2.2px 1.4px -1.5px rgb(72 72 72), inset 0 -2.2px 1.4px -1.5px rgb(48 48 48), inset 0 17px 10px -8px rgb(17 17 17), inset 0 -15px 10px -8px rgb(11 11 11);
+    --duet-rim-blend-light: color-dodge;
+  }
+  /* A column layer that follows the scroll runs a transform animation, its own compositing layer: the dodge has no
+     page under it to brighten and paints its dark sources as black caps (Duo sim, home page, light). */
+  .duet[data-follow] { --duet-glass-rim-light: var(--duet-glass-rim-white); --duet-rim-blend-light: normal; }
 }
 .duet button, .duet-sidebar button {
   appearance: none; border: 0; background: none; color: inherit; padding: 0; margin: 0; cursor: pointer; font: inherit;
@@ -239,6 +254,8 @@ html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--
 html[data-duet-mode="column"] .duet-sidebar[data-open] { box-shadow: 0 240px 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 0 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 240px 0 var(--duet-solid); }
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
+/* Over the page it fades from and to nothing: a 60% rest suits a sidebar the page uncovers, here it pops in and snaps out. */
+.duet-sidebar[data-overlay]:not([data-open]) { opacity: 0; }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }
 .duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-dim); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .duet-sidebar .duet-side-row { justify-content: flex-start; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; position: relative; }
@@ -376,7 +393,7 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 /* No children (no .duet-scroller): the document scrolls, and the layer rides it on a scroll timeline that Safari
    runs with the scroll itself, so it holds through momentum and smooth scrollTo/scrollIntoView (chrome.tsx sets
    data-follow and --duet-scroll-max, the document's scroll range, or a transform where this is unsupported). */
-.duet[data-mode="column"][data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
+.duet[data-mode="column"][data-follow], html[data-duet-mode="column"] .duet-sidebar[data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
 @keyframes duet-follow { from { transform: translateY(0); } to { transform: translateY(var(--duet-scroll-max, 0px)); } }
 /* The rubber band at either end moves the document past its scroll range, where the timeline (clamped to it) cannot
    follow, so the layer rode the bounce: up to 160pt over Safari's own column buttons, or out of the column (#76). The
@@ -455,7 +472,7 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
    it lands; one that goes stays put while it shrinks into itself and fades, so the slots that stay can slide into its
    place at once. The first paint, a fold and a side switch skip both (data-settling, data-drag="switch").
    Only the host scales: opacity on it would make it the glass's backdrop root, the glass would see nothing, and its
-   color-dodge rim would paint a dark disc for the whole fade. So the glass layers fade, not the host. */
+   rim (a colour dodge on iOS) would paint a dark disc for the whole fade. So the glass layers fade, not the host. */
 .duet-group[data-enter] { animation: duet-enter 0.5s var(--duet-spring-out) backwards; }
 .duet-group[data-enter]::before, .duet-group[data-enter]::after, .duet-group[data-enter] > .duet-edge, .duet-group[data-enter] > .duet-rim { animation: duet-appear 0.25s ease-out backwards; }
 .duet-group[data-enter] > button { animation: duet-ink-in 0.35s ease-out backwards; }

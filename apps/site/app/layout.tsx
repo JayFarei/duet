@@ -23,11 +23,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={serif.variable} suppressHydrationWarning>
       {/* The visitor's light/dark pick (theme.ts), on <html> before first paint. */}
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem("duet-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-lg-theme",t)}catch(e){}` }} />
+        <script dangerouslySetInnerHTML={{ __html: `try{var h=document.documentElement,t=localStorage.getItem("duet-theme");if(t==="light"||t==="dark")h.setAttribute("data-lg-theme",t);else t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";h.setAttribute("data-theme",t)}catch(e){}` }} />
         <script dangerouslySetInnerHTML={{ __html: e2eEarly }} />
       </head>
-      {/* Duet's pre-paint boot (docs/server-rendering.md, Pre-paint boot), first in <body>; Vercel Web Analytics and Speed Insights last. */}
-      <body><script dangerouslySetInnerHTML={{ __html: bootScript }} />{children}<E2EReporter /><Analytics /><SpeedInsights /></body>
+      {/* Duet's pre-paint boot (docs/server-rendering.md, Pre-paint boot), first in <body>; Vercel Web Analytics and Speed Insights last, on Vercel only: a local `next start` has no /_vercel/* scripts and would log 404s. */}
+      <body><script dangerouslySetInnerHTML={{ __html: bootScript }} />{children}<E2EReporter />{process.env.VERCEL && <><Analytics /><SpeedInsights /></>}</body>
     </html>
   );
 }

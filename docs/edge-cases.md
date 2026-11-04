@@ -84,6 +84,10 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [A dark circle as "…" comes back](#a-dark-circle-as--comes-back)
 - [Page content jumps 84pt on an inline Duo page](#page-content-jumps-84pt-on-an-inline-duo-page)
 - [Page with children clipped in the right split pane](#page-with-children-clipped-in-the-right-split-pane)
+- [Light rim paints black off iOS](#light-rim-paints-black-off-ios)
+- [List headings and the Sidebar button named by the glossary](#list-headings-and-the-sidebar-button-named-by-the-glossary)
+- [Telling the form of Navigation from outside](#telling-the-form-of-navigation-from-outside)
+- [Media referenced before it was built](#media-referenced-before-it-was-built)
 
 ## Split view pane, or the closed Duo turned left
 
@@ -449,7 +453,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** in the in-app preview, or a band that holds a single button, there is no burger, only "…".
 - **Cause:** the burger and "…" need two buttons of room, and every action has to stay reachable.
-- **Duet does:** shows "…" alone; its list starts with the page's actions, then a "Menu" section holding the places (checked for the current one). A sheet's `close` takes that one slot instead.
+- **Duet does:** shows "…" alone; its list starts with the page's actions, then a "Places" section holding the places (checked for the current one). A sheet's `close` takes that one slot instead.
 - **You do:** nothing.
 - **Status:** [#181](https://github.com/JayFarei/duet/issues/181), 0.6.0.
 
@@ -633,7 +637,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, an app chooses `tabs` or `menu` once. Tabs fold into "…" one at a time where room runs out, and a burger hides five places on a screen with room for all of them.
 - **Cause:** tabs merged into the actions, so nothing could turn them into a burger.
-- **Duet does:** with `menu.tabs`, `placeTabs` keeps the places as tabs, folding the last ones into "…" when the window is short, and the burger with its sidebar only below three tabs. Actions and primary fold first. An item without an icon keeps the burger. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the measured counts.
+- **Duet does:** with `menu.tabs`, `placeTabs` keeps the places as tabs, folding the last ones into "…" when the window is short, and the burger with its sidebar only below three tabs. Actions and primary fold first. An item without an icon keeps the burger. See [Navigation fit](how-duet-decides.md#navigation-fit) for the measured counts.
 - **You do:** pass `tabs: true` with an icon on every item, and inline `bootScript`.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator at 2, 3, 5, 6 and 7 places in Safari wide and tall, Home Screen wide and tall, Split View both sides, closed Safari and closed Home Screen. An open sidebar closes on unfolding into tabs. A rotation at the margin (7 places on the Home Screen) shows the old form for one frame, under 5ms, as the window lands. Live Activities are modelled. Not yet seen on a device.
 
@@ -793,7 +797,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** closed Safari upright, a `menu.tabs` app with actions and a primary: "…" opens with the primary and the actions, and the places come last, though everywhere else in a tabs app they lead.
 - **Cause:** the places led only when the primary had its own capsule. When it shared one with "…", the list kept the primary's lead.
-- **Duet does:** in a `menu.tabs` app the places always lead "…", then "This page" with the primary and the actions. Other apps keep their order.
+- **Duet does:** in a `menu.tabs` app the places always lead "…", then "Actions" with the primary and the actions. Other apps keep their order.
 - **You do:** nothing.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator: closed Safari upright with 5 places, 2 actions and a primary lists P1 to P5, then Book, Act 0, Act 1. Each action fires from it and the primary row arms in place.
 
@@ -812,3 +816,59 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** what it does without children: where the document spans a column on the left (a split pane, the closed Duo turned left), the scroller is moved right by that column (`--duet-shift` on `<html>`, `left` on `.duet-scroller`) and the insets are 0, so it fills exactly the visible pane. `<html data-duet-reserve>` marks this as before. A right column alone keeps the scroller running under it with the 84pt inset.
 - **You do:** nothing. `<Duet reserve={false}>` keeps the old layout, the scroller under both columns and padded by the insets.
 - **Status:** `test/page.test.mjs`, and on the Duo simulator, Safari in the right pane at 385x571: with 5, 20 and 12 places plus actions the title sits at x 16 in the pane (it was -68), the scroller fills the pane and the column shows the burger or Book and "…" as before.
+
+## Light rim paints black off iOS
+
+- **You see:** in light mode on desktop Safari, Chrome or any non iOS browser, each capsule has a black cap along its top and bottom edge instead of a bright rim. iOS looks right.
+- **Cause:** the light rim is near black inset shadows blended with `color-dodge`, tuned against iOS glass (#256). Only iOS WebKit dodges them against the backdrop. Other engines paint the shadows as they are, so the caps read 31 to 39 out of 255.
+- **Duet does:** off iOS the light rim is white inset highlights at normal blend. Under `@supports (-webkit-touch-callout: none)`, which only iOS WebKit matches, it keeps the dodge rim. Dark mode is unchanged.
+- **You do:** nothing.
+- **Status:** `test/glass.test.mjs`, `e2e/site/glass.spec.ts` (light cap 180 or brighter, blend `normal`, WebKit and Chromium at 390x844 and 1440x900), and on the Duo Lab simulator the iOS rim matches the earlier capture.
+
+## List headings and the Sidebar button named by the glossary
+
+- **You see:** the "…" list headed its sections "Menu" and "This page" (or "More"), and the button that opens the sidebar was announced as "Menu", while docs and the site call these Places, Actions and Sidebar.
+- **Cause:** the labels predate the glossary.
+- **Duet does:** the "…" list heads its sections "Places" and "Actions" in every mode. The sidebar button's `aria-label`, the sidebar's `aria-label` and its heading are "Sidebar".
+- **You do:** update any test or script that finds the button by `aria-label="Menu"`, or better, use `[data-duet-control="sidebar"]`.
+- **Status:** `test/names.test.mjs`, `e2e/site/names.spec.ts`.
+
+## Telling the form of Navigation from outside
+
+- **You see:** a test or app style cannot tell whether the places show as tabs, as tabs with the rest in "…", or behind the Sidebar button without counting buttons or reading labels.
+- **Cause:** the form was internal to the layout.
+- **Duet does:** the controls root `nav.duet` carries `data-duet-fit="tabs"`, `"tabs-more"` or `"sidebar"` (absent when there are no places or they sit in "…" alone, as in the in-app preview). Each button carries `data-duet-control`: `navigation`, `sidebar`, `more`, `actions`, `primary` or `close`.
+- **You do:** nothing. Key tests and styles on these attributes rather than labels.
+- **Status:** `test/names.test.mjs`, `e2e/site/names.spec.ts`.
+
+## Media referenced before it was built
+
+- **You see:** on the site, a clip, poster or still shows as a broken image or an empty player, though the page built fine.
+- **Cause:** pages referenced files under `apps/site/public/media` that were never recorded, or were written while a server was running, so the build did not pick them up.
+- **Duet does:** nothing, this is the site. `tools/media/check-media.mjs` runs after `next build` (`build:site`), requests every page, collects each `src`, `poster`, `srcset` and `<source>` under `/media` plus every path in the clip list, and fails on any response that is not 200 or has the wrong content type.
+- **You do:** record media before the build, never into `public` while a server runs, and rebuild after.
+- **Status:** `e2e/site/media.spec.ts`, `pnpm --filter @duet/site check:media`.
+
+## Sidebar off screen on a scrolled page in Safari's column
+
+- **You see:** on a Duo, in Safari's column, with `<Duet>` given no children (the document scrolls), the Sidebar button works at the top of the page and seems to do nothing once you scroll down.
+- **Cause:** in column mode the overlay sidebar is `position: absolute` at the document top, while the controls follow the scroll. It opened, but above the viewport.
+- **Duet does:** the overlay sidebar rides the same follow as the controls (the `duet-follow` scroll timeline, or the `translateY(scrollY)` fallback), so it opens where the reader is.
+- **You do:** nothing.
+- **Status:** `e2e/site/home.spec.ts` ("in Safari's column", emulated column signals in a 466x678 frame).
+
+## Overlay sidebar pops in and snaps out
+
+- **You see:** the sidebar over the page appears half drawn, and closing it hangs half faded, then vanishes.
+- **Cause:** the closed sidebar rests at 60% opacity, which suits a sidebar the page slides away from, not one drawn over the page. Visibility flips it on and off at 60%.
+- **Duet does:** the overlay sidebar rests at opacity 0, so it fades from and to nothing.
+- **You do:** nothing.
+- **Status:** `e2e/site/home.spec.ts` ("the sidebar fades in and out from nothing").
+
+## Black caps on the column capsule in light mode
+
+- **You see:** on iOS Safari, light theme, a page without children (the document scrolls), the group in Safari's column has black bars along its top and bottom edge.
+- **Cause:** the light rim uses dark sources with `color-dodge`, which brightens the page beneath. The column layer that follows the scroll runs a transform animation, so it is its own compositing layer and the dodge has nothing beneath it: the dark sources paint as they are.
+- **Duet does:** under `@supports (-webkit-touch-callout: none)`, `.duet[data-follow]` takes the white rim at normal blend, the same rim every other engine uses.
+- **You do:** nothing.
+- **Status:** `packages/duet-ui/test/glass.test.mjs` ("on iOS a column layer that follows the scroll drops the dodge"), checked on the Duo e2e 2 simulator.

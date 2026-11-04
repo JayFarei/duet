@@ -3,7 +3,8 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Archive, ArrowLeft, ChevronRight, FileText, Forward, Inbox, Paperclip, Reply, Send, SquarePen, Star, Trash2 } from "lucide-react";
 import { Duet, DuetPaneBar, DuetPanes, bleed, usePanes, type DuetItem } from "duet-ui";
-import { WebDuo, useDesktop } from "../duo/web-duo";
+import { Duo } from "../duo/duo";
+import { useDesktop } from "../duo/web-duo";
 
 const PATH = ["mailboxes", "inbox", "message", "attachment"];
 const MAILBOXES: [string, ReactNode][] = [["Inbox", <Inbox size={20} />], ["Starred", <Star size={20} />], ["Sent", <Send size={20} />], ["Archive", <Archive size={20} />], ["Trash", <Trash2 size={20} />]];
@@ -43,7 +44,7 @@ const dim: CSSProperties = { color: "var(--dim)", font: "400 15px/1.4 -apple-sys
 
 export function PanesDemo() {
   const desktop = useDesktop();
-  return desktop ? <WebDuo src="/panes" /> : <div className={desktop === null ? "ssr-site" : undefined}><Mail /></div>;
+  return desktop ? <Duo src="/panes" /> : <div className={desktop === null ? "ssr-site" : undefined}><Mail /></div>;
 }
 
 function Mail() {

@@ -3,10 +3,21 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, Lock, LockOpen, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square, } from "lucide-react";
 import { ONLY_OPEN, Segmented, TOUR, control, fit, group, hardware, rotate, type State, type Turn } from "./reexports";
-import { DUO_APP, channel, type Sync } from "./shared";
+import { DUO_APP, channel, type Highlight, type Sync } from "./shared";
+import { CLIPS, type ClipPosture, type Press } from "./clips";
 
 // This page's displays, told apart from another tab's.
 const ID = Math.random().toString(36).slice(2);
+
+/** The recorder's marks: with `?mark=<url>` on a loopback host (tools/media/record.mjs listens there), a clip posts
+ *  its start, its end and each measure of what Duet drew, stamped with the wall clock, so a screen recording made
+ *  outside the browser (the iOS simulator) can be trimmed to the clip and its cues timed. Logged to the console too. */
+let markTo: string | null = null;
+function mark(kind: string, data: Record<string, unknown>) {
+  const body = JSON.stringify({ kind, at: Date.now(), ...data });
+  if (kind !== "measure") console.log(`duet:${kind}`, body);
+  if (markTo) fetch(markTo, { method: "POST", mode: "no-cors", body, keepalive: true }).catch(() => {});
+}
 
 const SWAP = 450; // the interface turns upright this far into the device's turn
 
@@ -42,19 +53,33 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
 /** embed: the landing page's stage, no card, sized to its container. The
  *  device takes no touches until the reader asks to try it, so a swipe over it still scrolls the page, and the lock
  *  under it puts it back that way. */
-export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
-  const [s, setS] = useState<State>(TOUR[0]);
+/** chrome: false leaves only the device (an example block, a clip). posture: the block's picker drives it. idle: the
+ *  device sways and breathes while nothing else moves it (the landing page). live: it takes touches from the start. */
+/** scene: the home tour's step, a page in a posture and the control it presses once there. Leaving a step presses its
+ *  `undo` first (More or a sheet closed again), so the next step starts from the page's resting state. */
+/** highlight: the tour's pointer at a part of Duet in the page. fold: the hinge at a share of the way open (0 closed, 1
+ *  flat), for a step the scroll drives; the posture flips half way, as the fold slider's does. */
+export type Scene = { src: string; posture: ClipPosture; app?: "safari" | "home" | "sheet"; press?: Press; undo?: Press; highlight?: Highlight };
+export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, posture: wanted, idle = false, live = false, clip, scene, fold }: {
+  embed?: boolean; src?: string; chrome?: boolean; posture?: ClipPosture; idle?: boolean; live?: boolean; clip?: string; scene?: Scene; fold?: number;
+} = {}) {
+  const film = clip ? CLIPS[clip] : undefined;
+  // The landing page opens on a Moment: the closed Home Screen, seven tabs and "…".
+  const [s, setS] = useState<State>(film ? { ...TOUR[0], app: film.app ?? "safari" } : TOUR[0]);
+  const [selected, setSelected] = useState<Sync["selected"]>();
   const [deg, setDeg] = useState(0);
   const [stand, setStand] = useState<Stand>("flat");
   const [upright, setUpright] = useState<Turn>(0);
   const [duet, setDuet] = useState(true);
   const [more, setMore] = useState(false);
-  const [manual, setManual] = useState(false), [box, setBox] = useState({ w: 0, h: 0 });
+  const [manual, setManual] = useState(live), [box, setBox] = useState({ w: 0, h: 0 });
   const stage = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
   // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
-  const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : "/skeleton";
+  // A clip's own page, in place of the home one.
+  const [site, setSite] = useState<string | null>(null);
+  const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : site ?? film?.src ?? home;
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
   const url = useSyncExternalStore(() => () => {}, () => {
     const screens = `${location.origin}/duo3d/screen?id=${ID}`;
@@ -65,12 +90,82 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   const hw = hardware(s);
   spin.current += ((((hw - spin.current) % 360) + 540) % 360) - 180;
   const pose = { deg, roll: (-spin.current * Math.PI) / 180, pitch: pitch(stand, deg) };
-  const send = () => duo.current?.contentWindow?.postMessage(pose, "*");
+  // Idle: the device sways about ±12° and, laid open, its hinge breathes between 160° and 180°.
+  const sway = useRef({ yaw: 0, deg: 0 });
+  const shownRef = useRef(true);
+  // Every pose carries whether the stage is on screen: a `paused` sent before duo's page has loaded is lost, and a
+  // stage that starts below the fold would otherwise draw until it first scrolls into view and out again.
+  const send = () => duo.current?.contentWindow?.postMessage({ ...pose, ...(sway.current.deg && { deg: sway.current.deg }), yaw: sway.current.yaw, paused: !shownRef.current }, "*");
   useEffect(send, [deg, pose.roll, pose.pitch]); // eslint-disable-line react-hooks/exhaustive-deps
   // The camera eases back in front of the device, after a drag has orbited it.
   const front = () => duo.current?.contentWindow?.postMessage({ reset: true }, "*");
   // The landing page's stage locks again the way it started: the device in front, and a swipe over it scrolls.
   const lock = () => { front(); setManual(false); };
+
+  // The stage draws only while it is on screen and the tab is visible: duo stops its render loop (`paused`).
+  // window.__duoFrames counts the frames duo draws (its GL draw calls, one tick per animation frame), for the tests.
+  const [shown, setShown] = useState(true);
+  shownRef.current = shown;
+  useEffect(() => {
+    const el = duo.current;
+    if (!el) return;
+    let seen = true;
+    const io = new IntersectionObserver(([e]) => { seen = e.isIntersecting; update(); });
+    const update = () => setShown(seen && document.visibilityState === "visible");
+    io.observe(el);
+    document.addEventListener("visibilitychange", update);
+    return () => { io.disconnect(); document.removeEventListener("visibilitychange", update); };
+  }, [!!url]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { duo.current?.contentWindow?.postMessage({ paused: !shown }, "*"); }, [shown]);
+  useEffect(() => {
+    const w = window as unknown as { __duoFrames?: number; __duoYaw?: number };
+    w.__duoFrames ??= 0;
+    w.__duoYaw ??= 0;
+    let drew = false, raf = 0;
+    const tick = () => { if (drew) { w.__duoFrames!++; drew = false; } raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    const hook = () => {
+      const g = duo.current?.contentWindow as unknown as Record<string, { prototype: Record<string, unknown> } | undefined> | null;
+      for (const k of ["WebGL2RenderingContext", "WebGLRenderingContext"]) {
+        const p = g?.[k]?.prototype;
+        if (!p || p.__duoHooked) continue;
+        p.__duoHooked = true;
+        for (const m of ["drawElements", "drawArrays", "drawElementsInstanced", "drawArraysInstanced"]) {
+          const f = p[m] as ((...a: unknown[]) => unknown) | undefined;
+          if (f) p[m] = function (this: unknown, ...a: unknown[]) { drew = true; return f.apply(this, a); };
+        }
+      }
+    };
+    const el = duo.current;
+    hook();
+    el?.addEventListener("load", hook);
+    return () => { cancelAnimationFrame(raf); el?.removeEventListener("load", hook); };
+  }, [!!url]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Idle motion, not under reduced motion, nor while the reader drags the device.
+  useEffect(() => {
+    const w = window as unknown as { __duoYaw?: number };
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!idle || still || !shown || manual) { sway.current = { yaw: 0, deg: 0 }; w.__duoYaw = 0; send(); return; }
+    const t0 = performance.now();
+    const id = setInterval(() => {
+      const t = (performance.now() - t0) / 1000;
+      const yaw = 12 * Math.sin((t * 2 * Math.PI) / 9);
+      const breathe = fold === undefined && s.posture === "open" && stand === "flat" && !s.turn ? 170 + 10 * Math.sin((t * 2 * Math.PI) / 7) : 0;
+      sway.current = { yaw: (yaw * Math.PI) / 180, deg: breathe };
+      w.__duoYaw = yaw;
+      send();
+    }, 33);
+    return () => clearInterval(id);
+  }, [idle, shown, manual, s.posture, s.turn, stand, fold === undefined]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A press from the page (a block, a clip): `duet:press` with {id} or {selector}, sent on to both displays.
+  const pressIt = (p: Press) => ch.current?.postMessage({ press: p });
+  useEffect(() => {
+    const on = (e: Event) => { const d = (e as CustomEvent<Press>).detail; if (d) pressIt(d); };
+    addEventListener("duet:press", on);
+    return () => removeEventListener("duet:press", on);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const hi = (e: MessageEvent) => { if (e.source === duo.current?.contentWindow && (e.data?.live || e.data?.ready)) send(); };
     addEventListener("message", hi);
@@ -78,12 +173,16 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   });
 
   // Both displays follow the state; a display that loads late asks for it.
-  const sync: Sync = { s: { ...s, laptop: stand === "elevated" }, upright, src, duet };
+  const sync: Sync = { s: { ...s, laptop: stand === "elevated" }, upright, src, duet, selected, highlight: scene?.highlight };
   const ch = useRef<BroadcastChannel | null>(null), last = useRef(sync);
   last.current = sync;
   useEffect(() => {
     const c = ch.current = new BroadcastChannel(channel(ID));
-    c.onmessage = (e) => { if (e.data?.hello) c.postMessage(last.current); };
+    c.onmessage = (e) => {
+      if (e.data?.hello) c.postMessage(last.current);
+      // The displays' measures of what Duet drew: {display, fit, free, rects}, as a window event.
+      else if (e.data?.measure) dispatchEvent(new CustomEvent("duet:measure", { detail: e.data.measure }));
+    };
     return () => c.close();
   }, []);
   useEffect(() => { ch.current?.postMessage(sync); }, [JSON.stringify(sync)]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -115,6 +214,78 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     go({ posture: to, ...(stand !== "flat" && { turn: 0 as Turn, upside: false }) }, "flat");
   };
 
+  // A block's posture picker, or a clip's: Sideways is the closed device turned, its band one button long.
+  const take = (p: ClipPosture) => {
+    if (p === "laptop") return posture("laptop");
+    if (p === "sideways") return go({ posture: "closed", turn: 90, upside: false }, "flat");
+    go({ posture: p, turn: 0, upside: false }, "flat");
+  };
+  const takeRef = useRef(take);
+  takeRef.current = take;
+  useEffect(() => { if (wanted) takeRef.current(wanted); }, [wanted]);
+
+  // The tour's step: Duet on, the step's page, its posture and app, then its press once the page has drawn it.
+  const stageTo = (sc: Scene) => {
+    setPage("");
+    setDuet(true);
+    setSite(sc.src);
+    if (sc.posture === "laptop" || sc.posture === "sideways") take(sc.posture);
+    else go({ posture: sc.posture, app: sc.app ?? "safari", turn: 0, upside: false }, "flat");
+  };
+  const stageRef = useRef(stageTo);
+  stageRef.current = stageTo;
+  const lastScene = useRef<Scene | null>(null);
+  const sceneKey = scene ? JSON.stringify(scene) : "";
+  useEffect(() => {
+    if (!scene) return;
+    const prev = lastScene.current, timers: ReturnType<typeof setTimeout>[] = [];
+    lastScene.current = scene;
+    const apply = () => {
+      stageRef.current(scene);
+      if (scene.press) timers.push(setTimeout(() => pressIt({ ...scene.press!, retry: true }), 600));
+    };
+    if (prev?.undo) { pressIt(prev.undo); timers.push(setTimeout(apply, 450)); } else apply();
+    return () => timers.forEach(clearTimeout);
+  }, [sceneKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A step the scroll drives: the hinge follows the fold, after the scene's own posture (applied late after an undo).
+  useEffect(() => {
+    if (fold === undefined) return;
+    const set = () => setDeg(Math.max(0, Math.min(1, fold)) * 180);
+    set();
+    const t = setTimeout(set, 500);
+    return () => clearTimeout(t);
+  }, [fold, sceneKey]);
+
+  // A clip plays once, from the moment duo shows the device: duet:clip-start and duet:clip-end mark it in the log.
+  useEffect(() => {
+    if (!film) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let started = false;
+    const start = () => {
+      if (started) return;
+      started = true;
+      takeRef.current(film.posture);
+      timers.push(setTimeout(() => {
+        const t0 = performance.now();
+        mark("clip-start", { clip, t: 0 });
+        for (const st of film.steps) timers.push(setTimeout(() => {
+          if (st.posture) takeRef.current(st.posture);
+          if (st.duet !== undefined) setDuet(st.duet);
+          if (st.src) setSite(st.src);
+          if (st.press) pressIt(st.press);
+        }, st.at));
+        timers.push(setTimeout(() => mark("clip-end", { clip, t: Math.round(performance.now() - t0) }), film.length));
+      }, 1200));
+    };
+    const hi = (e: MessageEvent) => { if (e.source === duo.current?.contentWindow && e.data?.ready) start(); };
+    const measured = (e: Event) => mark("measure", { clip, ...(e as CustomEvent<Record<string, unknown>>).detail });
+    addEventListener("message", hi);
+    addEventListener("duet:measure", measured);
+    timers.push(setTimeout(start, 8000));
+    return () => { removeEventListener("message", hi); removeEventListener("duet:measure", measured); timers.forEach(clearTimeout); };
+  }, [clip]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!embed) return;
     const el = stage.current!;
@@ -133,6 +304,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
     setDeg(d);
     if (posture !== s.posture) setS(fit({ ...s, posture }));
   };
+
 
   const safari = s.app === "safari" || s.app === "split", preview = s.app === "sheet";
   const split = s.app === "split";
@@ -162,7 +334,7 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
       { id: "forward", label: "Navigation", icon: <ArrowLeftRight size={18} />, on: !!s.forward, off: !safari, pick: () => go({ forward: !s.forward }), hint: "Forward history (Safari)" },
     ] },
   ];
-  const fold = <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ flex: 1, minWidth: 90, accentColor: "var(--accent)" }} />;
+  const slider = <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ flex: 1, minWidth: 40, accentColor: "var(--accent)" }} />;
   const turns = ([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
     <Square42 key={by} label={label} onClick={() => go(rotate(s, by), "flat")}><Icon size={18} /></Square42>
   ));
@@ -205,21 +377,21 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
   // Rotate, fold and the camera act on the device itself, so they sit right under it. Reset view is always in reach,
   // since a stray drag or swipe orbits the model; on the landing page it also locks the stage, so the page scrolls again.
   const handle = (
-    <div style={{ alignSelf: "center", width: list ? "calc(100% - 24px)" : "min(380px, calc(100% - 32px))", margin: list ? "4px 0 6px" : "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
-      {turns}<span style={{ width: 8 }} />{fold}<span style={{ width: 8 }} />{embed ? <Square42 label={manual ? "Lock, reset view" : "Unlock to drag the device"} on={manual} onClick={() => manual ? lock() : setManual(true)}>{manual ? <LockOpen size={18} /> : <Lock size={18} />}</Square42> : <Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>}
+    <div style={{ alignSelf: "center", width: list ? "100%" : "min(380px, calc(100% - 32px))", margin: list ? "4px 0 6px" : "6px 0 14px", display: "flex", alignItems: "center", gap: 4, padding: 4, borderRadius: 16, background: "color-mix(in srgb, var(--card), transparent 20%)", backdropFilter: "blur(20px)", boxShadow: "0 0 0 0.5px var(--line)", boxSizing: "border-box" }}>
+      {turns}<span style={{ width: 8 }} />{slider}<span style={{ width: 8 }} />{embed ? <Square42 label={manual ? "Lock, reset view" : "Unlock to drag the device"} on={manual} onClick={() => manual ? lock() : setManual(true)}>{manual ? <LockOpen size={18} /> : <Lock size={18} />}</Square42> : <Square42 label="Reset view" onClick={front}><Rotate3d size={18} /></Square42>}
     </div>
   );
 
-  // Narrow: every question open at once, one row each, its title over what is chosen and the icons beside it.
+  // Narrow: every question open at once, one row each, its title over what is chosen and the icons beside it. Too narrow for both, the icons wrap under the title.
   const rows = list && (
-    <div style={{ display: "grid", gap: 6, padding: "0 12px 14px" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 6, padding: "0 0 14px" }}>
       {sections.map((x) => (
-        <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 6px 6px 14px", borderRadius: 16, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, rowGap: 4, padding: "6px 6px 6px 14px", borderRadius: 16, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
+          <div style={{ flex: "1 0 52px", minWidth: 0 }}>
             <div style={caption}>{x.title}</div>
             <div style={{ font: "600 14px/1.3 -apple-system, system-ui", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.one ? x.opts.find((o) => o.on)?.label : x.opts.filter((o) => o.on).map((o) => o.label).join(", ") || "None"}</div>
           </div>
-          <div style={{ display: "flex", gap: 4, justifyContent: "flex-end", minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
+          <div style={{ display: "flex", gap: 4, marginLeft: "auto", justifyContent: "flex-end", minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
             {x.opts.map((o) => <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
           </div>
         </div>
@@ -234,8 +406,15 @@ export function Duo3D({ embed = false }: { embed?: boolean } = {}) {
           document gets an opaque white backdrop instead of showing the page through. */}
       {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
         style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
-      <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
-        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>
+      {chrome && <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
+        <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>}
+    </div>
+  );
+
+  // A clip: the device alone on the page's own background, never transparent, sized to the window.
+  if (film || !chrome) return (
+    <div style={{ position: "fixed", inset: 0, background: "var(--bg)" }}>
+      {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" onLoad={send} style={{ width: "100%", height: "100%", border: 0, display: "block", background: "var(--bg)", colorScheme: "light" }} />}
     </div>
   );
 
@@ -274,3 +453,21 @@ function Square42({ label, on, off, onClick, children }: { label: string; on?: b
   );
 }
 
+
+/** /duo3d: the card, or with `?clip=<name>&theme=light|dark&chrome=0[&mark=<loopback url>]` one clip played once
+ *  for the recorder. */
+export function Duo3DPage() {
+  const q = useSyncExternalStore(() => () => {}, () => location.search, () => null);
+  const p = new URLSearchParams(q ?? ""), clip = p.get("clip"), theme = p.get("theme"), to = p.get("mark");
+  try { if (to && /^(127\.0\.0\.1|localhost)$/.test(new URL(to).hostname)) markTo = to; } catch { /* not a URL */ }
+  // A clip's theme is the site's pick too, so the Duo's frames and the pages on its screens (each its own document,
+  // light by the iframes' color-scheme) draw in it. Set before they load: they read it once, then on storage events.
+  if (clip && (theme === "light" || theme === "dark")) try { localStorage.setItem("duet-theme", theme); } catch { /* storage blocked */ }
+  useEffect(() => {
+    if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-lg-theme", theme);
+  }, [theme]);
+  // The query is only known in the browser: the page's background until then.
+  if (q === null) return <div style={{ position: "fixed", inset: 0, background: "var(--bg)" }} />;
+  if (clip && CLIPS[clip]) return <Duo3D key={clip} clip={clip} chrome={p.get("chrome") !== "0"} />;
+  return <Duo3D />;
+}

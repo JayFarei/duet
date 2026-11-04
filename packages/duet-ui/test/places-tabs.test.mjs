@@ -245,7 +245,7 @@ test("the docs' table is the rule", () => {
   for (const [name, c] of Object.entries(windows)) {
     const row = doc.match(new RegExp(`^\\| ${name}[^|]*\\| ([^|]+) \\| ([^|]+) \\| ([^|]+) \\|$`, "m"));
     assert.ok(row, name);
-    assert.deepEqual([row[1], row[2], row[3]].map((x) => x === "burger" ? x : +x), [most(c, true), most(c, false), overflow(c)], name);
+    assert.deepEqual([row[1], row[2], row[3]].map((x) => x === "Sidebar" ? "burger" : +x), [most(c, true), most(c, false), overflow(c)], name);
   }
 });
 

@@ -7,7 +7,8 @@
     "dev": "pnpm --filter duet-ui build && pnpm --parallel --filter \"./apps/*\" --filter \"./examples/*\" dev",
     "test": "pnpm --filter duet-ui test",
     "test:e2e": "pnpm --filter duet-ui build && playwright test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "media": "node tools/media/record.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.0",

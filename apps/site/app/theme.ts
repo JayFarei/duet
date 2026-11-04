@@ -11,19 +11,21 @@ const stored = (): "light" | "dark" | null => {
 };
 const listeners = new Set<() => void>();
 
+/** data-lg-theme: the visitor's pick, read by the CSS tokens; data-theme: the theme in effect, pick or system. */
 function apply() {
-  const forced = stored();
-  if (forced) document.documentElement.setAttribute("data-lg-theme", forced);
-  else document.documentElement.removeAttribute("data-lg-theme");
+  const forced = stored(), html = document.documentElement;
+  if (forced) html.setAttribute("data-lg-theme", forced);
+  else html.removeAttribute("data-lg-theme");
+  html.setAttribute("data-theme", forced ?? (mq().matches ? "dark" : "light"));
   listeners.forEach((f) => f());
 }
 
 function subscribe(cb: () => void) {
   const m = mq(), onStorage = (e: StorageEvent) => { if (e.key === THEME_KEY) apply(); };
   listeners.add(cb);
-  m.addEventListener("change", cb);
+  m.addEventListener("change", apply);
   addEventListener("storage", onStorage);
-  return () => { listeners.delete(cb); m.removeEventListener("change", cb); removeEventListener("storage", onStorage); };
+  return () => { listeners.delete(cb); m.removeEventListener("change", apply); removeEventListener("storage", onStorage); };
 }
 
 /** dark: the theme in effect; appearance: the pick, or "auto" for the system (pass it to <Duet appearance>). */

@@ -1,3 +1,4 @@
+import { source } from "./examples/source";
 import { Home, type InstallStats } from "./home";
 
 const METRICS = "https://opentraces-metrics.fareiunastrage.workers.dev/v1/projects/duet";
@@ -21,5 +22,7 @@ async function installs(): Promise<InstallStats | null> {
 }
 
 export default async function Page() {
-  return <Home installs={await installs()} />;
+  // Named here, not taken from home.tsx: a server component gets only a client reference from a "use client" module.
+  const sources = { inbox: source("inbox"), checkout: source("checkout"), reader: source("reader") };
+  return <Home installs={await installs()} sources={sources} />;
 }
