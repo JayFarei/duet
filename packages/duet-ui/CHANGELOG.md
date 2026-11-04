@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.1-rc.1
 
 - Light mode rim off iOS: desktop Safari, Chrome and other engines drew black caps on each capsule. They now get white highlights at normal blend; iOS keeps its dodge rim under `@supports (-webkit-touch-callout: none)`. Dark mode is unchanged.
 - **Behaviour change:** the "…" list heads its sections "Places" and "Actions" (was "Menu" and "This page" or "More"), and the sidebar button and sidebar are named "Sidebar" (was "Menu"). Tests that find the button by `aria-label="Menu"` need updating.
