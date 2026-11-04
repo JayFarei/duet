@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.1
+
+Everything from 0.8.1-rc.1, plus the last two fixes listed under it (the overlay sidebar in Safari's column, and the iOS follow-layer rim), which landed after rc.1 was published.
+
+Known issue: "…" can stay closing when its group unmounts mid-close in column mode, and then outside taps are swallowed (#262). 0.8.0 does the same.
+
 ## 0.8.1-rc.1
 
 - Light mode rim off iOS: desktop Safari, Chrome and other engines drew black caps on each capsule. They now get white highlights at normal blend; iOS keeps its dodge rim under `@supports (-webkit-touch-callout: none)`. Dark mode is unchanged.
