@@ -1,6 +1,6 @@
 // T11: retired routes are gone; the routes the Duo e2e harness and tools use stay, but no public page links to them
 // (PLAN 8, adjusted: lab, mockup, workbench, scroll, probe, column, panes, book, sheet and api/* are test infrastructure;
-// tools/e2e/catalogue.py drives /sheet, /book, /scroll and /probe on the Duo sims). Only /skeleton is gone.
+// tools/e2e/catalogue.py drives /sheet, /book, /scroll and /probe on the Duo sims). Only /components is gone; /skeleton is back as the simulator's page.
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
@@ -27,7 +27,7 @@ for (const path of PAGES) {
   });
 }
 
-// The full web Duo used the retired skeleton app; it now loads the Inbox example, and nothing it loads 404s.
+// The full web Duo loads the Inbox example, and nothing it loads 404s.
 test("/duo loads no retired route", async ({ page }) => {
   const missing: string[] = [];
   page.on("response", (r) => { if (r.status() === 404 && !new URL(r.url()).pathname.startsWith("/_vercel/")) missing.push(new URL(r.url()).pathname); });

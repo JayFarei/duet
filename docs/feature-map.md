@@ -18,10 +18,9 @@ One short page, four sections in order under an intro (`main > section[id]`): th
 | Part | Selector | What it does |
 |---|---|---|
 | Intro | `[data-testid="hero"]` | Title, lede, install line, copy prompt for coding agents, version and install stats. |
-| Simulator | `#simulator`, `[data-testid="simulator"]` | The live 3D Duo (`Duo embed`) with its own controls: Moments (Tabs, Tabs + More, Selected, Sidebar), With or Without Duet, posture, fold and lock. It stops drawing off screen (`window.__duoFrames` stops). Without WebGL 2 it falls back to the flat WebDuo (`[data-testid="web-duo"]`). |
-| App picker | `[data-testid="app-picker"]` | Inbox, Checkout, Reader. A press sends `duet:example` with `/examples/<name>?plain`; the button reads `aria-pressed="true"`. The simulator sends `duet:screen` with the page it runs, so a Moment (always the Inbox) moves the picker back. |
+| Simulator | `#simulator`, `[data-testid="simulator"]` | The live 3D Duo (`Duo embed src="/skeleton"`) with the skeleton site in Safari and its own controls, as on prod: turns, fold and lock, then Device, Surface, Layout and System UI, then With or Without Duet. No presets. The device box keeps one height (`min(width × 0.85, 600, 62% of the window)`), so the controls under it hold still as the posture changes. It stops drawing off screen (`window.__duoFrames` stops). Without WebGL 2 it falls back to the flat WebDuo (`[data-testid="web-duo"]`). |
 | How it works | `#how` | Four steps (`ol.how`): wrap your app, Duet measures, it draws what fits, it steps aside. Then the glossary `table.glossary`, one row per noun in glossary order. |
-| Examples | `#examples article` | One card per example. Try it loads it in the simulator and scrolls there, Open goes to `/examples/<name>`, Show code (`details.ex-src`) opens its one source file. |
+| Examples | `#examples article` | One card per example. Open goes to `/examples/<name>`, Show code (`details.ex-src`) opens its one source file. |
 | Install | `#install` | Install line, copy prompt, the usage code, links to the API reference, How Duet decides and GitHub. |
 
 ## Examples (`apps/site/app/examples/`)

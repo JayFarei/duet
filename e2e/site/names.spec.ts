@@ -89,6 +89,6 @@ test.describe("docs", () => {
     const map = readFileSync(join(ROOT, "docs/feature-map.md"), "utf8");
     for (const n of NOUNS) expect(map, `noun ${n}`).toContain(n);
     for (const p of [...PAGES, "/duo3d?clip=", "record.mjs", "compose.sh", "check-media.mjs"]) expect(map, p).toContain(p);
-    for (const gone of ["/skeleton", "form-", "control-", "duo3d-stills", "duo3d-apps", "#rules", "/components", "#tour"]) expect(map, gone).not.toContain(gone);
+    for (const gone of ["form-", "control-", "duo3d-stills", "duo3d-apps", "#rules", "/components", "#tour"]) expect(map, gone).not.toContain(gone);
   });
 });

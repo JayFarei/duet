@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowUpRight, Check, Sparkles } from "lucide-react";
 import { column } from "duet-ui";
 import pkg from "duet-ui/package.json";
@@ -23,7 +23,7 @@ const QUICK = `import { Duet } from "duet-ui";
 
 export type InstallStats = { total: number; daily: number[] };
 
-/** The examples, each a real app in one file at /examples/<name>. The simulator loads `?plain`: the app alone. */
+/** The examples, each a real app in one file at /examples/<name>. */
 export const EXAMPLES = [
   { name: "inbox", title: "Inbox", text: "Nine folders as Navigation: Tabs open, Tabs + More or Sidebar closed. Actions, and Close over a message." },
   { name: "checkout", title: "Checkout", text: "Pay as a Primary that asks to confirm. Turned sideways, Pay folds into More." },
@@ -52,19 +52,6 @@ const NOUNS = [
 
 /** The home page: the live simulator, how Duet works, the examples, install. */
 export function Home({ installs, sources }: { installs: InstallStats | null; sources: Record<Name, string> }) {
-  const [app, setApp] = useState<Name>("inbox");
-  const sim = useRef<HTMLElement>(null);
-  // The screens tell which app they run, so a Moment (always the Inbox) moves the picker back.
-  useEffect(() => {
-    const on = (e: Event) => { const src = String((e as CustomEvent<string>).detail); const hit = EXAMPLES.find((x) => src.includes(`/examples/${x.name}`)); if (hit) setApp(hit.name); };
-    addEventListener("duet:screen", on);
-    return () => removeEventListener("duet:screen", on);
-  }, []);
-  const load = (name: Name, scroll = false) => {
-    setApp(name);
-    dispatchEvent(new CustomEvent("duet:example", { detail: { src: `/examples/${name}?plain`, moment: "fit" } }));
-    if (scroll) sim.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  };
   return (
     <>
       <SiteNav />
@@ -78,14 +65,9 @@ export function Home({ installs, sources }: { installs: InstallStats | null; sou
           </div>
         </header>
 
-        <section id="simulator" ref={sim} className="sim" data-testid="simulator">
-          <div className="wrap sim-head">
-            <h2 className="h2">Try it</h2>
-            <div className="seg" role="group" aria-label="App" data-testid="app-picker">
-              {EXAMPLES.map((e) => <button key={e.name} type="button" aria-pressed={app === e.name} onClick={() => load(e.name)}>{e.title}</button>)}
-            </div>
-          </div>
-          <div className="stage"><Duo embed src="/examples/inbox?plain" /></div>
+        <section id="simulator" className="sim" data-testid="simulator">
+          <div className="wrap sim-head"><h2 className="h2">Try it</h2></div>
+          <div className="stage"><Duo embed src="/skeleton" /></div>
         </section>
 
         <section id="how" className="section wrap">
@@ -107,7 +89,6 @@ export function Home({ installs, sources }: { installs: InstallStats | null; sou
                 <h3 className="card-h">{e.title}</h3>
                 <p className="card-p">{e.text}</p>
                 <div className="ex-acts">
-                  <button type="button" className="pill pill-sm pill-solid" onClick={() => load(e.name, true)}>Try it</button>
                   <a className="pill pill-sm" href={`/examples/${e.name}`}>Open<ArrowUpRight size={14} aria-hidden /></a>
                 </div>
                 <details className="ex-src">

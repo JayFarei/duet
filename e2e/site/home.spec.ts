@@ -1,12 +1,12 @@
 // The home page is one short page: the live simulator, how Duet works, the examples, install. The simulator is the
-// interactive 3D Duo with its full controls (moments, toggles, fold, With or Without Duet) running the examples.
+// interactive 3D Duo with prod's controls (turns, fold, Device, Surface, Layout, System UI, With or Without Duet) on the skeleton site.
 import { expect, test } from "@playwright/test";
 import { GPU, stageReady } from "./site";
 
 test.use(GPU);
 
-const onScreen = (page: import("@playwright/test").Page, name: string) =>
-  expect.poll(() => page.frames().some((f) => f.url().includes(`/examples/${name}`)), { message: `the simulator runs ${name}`, timeout: 20_000 }).toBe(true);
+const onScreen = (page: import("@playwright/test").Page, path: string) =>
+  expect.poll(() => page.frames().some((f) => f.url().includes(path)), { message: `the simulator runs ${path}`, timeout: 20_000 }).toBe(true);
 
 test("four sections, in order, and no tour", async ({ page }) => {
   await page.goto("/");
@@ -16,32 +16,31 @@ test("four sections, in order, and no tour", async ({ page }) => {
   await expect(page.locator("main video")).toHaveCount(0);
 });
 
-test("the simulator is the live Duo with its controls", async ({ page }) => {
+test("the simulator is the live Duo with its controls, and no presets", async ({ page }) => {
   await page.goto("/");
   const sim = page.getByTestId("simulator");
   await stageReady(page);
   await expect(sim.getByRole("radio", { name: "With Duet" })).toBeVisible();
-  await expect(sim.getByRole("button", { name: "Sidebar", exact: true })).toBeVisible();
-  await onScreen(page, "inbox");
+  for (const name of ["Closed", "Open", "Tent", "Laptop"]) await expect(sim.getByRole("button", { name, exact: true }).first()).toBeVisible();
+  await expect(sim.getByText("System UI", { exact: true }).first()).toBeVisible();
+  await expect(sim.getByRole("group", { name: "Moments" })).toHaveCount(0);
+  await expect(sim.getByRole("button", { name: "Sidebar", exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("app-picker")).toHaveCount(0);
+  await onScreen(page, "/skeleton");
+  expect((await page.request.get("/skeleton")).status()).toBe(200);
 });
 
-test("the app picker switches the simulator's app", async ({ page }) => {
+test("the controls under the device hold still as the posture changes", async ({ page }) => {
   await page.goto("/");
   await stageReady(page);
-  const picker = page.getByTestId("app-picker");
-  await expect(picker.getByRole("button")).toHaveText(["Inbox", "Checkout", "Reader"]);
-  await picker.getByRole("button", { name: "Checkout" }).click();
-  await expect(picker.getByRole("button", { name: "Checkout" })).toHaveAttribute("aria-pressed", "true");
-  await onScreen(page, "checkout");
-});
-
-test("an example's Try it loads it in the simulator", async ({ page }) => {
-  await page.goto("/");
-  await stageReady(page);
-  const card = page.locator("#examples article", { hasText: "Reader" });
-  await card.getByRole("button", { name: /try it/i }).click();
-  await expect.poll(() => page.getByTestId("simulator").evaluate((e) => { const r = e.getBoundingClientRect(); return r.top < innerHeight && r.bottom > 0; })).toBe(true);
-  await onScreen(page, "reader");
+  const sim = page.getByTestId("simulator");
+  const top = () => sim.getByRole("radio", { name: "With Duet" }).evaluate((e) => Math.round(e.getBoundingClientRect().top + scrollY));
+  const before = await top();
+  for (const name of ["Closed", "Tent", "Laptop", "Open"]) {
+    await sim.getByRole("button", { name, exact: true }).first().click();
+    await page.waitForTimeout(600);
+    expect(await top(), name).toBe(before);
+  }
 });
 
 test("an example shows its source", async ({ page }) => {

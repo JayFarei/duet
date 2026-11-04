@@ -21,7 +21,7 @@ export const PAGES = ["/", ...EXAMPLES] as const;
 /** Routes the Duo e2e harness and tools use: kept, never linked from the site. */
 export const HARNESS = ["/lab", "/mockup", "/workbench", "/scroll", "/probe", "/column", "/panes", "/book", "/sheet"] as const;
 /** Routes that are gone. */
-export const GONE = ["/skeleton", "/components"] as const;
+export const GONE = ["/components"] as const;
 /** Words retired from every user-facing surface. */
 export const BANNED = /\b(burger|main button|call to action|cta|pill|capsule|control strip|this page)\b/i;
 

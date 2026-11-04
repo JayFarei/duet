@@ -21,16 +21,6 @@ function mark(kind: string, data: Record<string, unknown>) {
 
 const SWAP = 450; // the interface turns upright this far into the device's turn
 
-/** One-tap views of the rule Duet follows with the Inbox example's nine folders: the expected controls are the docs'
- *  table (how-duet-decides.md). home.tsx's rule cards send the same ids as a `duet:moment` window event. */
-export const MOMENTS = [
-  { id: "fit", label: "Tabs", state: { posture: "open", app: "safari" }, selected: "inbox", caption: "Unfolded, all nine folders fit as tabs." },
-  { id: "fold", label: "Tabs + More", state: { posture: "closed", app: "home" }, selected: "inbox", caption: "Room for some: those stay tabs, the rest go in More." },
-  { id: "folded", label: "Selected", state: { posture: "closed", app: "home" }, selected: "trash", caption: "More shows Trash selected, then its list marks it." },
-  { id: "burger", label: "Sidebar", state: { posture: "closed", app: "safari" }, selected: "inbox", caption: "Fewer than three tabs fit, so the Sidebar button opens every folder." },
-] as const satisfies readonly { id: string; label: string; state: Partial<State>; selected: string; caption: string }[];
-export type MomentId = (typeof MOMENTS)[number]["id"];
-
 // Stand poses, the device on a table seen a little from above. Both are landscape with the hinge across: the
 // interface turns with the hardware. Nightstand is a tent on the closed side, the cover display facing you;
 // elevated is a laptop, one half flat and the other raised. duo tips the whole device by `pitch`.
@@ -70,12 +60,12 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
 /** highlight: the tour's pointer at a part of Duet in the page. fold: the hinge at a share of the way open (0 closed, 1
  *  flat), for a step the scroll drives; the posture flips half way, as the fold slider's does. */
 export type Scene = { src: string; posture: ClipPosture; app?: "safari" | "home" | "sheet"; press?: Press; undo?: Press; highlight?: Highlight };
-export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chrome = true, posture: wanted, idle = false, live = false, clip, scene, fold }: {
+export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, posture: wanted, idle = false, live = false, clip, scene, fold }: {
   embed?: boolean; src?: string; chrome?: boolean; posture?: ClipPosture; idle?: boolean; live?: boolean; clip?: string; scene?: Scene; fold?: number;
 } = {}) {
   const film = clip ? CLIPS[clip] : undefined;
   // The landing page opens on a Moment: the closed Home Screen, seven tabs and "…".
-  const [s, setS] = useState<State>(embed && !wanted ? { ...TOUR[0], app: "home" } : film ? { ...TOUR[0], app: film.app ?? "safari" } : TOUR[0]);
+  const [s, setS] = useState<State>(film ? { ...TOUR[0], app: film.app ?? "safari" } : TOUR[0]);
   const [selected, setSelected] = useState<Sync["selected"]>();
   const [deg, setDeg] = useState(0);
   const [stand, setStand] = useState<Stand>("flat");
@@ -85,9 +75,9 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
   const [manual, setManual] = useState(live), [box, setBox] = useState({ w: 0, h: 0 });
   const stage = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
-  // The page in Safari: the Inbox example, or any URL through /duo3d/web, which adds Duet to it.
+  // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
-  // An example from the landing page (`duet:example`), shown in place of the Inbox until the next Moment.
+  // A clip's own page, in place of the home one.
   const [site, setSite] = useState<string | null>(null);
   const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : site ?? film?.src ?? home;
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
@@ -299,8 +289,7 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
   useEffect(() => {
     if (!embed) return;
     const el = stage.current!;
-    // A phone gives the device most of the window, its caption under it; a wide window sizes it by its column.
-    const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, innerWidth <= 760 ? innerHeight * 0.64 : Math.min(el.clientWidth * 0.85, 680, innerHeight * 0.7)) });
+    const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, Math.min(el.clientWidth * 0.85, 600, innerHeight * 0.62)) });
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
@@ -316,30 +305,6 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
     if (posture !== s.posture) setS(fit({ ...s, posture }));
   };
 
-  // A Moment: the device flat and upright in its posture and app, and the place it selects.
-  const moment = (id: MomentId) => {
-    const m = MOMENTS.find((x) => x.id === id)!;
-    setPage("");
-    setSite(null);
-    setDuet(true);
-    go({ ...m.state, turn: 0, upside: false }, "flat");
-    // Selected shows More holding the selection for a beat, then opens its list (examples/inbox/app.tsx).
-    setSelected({ id: m.selected, at: Date.now(), open: id === "folded" });
-  };
-  const momentRef = useRef(moment);
-  momentRef.current = moment;
-  useEffect(() => {
-    const on = (e: Event) => { const id = (e as CustomEvent<MomentId>).detail; if (MOMENTS.some((m) => m.id === id)) momentRef.current(id); };
-    // An example: its posture from a Moment, then its page.
-    const ex = (e: Event) => { const { src, moment: id } = (e as CustomEvent<{ src: string; moment: MomentId }>).detail; momentRef.current(id); setSite(src); };
-    addEventListener("duet:moment", on);
-    addEventListener("duet:example", ex);
-    return () => { removeEventListener("duet:moment", on); removeEventListener("duet:example", ex); };
-  }, []);
-  // Tells the page which app the screens run, so the home app picker follows a Moment back to the Inbox.
-  useEffect(() => { dispatchEvent(new CustomEvent("duet:screen", { detail: src })); }, [src]);
-  const picked = selected?.id ?? "home";
-  const at = MOMENTS.find((m) => stand === "flat" && !s.turn && !s.upside && !page && !site && duet && m.state.posture === s.posture && m.state.app === s.app && (m.id === "folded") === (picked === "settings"));
 
   const safari = s.app === "safari" || s.app === "split", preview = s.app === "sheet";
   const split = s.app === "split";
@@ -385,7 +350,7 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
             {/* Before and after: the same site as a plain mobile site, then with Duet. */}
             <form onSubmit={(e) => { e.preventDefault(); setPage(String(new FormData(e.currentTarget).get("url") ?? "").trim()); }} style={{ ...group, alignItems: "center", gap: 6, padding: "0 6px 0 14px" }}>
               <Globe size={16} style={{ color: "var(--dim)", flexShrink: 0 }} />
-              <input name="url" type="text" inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="Any URL, or empty for the Inbox" defaultValue={page}
+              <input name="url" type="text" inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="Any URL, or empty for the skeleton" defaultValue={page}
                 style={{ flex: 1, minWidth: 0, height: 36, border: 0, background: "transparent", color: "var(--ink)", font: "400 15px -apple-system, system-ui", outline: "none" }} />
               <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center", background: "transparent" }}><ArrowRight size={16} /></button>
             </form>
@@ -434,30 +399,14 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
     </div>
   );
 
-  // The Moments: the rule, one tap each, its caption under them.
-  const moments = (
-    <div className="moments">
-      <div className="moments-row" role="group" aria-label="Moments">
-        {MOMENTS.map((m) => <button key={m.id} className="moment" aria-pressed={at?.id === m.id} onClick={() => moment(m.id)}>{m.label}</button>)}
-      </div>
-      <p className="moments-cap" aria-live="polite">{at?.caption ?? "Duet measures the room and picks the largest controls that fit."}</p>
-      <p className="moments-hint">{manual ? "Press and drag along the tabs." : "Unlock below to try the press lens."}</p>
-    </div>
-  );
-
-  // duo fits a 17 by 14.9 box (any turn of the open device) inside 16px margins; flat and upright the device is
-  // only 11.25 tall, so the controls under it move up into the empty band below it, and back for a turn or a stand.
-  const scale = Math.min((box.w - 32) / 17, ((box.h || 260) - 32) / 14.9);
-  const crop = stand === "flat" && Math.abs(hw) % 180 === 0 ? Math.max(0, Math.floor((scale * (14.9 - 11.25)) / 2) - 8) : 0;
-
   // On the landing page: the device, its controls under it.
   if (embed) return (
     <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
       {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
           document gets an opaque white backdrop instead of showing the page through. */}
       {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
-        style={{ width: "100%", height: box.h || 260, marginBottom: -crop, transition: "margin-bottom 0.45s ease", border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
-      {chrome && <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{moments}{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
+        style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
+      {chrome && <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
         <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>}
     </div>
   );
