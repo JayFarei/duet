@@ -2,6 +2,7 @@ node_modules
 dist
 .next
 .next-test
+.next-review
 next-env.d.ts
 *.tsbuildinfo
 .venv
