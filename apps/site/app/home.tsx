@@ -1,25 +1,23 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, Check } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowUpRight, Check, Sparkles } from "lucide-react";
 import { column } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
-import { ClaudeGlyph, CodexGlyph, GrokGlyph, PiGlyph } from "./agent-glyphs";
 import { LoopVideo } from "./loop-video";
-import { REPO, SiteNav } from "./site-nav";
-import { TINTS, useTint } from "./theme";
+import { GitHub, REPO, SiteNav } from "./site-nav";
 import { Tour } from "./tour";
 
 const DOC = `${REPO}/blob/main/docs`;
 
-const quick = (tint?: string) => `import { Duet } from "duet-ui";
+const QUICK = `import { Duet } from "duet-ui";
 
 <Duet
   menu={{ items: PLACES, selected: place, onSelect: setPlace, tabs: true }}
   actions={[{ id: "share", label: "Share", icon: <Share />, onPress: share }]}
-  primary={{ id: "pay", label: "Pay", icon: <CreditCard />, onPress: pay }}${tint ? `\n  tint="${tint}"` : ""}
+  primary={{ id: "pay", label: "Pay", icon: <CreditCard />, onPress: pay }}
 >
   <App />
 </Duet>`;
@@ -58,11 +56,15 @@ export function Home({ installs, clips }: { installs: InstallStats | null; clips
             <h1 className="display">Native side controls for your web app on the <em>iPhone Duo.</em></h1>
             <p className="lede">You pass the places in your app. Duet measures the free space beside your page and draws the largest controls that fit. No device checks in your code.</p>
             <div className="actions">
+              <div className="ctas">
+                <a href="#docs" className="pill pill-solid">Get started</a>
+                <a href={REPO} className="pill" target="_blank" rel="noreferrer"><GitHub />GitHub</a>
+              </div>
               <div className="ctas"><AgentPrompt /><Npm /></div>
               <Stats installs={installs} />
             </div>
           </div>
-          <Tour />
+          <Tour clips={clips} />
         </section>
 
         <section id="examples" className="section wrap">
@@ -161,29 +163,17 @@ function Footer() {
   );
 }
 
-/** The quick start, with a tint picker: the stage and this page's own controls take the colour. */
+/** The quick start. */
 function Integrate() {
-  const { tint, setTint } = useTint();
-  const on = tint ?? TINTS[0][1];
-  return (
-    <>
-      <Snippet code={quick(tint)} />
-      <div className="tints" role="radiogroup" aria-label="Tint">
-        <span className="tints-k">Tint</span>
-        {TINTS.map(([name, c]) => (
-          <button key={c} role="radio" aria-checked={c === on} aria-label={name} className="tint" style={{ "--c": c } as CSSProperties} onClick={() => setTint(c)} />
-        ))}
-      </div>
-    </>
-  );
+  return <Snippet code={QUICK} />;
 }
 
 function Snippet({ code }: { code: string }) {
   return <pre className="card code"><code dangerouslySetInnerHTML={{ __html: highlight(code) }} /></pre>;
 }
 
-/** The hero's main call to action: copies a prompt that has a coding agent make the reader's app Duo-ready. A tilted
- *  deck of agent glyphs fans out on hover, and the label flips to a check once the prompt is on the clipboard. */
+/** The hero's call to action for agents: copies a prompt that has a coding agent make the reader's app Duo-ready. The
+ *  label flips to a check once the prompt is on the clipboard. */
 function AgentPrompt() {
   const [copied, setCopied] = useState(false);
   const timer = useRef(0);
@@ -194,9 +184,7 @@ function AgentPrompt() {
   return (
     <button className="pill pill-cta" data-done={copied || undefined} onClick={copy} aria-label="Copy a prompt that makes your app Duo-ready with a coding agent">
       <span className="cta-face">
-        <span className="cta-deck" aria-hidden>
-          <ClaudeGlyph /><CodexGlyph /><GrokGlyph /><PiGlyph />
-        </span>
+        <Sparkles size={18} strokeWidth={2.2} aria-hidden />
         Copy prompt
       </span>
       <span className="cta-face cta-done" aria-hidden><Check size={18} strokeWidth={2.6} />Copied</span>

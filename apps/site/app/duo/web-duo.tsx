@@ -1162,7 +1162,7 @@ function PreviewColumn({ x, top, h, col, clock, at, over }: { x: number; top: nu
 /** The preview's title band across the top of the sheet. Closed it holds the address (`address`: where); unfolded,
  *  close and the page menu 16pt in from its corners with the site's host between (`buttons`). */
 function PreviewBand({ width, h, host, address, buttons }: { width: number; h: number; host: string; address?: { x: number; w: number }; buttons?: boolean }) {
-  const name = host.replace(/:\d+$/, ""), btn = (left: number, d: string, style?: CSSProperties) => (
+  const name = shown(host), btn = (left: number, d: string, style?: CSSProperties) => (
     <div style={{ ...circle, position: "absolute", left, top: h - 54, width: 44, height: 44 }}><Glyph d={d} style={style} /></div>
   );
   return (
@@ -1233,8 +1233,12 @@ function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; b
   );
 }
 
-/** Safari's address field shows the host alone, on one line: no port, no www, and an ellipsis when it runs long. */
-const shown = (host: string) => host.replace(/:\d+$/, "").replace(/^www\./, "");
+/** Safari's address field shows the host alone, on one line: no port, no www, and an ellipsis when it runs long. A
+ *  loopback host (a local build, the recorder) reads as a neutral example.com, so no dev address reaches a clip. */
+const shown = (host: string) => {
+  const h = host.replace(/:\d+$/, "").replace(/^www\./, "");
+  return /^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|.*\.localhost)$/.test(h) || h === "" ? "example.com" : h;
+};
 const oneLine: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center", minWidth: 0 };
 
 function UrlBar({ left, top, width, host, h = BAR.h }: { left: number; top: number; width: number; host: string; h?: number }) {
@@ -1261,7 +1265,7 @@ function OpenSafari({ w, host, forward }: { w: number; host: string; forward?: b
       </div>
       <div data-wd-system style={{ position: "absolute", right: 25.5, top: OPEN.top + OPEN.h / 2 - 25, display: "flex", alignItems: "center", gap: 10 }}><Clock /><Battery /></div>
       <div data-wd-system style={{ position: "absolute", left: OPEN.tabs.left, right: OPEN.tabs.right, top: OPEN.tabs.top, height: OPEN.tabs.h, boxSizing: "border-box", borderRadius: 99, background: "var(--bg)", display: "flex", alignItems: "center", padding: 2, gap: 2, font: "500 13px -apple-system, system-ui" }}>
-        {["Duo Lab", "Duo Lab", "Duet"].map((t, i, all) => (
+        {["Reader", "Checkout", "Inbox"].map((t, i, all) => (
           <div key={i} style={{ flex: 1, height: "100%", borderRadius: 99, display: "grid", placeItems: "center", ...(i === all.length - 1 && { ...glass, flex: 1.4 }) }}>{t}</div>
         ))}
       </div>

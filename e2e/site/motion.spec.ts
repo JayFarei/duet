@@ -1,8 +1,8 @@
 // T8: reduced motion: no autoplay, no idle motion, tour steps still land on their end states (PLAN 3). Red until step 6.
 import { expect, test } from "@playwright/test";
-import { duetState } from "./site";
+import { GPU, duetState } from "./site";
 
-test.use({ reducedMotion: "reduce" });
+test.use({ reducedMotion: "reduce", ...GPU });
 
 test("reduced motion stills the stage and the loops", async ({ page }) => {
   await page.goto("/");
@@ -15,5 +15,6 @@ test("reduced motion stills the stage and the loops", async ({ page }) => {
   await page.evaluate(() => { const el = document.getElementById("tour-actions")!; el.scrollIntoView({ block: "center" }); });
   await page.waitForTimeout(800);
   await expect(page.getByTestId("tour-caption")).toHaveText("Actions + Sidebar");
-  expect((await duetState(page)).map((s) => s.fit)).toContain("sidebar");
+  // The stage starts below the fold and boots its screens once it scrolls into view.
+  await expect.poll(async () => (await duetState(page)).map((s) => s.fit), { timeout: 20_000 }).toContain("sidebar");
 });

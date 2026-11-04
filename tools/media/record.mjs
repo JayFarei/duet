@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const RAW = join(ROOT, ".tmp/media/raw"), OUT = join(ROOT, ".tmp/media/clip");
 const COMPOSE = join(ROOT, "tools/media/compose.sh");
-const MARKS = 3512, PROXY = 3513;
+const MARKS = 3513, PROXY = 3514; // 3512 is the review server
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i < 0 ? d : args.splice(i, 2)[1]; };
 const SITE = opt("--site", "http://127.0.0.1:3511");
@@ -107,7 +107,7 @@ async function record(theme, name) {
 }
 
 // The cues: what Duet measured on the display in view (closed and sideways show the outer display, open and laptop the
-// inner one), on the looped clip's own clock. The loop drops the first F seconds and fades its end into them.
+// inner one), on the looped clip's own clock. The loop drops the first F seconds and restarts with a hard cut.
 const F = 0.5;
 function cues(name, theme) {
   const { marks: ms } = JSON.parse(readFileSync(join(RAW, `${name}-${theme}.json`), "utf8"));
@@ -120,12 +120,13 @@ function cues(name, theme) {
   const list = [];
   for (const s of [...new Set(at)].sort((a, b) => a - b)) {
     const m = state(s); if (!m) continue;
-    const t = s >= F ? Math.min(s - F, L - 0.05) : L - F + s;
-    list.push({ t: +Math.max(0, t).toFixed(2), fit: m.fit ?? null, free: Math.round(m.free ?? 0) });
+    if (s < F) continue;
+    const t = Math.min(s - F, L - 0.05);
+    list.push({ t: +Math.max(0, t).toFixed(2), fit: m.fit ?? null, length: Math.round(m.length ?? 0), free: Math.round(m.free ?? 0) });
   }
   list.sort((a, b) => a.t - b.t);
-  const out = list.filter((x, i) => i === 0 || x.fit !== list[i - 1].fit || x.free !== list[i - 1].free);
-  return { clip: name, theme, duration: +L.toFixed(2), cues: out.length ? out : [{ t: 0, fit: null, free: 0 }] };
+  const out = list.filter((x, i) => i === 0 || x.fit !== list[i - 1].fit || x.free !== list[i - 1].free || x.length !== list[i - 1].length);
+  return { clip: name, theme, duration: +L.toFixed(2), cues: out.length ? out : [{ t: 0, fit: null, length: 0, free: 0 }] };
 }
 
 // The crop: one size for every clip so the device is the same size in each, 4:3, centred on everything that differs from

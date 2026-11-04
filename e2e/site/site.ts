@@ -16,7 +16,8 @@ export const TOUR = [
   { caption: "More", slug: "more" },
   { caption: "Actions + Sidebar", slug: "actions", fit: "sidebar" },
   { caption: "Primary", slug: "primary" },
-  { caption: "Close, Modes", slug: "close", only: ["close"] },
+  { caption: "Close", slug: "close", only: ["close"] },
+  { caption: "Modes", slug: "modes", mode: "column" },
 ] as const;
 /** Every recorded clip's base name (apps/site/public/media/clip/<name>-<light|dark>.{mp4,webp,cues.json}). */
 export const CLIPS = [

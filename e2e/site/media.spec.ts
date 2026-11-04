@@ -1,7 +1,14 @@
 // T2: every page's media loads and plays only in view (PLAN 1b, 5). Red until the clips and loop tiles land (step 7).
+import { execFileSync } from "node:child_process";
+import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { CLIPS, PAGES, scrollThrough } from "./site";
+import { CLIPS, GPU, PAGES, scrollThrough } from "./site";
 
+// The pages carry the live stage: drawn in software it starves the main thread, and four workers then miss the timeout.
+test.use(GPU);
+
+/** The least peak frame change a clip with a working step shows (calibrated on the recorded set, PROGRESS.md). */
+const MOTION = 0.3;
 const TYPES: Record<string, string> = { mp4: "video/mp4", webp: "image/webp", json: "application/json" };
 
 for (const path of PAGES) {
@@ -53,4 +60,30 @@ test("every clip on disk is on the clip list, in both themes", async ({ request 
     const r = await request.get(`/media/clip/${name}-${theme}.${ext}`);
     expect(r.status(), `${name}-${theme}.${ext}`).toBe(200);
   }
+});
+
+/** The largest change between two frames a quarter second apart, as the mean absolute grey difference (0..255) of a
+ *  64 px wide copy. A clip whose steps never fire shows only the idle sway and stays near 0. */
+function motion(file: string) {
+  const w = 64, h = 48;
+  const buf = execFileSync("ffmpeg", ["-v", "error", "-i", file, "-vf", `fps=4,scale=${w}:${h},format=gray`, "-f", "rawvideo", "-"], { maxBuffer: 64 << 20 });
+  const n = Math.floor(buf.length / (w * h));
+  let peak = 0;
+  for (let f = 1; f < n; f++) {
+    let sum = 0;
+    for (let i = 0; i < w * h; i++) sum += Math.abs(buf[f * w * h + i] - buf[(f - 1) * w * h + i]);
+    peak = Math.max(peak, sum / (w * h));
+  }
+  return peak;
+}
+
+test("every clip shows its steps, not a still device", async ({ browserName }) => {
+  test.skip(browserName !== "chromium", "reads files on disk, once is enough");
+  const dir = join(__dirname, "../../apps/site/public/media/clip");
+  const still: string[] = [];
+  for (const name of CLIPS.filter((c) => !c.startsWith("app-"))) for (const theme of ["light", "dark"]) {
+    const m = motion(join(dir, `${name}-${theme}.mp4`));
+    if (m < MOTION) still.push(`${name}-${theme} ${m.toFixed(2)}`);
+  }
+  expect(still, "clips with no visible step").toEqual([]);
 });

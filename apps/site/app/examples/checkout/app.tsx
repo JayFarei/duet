@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
-import { CreditCard, Pencil, Share, Trash2 } from "lucide-react";
+import { Cable, CreditCard, Laptop, Pencil, Share, Smartphone, Trash2, type LucideIcon } from "lucide-react";
 import { Duet, column } from "duet-ui";
 import { useTheme, useTint } from "../../theme";
 
@@ -9,6 +9,12 @@ import { useTheme, useTint } from "../../theme";
 // box before it charges. Turned sideways the band holds one button, so Pay folds into More too: the first tap
 // arms it, the second pays.
 type Item = { id: string; name: string; note: string; price: number; qty: number };
+/** Each item's thumbnail: a tinted tile with a line icon, so the rows read as products and not empty boxes. */
+const THUMB: Record<string, { icon: LucideIcon; tint: string }> = {
+  case: { icon: Smartphone, tint: "#5e5ce6" },
+  cable: { icon: Cable, tint: "#30b0c7" },
+  stand: { icon: Laptop, tint: "#ff9f0a" },
+};
 const CART: Item[] = [
   { id: "case", name: "Leather case", note: "Midnight", price: 59, qty: 1 },
   { id: "cable", name: "Braided cable, 2 m", note: "White", price: 29, qty: 2 },
@@ -45,7 +51,11 @@ export function CheckoutApp() {
           <h1 style={title}>Cart</h1>
           {cart.map((i) => (
             <div key={i.id} style={line}>
-              <div aria-hidden style={{ width: 56, height: 56, borderRadius: 14, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }} />
+              {(() => { const t = THUMB[i.id], Icon = t?.icon ?? Smartphone; return (
+                <div aria-hidden data-testid="checkout-thumb" style={{ display: "grid", placeItems: "center", width: 56, height: 56, flex: "none", borderRadius: 14, color: t?.tint, background: `color-mix(in srgb, ${t?.tint ?? "var(--dim)"} 16%, var(--card))`, boxShadow: "0 0 0 0.5px var(--line)" }}>
+                  <Icon size={26} strokeWidth={1.75} />
+                </div>
+              ); })()}
               <div><div>{i.name}</div><div style={dim}>{i.note}, {i.qty} × {usd(i.price)}</div></div>
               {editing
                 ? <button onClick={() => setCart((c) => c.filter((x) => x.id !== i.id))} style={{ border: 0, background: "none", color: "#ff3b30", font: "inherit", cursor: "pointer" }}>Remove</button>

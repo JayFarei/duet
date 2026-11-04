@@ -1,1 +1,1 @@
-{"clip":"example-checkout","theme":"light","duration":5.5,"cues":[{"t":0,"fit":null,"free":853},{"t":1.19,"fit":null,"free":849},{"t":1.59,"fit":null,"free":853},{"t":3,"fit":null,"free":0}]}
+{"clip":"example-checkout","theme":"light","duration":5.5,"cues":[{"t":0,"fit":null,"length":951,"free":853},{"t":1.15,"fit":null,"length":951,"free":847},{"t":1.56,"fit":null,"length":951,"free":853},{"t":3,"fit":null,"length":0,"free":0}]}

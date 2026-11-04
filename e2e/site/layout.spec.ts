@@ -1,7 +1,10 @@
 // T9: no sideways scroll, 16px gutters at 390, the sticky stage clear of caption text, a full-page screenshot of every
 // page at each size (PLAN 3). Red until the pages exist (steps 4 to 7).
 import { expect, test } from "@playwright/test";
-import { PAGES, scrollThrough } from "./site";
+import { GPU, PAGES, scrollThrough } from "./site";
+
+// The home page scrolls the live stage through every step: drawn in software it starves the main thread past the timeout.
+test.use(GPU);
 
 for (const path of PAGES) {
   test(`layout of ${path}`, async ({ page }, info) => {

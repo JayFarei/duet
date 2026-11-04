@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { detect, type Mode, type Signals } from "duet-ui/geometry";
 import { Island, SCREEN, fit, island, scene } from "../duo/web-duo";
-import { channel, type Sync } from "./shared";
+import { channel, type Highlight, type Sync } from "./shared";
 import { useTheme } from "../theme";
 
 const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
@@ -79,6 +79,16 @@ export function Screen() {
     addEventListener("message", ready);
     return () => removeEventListener("message", ready);
   }, [duet, !!sc, selected?.at]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The tour's pointer: a style in the page that rings the Navigation buttons or tints the column Duet measures.
+  const highlight = sync?.highlight;
+  useEffect(() => {
+    const el = frame.current;
+    const apply = () => paint(el, highlight);
+    apply();
+    el?.addEventListener("load", apply);
+    return () => el?.removeEventListener("load", apply);
+  }, [highlight, !!sc]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The mode Duet actually laid out in, so the frame follows it, flip damper included.
   useEffect(() => {
@@ -157,8 +167,22 @@ export function Screen() {
   );
 }
 
+const MARKS: Record<Highlight, string> = {
+  places: `[data-duet-control="navigation"] { outline: 2px solid rgb(10 132 255 / 0.9); outline-offset: -3px; animation: duo3d-hl 1.6s ease-in-out infinite; }`,
+  column: `nav.duet:not(.duet-sidebar) { box-shadow: inset 0 0 0 2px rgb(10 132 255 / 0.85); background: rgb(10 132 255 / 0.12); animation: duo3d-hl 1.6s ease-in-out infinite; }`,
+};
+/** Puts the tour's pointer into the page (same origin), or takes it out. Still under reduced motion. */
+function paint(el: HTMLIFrameElement | null, h: Highlight | undefined) {
+  const doc = el?.contentDocument;
+  if (!doc?.head) return;
+  let st = doc.getElementById("duo3d-hl");
+  if (!h) { st?.remove(); return; }
+  if (!st) { st = doc.createElement("style"); st.id = "duo3d-hl"; doc.head.append(st); }
+  st.textContent = `${MARKS[h]} @keyframes duo3d-hl { 50% { opacity: 0.7; } } @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }`;
+}
+
 /** A host's `duet:press`: the control pressed as a finger would, pointer down and up, then one click. */
-function press(el: HTMLIFrameElement | null, p: { id?: string; selector?: string; retry?: boolean }, tries = p.retry ? 20 : 0) {
+function press(el: HTMLIFrameElement | null, p: { id?: string; selector?: string; retry?: boolean; hold?: number }, tries = p.retry ? 20 : 0) {
   const doc = el?.contentDocument, win = el?.contentWindow as (Window & typeof globalThis) | null;
   if (!doc || !win) { if (tries > 0) setTimeout(() => press(el, p, tries - 1), 200); return; }
   const sel = p.selector ?? `.duet-group:not([data-leaving]) [data-duet-control="${p.id}"]`;
@@ -174,17 +198,28 @@ function press(el: HTMLIFrameElement | null, p: { id?: string; selector?: string
     const saw = () => { clicked = true; };
     doc.addEventListener("click", saw, true);
     t.dispatchEvent(new win.PointerEvent("pointerup", at));
-    setTimeout(() => { doc.removeEventListener("click", saw, true); if (!clicked) t.click(); }, 150);
-  }, 90);
+    // A press and hold ends on the release alone, as a finger lifting: no click.
+    setTimeout(() => { doc.removeEventListener("click", saw, true); if (!clicked && !p.hold) t.click(); }, 150);
+  }, p.hold ?? 90);
 }
 
-/** Duet's column in the page: its fit, the room its groups leave free along it, and each group's box. */
+/** Duet's column in the page: its fit, its length (the free space Duet measured), what its groups leave over, its
+ *  mode, and each group's box. */
 function measures(el: HTMLIFrameElement | null) {
   const nav = el?.contentDocument?.querySelector<HTMLElement>("nav.duet:not(.duet-sidebar)");
   if (!nav) return null;
   const box = (e: Element) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; };
   const rects = [...nav.querySelectorAll(".duet-group:not([data-leaving])")].map(box).filter((r) => r.w && r.h);
-  const n = box(nav), down = n.h >= n.w;
-  const free = Math.max(0, Math.round((down ? n.h : n.w) - rects.reduce((a, r) => a + (down ? r.h : r.w), 0)));
-  return { fit: nav.dataset.duetFit ?? null, free, rects };
+  const doc = el!.contentDocument!, root = doc.documentElement, mode = root.dataset.duetMode ?? null;
+  // A display the stage hides has no window: it reports its fit and mode, with no length.
+  const hidden = !doc.defaultView?.innerWidth;
+  // In Safari's column the nav has no box of its own (its groups sit absolute in the column), so the column's length
+  // is what Duet allocates from: the stable height (the window above Safari's bottom bar) below the band its top bars
+  // keep.
+  const px = (v: string) => parseFloat(getComputedStyle(root).getPropertyValue(v)) || 0;
+  const n = hidden ? { w: 0, h: 0 } : mode === "column" ? { w: px("--duet-column"), h: (px("--duet-vh") || doc.defaultView!.innerHeight) - px("--duet-safe-top-column") } : box(nav);
+  const down = mode === "column" || n.h >= n.w;
+  const length = Math.round(down ? n.h : n.w);
+  const free = Math.max(0, Math.round(length - rects.reduce((a, r) => a + (down ? r.h : r.w), 0)));
+  return { fit: nav.dataset.duetFit ?? null, length, free, mode, rects };
 }

@@ -3,6 +3,7 @@ dist
 .next
 .next-test
 .next-review
+.next-rec
 next-env.d.ts
 *.tsbuildinfo
 .venv

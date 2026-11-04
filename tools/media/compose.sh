@@ -9,15 +9,14 @@
 # compose.sh clip <recording.mp4> <start-s> <end-s> <width> <out-path-without-ext> <w:h:x:y> <background>
 #
 # A site loop (tools/media/record.mjs calls it): the recording trimmed to the clip, cropped to the device on the page's
-# background (Safari's own bars painted over with it, and padded with it where the crop runs off the frame), and made seamless: the first 0.5 s is dropped and the
-# end fades into it, so the last frame leads into the first. H.264 at 30 fps with +faststart, and a WebP poster of frame 0.
+# background (Safari's own bars painted over with it, and padded with it where the crop runs off the frame). The first 0.5 s is
+# dropped and the loop restarts with a hard cut: every clip ends where it began (the device back at rest), and a cross fade doubled
+# the frames at the seam. H.264 at 30 fps with +faststart, and a WebP poster of frame 0.
 set -euo pipefail
 if [ "${1:-}" = clip ]; then
   in=$2 t0=$3 t1=$4 w=$5 out=$6 crop=$7 bg=$8 f=0.5 m=400
   IFS=: read -r cw ch cx cy <<<"$crop"
-  d=$(python3 -c "print(round($t1 - $t0, 3))")
-  off=$(python3 -c "print(round($d - 2 * $f, 3))")
-  ffmpeg -v error -y -i "$in" -filter_complex "[0:v]fps=30,trim=start=$t0:end=$t1,setpts=PTS-STARTPTS,drawbox=x=iw*0.845:y=0:w=iw:h=ih:color=0x$bg:t=fill,drawbox=x=0:y=0:w=iw:h=ih*0.075:color=0x$bg:t=fill,drawbox=x=0:y=ih*0.865:w=iw:h=ih:color=0x$bg:t=fill,pad=iw+2*$m:ih+2*$m:$m:$m:color=0x$bg,crop=$cw:$ch:$((cx + m)):$((cy + m)),scale=$w:-2:flags=lanczos,format=yuv420p,split[a][b];[a]trim=start=$f,setpts=PTS-STARTPTS,fps=30[x];[b]trim=end=$f,setpts=PTS-STARTPTS,fps=30[y];[x][y]xfade=transition=fade:duration=$f:offset=$off,format=yuv420p" \
+  ffmpeg -v error -y -i "$in" -filter_complex "[0:v]fps=30,trim=start=$t0:end=$t1,setpts=PTS-STARTPTS,drawbox=x=iw*0.845:y=0:w=iw:h=ih:color=0x$bg:t=fill,drawbox=x=0:y=0:w=iw:h=ih*0.075:color=0x$bg:t=fill,drawbox=x=0:y=ih*0.865:w=iw:h=ih:color=0x$bg:t=fill,pad=iw+2*$m:ih+2*$m:$m:$m:color=0x$bg,crop=$cw:$ch:$((cx + m)):$((cy + m)),scale=$w:-2:flags=lanczos,trim=start=$f,setpts=PTS-STARTPTS,fps=30,format=yuv420p" \
     -an -c:v libx264 -preset slow -crf 24 -profile:v high -pix_fmt yuv420p -movflags +faststart "$out.mp4"
   ffmpeg -v error -y -i "$out.mp4" -frames:v 1 -c:v libwebp -q:v 78 "$out.webp"
   ls -la "$out.mp4" "$out.webp"

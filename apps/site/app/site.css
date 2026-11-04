@@ -33,24 +33,14 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 section[id] { scroll-margin-top: 24px; }
 .pill { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 22px; border-radius: 99px; border: 0; background: var(--card); color: var(--accent); font: 500 17px/1 -apple-system, system-ui; box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .pill-solid { background: var(--ink); color: var(--bg); box-shadow: none; }
-/* "Copy prompt", after the OpenTraces button: a tilted deck of agent glyphs that fans out on hover, and a face that
-   flips to "Copied". Ours is a card pill with system blue ink in SF, and the deck springs open the way iOS menus do. */
+/* "Copy prompt": a card pill with system blue ink in SF and one generic icon, and a face that flips to "Copied". */
 .pill-cta { position: relative; overflow: hidden; color: var(--cta); white-space: nowrap; font-weight: 600; transition: scale 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
 .pill-cta:active { scale: 0.96; transition-duration: 0.1s; }
 .cta-face { display: inline-flex; align-items: center; gap: 12px; transition: opacity 0.2s, translate 0.35s cubic-bezier(0.3, 1.3, 0.5, 1); }
 .cta-done { position: absolute; inset: 0; justify-content: center; gap: 7px; opacity: 0; translate: 0 60%; }
 .pill-cta[data-done] .cta-face:not(.cta-done) { opacity: 0; translate: 0 -60%; }
 .pill-cta[data-done] .cta-done { opacity: 1; translate: 0 0; }
-/* 4 glyphs of 18px: overlapping 15px apart at rest (63px, centred), 22px apart open (84px), so the deck fans out both ways. It reserves the open width,
-   so the label never moves. */
-.cta-deck { position: relative; width: 72px; height: 18px; flex: none; }
-.cta-deck > svg { position: absolute; top: 0; left: calc(4.5px + var(--i) * 15px); width: 18px; height: 18px; rotate: var(--r); transition: left 0.45s cubic-bezier(0.3, 1.4, 0.5, 1), rotate 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); filter: drop-shadow(1.5px 0 0 var(--card)) drop-shadow(-1.5px 0 0 var(--card)) drop-shadow(0 1.5px 0 var(--card)) drop-shadow(0 -1.5px 0 var(--card)); }
-.cta-deck > :nth-child(1) { --i: 0; --r: -13deg; z-index: 4; }
-.cta-deck > :nth-child(2) { --i: 1; --r: 8deg; z-index: 3; }
-.cta-deck > :nth-child(3) { --i: 2; --r: -6deg; z-index: 2; }
-.cta-deck > :nth-child(4) { --i: 3; --r: 10deg; z-index: 1; }
-.pill-cta:is(:hover, :focus-visible) .cta-deck > svg { left: calc(var(--i) * 18px); rotate: 0deg; }
-@media (prefers-reduced-motion: reduce) { .pill-cta, .cta-face, .cta-deck > svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pill-cta, .cta-face { transition: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pill-sm { height: 30px; padding: 0 14px; font-size: 13px; }
 .npm code { font-size: 15px; }
@@ -107,6 +97,9 @@ section[id] { scroll-margin-top: 24px; }
 .duet[data-mode="inline"] .duet-blob { --duet-menu: color-mix(in srgb, var(--bg) 62%, transparent); }
 .duet[data-mode="inline"] .duet-blob::before, .duet[data-mode="inline"] .duet-blob::after { display: none; }
 .duet[data-mode="inline"] .duet-fill { -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
+/* In the column and the strip the list sits on the page's own text (the stage's Inbox), and a backdrop filter there
+   draws nothing in iOS Safari inside the 3D Duo's frames, so the list keeps the library's glass on a near opaque fill. */
+.duet:not([data-mode="inline"]) .duet-blob { --duet-menu: color-mix(in srgb, var(--bg) 90%, transparent); }
 /* The selection as a grey fill, like the phone bar's: Duet's dark default darkens, which vanishes on a flat black control. */
 html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
 
@@ -137,11 +130,6 @@ html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
 /* The tour row under a narrow stage (web-duo.tsx): the app icon gives its room to what is showing, which reads first. */
 [data-wd-phases] { container-type: inline-size; }
 @container (max-width: 380px) { [data-wd-showing] > :first-child { display: none; } }
-/* Integrate's tint picker: small swatches, the picked one ringed like iOS's accent colour setting. */
-.tints { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
-.tints-k { font: 500 13px -apple-system, system-ui; color: var(--dim); margin-right: 4px; }
-.tint { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 0.12); transition: box-shadow 0.15s; }
-.tint[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c); }
 
 /* The sheets recipe (app/sheet). A plain web modal: a full-screen fixed scrim, the sheet at its bottom. */
 .sheet-scrim { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / 0.38); animation: sheet-fade 0.2s ease-out; }
@@ -186,35 +174,50 @@ html[data-duet-close] .sheet-x { display: none; }
 @media (max-width: 520px) { .nav { gap: 12px; } .nav-brand { font-size: 0; gap: 0; } .nav-links { gap: 14px; } }
 
 /* The hero: the title, then the tour's stage right under it. */
-.hero-copy { text-align: center; padding-top: clamp(32px, min(7vw, 7vh), 96px); padding-bottom: clamp(16px, 3vh, 40px); }
+/* The title, the lede and the buttons fill the first window under the top bar, no more. */
+.hero-copy { box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; min-height: calc(100vh - 60px); min-height: calc(100svh - 60px); text-align: center; padding-top: clamp(16px, 4vh, 64px); padding-bottom: clamp(16px, 4vh, 64px); }
+.hero-copy .actions { gap: 12px; }
+@media (max-width: 760px) {
+  .hero-copy .display { font-size: clamp(38px, min(10.5vw, 6vh), 52px); }
+  .hero-copy .lede { margin-top: 14px; font-size: 17px; }
+  .hero-copy .actions { margin-top: 22px; gap: 10px; }
+  .hero-copy .ctas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hero-copy .pill { justify-content: center; padding: 0 12px; font-size: 16px; }
+  .hero-copy .npm code { font-size: 13px; }
+  .hero-copy .npm .npm-hint { display: none; }
+}
 
-/* The tour (tour.tsx): the stage sticks for the tour's whole height while seven empty steps of one window each
-   scroll past under it; the step holding the window's middle sets the scene. */
+/* The tour (tour.tsx): the stage sticks for the tour's whole height while empty steps of one window each
+   scroll past under it (one per step); the step holding the window's middle sets the scene. */
 .tour { position: relative; }
 .tour-stage { position: sticky; top: 0; z-index: 1; box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: center; gap: 32px; height: 100vh; height: 100svh; max-width: 1120px; margin: 0 auto; padding: 0 20px; }
 .tour-stage .duo3d { min-width: 0; }
 .tour-steps { margin-top: -100vh; margin-top: -100svh; pointer-events: none; }
 .tour-step { height: 100vh; height: 100svh; }
+/* The stage centres the Duo in a full-height box, so its lower margin already spaces the tour from the next section. */
+.section:has(> .tour) + .section { padding-top: 0; }
 .tour-side { display: grid; gap: 14px; align-content: center; }
 .tour-ticks { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin: 0 0 8px; padding: 0; list-style: none; }
 .tour-ticks button { padding: 6px 0; border: 0; background: none; color: var(--dim); font: 500 15px/1.2 -apple-system, system-ui; cursor: pointer; text-align: left; }
 .tour-ticks button::before { content: ""; display: inline-block; width: 14px; height: 2px; margin-right: 10px; vertical-align: middle; border-radius: 1px; background: currentColor; opacity: 0.5; transition: width 0.25s ease; }
 .tour-ticks button[aria-current="step"] { color: var(--ink); font-weight: 600; }
-.tour-ticks button[aria-current="step"]::before { width: 28px; opacity: 1; background: var(--cta); }
+.tour-ticks button[aria-current="step"]::before { width: 28px; opacity: 1; background: linear-gradient(90deg, var(--cta) calc(var(--p, 0) * 100%), color-mix(in srgb, var(--cta), transparent 70%) 0); transition: none; }
 .tour-caption { margin: 0; font: 400 clamp(36px, 4vw, 52px)/1.05 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
 .tour-text { margin: 0; max-width: 34em; color: var(--dim); font: 500 17px/1.45 -apple-system, system-ui; min-height: 4.4em; }
-.tour-meters { display: flex; gap: 8px; margin: 0; }
+.tour-meters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; }
 .tour-meters span { padding: 6px 10px; border-radius: 8px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); font: 500 13px/1 ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric: tabular-nums; }
 /* A phone: the device on top, the caption under it, the steps as one wrapping row. */
 @media (max-width: 760px) {
-  .tour-stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 8px; padding-top: 8px; }
-  .tour-side { gap: 8px; }
+  .tour-stage { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto; align-content: start; gap: 6px; padding-top: 4px; padding-inline: 16px; }
+  .tour-side { gap: 6px; }
   .tour-ticks { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; margin: 0; }
   .tour-ticks button { padding: 4px 0; font-size: 13px; }
   .tour-ticks button::before { display: none; }
   .tour-ticks button[aria-current="step"] { color: var(--cta); }
-  .tour-caption { font-size: 32px; }
-  .tour-text { font-size: 15px; min-height: 0; }
+  .tour-caption { font-size: 28px; }
+  .tour-text { font-size: 14px; line-height: 1.4; min-height: 0; }
+  .tour-meters { flex-wrap: wrap; gap: 6px; }
+  .tour-meters span { padding: 5px 8px; font-size: 12px; }
 }
 
 /* Cards: the examples, the real apps, the modes. */
@@ -236,6 +239,7 @@ html[data-duet-close] .sheet-x { display: none; }
 .loop video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .loop:not([data-ready]) video { visibility: hidden; }
 .loop:not([data-ready])::after { content: ""; position: absolute; inset: 22% 30%; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.loop-play { position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 99px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .loop-count { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 4px 10px; border-radius: 99px; background: var(--card); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; font-variant-numeric: tabular-nums; }
 
 /* /components: the nouns down a sidebar (a row of chips on a phone), each with Preview | Code and its variants. */
@@ -269,6 +273,6 @@ html[data-duet-close] .sheet-x { display: none; }
   .cmp-nav { position: sticky; top: 0; z-index: 2; flex-direction: row; gap: 6px; margin: 0 -20px; padding: 10px 20px; overflow-x: auto; background: var(--bg); scrollbar-width: none; }
   .cmp-nav a { flex: none; background: var(--card); border-radius: 99px; padding: 7px 12px; font-size: 14px; }
   .cmp-sec { scroll-margin-top: 60px; }
-  .props { font-size: 13px; }
-  .props td:nth-child(2) { word-break: break-word; }
+  .props { display: block; overflow-x: auto; font-size: 13px; }
+  .props td:nth-child(2) code { white-space: nowrap; }
 }

@@ -18,6 +18,13 @@ for (const path of ["/", ...EXAMPLES]) {
 
 test("the stage stops rendering past the tour", async ({ page }) => {
   await page.goto("/");
+  // The hero copy fills the first screen, so the stage starts below the fold and draws nothing until it scrolls in.
+  await page.waitForTimeout(1500);
+  const before = await page.evaluate(() => (window as unknown as { __duoFrames?: number }).__duoFrames ?? 0);
+  await page.waitForTimeout(1000);
+  // At most the one frame duo draws as its model arrives.
+  expect(await page.evaluate(() => (window as unknown as { __duoFrames?: number }).__duoFrames ?? 0), "no frames below the fold").toBeLessThanOrEqual(before + 1);
+  await page.getByTestId("tour-stage").scrollIntoViewIfNeeded();
   await expect.poll(() => page.evaluate(() => (window as unknown as { __duoFrames?: number }).__duoFrames ?? -1), { message: "the stage counts frames", timeout: 20_000 }).toBeGreaterThan(0);
   await scrollPage(page, -1);
   await page.waitForTimeout(1200);
