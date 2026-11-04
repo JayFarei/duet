@@ -180,7 +180,7 @@ function lean() {
 
 export function E2EReporter() {
   useEffect(() => {
-    // The top page only: a same-origin iframe (/'s WebDuo demo of /skeleton) shares the tab's sessionStorage, so it
+    // The top page only: a same-origin iframe (/'s Duo demo of the Inbox example) shares the tab's sessionStorage, so it
     // would report under the run's token and the driver could follow it instead of the page (nav01-04, "the page is
     // not reporting").
     if (window.top !== window) return;

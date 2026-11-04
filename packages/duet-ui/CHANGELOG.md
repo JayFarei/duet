@@ -1,5 +1,83 @@
 # Changelog
 
+## 0.8.1
+
+Everything from 0.8.1-rc.1, plus the last two fixes listed under it (the overlay sidebar in Safari's column, and the iOS follow-layer rim), which landed after rc.1 was published.
+
+Known issue: "…" can stay closing when its group unmounts mid-close in column mode, and then outside taps are swallowed (#262). 0.8.0 does the same.
+
+## 0.8.1-rc.1
+
+- Light mode rim off iOS: desktop Safari, Chrome and other engines drew black caps on each capsule. They now get white highlights at normal blend; iOS keeps its dodge rim under `@supports (-webkit-touch-callout: none)`. Dark mode is unchanged.
+- **Behaviour change:** the "…" list heads its sections "Places" and "Actions" (was "Menu" and "This page" or "More"), and the sidebar button and sidebar are named "Sidebar" (was "Menu"). Tests that find the button by `aria-label="Menu"` need updating.
+- `nav.duet` carries `data-duet-fit` (`tabs`, `tabs-more`, `sidebar`) and each button `data-duet-control` (`navigation`, `sidebar`, `more`, `actions`, `primary`, `close`), for tests and styles.
+- Safari's column, page without children (the document scrolls): the sidebar opened at the document top, off screen once the page was scrolled, so the Sidebar button seemed dead below the first screen. It now rides the same scroll follow as the controls. And over the page it fades from and to nothing; it rested at 60% opacity, so it popped in half drawn and snapped out from half faded.
+- Light mode on iOS, a page whose document scrolls: the column capsule showed black caps top and bottom. The layer that follows the scroll is its own compositing layer, so the dodge rim had no page under it to brighten. That layer now takes the white rim at normal blend.
+
+## 0.8.0
+
+Since 0.7.1, Duet shows the largest form of controls that fits, from its own measure of the space; apps carry no device logic.
+
+- `menu.tabs`: the app's places are tabs in the capsule. Where they do not all fit, the tabs tighten from 51.7pt down to 44pt, then the first ones stay tabs and the rest fold into "…". The burger only where fewer than three tabs would show. `placesFit` and `placeTabs` expose the rule.
+- Moving the controls is an option, `moveControls`, off by default.
+- Column press rebuilt from Safari's own column: a lens follows the finger and release runs the item under it. Buttons fire on release, not on touch down.
+- Action capsule at the foot of the room on the open Duo, full screen Safari and split panes.
+- Light mode capsule and buttons match native glass. Dark mode is unchanged.
+- A page with `children` in a split pane is no longer clipped by Safari's column.
+- Home Screen launch, fold and rotation fixes on the Duo, with no flash of the wrong form.
+
+Everything from 0.8.0-rc.1 to 0.8.0-rc.3 and the entries below.
+
+- **Behaviour change:** a page with `children` in a split pane, or on the closed Duo turned left, no longer has its left 84pt cut off by Safari's column. The inner scroller is moved beside the column, like a page without children, and the insets there are 0. `reserve={false}` keeps the old layout, the scroller under both columns and padded by `--duet-inset-left` / `--duet-inset-right`.
+- **Behaviour change:** `menu.tabs` is no longer all or nothing, so the burger is rarer. Where the places do not all fit, the first ones stay tabs and the rest go in "…", at the widest pitch from 51.7pt down to 44pt (`placeTabs`): 9 places on a wide Home Screen are 7 tabs and "…" at 48.6pt. The burger only where fewer than three tabs would show, closed Safari and the right of Split View. Places that all fit are pixel identical. Put the primary places first.
+- **Behaviour change:** moving the controls is now an option, `moveControls`, off by default. Off: no "Move controls" row, no drag across the page, the default side even if an earlier visit stored another, and no "…" when nothing else needs it, so tabs get its room (9 places in wide Safari, 15 in tall). To keep the old behaviour pass `moveControls`.
+- Tabs use the room: when the places do not fit at the normal 51.7pt pitch, the tabs capsule tightens, down to 44pt (`placeTabs`), before folding any. A wide Safari on the open Duo now holds 11 places, or 10 with "…". Tabs that already fit are pixel identical.
+- "…" no longer shows as a dark disc when the sidebar closes: it returns as closing starts, in one motion, its glass fading rather than its host.
+- A tap that dismisses "…" no longer also presses what lies under it.
+- `bootScript` sets the 84pt inset of a wide or tall Safari page on the open Duo before the first paint, so its content does not jump on mount.
+- With `moveControls`, a Home Screen app in a strip no longer lists a "Move controls" row that did nothing: `canMoveControls` is true only where the controls can change edge.
+- Open Duo, Home Screen: a page with `viewport-fit=auto` or `contain` turning to wide shows its controls in place after about 0.5s, once the tall status clock has faded, with no 1s hold and glide. A wide launch no longer shows the controls 84pt off for a frame or two before they hop to their place.
+- Closed Duo, Home Screen app turned sideways: the capsule stays on the screen. It used to run 61pt past the foot of the screen with 9 places, hiding the last tabs and "…".
+- Closed Duo turned sideways, same window at 5 places: the capsule used to end 16pt past the foot of the window, cutting the fifth tab. It now ends inside it.
+- `menu.tabs`: the places lead the "…" list also when the primary shares the capsule with "…", as on closed Safari upright with actions. The primary used to come first, ahead of the places.
+- Press lens: releasing on a tab, or holding still on it, names that tab. On a long capsule it used to name the one below, after a drag up or held still, as with P5 of 12 places in tall Safari or the first tab of a wide one. The open capsule now grows about its middle item, at up to 57pt, about 55pt for 13 items.
+
+Known issue: on the open Duo, in Safari's right Split View pane, places show only behind the menu button, even where tabs fit (the left pane of the same size shows tabs). The menu lists every place and action, so all stay reachable.
+
+## 0.8.0-rc.3
+
+- Turning an open Duo's Home Screen app to wide no longer leaves the burger over the status clock and glides it into the strip: the controls stay hidden until the strip's inset lands, then appear in place.
+- `menu.tabs`: the app's places are tabs in the capsule when all of them fit, and the burger with its sidebar when they do not. Icons required, all or nothing, actions and primary fold first. Correct from the first paint, an open sidebar closes when tabs take over. Other apps are unchanged.
+- Docs: the tabs table counts "…" in every inline window, since "Move controls" is always listed there: 8 and 14 in full-screen Safari, not 9 and 15, with Home Screen rows corrected too.
+- Docs: `server-rendering.md` no longer describes the removed docked column.
+- `placesFit(context, places, rest)`: the rule behind `menu.tabs`, pure and exported.
+- `menu.tabs`: the "…" list ends at its own height from a capsule taller than it, so it stays in the page. Other apps keep the height they had, on every device.
+- On a Duo, a new mode or window width closes "…", so a Home Screen app does not keep it open off the screen after a fold.
+- One button of room in a `menu.tabs` app: the places lead the "…" list. Docs: the tabs table gives the count with and without "…", tested against the rule.
+- A Home Screen `menu.tabs` app allocates its actions from the strip's room too, so an action does not fold after the first paint.
+- A Home Screen tabs app on a Duo reads its strip's room from the start, so a launch does not show tabs and then a burger.
+- A Home Screen app launching on an unfolded Duo keeps its burger and controls hidden until the window lands, instead of painting them at the closed screen's places.
+- Split view on a Duo: the open sidebar keeps clear of Safari's floating buttons and the burger, by the page's left inset (`--duet-sidebar-inset`).
+- Split view on a Duo, right pane: the open sidebar no longer leaves Safari's column white beside it, and the moving page card falls back to the sidebar's colour instead of `Canvas`.
+- On a Duo, the burger's open sheet closes when the window crosses a layout (split pane to full, or folding), so the page is not left pushed beside it.
+- Column mode: the open sidebar's colour carries on to the screen's foot behind Safari's bar.
+- Docs: pad top content by `calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px))`, which clears the status bar in a Home Screen app rotated to tall, and use the `default` status bar style. `--duet-inset-top` is unchanged.
+- Docs: `useDuet()` keeps its server snapshot until hydration, how to recognise that, and `allowedDevOrigins` for `next dev` over a LAN or VPN name.
+
+## 0.8.0-rc.2
+
+- Light mode column buttons and capsule match native glass on the Duo: no pale seam at the caps, an edge line that darkens the page colour, and fill that keeps saturated colours (#256). Dark mode is unchanged.
+
+## 0.8.0-rc.1
+
+- Action capsule at the foot of the room on the Duo's open screen, full screen Safari and split panes, where fingers rest (#254). Same room, new position in it.
+- Column press rebuilt from Safari's own column, measured from a 60fps recording (#251). A capsule swells as the finger lands, then opens wider and taller with labels after 205ms or a drag. A lens follows the finger and tints what it covers, and release runs the item under it, on springs fitted to native.
+- Behaviour change: column buttons fire on release, not on touch down. If a device never reports a release, a tap runs 1.2s late, and a finger held still that long runs its item.
+- Holding a column button no longer starts text selection and its loupe on the page beneath.
+- Column press, closer to native: the lens's accent copy now bends and fringes at its rim, the release now eases out instead of snapping (the fitted spring was past critical damping and produced an invalid easing, so it never ran), and a two-item capsule can open up into the space reserved for a Live Activity, so its labels clear the next icon. Where the band is still too short for labels, the capsule opens without them.
+- Column press, measured against native with five items on the Duo's large screen (#251): the open capsule and its item spacing match native's 78 by 303, the press opens sooner, the release falls on a spring fitted to native's, and the lens follows the finger one to one past the last item. In dark mode the pressed capsule keeps the page's colour instead of washing it out, and the lens tint is closer to native's cyan. Light mode glass is unchanged.
+- Column press, superposed frame by frame on native (#251): the open capsule's corners are 30.5 by 33px rather than a 39px stadium, as native's are a tighter rounded rectangle. A still finger now scales the capsule, its item spacing and its icons about the capsule's centre by 6% over 170ms, and the icons stay scaled until the fall. Rise and fall use a measured stiffness 204 spring, damping 14.6 and 22.8, so the rise rings as native's does and the fall lands with a 3% undershoot. Icons travel on the same springs and wait 70ms on the fall, so a far icon first dips up with the shrinking spacing, as native's does. The lens stays still on the page while the capsule moves under it, is 68pt tall when open, bends labels half as much in a rim about half as wide, and labels fade linearly, 130ms in and 200ms out.
+
 ## 0.7.1
 
 Everything from 0.7.1-rc.1, unchanged.

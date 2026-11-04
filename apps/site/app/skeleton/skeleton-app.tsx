@@ -2,26 +2,32 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { flushSync } from "react-dom";
-import { Bell, House, Library, Plus, Search, Share } from "lucide-react";
+import { Bell, Bookmark, Compass, Ellipsis, House, Library, MessageCircle, Plus, Search, Settings, Share, User } from "lucide-react";
 import { Duet, bleed, column, readSignals, watchSignals, type DuetMenuItem } from "duet-ui";
 import { useTheme, useTint } from "../theme";
 
+// Nine places, primary ones first: where they all fit Duet shows nine tabs, where not the first ones stay tabs and
+// the rest fold into "…", and where fewer than three would show, the burger.
 const TABS = [
   { id: "home", label: "Home", icon: <House size={24} /> },
   { id: "library", label: "Library", icon: <Library size={24} /> },
   { id: "alerts", label: "Alerts", icon: <Bell size={24} /> },
+  { id: "search", label: "Search", icon: <Search size={24} /> },
+  { id: "saved", label: "Saved", icon: <Bookmark size={24} /> },
+  { id: "explore", label: "Explore", icon: <Compass size={24} /> },
+  { id: "messages", label: "Messages", icon: <MessageCircle size={24} /> },
+  { id: "profile", label: "Profile", icon: <User size={24} /> },
+  { id: "settings", label: "Settings", icon: <Settings size={24} /> },
 ] as const satisfies readonly DuetMenuItem[];
+type Tab = (typeof TABS)[number]["id"];
+/** The plain site's tab bar holds four, the rest behind its More tab. */
+const BAR = 4;
 
 const CSS = `
 [data-sk] { background: var(--sk); }
 [data-sk-row]::-webkit-scrollbar { display: none; }
 /* Duet off and on (the 3D Duo's before and after): each control's icon glides between the plain site's bars and Duet's. */
-.duet [aria-label="Home"] > svg, .sk-plain [aria-label="Home"] > svg { view-transition-name: sk-home; }
-.duet [aria-label="Library"] > svg, .sk-plain [aria-label="Library"] > svg { view-transition-name: sk-library; }
-.duet [aria-label="Alerts"] > svg, .sk-plain [aria-label="Alerts"] > svg { view-transition-name: sk-alerts; }
-.duet [aria-label="Search"] > svg, .sk-plain [aria-label="Search"] > svg { view-transition-name: sk-search; }
-.duet [aria-label="Share"] > svg, .sk-plain [aria-label="Share"] > svg { view-transition-name: sk-share; }
-.duet [aria-label="New"] > svg, .sk-plain [aria-label="New"] > svg { view-transition-name: sk-new; }
+${[...TABS.map((t) => t.label), "Share", "New", "More"].map((l) => `.duet [aria-label="${l}"] > svg, .sk-plain [aria-label="${l}"] > svg { view-transition-name: sk-${l.toLowerCase()}; }`).join("\n")}
 ::view-transition-group(*) { animation-duration: 520ms; animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1); }
 :root { --sk: rgb(60 60 67 / 0.13); }
 @media (prefers-color-scheme: dark) { :root:not([data-lg-theme="light"]) { --sk: rgb(235 235 245 / 0.12); } }
@@ -74,8 +80,9 @@ function Content({ top }: { top: string }) {
 const bar: CSSProperties = { position: "fixed", zIndex: 10, display: "flex", alignItems: "center", background: "color-mix(in srgb, var(--bg) 85%, transparent)", WebkitBackdropFilter: "blur(20px)", backdropFilter: "blur(20px)" };
 const icon: CSSProperties = { width: 40, height: 40, display: "grid", placeItems: "center", border: 0, background: "transparent", color: "var(--ink)", padding: 0 };
 
-function Plain({ tab, onTab, inset }: { tab: string; onTab: (t: (typeof TABS)[number]["id"] | "search") => void; inset: { l: number; r: number } }) {
-  const all: { id: (typeof TABS)[number]["id"] | "search"; label: string; icon: ReactNode }[] = [...TABS, { id: "search", label: "Search", icon: <Search size={24} /> }];
+function Plain({ tab, onTab, inset }: { tab: Tab; onTab: (t: Tab) => void; inset: { l: number; r: number } }) {
+  const more = !TABS.slice(0, BAR).some((t) => t.id === tab);
+  const all: { id: Tab | "more"; label: string; icon: ReactNode }[] = [...TABS.slice(0, BAR), { id: "more", label: "More", icon: <Ellipsis size={24} /> }];
   return (
     <div className="sk-plain" style={{ paddingLeft: inset.l, paddingRight: inset.r }}>
       <header style={{ ...bar, top: 0, left: inset.l, right: inset.r, height: 56, padding: "0 8px 0 20px", gap: 4, boxShadow: "0 0.5px 0 var(--line)" }}>
@@ -86,7 +93,7 @@ function Plain({ tab, onTab, inset }: { tab: string; onTab: (t: (typeof TABS)[nu
       <Content top="80px" />
       <nav style={{ ...bar, bottom: 0, left: inset.l, right: inset.r, height: 64, justifyContent: "space-around", boxShadow: "0 -0.5px 0 var(--line)" }}>
         {all.map((t) => (
-          <button key={t.id} aria-label={t.label} onClick={() => onTab(t.id)} style={{ ...icon, width: 64, height: 52, gap: 2, color: t.id === tab ? "var(--cta)" : "var(--dim)", font: "500 10px -apple-system, system-ui" }}>
+          <button key={t.id} aria-label={t.label} onClick={() => t.id !== "more" && onTab(t.id)} style={{ ...icon, width: 64, height: 52, gap: 2, color: t.id === tab || (t.id === "more" && more) ? "var(--cta)" : "var(--dim)", font: "500 10px -apple-system, system-ui" }}>
             {t.icon}<span>{t.label}</span>
           </button>
         ))}
@@ -96,7 +103,7 @@ function Plain({ tab, onTab, inset }: { tab: string; onTab: (t: (typeof TABS)[nu
 }
 
 export function SkeletonApp() {
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"] | "search">("home");
+  const [tab, setTab] = useState<Tab>("home");
   const { appearance } = useTheme();
   const { tint } = useTint();
   // A host on this origin (the 3D Duo) turns Duet off and on; the controls morph between the two layouts.
@@ -110,6 +117,14 @@ export function SkeletonApp() {
     const on = (e: MessageEvent) => {
       if (e.source !== parent || e.origin !== location.origin) return;
       if (e.data?.type === "skeleton:duet") {
+        // The host may also pick the selected place, to show one folded into "…".
+        const pick = TABS.find((t) => t.id === e.data.selected?.id);
+        if (pick) setTab(pick.id);
+        // ...and open the More list once the device has settled and More has shown the selection for a beat.
+        if (e.data.selected?.open) setTimeout(() => {
+          const more = document.querySelector<HTMLButtonElement>('button.duet-btn[aria-label="More"]');
+          if (more && more.getAttribute("aria-expanded") !== "true") more.click();
+        }, 3600);
         const to = !!e.data.on, swap = () => flushSync(() => setDuet(to));
         if (to === now.current) return;
         now.current = to;
@@ -124,7 +139,7 @@ export function SkeletonApp() {
   if (!duet) return <><style>{CSS}</style><Plain tab={tab} onTab={setTab} inset={inset} /></>;
   return (
     <Duet
-      menu={{ items: [...TABS, { id: "search", label: "Search", icon: <Search size={24} /> }], selected: tab, onSelect: setTab, burger: false }}
+      menu={{ items: [...TABS], selected: tab, onSelect: setTab, tabs: true }}
       actions={[{ id: "share", label: "Share", icon: <Share size={22} />, onPress: () => {} }]}
       appearance={appearance}
       tint={tint}

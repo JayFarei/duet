@@ -30,28 +30,17 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 [data-wd-callout] [data-wd-system] { outline: 1.5px dashed rgb(142 142 147); outline-offset: 2px; }
 
 /* The home page (app/home.tsx): one responsive page, Apple-style. Horizontal layout comes from duet-ui's column(). */
-html { scroll-behavior: smooth; }
 section[id] { scroll-margin-top: 24px; }
 .pill { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 22px; border-radius: 99px; border: 0; background: var(--card); color: var(--accent); font: 500 17px/1 -apple-system, system-ui; box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .pill-solid { background: var(--ink); color: var(--bg); box-shadow: none; }
-/* "Copy prompt", after the OpenTraces button: a tilted deck of agent glyphs that fans out on hover, and a face that
-   flips to "Copied". Ours is a card pill with system blue ink in SF, and the deck springs open the way iOS menus do. */
+/* "Copy prompt": a card pill with system blue ink in SF and one generic icon, and a face that flips to "Copied". */
 .pill-cta { position: relative; overflow: hidden; color: var(--cta); white-space: nowrap; font-weight: 600; transition: scale 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
 .pill-cta:active { scale: 0.96; transition-duration: 0.1s; }
 .cta-face { display: inline-flex; align-items: center; gap: 12px; transition: opacity 0.2s, translate 0.35s cubic-bezier(0.3, 1.3, 0.5, 1); }
 .cta-done { position: absolute; inset: 0; justify-content: center; gap: 7px; opacity: 0; translate: 0 60%; }
 .pill-cta[data-done] .cta-face:not(.cta-done) { opacity: 0; translate: 0 -60%; }
 .pill-cta[data-done] .cta-done { opacity: 1; translate: 0 0; }
-/* 4 glyphs of 18px: overlapping 15px apart at rest (63px, centred), 22px apart open (84px), so the deck fans out both ways. It reserves the open width,
-   so the label never moves. */
-.cta-deck { position: relative; width: 72px; height: 18px; flex: none; }
-.cta-deck > svg { position: absolute; top: 0; left: calc(4.5px + var(--i) * 15px); width: 18px; height: 18px; rotate: var(--r); transition: left 0.45s cubic-bezier(0.3, 1.4, 0.5, 1), rotate 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); filter: drop-shadow(1.5px 0 0 var(--card)) drop-shadow(-1.5px 0 0 var(--card)) drop-shadow(0 1.5px 0 var(--card)) drop-shadow(0 -1.5px 0 var(--card)); }
-.cta-deck > :nth-child(1) { --i: 0; --r: -13deg; z-index: 4; }
-.cta-deck > :nth-child(2) { --i: 1; --r: 8deg; z-index: 3; }
-.cta-deck > :nth-child(3) { --i: 2; --r: -6deg; z-index: 2; }
-.cta-deck > :nth-child(4) { --i: 3; --r: 10deg; z-index: 1; }
-.pill-cta:is(:hover, :focus-visible) .cta-deck > svg { left: calc(var(--i) * 18px); rotate: 0deg; }
-@media (prefers-reduced-motion: reduce) { .pill-cta, .cta-face, .cta-deck > svg { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .pill-cta, .cta-face { transition: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .pill-sm { height: 30px; padding: 0 14px; font-size: 13px; }
 .npm code { font-size: 15px; }
@@ -65,7 +54,7 @@ section[id] { scroll-margin-top: 24px; }
 .stats:hover { box-shadow: 0 0 0 1px var(--dim); }
 .stats:not(:has(.stat-spark)) { grid-auto-columns: 1fr; justify-self: center; width: 120px; }
 .stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 13px 4px 12px; }
-.stat-label { color: var(--dim); font: 600 10px/1 -apple-system, system-ui; letter-spacing: 0.1em; text-transform: uppercase; }
+.stat-label { color: var(--dim); font: 600 12px/1 -apple-system, system-ui; }
 .stat-value { font: 400 25px/1 var(--serif), Georgia, serif; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .stat-spark { display: flex; align-items: center; min-width: 0; padding: 10px 14px; border-inline: 0.5px solid var(--line); }
 .spark { display: block; width: 100%; height: 40px; overflow: visible; }
@@ -78,28 +67,14 @@ section[id] { scroll-margin-top: 24px; }
 .display em, .h2 em { font-style: italic; white-space: nowrap; }
 .h2 { margin: 0; font: 400 clamp(42px, 6.6vw, 72px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.015em; }
 .lede { margin: 20px auto 0; max-width: 760px; color: var(--dim); font: 500 clamp(19px, min(2.2vw, 3vh), 24px)/1.35 -apple-system, system-ui; letter-spacing: -0.01em; text-wrap: balance; }
-.lede-l { margin-left: 0; margin-bottom: 36px; }
+.lede-l { margin-left: 0; margin-top: 14px; margin-bottom: 32px; }
+.h3 + .lede { margin-top: 10px; font-size: clamp(17px, 1.8vw, 20px); }
+.ctas.ctas-l { justify-content: flex-start; margin-top: 32px; }
 .ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
 
-.hero { --hero-top: clamp(40px, min(9vw, 8vh), 110px); text-align: center; padding: var(--hero-top) 0 20px; }
-.stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding-bottom: clamp(48px, 8vw, 100px); }
-/* The stage centres where the hero's column(980, 20) does (duet-ui layout.ts), so device and title share one axis: --c2 is twice that column's centre. Each side keeps 16px clear of Duet's controls, and the side away from them gives up room to stay on the axis. */
-.stage {
-  --l: var(--duet-inset-left, 0px); --r: var(--duet-inset-right, 0px);
-  --w: min(980px, 100% - var(--l) - var(--r) - 40px);
-  --c2: calc(2 * clamp(var(--l) + 20px, (100% - var(--w)) / 2, 100% - var(--r) - 20px - var(--w)) + var(--w));
-  padding-left: max(16px + var(--l), var(--c2) - 100% + 16px + var(--r));
-  padding-right: max(16px + var(--r), 100% - var(--c2) + 16px + var(--l));
-}
 .section { padding: clamp(64px, 10vw, 128px) 0 0; }
 
 .card { background: var(--card); border-radius: 22px; }
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-@media (max-width: 760px) { .tiles { grid-template-columns: 1fr; } }
-.tile { background: var(--card); border-radius: 26px; padding: 14px 14px 24px; }
-.tile-k { margin: 16px 8px 2px; color: var(--dim); font: 600 13px/1.2 -apple-system, system-ui; text-transform: uppercase; letter-spacing: 0.04em; }
-.tile-h { margin: 0 8px 6px; font: 400 32px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
-.tile-p { margin: 0 8px; color: var(--dim); font: 400 16px/1.45 -apple-system, system-ui; }
 
 .code { margin: 16px 0 0; padding: 18px 20px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
 
@@ -113,25 +88,7 @@ section[id] { scroll-margin-top: 24px; }
 /* The OpenMake square, as on RegTail and farei.me: red on hover. */
 .foot-mark { display: inline-block; width: 0.65em; height: 0.65em; margin-right: 0.35em; background: currentColor; transition: background 0.15s ease; }
 .foot-om:hover .foot-mark { background: #e63329; }
-/* On the Duo the page runs inside <Duet>: clear the status bar and the controls at the bottom. */
-html[data-duet-mode] .hero { padding-top: calc(var(--hero-top) + env(safe-area-inset-top)); }
-html[data-duet-mode] .foot { padding-bottom: 140px; }
 
-/* A portrait iPhone (Bars in app/home.tsx): a top bar and a tab bar of glass over a page that scrolls under them. */
-.bar-glass { background: color-mix(in srgb, var(--card) 70%, transparent); -webkit-backdrop-filter: blur(20px) saturate(1.8); backdrop-filter: blur(20px) saturate(1.8); box-shadow: 0 0 0 0.5px var(--line), 0 6px 20px rgb(0 0 0 / 0.08); color: var(--ink); border: 0; border-radius: 99px; }
-.bar-top { position: fixed; z-index: 50; top: max(12px, env(safe-area-inset-top)); left: 16px; right: 16px; display: flex; justify-content: space-between; pointer-events: none; }
-.bar-top > * { pointer-events: auto; }
-/* iOS's scroll-edge effect: the page blurs and fades under the status bar and the top bar. */
-.bars::before { content: ""; position: fixed; z-index: 49; top: 0; left: 0; right: 0; height: calc(max(12px, env(safe-area-inset-top)) + 64px); pointer-events: none; background: linear-gradient(var(--bg) 30%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); -webkit-mask-image: linear-gradient(#000 50%, transparent); mask-image: linear-gradient(#000 50%, transparent); }
-.bar-end { display: flex; gap: 8px; }
-.bar-round { display: grid; place-items: center; width: 44px; height: 44px; }
-.bar-try { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; font: 600 15px/1 -apple-system, system-ui; cursor: pointer; }
-.bar-tabs { position: fixed; z-index: 50; bottom: calc(10px + env(safe-area-inset-bottom)); left: 50%; translate: -50% 0; display: flex; padding: 4px; }
-.bar-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 84px; height: 54px; border: 0; border-radius: 99px; background: none; color: var(--ink); font: 600 10px/1 -apple-system, system-ui; cursor: pointer; transition: background 0.2s, color 0.2s; }
-.bar-tab svg { width: 24px; height: 24px; }
-.bar-tab[data-on] { color: #007aff; background: rgb(120 120 128 / 0.14); }
-.bars .hero, html .float .hero { padding-top: calc(max(12px, env(safe-area-inset-top)) + 72px); }
-.bars .foot, html .float .foot { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
 /* Duet's controls beside the page on a desktop, flat as iOS draws them: no specular rim or bevel from GlassyUI, only a
    hairline. The glimmer over the stage's buttons ([data-wd-shine]) is separate and stays. */
 .duet[data-mode="inline"] .duet-glass::after { display: none; }
@@ -140,11 +97,12 @@ html[data-duet-mode] .foot { padding-bottom: 140px; }
 .duet[data-mode="inline"] .duet-blob { --duet-menu: color-mix(in srgb, var(--bg) 62%, transparent); }
 .duet[data-mode="inline"] .duet-blob::before, .duet[data-mode="inline"] .duet-blob::after { display: none; }
 .duet[data-mode="inline"] .duet-fill { -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
+/* In the column and the strip the list sits on the page's own text (the stage's Inbox), and a backdrop filter there
+   draws nothing in iOS Safari inside the 3D Duo's frames, so the list keeps the library's glass on a near opaque fill. */
+.duet:not([data-mode="inline"]) .duet-blob { --duet-menu: color-mix(in srgb, var(--bg) 90%, transparent); }
 /* The selection as a grey fill, like the phone bar's: Duet's dark default darkens, which vanishes on a flat black control. */
 html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
 
-/* Side controls tried on an iPhone (home.tsx): the page ignores Duet's insets, so the controls float over it. */
-.float { --duet-inset-left: 0px; --duet-inset-right: 0px; }
 
 /* A server-rendered phone page, hidden on desktops until the web Duo replaces it (same query as useDesktop). */
 @media (hover: hover) and (pointer: fine) and (min-width: 900px) { .ssr-site { visibility: hidden; } }
@@ -172,11 +130,6 @@ html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
 /* The tour row under a narrow stage (web-duo.tsx): the app icon gives its room to what is showing, which reads first. */
 [data-wd-phases] { container-type: inline-size; }
 @container (max-width: 380px) { [data-wd-showing] > :first-child { display: none; } }
-/* Integrate's tint picker: small swatches, the picked one ringed like iOS's accent colour setting. */
-.tints { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
-.tints-k { font: 500 13px -apple-system, system-ui; color: var(--dim); margin-right: 4px; }
-.tint { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--c); cursor: pointer; box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 0.12); transition: box-shadow 0.15s; }
-.tint[aria-checked="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px var(--c); }
 
 /* The sheets recipe (app/sheet). A plain web modal: a full-screen fixed scrim, the sheet at its bottom. */
 .sheet-scrim { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / 0.38); animation: sheet-fade 0.2s ease-out; }
@@ -190,3 +143,149 @@ html[data-duet-close] .sheet-x { display: none; }
 @keyframes sheet-fade { from { opacity: 0; } }
 @keyframes sheet-up { from { transform: translateY(100%); } }
 @media (prefers-reduced-motion: reduce) { .sheet-scrim, .sheet { animation: none; } }
+
+.h3 { margin: clamp(56px, 7vw, 88px) 0 0; font: 400 clamp(32px, 4.6vw, 48px)/1.05 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+
+/* The site pages (home.tsx, examples): one column 1080 wide at most, 20px clear of each edge. */
+.wrap { box-sizing: border-box; width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 20px; }
+.duo-wait { width: 100%; height: min(85vw, 680px, 70vh); }
+
+/* The top bar (site-nav.tsx). */
+.nav { box-sizing: border-box; display: flex; align-items: center; gap: 20px; max-width: 1120px; height: 60px; margin: 0 auto; padding: 0 20px; }
+.nav-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font: 600 17px/1 -apple-system, system-ui; }
+.nav-links { display: flex; gap: 18px; margin-right: auto; }
+.nav-links a { color: var(--dim); font: 500 15px/1 -apple-system, system-ui; }
+.nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--ink); }
+.nav-end { display: flex; gap: 6px; }
+.nav-icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 99px; background: none; color: var(--ink); cursor: pointer; }
+.nav-icon:hover { background: var(--card); }
+@media (max-width: 520px) { .nav { gap: 12px; } .nav-brand { font-size: 0; gap: 0; } .nav-links { gap: 14px; } }
+
+/* The intro: title, lede, install and stats. Not a full window, so the simulator shows right under it. */
+.intro { padding-top: clamp(40px, 8vh, 96px); text-align: center; }
+.intro .actions { gap: 12px; }
+@media (max-width: 760px) {
+  .intro .display { font-size: clamp(38px, 10.5vw, 52px); }
+  .intro .lede { margin-top: 14px; font-size: 17px; }
+  .intro .actions { margin-top: 22px; gap: 10px; }
+  .intro .ctas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .intro .pill { justify-content: center; padding: 0 12px; font-size: 16px; }
+  .intro .npm code { font-size: 13px; }
+  .intro .npm .npm-hint { display: none; }
+}
+
+/* The simulator: the app picker, then the live Duo with its own controls. */
+.sim { padding-top: clamp(48px, 8vw, 96px); scroll-margin-top: 8px; }
+.sim-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.stage { max-width: 1120px; margin: 0 auto; padding-inline: 20px; }
+@media (max-width: 760px) { .stage { padding-inline: 16px; } .sim-head { padding-inline: 16px; } }
+
+/* How it works: four numbered steps, then the glossary. */
+.how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 32px 0 0; padding: 0; list-style: none; }
+.how li { padding: 20px; border-radius: 22px; background: var(--card); }
+.how-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 99px; background: var(--ink); color: var(--bg); font: 600 14px/1 -apple-system, system-ui; }
+.how h3 { margin: 14px 0 6px; font: 400 26px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.how p { margin: 0; color: var(--dim); font: 400 15px/1.45 -apple-system, system-ui; }
+@media (max-width: 960px) { .how { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .how { grid-template-columns: minmax(0, 1fr); } }
+.glossary { width: 100%; margin-top: 32px; border-collapse: collapse; font: 400 16px/1.45 -apple-system, system-ui; }
+.glossary th, .glossary td { padding: 12px 16px 12px 0; border-bottom: 0.5px solid var(--line); text-align: left; vertical-align: top; }
+.glossary th { width: 9em; font-weight: 600; white-space: nowrap; }
+.glossary td { color: var(--dim); }
+
+/* Examples: one card each, Try it loads it in the simulator, Show code opens its one file. */
+.exs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 960px) { .exs { grid-template-columns: minmax(0, 1fr); } }
+.ex { padding: 12px 12px 16px; min-width: 0; }
+.ex .card-h { margin-top: 8px; }
+.ex-acts { display: flex; gap: 8px; margin: 16px 6px 0; }
+.ex-src { margin: 14px 6px 0; }
+.ex-src summary { color: var(--dim); font: 500 14px/1.2 -apple-system, system-ui; cursor: pointer; }
+.ex-src .code { max-height: 420px; margin-top: 10px; border-radius: 14px; background: var(--code); }
+
+/* Cards. */
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 760px) { .cards { grid-template-columns: minmax(0, 1fr); } }
+.cards .card { display: block; padding: 12px 12px 20px; color: inherit; }
+.ex-card-link:hover { box-shadow: 0 0 0 1px var(--line); }
+.card-h { display: flex; align-items: center; gap: 6px; margin: 14px 6px 4px; font: 400 28px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.card-p { margin: 0 6px; color: var(--dim); font: 400 15px/1.45 -apple-system, system-ui; }
+
+/* A recorded loop (loop-video.tsx): poster first, or a plain box until the clip is recorded. */
+.loop { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; background: var(--bg); }
+.loop video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.loop:not([data-ready]) video { visibility: hidden; }
+.loop:not([data-ready])::after { content: ""; position: absolute; inset: 22% 30%; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.loop-play { position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 99px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
+.loop-count { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 4px 10px; border-radius: 99px; background: var(--card); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; font-variant-numeric: tabular-nums; }
+
+/* Example demos (ex-demo.tsx): a page, the controls Duet draws beside it, and what they do, looping. Like anime.js's
+ * documentation previews: a small panel, its label in the corner, the moving part in the middle. */
+.exd { position: relative; height: 184px; overflow: hidden; border-radius: 16px; background: var(--bg); color: var(--ink); --exd-cta: var(--cta); }
+.exd-label, .exd-cap { position: absolute; top: 12px; font: 600 11px/1 -apple-system, system-ui; letter-spacing: 0.04em; }
+.exd-label { left: 14px; color: var(--dim); text-transform: uppercase; }
+.exd-cap { right: 14px; }
+.exd-page { position: absolute; top: 36px; bottom: 14px; left: 14px; right: 80px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
+.exd-page::before { content: ""; position: absolute; top: 14px; left: 14px; width: 58%; height: 48px; border-radius: 3px; background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
+.exd-group { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px; border-radius: 99px; background: var(--wd-glass); box-shadow: 0 0 0 0.5px var(--line), 0 4px 14px rgb(0 0 0 / 0.08); }
+.exd-group > svg { position: relative; display: block; }
+.exd-one { padding: 9px; }
+.exd-step { position: absolute; top: 36px; bottom: 14px; right: 14px; width: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+
+/* Inbox: Tabs while all fit, then Tabs + More, then one Sidebar button. Three states, three seconds each. */
+.exd-s2, .exd-s3 { opacity: 0; }
+[data-demo="inbox"] .exd-s1, [data-demo="inbox"] .exd-s2, [data-demo="inbox"] .exd-s3 { animation: exd-phase 9s ease both infinite; }
+[data-demo="inbox"] .exd-s2 { animation-delay: 3s; }
+[data-demo="inbox"] .exd-s3 { animation-delay: 6s; }
+@keyframes exd-phase { 0% { opacity: 0; transform: scale(0.8); filter: blur(4px); } 5%, 29% { opacity: 1; transform: none; filter: none; } 33%, 100% { opacity: 0; transform: scale(0.8); filter: blur(4px); } }
+.exd-sel { position: absolute; top: 3px; left: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 99px; background: color-mix(in srgb, var(--exd-cta) 24%, transparent); animation: exd-sel 9s cubic-bezier(0.3, 1.4, 0.5, 1) infinite; }
+@keyframes exd-sel { 0%, 9% { translate: 0 0; } 13%, 20% { translate: 0 19px; } 24%, 100% { translate: 0 38px; } }
+
+/* Checkout: Pay is tapped, asks to confirm, and turns into a check. */
+.exd-pay { position: absolute; top: calc(50% + 11px); right: 23px; height: 34px; width: 34px; translate: 0 -50%; overflow: hidden; border-radius: 99px; background: var(--exd-cta); color: #fff; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); animation: exd-pay 6s ease infinite; }
+.exd-pay > span { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; }
+.exd-pay-icon, .exd-pay-done { right: 0; width: 34px; justify-content: center; }
+.exd-pay-text { left: 14px; font: 600 13px/1 -apple-system, system-ui; white-space: nowrap; opacity: 0; animation: exd-pay-text 6s ease infinite; }
+.exd-pay-icon { animation: exd-pay-icon 6s ease infinite; }
+.exd-pay-done { opacity: 0; animation: exd-pay-done 6s ease infinite; }
+@keyframes exd-pay { 0%, 15% { width: 34px; scale: 1; background: var(--exd-cta); } 18% { scale: 0.9; } 21% { scale: 1; width: 34px; } 30%, 55% { width: 104px; scale: 1; background: var(--exd-cta); } 58% { scale: 0.94; } 61% { scale: 1; width: 104px; } 67%, 90% { width: 34px; background: #34c759; } 97%, 100% { width: 34px; background: var(--exd-cta); } }
+@keyframes exd-pay-icon { 0%, 21% { opacity: 1; } 25%, 92% { opacity: 0; } 98%, 100% { opacity: 1; } }
+@keyframes exd-pay-text { 0%, 24% { opacity: 0; } 30%, 56% { opacity: 1; } 60%, 100% { opacity: 0; } }
+@keyframes exd-pay-done { 0%, 62% { opacity: 0; } 67%, 88% { opacity: 1; } 93%, 100% { opacity: 0; } }
+.exd-tap { position: absolute; top: calc(50% + 11px); right: 23px; width: 34px; height: 34px; translate: 0 -50%; border-radius: 99px; box-shadow: 0 0 0 2px var(--ink); opacity: 0; pointer-events: none; animation: exd-tap 6s ease-out infinite; }
+@keyframes exd-tap { 0%, 14% { opacity: 0; scale: 0.5; } 17% { opacity: 0.45; scale: 0.8; } 24% { opacity: 0; scale: 1.5; } 53% { opacity: 0; scale: 0.5; } 56% { opacity: 0.45; scale: 0.8; } 63%, 100% { opacity: 0; scale: 1.5; } }
+.exd-c2, .exd-c3 { opacity: 0; }
+[data-demo="checkout"] .exd-c1 { animation: exd-c1 6s ease infinite; }
+[data-demo="checkout"] .exd-c2 { animation: exd-c2 6s ease infinite; }
+[data-demo="checkout"] .exd-c3 { animation: exd-c3 6s ease infinite; }
+@keyframes exd-c1 { 0%, 22% { opacity: 1; } 26%, 96% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes exd-c2 { 0%, 24% { opacity: 0; } 28%, 58% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@keyframes exd-c3 { 0%, 61% { opacity: 0; } 65%, 90% { opacity: 1; } 95%, 100% { opacity: 0; } }
+
+/* Reader: a second pane opens with its Pane bar beside it, goes full screen, and closes. */
+.exd-pane { position: absolute; top: 36px; bottom: 14px; right: 80px; width: calc((100% - 94px) / 2); border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line), -6px 0 18px rgb(0 0 0 / 0.1); animation: exd-pane 8s cubic-bezier(0.3, 1.1, 0.5, 1) infinite; }
+.exd-pane::before { content: ""; position: absolute; top: 14px; left: 12px; right: 12px; height: 34px; border-radius: 3px; background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
+@keyframes exd-pane { 0%, 8% { opacity: 0; translate: 24px 0; width: calc((100% - 94px) / 2); } 16%, 40% { opacity: 1; translate: 0 0; width: calc((100% - 94px) / 2); } 50%, 70% { opacity: 1; width: calc(100% - 94px); } 78% { opacity: 1; translate: 0 0; width: calc((100% - 94px) / 2); } 86%, 100% { opacity: 0; translate: 24px 0; width: calc((100% - 94px) / 2); } }
+.exd-panebar { position: absolute; top: calc(50% + 11px); right: 23px; translate: 0 -50%; padding: 9px; gap: 12px; animation: exd-panebar 8s ease infinite; }
+.exd-panebar > svg { border-radius: 99px; outline: 0 solid transparent; animation: exd-key 8s ease infinite; }
+.exd-panebar > svg:last-child { animation-name: exd-key-full; }
+@keyframes exd-panebar { 0%, 10% { opacity: 0; scale: 0.8; } 16%, 80% { opacity: 1; scale: 1; } 86%, 100% { opacity: 0; scale: 0.8; } }
+@keyframes exd-key { 0%, 72% { box-shadow: 0 0 0 0 transparent; } 75% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ink) 18%, transparent); } 80%, 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes exd-key-full { 0%, 41% { box-shadow: 0 0 0 0 transparent; } 44% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ink) 18%, transparent); } 49%, 100% { box-shadow: 0 0 0 0 transparent; } }
+.exd-r2, .exd-r3 { opacity: 0; }
+[data-demo="reader"] .exd-r1 { animation: exd-r1 8s ease infinite; }
+[data-demo="reader"] .exd-r2 { animation: exd-r2 8s ease infinite; }
+[data-demo="reader"] .exd-r3 { animation: exd-r3 8s ease infinite; }
+@keyframes exd-r1 { 0%, 40% { opacity: 1; } 44%, 100% { opacity: 0; } }
+@keyframes exd-r2 { 0%, 42% { opacity: 0; } 46%, 70% { opacity: 1; } 74%, 100% { opacity: 0; } }
+@keyframes exd-r3 { 0%, 72% { opacity: 0; } 76%, 94% { opacity: 1; } 98%, 100% { opacity: 0; } }
+
+/* Still for readers who ask for less motion: the first state of each. */
+@media (prefers-reduced-motion: reduce) { .exd *, .exd *::before { animation: none !important; } }
+
+/* On a Duo the home page wears Duet's controls (site-duet.tsx): the top bar keeps the name only, and in inline mode
+ * the page keeps clear of the controls on its edge. */
+html[data-duet-mode] .nav-links, html[data-duet-mode] .nav-end { display: none; }
+html[data-duet-mode] .nav { justify-content: center; }
+.nav, .wrap, .stage { padding-left: calc(20px + var(--duet-inset-left, 0px)); padding-right: calc(20px + var(--duet-inset-right, 0px)); }
+@media (max-width: 760px) { .stage { padding-left: calc(16px + var(--duet-inset-left, 0px)); padding-right: calc(16px + var(--duet-inset-right, 0px)); } }

@@ -682,20 +682,19 @@ index 2c08be7..a97ec81 100644
      const on = shown.length > 0 && flat.every((m) => m !== null)
  
 diff --git a/packages/shell/index.html b/packages/shell/index.html
-index f5a37b7..495bb35 100644
+index f5a37b7..cd0592e 100644
 --- a/packages/shell/index.html
 +++ b/packages/shell/index.html
-@@ -7,7 +7,7 @@
+@@ -7,7 +7,6 @@
      <link rel="icon" href="../../public/icon.svg" type="image/svg+xml" />
      <!-- The body of the phone, fetched by main.ts. Asked for here so it downloads
           while the module graph is still being parsed rather than after it. -->
 -    <link rel="preload" href="/model/iPhone_Duo_Render.usdc" as="fetch" crossorigin />
-+    <link rel="preload" href="model/iPhone_Duo_Render.usdc" as="fetch" crossorigin />
      <style>
        /* Everything in a layer: StyleX emits layered CSS and unlayered rules
           would beat it regardless of specificity. `reset` is declared first so
 diff --git a/packages/shell/main.ts b/packages/shell/main.ts
-index 489947a..a385078 100644
+index 489947a..ebd869c 100644
 --- a/packages/shell/main.ts
 +++ b/packages/shell/main.ts
 @@ -6,7 +6,7 @@ import { USDLoader } from 'three/addons/loaders/USDLoader.js'
@@ -740,11 +739,15 @@ index 489947a..a385078 100644
  /** False until the first frame the phone is drawn in; the scene fades in there. */
  let shown = false
  addEventListener('message', (e: MessageEvent<Pose>) => {
-@@ -129,10 +137,10 @@ announce({ live: true })
+@@ -127,12 +135,12 @@ announce({ live: true })
+ // The 3.6 MB body is the long pole, so it is asked for before anything else on
+ // this page runs: the icons, the baked screens and the environment map all
  // happen while it is in flight, and the await for it is at the model section
- // below. index.html preloads the same URL, so the request is already open by
- // the time this module is evaluated.
+-// below. index.html preloads the same URL, so the request is already open by
+-// the time this module is evaluated.
 -const modelLoad = new USDLoader().loadAsync('/model/iPhone_Duo_Render.usdc')
++// below. No link preload: WebKit never matches it to this fetch, so it
++// downloaded the model twice and warned.
 +const modelLoad = new USDLoader().loadAsync('model/iPhone_Duo_Render.usdc')
  
  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
@@ -848,7 +851,40 @@ index 489947a..a385078 100644
    if (typeof m.yaw === 'number') {
      // A page turns the phone to face its reader, which only holds from the front: a new yaw brings the camera home.
      homing ||= m.yaw !== targetYaw
-@@ -745,8 +782,10 @@ renderer.setAnimationLoop((now) => {
+@@ -690,7 +727,8 @@ const curve = (v: number, lo: number) => Math.min(1, Math.max(0, (1 - lo - v) /
+  * much of the width the shader's gradient spans — half the inner display, the
+  * whole cover (`uiGradient` in main.ts). Returns the per-frame setter.
+  */
+-function ramp(panel: HTMLElement, free: 'left' | 'right', band: number) {
++/** `depth` scales the shading and the blur: the site's cover keeps a hint of the fold, not a smear across it. */
++function ramp(panel: HTMLElement, free: 'left' | 'right', band: number, depth = 1) {
+   const dir = free === 'left' ? '90deg' : '270deg'
+   /** `to` of the panel's width from the free edge, as the inset of the far side. */
+   const far = (to: number) => (free === 'left' ? `0 ${100 - to}% 0 0` : `0 0 0 ${100 - to}%`)
+@@ -718,11 +756,11 @@ function ramp(panel: HTMLElement, free: 'left' | 'right', band: number) {
+     ramped = motion
+     for (const el of layers) el.style.display = motion > 0 ? 'block' : 'none'
+     if (motion <= 0) return
+-    dark.style.background = `linear-gradient(${dir},${stops((v) => Math.min(1, 2 * motion * curve(v, 0.2)))})`
++    dark.style.background = `linear-gradient(${dir},${stops((v) => Math.min(1, 2 * motion * curve(v, 0.2)) * depth)})`
+     // 72 texels of a 12 px/mm bake is 30 px of a 5 px/mm panel. Gaussians add
+     // in variance, so the layer that reaches step `i` carries what the shader's
+     // radius there has over the next step's.
+-    const sigma = (i: number) => (i < STEPS ? 30 * motion * curve((i + 0.5) / STEPS, 0) : 0)
++    const sigma = (i: number) => (i < STEPS ? 30 * depth * motion * curve((i + 0.5) / STEPS, 0) : 0)
+     steps.forEach((el, i) => {
+       el.style.backdropFilter = `blur(${Math.sqrt(Math.max(0, sigma(i) ** 2 - sigma(i + 1) ** 2)).toFixed(2)}px)`
+     })
+@@ -730,7 +768,7 @@ function ramp(panel: HTMLElement, free: 'left' | 'right', band: number) {
+ }
+ const innerFold = ramp(innerLive.element, 'left', 0.5)
+ // Rotated half a turn to face out, so the cover's free edge is the panel's right.
+-const coverFold = ramp(outerLive.element, 'right', 1)
++const coverFold = ramp(outerLive.element, 'right', 1, 0.2)
+ const smooth = (x: number) => x * x * (3 - 2 * x)
+ 
+ /** The cover panel answers a finger only while flat, so `coverTouch` is written on change. */
+@@ -745,8 +783,10 @@ renderer.setAnimationLoop((now) => {
    const dt = Math.min(now - last, 50)
    const k = 1 - 0.92 ** (dt / 16.7)
    last = now
@@ -861,7 +897,7 @@ index 489947a..a385078 100644
    // Not while the boot screen is up: the phone turns once the OS is on the glass.
    if (hud.spinning() && booted()) targetYaw += 0.004
    hud.angle(angle)
-@@ -758,6 +797,8 @@ renderer.setAnimationLoop((now) => {
+@@ -758,6 +798,8 @@ renderer.setAnimationLoop((now) => {
    bend.value = ((180 - angle) / 180) * Math.PI
    hinge.rotation.y = bend.value
    phone.rotation.y = yaw
@@ -870,7 +906,7 @@ index 489947a..a385078 100644
    // Facing you means facing the eye: a drag orbits the camera, not the phone, and still turns it as you see it.
    setPose(yaw - controls.getAzimuthalAngle(), angle)
    hardware.tick(dt / 1000)
-@@ -784,7 +825,6 @@ renderer.setAnimationLoop((now) => {
+@@ -784,7 +826,6 @@ renderer.setAnimationLoop((now) => {
    controls.update()
    frame()
    hud.orbit(controls.getAzimuthalAngle(), controls.getPolarAngle(), controls.getDistance(), yaw)
@@ -878,7 +914,7 @@ index 489947a..a385078 100644
    if (spotsTo) {
      const spots = hardware.spots()
      const now = JSON.stringify(spots)
-@@ -805,15 +845,21 @@ renderer.setAnimationLoop((now) => {
+@@ -805,15 +846,21 @@ renderer.setAnimationLoop((now) => {
    // last 30° so the mirror is never a pop when the fold begins.
    outerLive.visible = facing(outerLive) && (angle < 1 || (app && angle < FLAT))
    outerLive.element.style.opacity = Math.min(1, (FLAT - angle) / 30).toFixed(3)
@@ -903,7 +939,7 @@ index 489947a..a385078 100644
    updateDisplays(
      { visible: innerLive.visible, active: angle > 40, angle, clip },
      {
-@@ -824,7 +870,7 @@ renderer.setAnimationLoop((now) => {
+@@ -824,7 +871,7 @@ renderer.setAnimationLoop((now) => {
      }
    )
    // Past half way the clip has eaten the whole band, as it has in the shader.
@@ -912,7 +948,7 @@ index 489947a..a385078 100644
    // No depth test either: a turned panel would still take the clicks meant for
    // the frame drawn over it, so it is scenery until it is flat.
    const touch = angle < 1
-@@ -832,6 +878,19 @@ renderer.setAnimationLoop((now) => {
+@@ -832,6 +879,19 @@ renderer.setAnimationLoop((now) => {
      coverTouch = touch
      outerLive.element.style.pointerEvents = touch ? 'auto' : 'none'
    }

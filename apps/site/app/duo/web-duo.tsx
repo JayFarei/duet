@@ -103,13 +103,13 @@ interface Size { w: number; h: number }
 interface Scene { clip: Box; clipR?: number; frame: Box; signals: Signals; under?: ReactNode; chrome: ReactNode; mode: Mode; note: string }
 
 // The slots a developer fills with <Duet> props, each in its own temporary colour for the call-out. A group of
-// actions is "actions", a lone one "action" (template.ts Slot).
+// actions is "actions", a lone one "action" (template.ts Slot); a group of places shown as tabs ([data-tab]) is "tabs".
 const SLOTS: [slot: string, color: string, label: string][] = [
-  ["menu", "#ff375f", "menu"], ["actions", "#0a84ff", "actions"], ["primary", "#30d158", "primary"], ["close", "#ff453a", "close"],
+  ["menu", "#ff375f", "menu"], ["tabs", "#bf5af2", "tabs"], ["actions", "#0a84ff", "actions"], ["primary", "#30d158", "primary"], ["close", "#ff453a", "close"],
   ["more", "#ffd60a", "overflow"],
 ];
 const CALLOUT = "html[data-wd-slots] [data-duet-slot] { outline: 2.5px solid var(--wd-c); outline-offset: 2px; box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--wd-c) 30%, transparent) !important; }\n"
-  + SLOTS.map(([slot, c]) => `[data-duet-slot="${slot}"] { --wd-c: ${c}; }`).join("\n") + '\n[data-duet-slot="action"] { --wd-c: #0a84ff; }'
+  + SLOTS.map(([slot, c]) => `[data-duet-slot="${slot}"] { --wd-c: ${c}; }`).join("\n") + '\n[data-duet-slot="action"] { --wd-c: #0a84ff; }\n[data-duet-slot]:has([data-tab]) { --wd-c: #bf5af2; }'
   // Duet's column rim as the flat band the stage's Safari buttons use (site.css [data-wd-col]): in the stage Chrome
   // drops the rim's mask and lights the whole button. Only here, never on the page itself.
   + '\n.duet[data-mode="column"] .duet-glass::after { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgb(255 255 255 / 0.2); }';
@@ -198,7 +198,7 @@ function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals
       ? { clip: screen, frame: screen, signals, mode: modeOf(signals), chrome: <Status x={W - DUO.centerFromEdge} top={(s.posture === "closed" ? 84 : 26) + push} />,
           note: "Added to the Home Screen, the app owns the display and iOS gives it the strip. Duet draws its controls there, like a native app." }
       : { clip: screen, frame: screen, signals, mode: modeOf(signals), chrome: null,
-          note: "Turned sideways there is no strip, so Duet keeps an 84pt one inside the page. Drag it to the other edge; it remembers." };
+          note: "Turned sideways there is no strip, so Duet keeps an 84pt one inside the page." };
   }
   if (s.app === "split") {
     const win = { x: s.pane === "right" ? W - PANE.w : 0, y: 0, w: PANE.w, h: H }, otherX = s.pane === "right" ? 0 : W - PANE.w;
@@ -1162,7 +1162,7 @@ function PreviewColumn({ x, top, h, col, clock, at, over }: { x: number; top: nu
 /** The preview's title band across the top of the sheet. Closed it holds the address (`address`: where); unfolded,
  *  close and the page menu 16pt in from its corners with the site's host between (`buttons`). */
 function PreviewBand({ width, h, host, address, buttons }: { width: number; h: number; host: string; address?: { x: number; w: number }; buttons?: boolean }) {
-  const name = host.replace(/:\d+$/, ""), btn = (left: number, d: string, style?: CSSProperties) => (
+  const name = shown(host), btn = (left: number, d: string, style?: CSSProperties) => (
     <div style={{ ...circle, position: "absolute", left, top: h - 54, width: 44, height: 44 }}><Glyph d={d} style={style} /></div>
   );
   return (
@@ -1233,8 +1233,12 @@ function Keyboard({ w, top, k, bar, host }: { w: number; top: number; k: Keys; b
   );
 }
 
-/** Safari's address field shows the host alone, on one line: no port, no www, and an ellipsis when it runs long. */
-const shown = (host: string) => host.replace(/:\d+$/, "").replace(/^www\./, "");
+/** Safari's address field shows the host alone, on one line: no port, no www, and an ellipsis when it runs long. A
+ *  loopback host (a local build, the recorder) reads as a neutral example.com, so no dev address reaches a clip. */
+const shown = (host: string) => {
+  const h = host.replace(/:\d+$/, "").replace(/^www\./, "");
+  return /^(localhost|127\.\d+\.\d+\.\d+|\[::1\]|.*\.localhost)$/.test(h) || h === "" ? "example.com" : h;
+};
 const oneLine: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center", minWidth: 0 };
 
 function UrlBar({ left, top, width, host, h = BAR.h }: { left: number; top: number; width: number; host: string; h?: number }) {
@@ -1261,7 +1265,7 @@ function OpenSafari({ w, host, forward }: { w: number; host: string; forward?: b
       </div>
       <div data-wd-system style={{ position: "absolute", right: 25.5, top: OPEN.top + OPEN.h / 2 - 25, display: "flex", alignItems: "center", gap: 10 }}><Clock /><Battery /></div>
       <div data-wd-system style={{ position: "absolute", left: OPEN.tabs.left, right: OPEN.tabs.right, top: OPEN.tabs.top, height: OPEN.tabs.h, boxSizing: "border-box", borderRadius: 99, background: "var(--bg)", display: "flex", alignItems: "center", padding: 2, gap: 2, font: "500 13px -apple-system, system-ui" }}>
-        {["Duo Lab", "Duo Lab", "Duet"].map((t, i, all) => (
+        {["Reader", "Checkout", "Inbox"].map((t, i, all) => (
           <div key={i} style={{ flex: 1, height: "100%", borderRadius: 99, display: "grid", placeItems: "center", ...(i === all.length - 1 && { ...glass, flex: 1.4 }) }}>{t}</div>
         ))}
       </div>

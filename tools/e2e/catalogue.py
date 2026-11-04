@@ -259,8 +259,8 @@ SUITES = [
     # #191: QA reported the column's burger and "…" gone for good after this exact flick up then down on a page with
     # the column; the trace showed them in place throughout, so this guards the report as given.
     {"id": "scr06", "title": "The reported flick up then down, Safari tab, outer screen: column controls stay (#191)", "page": "/book", "start": TAB0, "steps": [
-        (("drags", (((180, 490), (180, 150), 130), ((180, 170), (180, 520), 130))), "Flick up (180,490 to 180,150, 130ms), then down (180,170 to 180,520)", {"label": "Menu", "menu": False}),
-        (("drags", (((180, 490), (180, 150), 130), ((180, 170), (180, 520), 130))), "The same flick again", {"label": "Menu", "menu": False}),
+        (("drags", (((180, 490), (180, 150), 130), ((180, 170), (180, 520), 130))), "Flick up (180,490 to 180,150, 130ms), then down (180,170 to 180,520)", {"label": "Sidebar", "menu": False}),
+        (("drags", (((180, 490), (180, 150), 130), ((180, 170), (180, 520), 130))), "The same flick again", {"label": "Sidebar", "menu": False}),
     ]},
     {"id": "nav01", "title": "Link, Safari Back and Forward, outer screen upright", "page": "/", "start": TAB0, "steps": [
         (("tap", "Call to action example"), "Tap the link \"Call to action example\"", {"path": "/book"}),

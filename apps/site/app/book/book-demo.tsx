@@ -3,7 +3,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { ArrowLeft, CalendarCheck, Check, ChevronRight, Heart, Home, Search, Share, Ticket, User } from "lucide-react";
 import { Duet, bleed, type DuetPrimary } from "duet-ui";
-import { WebDuo, useDesktop } from "../duo/web-duo";
+import { Duo } from "../duo/duo";
+import { useDesktop } from "../duo/web-duo";
 
 const CLASSES = [
   { id: "sauna", name: "Sauna and cold plunge", when: "Today, 18:30", credits: 2 },
@@ -27,7 +28,7 @@ const row: CSSProperties = { display: "flex", alignItems: "center", gap: 12, wid
 
 export function BookDemo() {
   const desktop = useDesktop();
-  return desktop ? <WebDuo src="/book" title="Call to action" intro="A class page's call to action is a control: a tinted button in the controls, in the burger's slot on the closed Duo. Tap it: it grows into a confirmation, and booking folds it back as Booked." />
+  return desktop ? <Duo src="/book" title="Call to action" intro="A class page's call to action is a control: a tinted button in the controls, in the burger's slot on the closed Duo. Tap it: it grows into a confirmation, and booking folds it back as Booked." />
     : <div className={desktop === null ? "ssr-site" : undefined}><Book /></div>;
 }
 

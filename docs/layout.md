@@ -11,7 +11,35 @@ The page spans the whole window and the controls float over it, so backgrounds r
 - `column(maxWidth, pad)`: a centred reading column. It centres on the whole window and moves aside from the controls only as far as it must. The `duet-column` class does the same in CSS (`--duet-max`, `--duet-pad`).
 - `bleed(pad)`: a full-width band (hero, sticky bar, list row). The band runs under the controls, its content is padded back beside them. `bleed(false)` runs content itself edge to edge (a map, an image). The `duet-bleed` class does the same in CSS.
 
-Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right` (the controls' width on their edge; 0 in `column` mode without children, see below), `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear) and `--duet-safe-top-column` (in `column` mode, the top of the part of Safari's column clear of its back and reader buttons: keep popovers that cross the column below it). `--duet-vh` is `stableHeight` in px: size full-screen sections with `min-height: var(--duet-vh, 100svh)` so they keep their height while the URL bar collapses and expands. Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
+Duet sets the insets on `<html>` as `--duet-inset-left`, `--duet-inset-right` (the controls' width on their edge; 0 in `column` mode without children, see below), `--duet-inset-top` (28px in `strip` mode, for iOS's top blur in Home Screen apps, else 0; it adds to the safe area, see [Keeping the top clear](#keeping-the-top-clear)) and `--duet-inset-bottom` (in `column` mode, Safari's chrome below the page: the page runs on under Safari's floating URL bar, and the scroller ends with that much space so the last content scrolls clear) and `--duet-safe-top-column` (in `column` mode, the top of the part of Safari's column clear of its back and reader buttons: keep popovers that cross the column below it). `--duet-vh` is `stableHeight` in px: size full-screen sections with `min-height: var(--duet-vh, 100svh)` so they keep their height while the URL bar collapses and expands. Inside `<DuetPanes>` each pane gets its own left and right insets: only a pane on the controls' edge is inset. `<html data-duet-mode>` holds the current mode for CSS.
+
+### Keeping the top clear
+
+Pad top content by the safe area plus Duet's inset, with `viewport-fit=cover` in the viewport meta:
+
+```css
+padding-top: calc(env(safe-area-inset-top) + var(--duet-inset-top, 0px));
+```
+
+Neither value is enough alone. `--duet-inset-top` holds only the extra blur iOS does not report, so it is 0 where the safe area does the work: a Home Screen app on the Duo's inner screen rotated to tall has a safe top of 61pt and `--duet-inset-top` 0, and a page padding by the variable alone puts its header in the status bar row. Read the height live too: the same app is 669x869 launched tall, 669x930 rotated to tall, 951x669 launched wide and 951x648 rotated to wide.
+
+### Status bar style for Home Screen apps
+
+Use `default`, or leave the meta out:
+
+```html
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+```
+
+Measured on the Duo simulator's inner screen, tall:
+
+| Style | Launched tall | Rotated to tall |
+|---|---|---|
+| `default` | 669x869, safe top 0, band above the page | 669x930, safe top 61, band above the page |
+| `black` | same as `default` | same as `default` |
+| `black-translucent` | 669x869, safe top 82, 82pt strip below the page | 669x930, safe top 82, 21pt strip below the page |
+
+No style or `viewport-fit` reaches the full 951pt. With `default` iOS fills the band with the colour at the page's top, so keep that colour at the viewport's top. With `black-translucent` the strip below the page is unreachable and shows the `html` and `body` background. The icon keeps the style it had when it was added to the Home Screen: remove it and add it again to change it. Next.js sets this with `appleWebApp.statusBarStyle`.
 
 ### Column mode without children: Duet places the page
 
@@ -21,7 +49,7 @@ In `column` mode the controls sit in Safari's column, outside the layout viewpor
 - Where the document spans a left column (split view, the closed Duo turned to 90), Duet keeps it scrolled across and gives `<html>` `margin-left` of the column width and the matching negative `margin-right`, so the page lands in the visible part of the window instead of under the column. `<html data-duet-reserve>` marks this. Do not set `margin` on `<html>` yourself, and do not reset `scrollX`: Duet owns it.
 - `<Duet reserve={false}>` opts out: the page runs under the column as before, and `--duet-inset-left` / `--duet-inset-right` hold the column's width for `column()`, `bleed()` or your own padding.
 
-With `children`, in `inline` and `strip` mode and in the emulated column, the page still runs under the controls and keeps clear through the insets above.
+With `children` the same holds where the document spans a left column: the scroller is moved beside the column (`--duet-shift`) and the insets are 0. Beside a right column alone, in `inline` and `strip` mode and in the emulated column, the page still runs under the controls and keeps clear through the insets above.
 
 ## Panes
 

@@ -463,7 +463,7 @@ function Page({ k, set, real, f, armed }: { k: Knobs; set: (p: Partial<Knobs>) =
       <header className="cp-head">
         <div className="cp-eyebrow">Prototype · #169</div>
         <h1>Templated column</h1>
-        <p>Burger always. Key buttons while they fit, then “…” grows the full list. Burger slides this page away.</p>
+        <p>The 0.7 template, kept for reference: burger always, key buttons while they fit, then the More button with the full list. duet-ui 0.8 shows places as tabs where they fit.</p>
       </header>
       <section className="cp-card-box">
         {real ? <div className="cp-knob"><span>Screen</span><b>{f.preview ? "Preview column (real)" : f.kind === "column" ? "Safari column (real)" : "Inline (real)"}</b></div>

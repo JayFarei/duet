@@ -6,7 +6,11 @@
     "dev": "next dev -p 3100",
     "build": "next build",
     "start": "next start -p 3100",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:site": "next build && node ../../tools/media/check-media.mjs",
+    "build:test": "NEXT_DIST_DIR=.next-test next build",
+    "start:test": "NEXT_DIST_DIR=.next-test next start -H 127.0.0.1 -p 3510",
+    "check:media": "node ../../tools/media/check-media.mjs"
   },
   "dependencies": {
     "@haptics/react": "2.1.1",

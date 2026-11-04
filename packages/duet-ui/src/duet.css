@@ -21,23 +21,28 @@
    is not frosted: what is under it stays sharp, tone mapped, and a heavily blurred base sets its level. Per channel,
    dark is min(sharp, base) and light is max(sharp, base), within about 5 levels on greys and 2 on colours. ::before
    is the sharp layer, ::after the base blended over it (darken, lighten). The open menu is darker in dark mode
-   (--duet-glass-lg). Not matched: native refracts a ~5pt band at the rim, which WebKit cannot displace, so the rim
-   band (.duet-rim) is only blurred. Soft 1pt rims inside top and bottom, a 0.5pt dark keyline on the sides. */
+   (--duet-glass-lg). Not matched: native refracts a ~5pt band at the rim, which WebKit cannot displace. In dark that
+   band (.duet-rim) is blurred, with soft 1pt rims top and bottom and a 0.5pt dark keyline on the sides. In light native
+   keeps colour at the edge, so on iOS .duet-rim colour-dodges (caps only, none on the sides, grey sources not white;
+   white highlights at normal blend elsewhere, see the @supports block below) and
+   .duet-edge, a ring under the inset glass, tone maps the page itself into a saturated line, weaker on the caps. */
 .duet {
   -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
   --duet-solid: rgb(242 242 247);
   --duet-ring: rgb(140 144 152 / 0.35);
   --duet-frost: transparent;
-  --duet-lift: rgb(255 255 255 / 0.18);
+  --duet-lift: rgb(255 255 255 / 0.06);
   --duet-sel: rgb(60 60 67 / 0.18);
   --duet-menu: transparent;
   --duet-ink: #000; --duet-dim: rgb(60 60 67 / 0.6);
-  --duet-tint: #0088ff;
+  --duet-tint: #0088ff; --duet-lens-accent: var(--duet-tint); --duet-lens-rim: rgb(0 0 0 / 0.16); --duet-tab-sel: rgb(0 0 0 / 0.07); --duet-tab-rim: rgb(0 0 0 / 0.14); --duet-tab-line: rgb(0 0 0 / 0.05);
   --duet-icon-size: 22px; --duet-tab-icon-size: 24px; --duet-icon-weight: 2;
   --duet-badge: #ff3b30; --duet-badge-neutral: #6e6e73; --duet-badge-ink: #fff;
-  --duet-glass-lg: transparent; --duet-glass-sharp: contrast(0.2675) brightness(1.3925) saturate(2.1); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
-  --duet-glass-edge: 0 0 0 0.5px rgb(0 0 0 / 0.1), -0.75px 0 0 -0.25px rgb(0 0 0 / 0.22), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.22);
-  --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08);
+  --duet-glass-lg: transparent; --duet-glass-sharp: contrast(0.25) brightness(1.3925) saturate(2.2); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
+  --duet-glass-edge: 0 0 0 0 transparent; --duet-edge-filter: contrast(1.75) brightness(0.505); --duet-glass-inset: 0.6px;
+  --duet-glass-rim-white: inset 0 1px 0.5px rgb(255 255 255 / 0.7), inset 0 -1px 0.5px rgb(255 255 255 / 0.35), inset 0 12px 8px -8px rgb(255 255 255 / 0.16), inset 0 -10px 8px -8px rgb(255 255 255 / 0.08);
+  --duet-glass-rim-light: var(--duet-glass-rim-white); --duet-rim-blend-light: normal;
+  --duet-glass-rim: var(--duet-glass-rim-light); --duet-rim-filter: none; --duet-rim-blend: var(--duet-rim-blend-light); --duet-rim-band: 16px;
   --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.02); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.12);
   color: var(--duet-ink);
   -webkit-tap-highlight-color: transparent;
@@ -47,37 +52,49 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-lg-theme="light"]) .duet {
-    --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
-    --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
+    --duet-lens-accent: color-mix(in srgb, var(--duet-tint) 60%, #5ce4ff); --duet-lens-rim: rgb(0 0 0 / 0.5); --duet-tab-sel: rgb(0 0 0 / 0.55); --duet-tab-rim: rgb(8 8 8 / 0.75); --duet-tab-line: rgb(255 255 255 / 0.05); --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
+    --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken; --duet-glass-press: blur(30px) brightness(0.99) contrast(2.07) saturate(0.85); --duet-press-lift: transparent;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
-    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
+    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --duet-rim-filter: blur(2.5px) brightness(1.08); --duet-rim-blend: normal; --duet-rim-band: 5px; --duet-edge-filter: none; --duet-glass-inset: 0px;
     --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18);
   }
 }
 [data-lg-theme="dark"] .duet {
-  --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
-  --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
+  --duet-lens-accent: color-mix(in srgb, var(--duet-tint) 60%, #5ce4ff); --duet-lens-rim: rgb(0 0 0 / 0.5); --duet-tab-sel: rgb(0 0 0 / 0.55); --duet-tab-rim: rgb(8 8 8 / 0.75); --duet-tab-line: rgb(255 255 255 / 0.05); --duet-solid: #000; --duet-ring: rgb(255 255 255 / 0.16); --duet-sel: rgb(84 84 88 / 0.6); --duet-ink: #fff; --duet-dim: rgb(235 235 245 / 0.6); --duet-badge-neutral: #636366;
+  --duet-glass-lg: rgb(32 32 32 / 0.41); --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken; --duet-glass-press: blur(30px) brightness(0.99) contrast(2.07) saturate(0.85); --duet-press-lift: transparent;
   --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
-  --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
+  --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --duet-rim-filter: blur(2.5px) brightness(1.08); --duet-rim-blend: normal; --duet-rim-band: 5px; --duet-edge-filter: none; --duet-glass-inset: 0px;
   --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.04); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.18);
 }
 /* In Safari's column the capsules follow the system, not the page, so they match Safari's own buttons beside them.
    The menu opens over the page and keeps the page's appearance. */
 @media (prefers-color-scheme: light) {
   .duet[data-mode="column"] .duet-group {
-    --duet-ink: #000;
-    --duet-glass-sharp: contrast(0.2675) brightness(1.3925) saturate(2.1); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
-    --duet-glass-edge: 0 0 0 0.5px rgb(0 0 0 / 0.1), -0.75px 0 0 -0.25px rgb(0 0 0 / 0.22), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.22);
-    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.08), inset 0 -8px 8px -8px rgb(255 255 255 / 0.08);
+    --duet-ink: #000; --duet-lens-accent: var(--duet-tint); --duet-lens-rim: rgb(0 0 0 / 0.16); --duet-tab-sel: rgb(0 0 0 / 0.07); --duet-tab-rim: rgb(0 0 0 / 0.14); --duet-tab-line: rgb(0 0 0 / 0.05);
+    --duet-glass-sharp: contrast(0.25) brightness(1.3925) saturate(2.2); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten; --duet-glass-press: var(--duet-glass-base); --duet-press-lift: var(--duet-lift);
+    --duet-glass-edge: 0 0 0 0 transparent; --duet-edge-filter: contrast(1.75) brightness(0.505); --duet-glass-inset: 0.6px;
+    --duet-glass-rim: var(--duet-glass-rim-light); --duet-rim-filter: none; --duet-rim-blend: var(--duet-rim-blend-light); --duet-rim-band: 16px;
   }
 }
 @media (prefers-color-scheme: dark) {
   .duet[data-mode="column"] .duet-group {
-    --duet-ink: #fff;
-    --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken;
+    --duet-ink: #fff; --duet-lens-accent: color-mix(in srgb, var(--duet-tint) 60%, #5ce4ff); --duet-lens-rim: rgb(0 0 0 / 0.5); --duet-tab-sel: rgb(0 0 0 / 0.55); --duet-tab-rim: rgb(8 8 8 / 0.75); --duet-tab-line: rgb(255 255 255 / 0.05);
+    --duet-glass-sharp: contrast(0.348) brightness(1.071) saturate(2.85); --duet-glass-base: blur(30px) brightness(0.9696) contrast(2.07) saturate(0.56); --duet-glass-blend: darken; --duet-glass-press: blur(30px) brightness(0.99) contrast(2.07) saturate(0.85); --duet-press-lift: transparent;
     --duet-glass-edge: -0.75px 0 0 -0.25px rgb(0 0 0 / 0.6), 0.75px 0 0 -0.25px rgb(0 0 0 / 0.6);
-    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06);
+    --duet-glass-rim: inset 0 1px 1px rgb(255 255 255 / 0.3), inset 0 -1px 1px rgb(255 255 255 / 0.25), inset 0 8px 8px -8px rgb(255 255 255 / 0.06), inset 0 -8px 8px -8px rgb(255 255 255 / 0.06); --duet-rim-filter: blur(2.5px) brightness(1.08); --duet-rim-blend: normal; --duet-rim-band: 5px; --duet-edge-filter: none; --duet-glass-inset: 0px;
   }
+}
+/* The light rim's colour dodge only works in iOS WebKit, which dodges against the blurred backdrop. Desktop Safari,
+   Chromium and Chrome paint its near-black sources as they are: black caps. So off iOS the light rim is white
+   highlights at normal blend, and only iOS (the one engine with -webkit-touch-callout) keeps the dodge tuned in #256. */
+@supports (-webkit-touch-callout: none) {
+  .duet {
+    --duet-glass-rim-light: inset 0 2.2px 1.4px -1.5px rgb(72 72 72), inset 0 -2.2px 1.4px -1.5px rgb(48 48 48), inset 0 17px 10px -8px rgb(17 17 17), inset 0 -15px 10px -8px rgb(11 11 11);
+    --duet-rim-blend-light: color-dodge;
+  }
+  /* A column layer that follows the scroll runs a transform animation, its own compositing layer: the dodge has no
+     page under it to brighten and paints its dark sources as black caps (Duo sim, home page, light). */
+  .duet[data-follow] { --duet-glass-rim-light: var(--duet-glass-rim-white); --duet-rim-blend-light: normal; }
 }
 .duet button, .duet-sidebar button {
   appearance: none; border: 0; background: none; color: inherit; padding: 0; margin: 0; cursor: pointer; font: inherit;
@@ -92,12 +109,17 @@
 /* The groups and the menu's glass. The host isolates so ::after blends with ::before only. */
 .duet-group, .duet-blob { position: fixed; z-index: 50; box-sizing: border-box; isolation: isolate; color: var(--duet-ink); }
 .duet[data-mode="column"] :is(.duet-group, .duet-blob) { position: absolute; }
-:is(.duet-group, .duet-blob)::before, :is(.duet-group, .duet-blob)::after { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none; }
+:is(.duet-group, .duet-blob)::before, :is(.duet-group, .duet-blob)::after { content: ""; position: absolute; inset: var(--duet-glass-inset, 0px); border-radius: inherit; z-index: -1; pointer-events: none; }
 :is(.duet-group, .duet-blob)::before { -webkit-backdrop-filter: var(--duet-glass-sharp); backdrop-filter: var(--duet-glass-sharp); background: var(--duet-frost); transition: background 200ms ease; }
-:is(.duet-group, .duet-blob)::after { -webkit-backdrop-filter: var(--duet-glass-base); backdrop-filter: var(--duet-glass-base); mix-blend-mode: var(--duet-glass-blend); }
+:is(.duet-group, .duet-blob)::after { -webkit-backdrop-filter: var(--duet-glass-base); backdrop-filter: var(--duet-glass-base); mix-blend-mode: var(--duet-glass-blend); transition: -webkit-backdrop-filter 200ms ease, backdrop-filter 200ms ease; }
+.duet-edge {
+  position: absolute; inset: 0; z-index: -2; box-sizing: border-box; padding: 0.7px; border-radius: inherit; pointer-events: none;
+  -webkit-backdrop-filter: var(--duet-edge-filter); backdrop-filter: var(--duet-edge-filter);
+  -webkit-mask: linear-gradient(#0005, #000 25px, #000 calc(100% - 25px), #0005), linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: source-in, xor; mask-composite: intersect, exclude;
+}
 .duet-rim {
-  position: absolute; inset: 0; box-sizing: border-box; padding: 5px; border-radius: inherit; box-shadow: var(--duet-glass-rim); pointer-events: none;
-  -webkit-backdrop-filter: blur(2.5px) brightness(1.08); backdrop-filter: blur(2.5px) brightness(1.08);
+  position: absolute; inset: var(--duet-glass-inset, 0px); box-sizing: border-box; padding: var(--duet-rim-band, 5px); border-radius: inherit; box-shadow: var(--duet-glass-rim); pointer-events: none; mix-blend-mode: var(--duet-rim-blend, normal);
+  -webkit-backdrop-filter: var(--duet-rim-filter); backdrop-filter: var(--duet-rim-filter);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
 /* Groups reshape on GROUP's spring (--duet-group, set by chrome.tsx from template.ts), so a page change, the sidebar
@@ -108,9 +130,75 @@
     top var(--duet-group-ms) var(--duet-group), height var(--duet-group-ms) var(--duet-group), background 200ms ease;
 }
 .duet .duet-btn { position: absolute; left: 0; height: 49px; transition: width var(--duet-group-ms) var(--duet-group); }
-/* iOS swells glass under the finger, lighter, rather than pressing it in. */
-.duet-group:has(.duet-btn:active) { scale: 1.12; }
-.duet-group:has(.duet-btn:active)::before { background: var(--duet-lift); }
+/* The press (press.ts, #251), measured from Safari's own column. iOS swells glass under the finger, lighter, rather
+   than pressing it in: a lone button by scale, a capsule by its shape, then a hold or a drag opens it: wider, items
+   further apart with their labels, and a clear lens that overhangs it following the finger. WebKit cannot displace a
+   backdrop, so the bent rim is only on the lens's own accent copy (.duet-lens-ink), its items magnified in place and
+   bent by an SVG filter (press.ts). Each item hides under the lens by a moving hole in its mask, not by a second copy. */
+.duet-group[data-press="down"]:not(:has(> .duet-btn:nth-of-type(2))) { scale: 1.12; }
+.duet-group:is([data-press="down"], [data-press="open"])::before { background: var(--duet-press-lift, var(--duet-lift)); }
+.duet-group:is([data-press="down"], [data-press="open"])::after { -webkit-backdrop-filter: var(--duet-glass-press, var(--duet-glass-base)); backdrop-filter: var(--duet-glass-press, var(--duet-glass-base)); }
+.duet-group[data-press="down"]:has(> .duet-btn:nth-of-type(2)), .duet-group[data-press="open"] {
+  left: var(--duet-p-x) !important; top: var(--duet-p-y) !important; width: var(--duet-p-w) !important; height: var(--duet-p-h) !important;
+}
+.duet-group[data-press="down"] { transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left 170ms ease-out, top 170ms ease-out, width 170ms ease-out, height 170ms ease-out, background 200ms ease; }
+.duet-group[data-press="down"]:has(> .duet-btn:nth-of-type(2)) .duet-btn { top: calc(var(--duet-p-top) + var(--duet-j) * var(--duet-p-pitch)) !important; transition: top 170ms ease-out; }
+.duet-group:has(> .duet-lens) { overflow: visible; }
+.duet-group:has(> .duet-lens) > .duet-btn {
+  -webkit-mask: linear-gradient(#000 0 0), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 88' preserveAspectRatio='none'%3E%3Crect width='90' height='88' rx='40'/%3E%3C/svg%3E") center var(--duet-lens-dy) / var(--duet-hole-w) var(--duet-hole-h) no-repeat;
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.duet-group[data-press="open"] {
+  border-radius: 30.5px / 33px;
+  transition: left var(--duet-press-rise-ms) var(--duet-press-rise), top var(--duet-press-rise-ms) var(--duet-press-rise), width var(--duet-press-rise-ms) var(--duet-press-rise), height var(--duet-press-rise-ms) var(--duet-press-rise), border-radius var(--duet-press-rise-ms) var(--duet-press-rise);
+}
+.duet-group[data-press="fall"] {
+  transition: scale 160ms ease-out, left var(--duet-press-fall-ms) var(--duet-press-fall), top var(--duet-press-fall-ms) var(--duet-press-fall), width var(--duet-press-fall-ms) var(--duet-press-fall), height var(--duet-press-fall-ms) var(--duet-press-fall), border-radius var(--duet-press-fall-ms) var(--duet-press-fall);
+}
+.duet-group[data-press="open"] .duet-btn {
+  top: calc(var(--duet-p-top) + var(--duet-j) * var(--duet-p-pitch)) !important; width: 100% !important;
+  transition: top var(--duet-press-rise-ms) var(--duet-press-rise), width var(--duet-press-rise-ms) var(--duet-press-rise);
+}
+.duet-group[data-press="fall"] .duet-btn { transition: top var(--duet-press-fall-ms) var(--duet-press-fall), width var(--duet-press-fall-ms) var(--duet-press-fall); }
+.duet-btn > :not(.duet-label, .duet-badge) { transition: translate 200ms ease-out, scale 170ms ease-out; }
+.duet-group:is([data-press="down"]:has(> .duet-btn:nth-of-type(2)), [data-press="open"]) .duet-btn > :not(.duet-label, .duet-badge) { scale: 1.06; }
+.duet-group[data-press="open"] .duet-btn > :not(.duet-label, .duet-badge) { translate: 0 -8px; transition: translate var(--duet-press-rise-ms) var(--duet-press-rise), scale 170ms ease-out; }
+.duet-group[data-press="fall"] .duet-btn > :not(.duet-label, .duet-badge) { transition: translate var(--duet-press-fall-ms) var(--duet-press-fall) 70ms, scale 170ms ease-out; }
+.duet-label {
+  position: absolute; left: 2px; right: 2px; bottom: 3px; text-align: center; font: 500 11px/14px -apple-system, system-ui, sans-serif; color: var(--duet-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; filter: blur(4px); pointer-events: none; transition: opacity 200ms linear, filter 200ms linear;
+}
+.duet-group[data-press="open"]:not([data-press-tight]) .duet-label { opacity: 1; filter: none; transition: opacity 130ms linear, filter 130ms linear; }
+.duet-lens, .duet-lens-ink {
+  position: absolute; left: calc(50% - var(--duet-lens-w) / 2); top: calc(var(--duet-lens-y) - var(--duet-lens-h) / 2); width: var(--duet-lens-w); height: var(--duet-lens-h);
+  border-radius: 40px; pointer-events: none; transition: opacity 67ms ease-out;
+}
+.duet-lens {
+  z-index: 1; background: rgb(255 255 255 / 0.03); -webkit-backdrop-filter: brightness(1.18) saturate(1.12); backdrop-filter: brightness(1.18) saturate(1.12);
+  box-shadow: 0 0 0 0.5px var(--duet-lens-rim), inset 0 0 0 0.5px rgb(255 255 255 / 0.22), inset 5px 0 5px -3px rgb(0 0 0 / 0.22), inset -5px 0 5px -3px rgb(0 0 0 / 0.22);
+}
+.duet-lens-ink { z-index: 2; overflow: hidden; clip-path: inset(0 round 40px); --duet-icon: var(--duet-lens-accent); --duet-ink: var(--duet-lens-accent); color: var(--duet-lens-accent); }
+.duet-lens-rail { position: absolute; left: calc(var(--duet-lens-w) / 2 - 39px); top: calc(var(--duet-lens-h) / 2 - var(--duet-lens-y)); width: 78px; }
+.duet-lens-rail > .duet-btn { width: 100% !important; scale: 1.17; transform-origin: 50% 27.75px; }
+/* The selected tab (the `tabs` prop, #251): a bubble darker than the glass and the icon in the tint. While the lens is
+   up it carries the selection, tinting what it passes over, so the rest of the capsule is plain. It lands on a dip. */
+.duet-btn[aria-current] { isolation: isolate; color: var(--duet-tint); --duet-icon: var(--duet-tint); --duet-ink: var(--duet-tint); }
+.duet-btn[aria-current]::before { content: ""; position: absolute; inset: 0 2px; z-index: -1; border-radius: 22px / 24.5px; background: var(--duet-tab-sel); pointer-events: none; }
+.duet-group:has(> .duet-lens) > .duet-btn[aria-current] { color: var(--duet-tab-ink); --duet-icon: var(--duet-tab-ink); --duet-ink: var(--duet-tab-ink); }
+.duet-group:has(> .duet-lens) > .duet-btn[aria-current]::before { opacity: 0; }
+.duet-group:has(> .duet-btn[aria-current]) { --duet-lens-accent: color-mix(in srgb, var(--duet-tint) 91%, #fff); --duet-tab-ink: var(--duet-ink); }
+/* Native's lens here adds no fill: the capsule keeps its colour under it and the page shows past it, only a dark rim over the capsule and a faint line off it. It starts as the bubble it lifts off. */
+.duet-group:has(> .duet-btn[aria-current]) > .duet-lens {
+  background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: inset 0 0 3px 1.5px var(--duet-tab-rim), 0 0 0 1px var(--duet-tab-line);
+  animation: duet-lift 33ms linear 17ms backwards;
+}
+.duet-group:has(> .duet-btn[aria-current]) > .duet-lens-ink { animation: duet-lift-ink 50ms linear; }
+@keyframes duet-lift { from { background: var(--duet-tab-sel); } }
+@keyframes duet-lift-ink { from { opacity: 0.8; } }
+.duet-btn[data-arrive] > :not(.duet-label, .duet-badge) { animation: duet-arrive 433ms linear; }
+@keyframes duet-arrive { 0%, 26% { filter: none; } 26.1%, 35% { filter: saturate(0.7) brightness(0.94); } 100% { filter: none; } }
+.duet-btn[data-hover]::after { content: ""; position: absolute; inset: 2px 4px; border-radius: 22px; background: var(--duet-lift); pointer-events: none; }
 .duet-btn[data-destructive] { color: #ff3b30; }
 
 /* The primary: a tinted button in a glass capsule, on its own or sharing one with "…" (#213). A tap grows the capsule
@@ -154,14 +242,20 @@
 
 /* The sidebar sits under the page; the burger slides the page (the inner scroller) away by --duet-slide. */
 .duet-sidebar {
-  position: fixed; left: 0; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; padding: calc(18px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
+  position: fixed; left: 0; top: 0; bottom: 0; z-index: 0; box-sizing: border-box; padding: calc(18px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom)) calc(14px + var(--duet-sidebar-inset, 0px));
   overflow: auto; overscroll-behavior: contain; background: var(--duet-solid); color: var(--duet-ink); opacity: 0.6; translate: -40px 0; visibility: hidden;
   transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease, visibility 0s var(--duet-slide-ms);
   -webkit-tap-highlight-color: transparent; font-family: -apple-system, system-ui, sans-serif;
 }
 html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--duet-vh, 100vh); bottom: auto; }
+/* The height keeps the last row above Safari's bar. The surface carries on down behind the bar, which the page's canvas
+   would show otherwise; a shadow, as it adds no scrollable overflow. 240pt: the bar's 98pt plus the document's 98pt of scroll.
+   And across the right edge, by the inset: a split pane's column can be on either side, and the page cannot tell which. */
+html[data-duet-mode="column"] .duet-sidebar[data-open] { box-shadow: 0 240px 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 0 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 240px 0 var(--duet-solid); }
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
+/* Over the page it fades from and to nothing: a 60% rest suits a sidebar the page uncovers, here it pops in and snaps out. */
+.duet-sidebar[data-overlay]:not([data-open]) { opacity: 0; }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }
 .duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-dim); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .duet-sidebar .duet-side-row { justify-content: flex-start; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; position: relative; }
@@ -170,6 +264,8 @@ html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--
 .duet-sidebar .duet-badge { position: static; margin-left: auto; box-shadow: none; }
 .duet-scroller { transition: translate var(--duet-slide-ms) var(--duet-slide), border-radius 300ms ease, box-shadow 300ms ease; }
 .duet-scroller[data-slid] { background: var(--duet-page, Canvas); border-radius: 28px; box-shadow: 0 0 0 0.5px var(--duet-ring), -12px 0 40px rgb(0 0 0 / 0.18); overflow: hidden; }
+/* In a split pane the card passes through the strip beside the rail on its way out; Canvas would flash white beside a dark rail. */
+html[data-duet-mode="column"] .duet-scroller[data-slid] { background: var(--duet-page, var(--duet-solid)); }
 /* A tap on the slid page closes the sidebar; the page itself takes no taps meanwhile. */
 .duet-scroller[data-slid] > * { pointer-events: none; }
 .duet-sidebar :is(.duet-side-row) { color: var(--duet-ink); }
@@ -237,7 +333,7 @@ html:has(> body .duet-scroller), html:has(> body .duet-scroller) > body { height
    fixed box reaches it: a fixed box stops at the viewport edge, and one covering the middle of that edge has its
    colour painted over the column instead (the guard below). So there the scroller is an in-document box that runs
    on under the column. The document still never scrolls, so the chrome layer never moves. */
-html[data-duet-mode="column"] .duet-scroller { position: absolute; width: calc(100% + var(--duet-inset-left, 0px) + var(--duet-inset-right, 0px)); bottom: auto; height: calc(100% + var(--duet-inset-bottom, 0px)); }
+html[data-duet-mode="column"] .duet-scroller { position: absolute; left: var(--duet-shift, 0px); width: calc(100% + var(--duet-inset-left, 0px) + var(--duet-inset-right, 0px)); bottom: auto; height: calc(100% + var(--duet-inset-bottom, 0px)); }
 /* That overflow widens the document, and touch-action on <html> stops at this scroll container, so without its own
    a sideways swipe pans the whole page, chrome and all, into the column. Carousels inside are scrollers of their own
    and still pan. */
@@ -246,7 +342,8 @@ html[data-duet-mode="column"] .duet-scroller { touch-action: pan-y; }
    the last content scroll clear of it. */
 .duet-scroller::after { content: ""; display: block; height: var(--duet-inset-bottom, 0px); }
 /* A column on the left (closed landscape turned left, or a split pane, which spans one on each side since its own
-   is on its outer edge, which the page cannot see): the document is scrolled one column across (chrome.tsx). */
+   is on its outer edge, which the page cannot see): the document is scrolled one column across (chrome.tsx) and the
+   scroller is moved right by that column (--duet-shift, insets 0), so it fills the visible pane exactly. */
 /* Emulated (the site's web Duo): the frame already spans the column and runs under the pill. */
 html[data-duet-mode="column"][data-duet-emulated] .duet-scroller { width: 100%; height: 100%; }
 
@@ -296,7 +393,7 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 /* No children (no .duet-scroller): the document scrolls, and the layer rides it on a scroll timeline that Safari
    runs with the scroll itself, so it holds through momentum and smooth scrollTo/scrollIntoView (chrome.tsx sets
    data-follow and --duet-scroll-max, the document's scroll range, or a transform where this is unsupported). */
-.duet[data-mode="column"][data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
+.duet[data-mode="column"][data-follow], html[data-duet-mode="column"] .duet-sidebar[data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
 @keyframes duet-follow { from { transform: translateY(0); } to { transform: translateY(var(--duet-scroll-max, 0px)); } }
 /* The rubber band at either end moves the document past its scroll range, where the timeline (clamped to it) cannot
    follow, so the layer rode the bounce: up to 160pt over Safari's own column buttons, or out of the column (#76). The
@@ -373,21 +470,27 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 
 /* Page changes (Presence in chrome.tsx). A slot that arrives pops out of nothing on the spring, its ink unblurring as
    it lands; one that goes stays put while it shrinks into itself and fades, so the slots that stay can slide into its
-   place at once. The first paint, a fold and a side switch skip both (data-settling, data-drag="switch"). */
+   place at once. The first paint, a fold and a side switch skip both (data-settling, data-drag="switch").
+   Only the host scales: opacity on it would make it the glass's backdrop root, the glass would see nothing, and its
+   rim (a colour dodge on iOS) would paint a dark disc for the whole fade. So the glass layers fade, not the host. */
 .duet-group[data-enter] { animation: duet-enter 0.5s var(--duet-spring-out) backwards; }
+.duet-group[data-enter]::before, .duet-group[data-enter]::after, .duet-group[data-enter] > .duet-edge, .duet-group[data-enter] > .duet-rim { animation: duet-appear 0.25s ease-out backwards; }
 .duet-group[data-enter] > button { animation: duet-ink-in 0.35s ease-out backwards; }
 .duet-group[data-leaving] { animation: duet-leave 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards; pointer-events: none; }
 .duet-group[data-leaving] > button { animation: duet-ink-out 0.2s ease-in forwards; }
-@keyframes duet-enter { from { opacity: 0; scale: 0.6; } }
-@keyframes duet-leave { to { opacity: 0; scale: 0.6; } }
+.duet-group[data-leaving]::before, .duet-group[data-leaving]::after, .duet-group[data-leaving] > .duet-edge, .duet-group[data-leaving] > .duet-rim { animation: duet-vanish 0.3s ease-in forwards; }
+@keyframes duet-enter { from { scale: 0.6; } }
+@keyframes duet-leave { to { scale: 0.6; } }
 @keyframes duet-ink-in { from { opacity: 0; filter: blur(6px); } }
 @keyframes duet-ink-out { to { opacity: 0; filter: blur(6px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .duet-group[data-enter] { animation: duet-appear 0.2s ease-out backwards; }
-  .duet-group[data-leaving] { animation: duet-vanish 0.2s ease-in forwards; }
-  .duet-group[data-enter] > button, .duet-group[data-leaving] > button { animation: none; }
-  .duet-group, .duet .duet-btn, .duet-sidebar, .duet-scroller { transition: none; }
+  .duet-group[data-enter], .duet-group[data-leaving] { animation: none; }
+  .duet-group[data-enter]::before, .duet-group[data-enter]::after, .duet-group[data-enter] > .duet-edge, .duet-group[data-enter] > .duet-rim, .duet-group[data-enter] > button { animation: duet-appear 0.2s ease-out backwards; }
+  .duet-group[data-leaving]::before, .duet-group[data-leaving]::after, .duet-group[data-leaving] > .duet-edge, .duet-group[data-leaving] > .duet-rim, .duet-group[data-leaving] > button { animation: duet-vanish 0.2s ease-in forwards; }
+  .duet-group, .duet-group[data-press], .duet .duet-btn, .duet-group[data-press] > .duet-btn, .duet-btn > *, .duet-label, .duet-sidebar, .duet-scroller { transition: none !important; }
+  .duet-lens, .duet-lens-ink { transition: none; }
+  .duet-lens-rail > .duet-btn { scale: 1; }
 }
 @keyframes duet-appear { from { opacity: 0; } }
 @keyframes duet-vanish { to { opacity: 0; } }

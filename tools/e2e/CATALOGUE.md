@@ -99,8 +99,8 @@ Not covered yet:
 ## scr06: The reported flick up then down, Safari tab, outer screen: column controls stay (#191)
 
 1. Open /book in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right.
-2. Flick up (180,490 to 180,150, 130ms), then down (180,170 to 180,520). Expect: controls in a column on the right; Duet offers "Menu"; Duet's menu is closed.
-3. The same flick again. Expect: controls in a column on the right; Duet offers "Menu"; Duet's menu is closed.
+2. Flick up (180,490 to 180,150, 130ms), then down (180,170 to 180,520). Expect: controls in a column on the right; Duet offers "Sidebar"; Duet's menu is closed.
+3. The same flick again. Expect: controls in a column on the right; Duet offers "Sidebar"; Duet's menu is closed.
 
 ## nav01: Link, Safari Back and Forward, outer screen upright
 

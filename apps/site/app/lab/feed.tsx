@@ -8,7 +8,7 @@ const FEATURES = [
   ["Two screens. One flow.", "Unfold and your app follows, from strip to split view without a single reload.", "linear-gradient(135deg, #ff512f, #dd2476)", "◐"],
   ["Glass that breathes", "Controls float over your content and borrow its colour, light or dark.", "linear-gradient(135deg, #00c6ff, #0072ff)", "◎"],
   ["Elastic menus", "Every button stretches into an island and snaps back like a rubber band.", "linear-gradient(135deg, #f7971e, #ffd200)", "⟷"],
-  ["Either hand", "Drag the controls to the side you hold. We remember.", "linear-gradient(135deg, #11998e, #38ef7d)", "✋"],
+  ["Either hand", "Pass moveControls and readers can drag the controls to the side they hold.", "linear-gradient(135deg, #11998e, #38ef7d)", "✋"],
 ];
 const COLORS = [
   ["Sunset", "linear-gradient(160deg, #ff9a8b, #ff6a88 55%, #ff99ac)"],

@@ -1,20 +1,26 @@
 // The templated column (#181): one template on every layout. The menu (burger) first, then the developer's actions
 // while they fit, then "…", which closes the group and grows into the full list. Pure layout: chrome.tsx draws it.
-import { DUO, RAIL, columnBand, type Context, type Side } from "./geometry.ts";
+import { DUO, DUO_SIZES, RAIL, WIDE, columnBand, type Context, type Side } from "./geometry.ts";
 
 /** Duo metrics: button, stacked item pitch, gap between groups, strip centre from the edge, menu row, list pad and
  *  header, and menu width. */
 export const TEMPLATE = { control: DUO.control, item: DUO.groupItem, gap: DUO.gap, edge: DUO.centerFromEdge, row: 44, pad: 6, head: 26, menuWidth: 232 } as const;
 const T = TEMPLATE;
 
+/** The tightest pitch tabs may take to stay tabs, below it the burger. Buttons stay T.control tall and their icons clear. */
+export const TIGHTEST_TAB_PITCH = 44;
+/** The fewest tabs worth showing beside "…" when some places fold into it, below it the burger. */
+export const FEWEST_TABS = 3;
+
 /** A group of n buttons in one capsule. */
 export const groupHeight = (n: number) => T.control + (n - 1) * T.item;
 
 /** A damped spring as a CSS linear() easing (Safari 17.2+), with the time it takes to settle. */
 export function spring(stiffness: number, damping: number, n = 40) {
-  const w0 = Math.sqrt(stiffness), z = damping / (2 * w0), wd = w0 * Math.sqrt(1 - z * z);
-  const x = (t: number) => 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t));
-  const end = -Math.log(0.002) / (z * w0);
+  const w0 = Math.sqrt(stiffness), z = damping / (2 * w0), wd = w0 * Math.sqrt(Math.abs(1 - z * z)) || 1e-6, under = z < 1;
+  const x = (t: number) => 1 - Math.exp(-z * w0 * t) * ((under ? Math.cos : Math.cosh)(wd * t) + (z * w0 / wd) * (under ? Math.sin : Math.sinh)(wd * t));
+  let end = -Math.log(0.002) / (z * w0);
+  while (!under && 1 - x(end) > 0.002) end += 0.01; // past critical damping the envelope above is too quick
   return { easing: `linear(${Array.from({ length: n + 1 }, (_, i) => +x((i / n) * end).toFixed(4)).join(",")})`, ms: Math.round(end * 1000) };
 }
 /** The sidebar's slide and the groups' moves. */
@@ -26,8 +32,9 @@ export const CLEAR_MS = 110;
 /** s plus k·s(1-s)²: 0 to 1 with slope 1 at 1 (so a spring's overshoot carries on smoothly), leading for k > 0
  *  (up to 3), lagging for k < 0 (down to -1). */
 export const lead = (s: number, k: number) => s + k * s * (1 - s) * (1 - s);
+const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
-export type Slot = { kind: "menu" } | { kind: "more" } | { kind: "close" } | { kind: "primary" } | { kind: "action"; index: number };
+export type Slot = { kind: "place"; index: number } | { kind: "menu" } | { kind: "more" } | { kind: "close" } | { kind: "primary" } | { kind: "action"; index: number };
 export type Group = Slot[];
 
 /** The roomiest arrangement that fits `h`: every action shown, then fewer with "…" closing the group. The primary
@@ -36,10 +43,12 @@ export type Group = Slot[];
  *  is all that fits. Most actions shown wins.
  *  `split`: a lone menu button breaks ties (inline; in the column a second capsule's gap would push the stack toward
  *  Safari's own buttons). `rest`: the list holds items whatever fits, so "…" always shows. `extra`: what a lone group
- *  may take beyond `h`. */
-export function allocate(h: number, n: number, o: { menu?: boolean; primary?: boolean; split?: boolean; rest?: boolean; extra?: number } = {}): { groups: Group[]; shown: number; primary: boolean } {
-  if (!o.menu && !n && !o.primary && !o.rest) return { groups: [], shown: 0, primary: false };
-  const B: Slot[] = o.menu ? [{ kind: "menu" }] : [], M: Slot = { kind: "more" }, P: Group = [{ kind: "primary" }];
+ *  may take beyond `h`. `places`: the app's places as tabs, heading the group and always shown (placeTabs decided they
+ *  fit), so only the actions and the primary fold. */
+export function allocate(h: number, n: number, o: { menu?: boolean; primary?: boolean; split?: boolean; rest?: boolean; extra?: number; places?: number } = {}): { groups: Group[]; shown: number; primary: boolean } {
+  const places = o.places ?? 0;
+  if (!o.menu && !n && !o.primary && !o.rest && !places) return { groups: [], shown: 0, primary: false };
+  const B: Slot[] = o.menu ? [{ kind: "menu" }] : Array.from({ length: places }, (_, index) => ({ kind: "place", index })), M: Slot = { kind: "more" }, P: Group = [{ kind: "primary" }];
   const it = (k: number): Slot[] => Array.from({ length: k }, (_, index) => ({ kind: "action", index }));
   const height = (gs: Group[]) => gs.reduce((s, g) => s + groupHeight(g.length), 0) + (gs.length - 1) * T.gap;
   const tries: { groups: Group[]; shown: number; score: number }[] = [];
@@ -52,7 +61,7 @@ export function allocate(h: number, n: number, o: { menu?: boolean; primary?: bo
       add([[...B, ...it(k), ...tail], ...p], k, bonus + k * 10);
     }
   }
-  if (o.primary) add([[...P, ...(o.menu || n || o.rest ? [M] : [])]], 0, 500);
+  if (o.primary && !places) add([[...P, ...(o.menu || n || o.rest ? [M] : [])]], 0, 500);
   const fit = tries.filter((t) => height(t.groups) <= h + (t.groups.length === 1 ? o.extra ?? 0 : 0)).sort((a, b) => b.score - a.score)[0];
   if (fit) return { groups: fit.groups, shown: fit.shown, primary: fit.groups.some((g) => g.some((s) => s.kind === "primary")) };
   return { groups: [[...B, M].slice(-Math.max(1, Math.floor((h + (o.extra ?? 0) - T.control) / T.item) + 1))], shown: 0, primary: false };
@@ -68,6 +77,8 @@ export interface Frame {
   ph: number; insetTop: number;
   /** Strip centre line, and the band the groups stay in. */
   cx: number; top: number; bottom: number;
+  /** The stack ends at the band's foot, where fingers rest, rather than centring in it. */
+  foot: boolean;
   /** The page-side edge the menu opens past: the column's inner edge, or the strip's. */
   edge: number;
 }
@@ -80,35 +91,75 @@ export function frame(c: Context): Frame {
   const clear = c.clearTop ?? -Infinity;
   if (band) {
     const reach = c.screenWidth - c.width - T.edge;
-    return { kind: "column", side: c.side, preview: !!c.preview, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top: Math.max(band.top, clear), bottom: band.bottom, edge: right ? cx - reach : cx + reach };
+    return { kind: "column", side: c.side, preview: !!c.preview, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top: Math.max(band.top, clear), bottom: band.bottom, foot: !!c.split, edge: right ? cx - reach : cx + reach };
   }
   const strip = c.mode === "strip" && !c.preview;
   const top = Math.max(strip ? DUO.top + DUO.island - c.offsetTop : c.insetTop + DUO.gap, clear);
-  const bottom = strip ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
+  const bottom = strip ? c.height - DUO.bottom : c.duo && !c.preview ? c.height - DUO.bottom : c.height - Math.max(c.insetBottom, DUO.gap);
   const edge = right ? cx - T.control / 2 - 4 : cx + T.control / 2 + 4;
-  return { kind: "inline", side: c.side, preview: false, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top, bottom, edge };
+  return { kind: "inline", side: c.side, preview: false, ph: c.height, insetTop: Math.max(c.insetTop, clear), cx, top, bottom, foot: true, edge };
 }
 /** What a lone group may take beyond the band in the column: all but RAIL.gap of the gap kept on each side. */
 export const extra = (f: Frame) => f.kind === "column" ? 2 * T.gap - 2 * RAIL.gap : 0;
 
 export interface Rect { x: number; y: number; w: number; h: number }
 /** `primary`: the primary's own capsule, placed at the strip's foot (in either form only its button is tinted). */
-export interface Placed { group: Group; rect: Rect; primary: boolean }
+export interface Placed { group: Group; rect: Rect; primary: boolean; pitch: number }
 
-/** In the column the stack centres in the band; elsewhere the menu heads the strip and the primary sits at its foot,
- *  under the thumb. */
-export function place(f: Frame, groups: Group[]): Placed[] {
-  const heights = groups.map((g) => groupHeight(g.length));
+/** The closed column centres the stack in its band, as does any band it overfills. Elsewhere the stack ends at the
+ *  band's foot, under the thumb, with the primary lowest; inline, a lone burger stays at the head of the strip. */
+export function place(f: Frame, groups: Group[], tabPitch: number = T.item): Placed[] {
+  const pitchOf = (g: Group) => g[0]?.kind === "place" ? tabPitch : T.item;
+  const heights = groups.map((g) => T.control + (g.length - 1) * pitchOf(g));
   const total = heights.reduce((s, h) => s + h, 0) + (groups.length - 1) * T.gap;
   const x = f.cx - T.control / 2;
-  let y = f.kind === "column" ? f.top + (f.bottom - f.top - total) / 2 : f.top;
+  const head = f.kind === "inline" && groups[0]?.length === 1 && groups[0][0].kind === "menu";
+  const stack = head ? total - heights[0] - T.gap : total;
+  const start = f.foot && total <= f.bottom - f.top ? f.bottom - stack : f.top + (f.bottom - f.top - total) / 2;
+  let y = head ? start - heights[0] - T.gap : start;
   return groups.map((group, i) => {
     const primary = group.length === 1 && group[0].kind === "primary";
-    const top = primary && f.kind === "inline" ? f.bottom - T.control : y;
+    const top = head && !i ? f.top : y;
     y += heights[i] + T.gap;
-    return { group, rect: { x, y: top, w: T.control, h: heights[i] }, primary };
+    return { group, rect: { x, y: top, w: T.control, h: heights[i] }, primary, pitch: pitchOf(group) };
   });
 }
+
+/** A Duo Home Screen app, but for the inner screen upright, is the strip once its inset lands, up to 600ms after the
+ *  first paint or a turn (stable() holds inline meanwhile), and its viewport passes through shorter heights. The strip's
+ *  room is the screen's 678pt less its fixed margins, whatever the viewport says, so read that from the start: no capsule
+ *  that shows, then gives way to a burger, and no action that shows, then folds. */
+const stripFrame = (c: Context) => c.duo && c.standalone && !(c.width >= WIDE && c.height > c.width) ? frame({ ...c, mode: "strip", height: DUO_SIZES[0][1], offsetTop: 0 }) : undefined;
+/** The room a menu.tabs app allocates from in this window, where the window's own band would mislead (stripFrame). */
+export const landingRoom = (c: Context) => { const f = stripFrame(c); return f && f.bottom - f.top; };
+/** Whether this window lets the controls change edge (moveControls): inline only. A strip sits on the edge its inset
+ *  gives it, and a Home Screen app reads inline only until that inset lands, so neither may offer a move that cannot happen. */
+export const canMoveControls = (c: Context) => c.mode === "inline" && !stripFrame(c);
+
+/** How the app's places show as tabs (menu.tabs), undefined when they go behind the burger. `shown` leading places at
+ *  `pitch`: all of them in one capsule, plus "…" when anything else (`rest`: actions, the primary, anything "…" lists)
+ *  needs folding; else as many as fit beside "…", which lists the others, if that is at least FEWEST_TABS. The normal
+ *  pitch while that fits, tighter down to TIGHTEST_TAB_PITCH when it does not. Never in the in-app preview, whose gap
+ *  holds one button. From the smallest height at this window (stableHeight), so Safari's bar collapsing on a scroll
+ *  cannot flip it. Pure, and the only place this is decided. */
+export function placeTabs(c: Context, places: number, rest: boolean): { shown: number; pitch: number } | undefined {
+  const f = stripFrame(c) ?? frame({ ...c, height: c.stableHeight }), room = f.bottom - f.top + extra(f);
+  if (places <= 0 || f.preview) return undefined;
+  const pitchOf = (n: number) => {
+    if (groupHeight(n) <= room) return T.item;
+    const pitch = n > 1 ? Math.floor((room - T.control) / (n - 1) * 10) / 10 : 0;
+    return pitch >= TIGHTEST_TAB_PITCH ? pitch : undefined;
+  };
+  const whole = pitchOf(places + (rest ? 1 : 0));
+  if (whole !== undefined) return { shown: places, pitch: whole };
+  for (let shown = places - 1; shown >= FEWEST_TABS; shown--) {
+    const pitch = pitchOf(shown + 1);
+    if (pitch !== undefined) return { shown, pitch };
+  }
+  return undefined;
+}
+/** Whether every place fits as a tab, so none folds into "…". */
+export const placesFit = (c: Context, places: number, rest: boolean) => placeTabs(c, places, rest)?.shown === places;
 
 /** The "…" list: beside the column (or strip), aligned to the button's top, or its bottom when the button is in the
  *  page's lower half, kept 12pt inside the page. `heads`: section headers. A list taller than the page scrolls. */
@@ -119,6 +170,10 @@ export function menuBox(f: Frame, from: Rect, n: number, heads = 1): Rect {
   return { x, y: Math.min(Math.max(y, Math.max(f.insetTop, 12)), f.ph - 12 - h), w, h };
 }
 
+/** The morph's height for its spring progress `tall`, with the press swell. Past the swell it heads for the list.
+ *  `fit` (menu.tabs): a capsule taller than the list ends at the list's height. Otherwise it keeps its own height. */
+export const morphHeight = (from: number, box: number, tall: number, swell: number, fit: boolean) => Math.max((fit ? mix(from, Math.min(from, box), tall) : from) * swell, mix(from, box, tall));
+
 /** The primary's confirmation: its whole capsule grows into this box beside it, its label over a `confirm` button. */
 export const confirmBox = (f: Frame, from: Rect): Rect => menuBox(f, from, 2, 0);
 
@@ -128,12 +183,15 @@ export const primaryTap = (armed: boolean, confirm?: string | false): "arm" | "r
 
 /** The whole template for one frame: a sheet's lone close (when the band has room; the preview's gap holds one), the preview's lone "…", the
  *  open sidebar's lone burger, else allocate. `rest`: items "…" lists whatever fits (folded, destructive, the side
- *  switch). */
-export function template(f: Frame, o: { close?: boolean; menu?: boolean; actions: number; primary?: boolean; rest?: boolean; sidebar?: boolean }) {
+ *  switch). `room`: allocate from this height rather than the frame's band (landingRoom). `places`, `tabPitch`: the tabs
+ *  (placeTabs). `overflow`: some places fold into "…". Then, or tighter than normal, nothing else has room, so they and
+ *  "…" are the whole template. */
+export function template(f: Frame, o: { room?: number; close?: boolean; menu?: boolean; places?: number; actions: number; primary?: boolean; rest?: boolean; sidebar?: boolean; tabPitch?: number; overflow?: boolean }) {
   const none = (groups: Group[]) => ({ groups, shown: 0, primary: false });
   const a = o.close ? none(f.preview || f.bottom - f.top + extra(f) >= T.control ? [[{ kind: "close" }]] : [])
-    : f.preview ? none(o.menu || o.actions || o.primary || o.rest ? [[{ kind: "more" }]] : [])
+    : f.preview ? none(o.menu || o.places || o.actions || o.primary || o.rest ? [[{ kind: "more" }]] : [])
     : o.sidebar ? none([[{ kind: "menu" }]])
-    : allocate(f.bottom - f.top, o.actions, { menu: o.menu, primary: o.primary, split: f.kind === "inline", rest: o.rest, extra: extra(f) });
-  return { ...a, placed: place(f, a.groups) };
+    : o.places && (o.overflow || (o.tabPitch !== undefined && o.tabPitch < T.item)) ? none([[...Array.from({ length: o.places }, (_, index): Slot => ({ kind: "place", index })), ...(o.overflow || o.actions || o.primary || o.rest ? [{ kind: "more" } as Slot] : [])]])
+    : allocate(o.room ?? f.bottom - f.top, o.actions, { menu: o.menu, places: o.places, primary: o.primary, split: f.kind === "inline", rest: o.rest, extra: extra(f) });
+  return { ...a, placed: place(f, a.groups, o.tabPitch) };
 }
