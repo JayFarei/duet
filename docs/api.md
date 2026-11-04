@@ -47,6 +47,7 @@ Icons are required, and an item without one keeps the Sidebar button. Without `t
 - Tabs behave like the `tabs` prop: the selected one sits in a bubble in `tint`, with the same press.
 - `placeTabs(context, places, rest)` is the rule, pure and exported, `rest` meaning something else needs More. It returns `{ shown, pitch }`, or undefined for the Sidebar button. `placesFit` is whether every place is shown. See [Navigation fit](how-duet-decides.md#navigation-fit) for the room each mode has.
 - On the Duo, inline `bootScript`: the controls stay hidden until the chrome has mounted, so neither form shows before the right one, with no cookie or reload. See [Pre-paint boot](server-rendering.md#pre-paint-boot). On every device the nav stays hidden until hydration.
+- Every button carries `data-duet-control`, the same in any arrangement, shared capsule or its own: `navigation` (a tab), `sidebar` (the Sidebar button), `more` ("…"), `actions` (an Action), `primary`, `close`. Tests and app styles key on it, never on `aria-label`, which changes with labels and translation: `nav.duet [data-duet-control="primary"]`.
 - An open sidebar closes when tabs take over. The switch across rotation, Split View and folding goes through the usual hidden move.
 - On an iPad, phone or desktop the same rule runs on the inline template: tabs when they fit the window's height, else the Sidebar button. An app that does not pass `tabs: true` is unchanged everywhere.
 
