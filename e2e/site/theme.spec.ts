@@ -1,11 +1,13 @@
 // T7: the theme toggle swaps the page, the stage's appearance and every loop to its dark recording (PLAN 3, 5).
 // Red until step 7.
 import { expect, test } from "@playwright/test";
+import { GPU, stageReady } from "./site";
 
-test.use({ colorScheme: "light" });
+test.use({ colorScheme: "light", ...GPU });
 
 test("dark theme reaches the videos and the stage", async ({ page }) => {
   await page.goto("/");
+  await stageReady(page);
   await page.getByRole("button", { name: /dark|theme/i }).first().click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   const srcs = await page.evaluate(() => [...document.querySelectorAll("video")].map((v) => v.currentSrc || v.querySelector("source")?.getAttribute("src") || v.getAttribute("src") || ""));

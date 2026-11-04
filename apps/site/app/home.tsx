@@ -1,282 +1,125 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { BookOpen, Check, ListTree, Moon, PanelBottom, PanelRight, Sun } from "lucide-react";
-import { Duet, column, useDuet, type DuetItem } from "duet-ui";
+import { useRef, useState, type CSSProperties } from "react";
+import { ArrowUpRight, Check } from "lucide-react";
+import { column } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
 import { ClaudeGlyph, CodexGlyph, GrokGlyph, PiGlyph } from "./agent-glyphs";
-import { Duo } from "./duo/duo";
-import { TINTS, useTheme, useTint } from "./theme";
+import { LoopVideo } from "./loop-video";
+import { REPO, SiteNav } from "./site-nav";
+import { TINTS, useTint } from "./theme";
+import { Tour } from "./tour";
 
-const REPO = "https://github.com/JayFarei/duet";
-/** The app icon drawn as a line icon: the page, and the column beside it with a button. */
-function DuetMark() {
-  return (
-    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <rect x="2.5" y="3.5" width="11" height="17" rx="3" /><rect x="16" y="3.5" width="5.5" height="17" rx="2.75" />
-      <circle cx="18.75" cy="13.5" r="1.1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-const SECTIONS: DuetItem[] = [
-  { id: "top", label: "Duet", icon: <DuetMark /> },
-  { id: "rules", label: "How it works", icon: <ListTree size={24} /> },
-  { id: "docs", label: "Docs", icon: <BookOpen size={24} /> },
-];
+const DOC = `${REPO}/blob/main/docs`;
 
 const quick = (tint?: string) => `import { Duet } from "duet-ui";
 
-<Duet menu={{ items: PLACES, selected: place, onSelect: setPlace, tabs: true }}${tint ? `\n  tint="${tint}"` : ""}>
+<Duet
+  menu={{ items: PLACES, selected: place, onSelect: setPlace, tabs: true }}
+  actions={[{ id: "share", label: "Share", icon: <Share />, onPress: share }]}
+  primary={{ id: "pay", label: "Pay", icon: <CreditCard />, onPress: pay }}${tint ? `\n  tint="${tint}"` : ""}
+>
   <App />
 </Duet>`;
 
-
-// Recorded on the Duo simulator and framed by tools/media/compose.sh.
-const ISLANDS: [string, string, string, string][] = [
-  ["Home Screen", "Strip", "In the strip iOS gives the app, beside the page.", "strip"],
-  ["Safari", "Column", "In the empty part of Safari's column. The page keeps its full width.", "column"],
-  ["Everywhere else", "Inline", "A slim strip inside the page, beside the content.", "inline"],
-];
-
-/** One page for every screen, navigated by its own Duet controls, with the web Duo playing on a stage. On a Duo too:
- *  the page is a demo there already, and the stage lets the reader try every other posture on the device (#165). */
 export type InstallStats = { total: number; daily: number[] };
+/** Which recorded clips are on disk (app/clip.ts, read on the server). */
+export type Clips = Record<string, boolean>;
 
-export function Home({ installs }: { installs: InstallStats | null }) {
-  return <Site installs={installs} />;
-}
-
-function Site({ installs }: { installs: InstallStats | null }) {
-  const [tab, setTab] = useState("top");
-  // A portrait iPhone gets an iPhone's bars, with a button to try the Duo's side controls on it.
-  const { device, width, height } = useDuet();
-  const [sides, setSides] = useState(false);
-  const theme = useTheme();
-  const { tint } = useTint();
-  const go = (id: string) => { setTab(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })); };
-  const portrait = device === "iphone" && height > width;
-  if (portrait && !sides) return <Bars installs={installs} tab={tab} setTab={setTab} go={go} onSides={() => setSides(true)} theme={theme} />;
-  return (
-    <Duet
-      menu={{ items: SECTIONS, selected: tab, onSelect: go, tabs: true, burger: false }}
-      actions={[
-        { id: "gh", label: "GitHub", icon: <GitHub />, onPress: () => window.open(REPO, "_blank") },
-        { id: "theme", label: theme.dark ? "Light mode" : "Dark mode", icon: theme.dark ? <Sun size={22} /> : <Moon size={22} />, onPress: theme.toggle },
-        ...(device === "iphone" ? [{ id: "bars", label: "Top and bottom bars", icon: <PanelBottom size={22} />, onPress: () => setSides(false) }] : []),
-      ]}
-      appearance={theme.appearance}
-      tint={tint}
-    >
-      {/* On a portrait iPhone the side controls float over the page, which keeps the layout of the bars. */}
-      {portrait ? <div className="float"><Page installs={installs} /></div> : <Page installs={installs} />}
-    </Duet>
-  );
-}
-
-/** The page as an iPhone app would show it: actions in a top bar, sections in a tab bar at the bottom. The document
- *  itself scrolls, so the page runs on under Safari's toolbar. */
-function Bars({ installs, tab, setTab, go, onSides, theme }: { installs: InstallStats | null; tab: string; setTab: (id: string) => void; go: (id: string) => void; onSides: () => void; theme: ReturnType<typeof useTheme> }) {
-  useEffect(() => {
-    // Duet leaves its insets on <html> when it steps aside; here nothing floats beside the page.
-    const html = document.documentElement;
-    for (const k of ["inset-left", "inset-right", "edge-left", "edge-right", "inset-top", "inset-bottom"]) html.style.removeProperty(`--duet-${k}`);
-    delete html.dataset.duetMode;
-    // The tab follows the section in view.
-    const f = () => {
-      let at = SECTIONS[0].id;
-      for (const s of SECTIONS) if ((document.getElementById(s.id)?.getBoundingClientRect().top ?? 1e9) < innerHeight * 0.4) at = s.id;
-      setTab(at);
-    };
-    f();
-    addEventListener("scroll", f, { passive: true });
-    return () => removeEventListener("scroll", f);
-  }, [setTab]);
-  return (
-    <div className="bars">
-      <Page installs={installs} />
-      <div className="bar-top">
-        <button className="bar-glass bar-try" onClick={onSides}><PanelRight size={18} />Side controls</button>
-        <span className="bar-end">
-          <button className="bar-glass bar-round" onClick={theme.toggle} aria-label={theme.dark ? "Light mode" : "Dark mode"}>{theme.dark ? <Sun size={20} /> : <Moon size={20} />}</button>
-          <a className="bar-glass bar-round" href={REPO} target="_blank" rel="noreferrer" aria-label="GitHub"><GitHub /></a>
-        </span>
-      </div>
-      <nav className="bar-glass bar-tabs" role="tablist">
-        {SECTIONS.map((s) => (
-          <button key={s.id} role="tab" aria-selected={s.id === tab} data-on={s.id === tab || undefined} className="bar-tab" onClick={() => go(s.id)}>
-            {s.icon}<span>{s.label}</span>
-          </button>
-        ))}
-      </nav>
-    </div>
-  );
-}
-
-function Page({ installs }: { installs: InstallStats | null }) {
-  return (
-    <main>
-      <section id="top" className="hero" style={column(980, 20)}>
-        <h1 className="display">
-          Native side controls for your web app on the <em>iPhone Duo.</em>
-        </h1>
-        <p className="lede">You pass the places in your app. Duet measures the free space beside your page and draws the biggest controls that fit. No device checks in your code.</p>
-        <div className="actions">
-          <div className="ctas">
-            <AgentPrompt />
-            <Npm />
-          </div>
-          <Stats installs={installs} />
-        </div>
-      </section>
-
-      <section className="stage">
-        <Duo embed src="/examples/inbox?plain" />
-      </section>
-
-      <Section id="rules" title="How it works" lede="You list your places. Duet does the rest.">
-        <Steps />
-        <h3 className="h3">Where the controls go</h3>
-        <p className="lede lede-l">Duet picks the spot from the device and the browser.</p>
-        <div className="tiles">
-          {ISLANDS.map(([where, mode, text, clip]) => (
-            <div key={mode} className="tile">
-              <Clip name={clip} />
-              <p className="tile-k">{where}</p>
-              <h3 className="tile-h">{mode}</h3>
-              <p className="tile-p">{text}</p>
-            </div>
-          ))}
-        </div>
-        <h3 className="h3">The controls</h3>
-        <p className="lede lede-l">The biggest that fit. What doesn't fit goes in “…”.</p>
-        <Controls />
-        <h3 className="h3">In real apps</h3>
-        <p className="lede lede-l">Three of our apps, on the same Duo.</p>
-        <Apps />
-      </Section>
-
-      <Section id="docs" title="Docs" lede="Wrap your app and list your places, most used first.">
-        <Integrate />
-        <h3 className="h3">Also included</h3>
-        <p className="lede lede-l">Beyond the controls.</p>
-        <Library />
-        <div className="ctas ctas-l">
-          <a href={`${REPO}#readme`} className="pill pill-solid">Read the docs</a>
-        </div>
-      </Section>
-
-      <Footer />
-    </main>
-  );
-}
-
-// What the library ships beyond the controls, each linking to its docs.
-const DOC = `${REPO}/blob/main/docs`;
-const LIBRARY = [
-  { h: "Panes", p: "One pane closed, two side by side unfolded.", href: "/panes" },
-  { h: "useDuet", p: "The device, browser and layout, for your own code.", href: `${DOC}/api.md#useduet` },
-  { h: "Colors", p: "Your accent color, light and dark.", href: `${DOC}/api.md#theming` },
-  { h: "Server rendering", p: "The right controls on first paint, no flash.", href: `${DOC}/server-rendering.md` },
+/** The examples, each a real app in one file at /examples/<name>. */
+const EXAMPLES = [
+  { name: "inbox", title: "Inbox", text: "Nine folders as Navigation in all three fits, Actions, and Close over a message." },
+  { name: "checkout", title: "Checkout", text: "Pay as a Primary that asks to confirm, the order as a sheet." },
+  { name: "reader", title: "Reader", text: "A book with a Pane bar, and Next book as a Direct Primary." },
 ];
-
-function Library() {
-  return (
-    <div className="tiles lib">
-      {LIBRARY.map((x) => (
-        <a key={x.h} href={x.href} className="tile lib-item">
-          <h3 className="tile-h">{x.h}</h3>
-          <p className="tile-p">{x.p}</p>
-        </a>
-      ))}
-    </div>
-  );
-}
-
-/** How it works: what the app passes, what Duet measures, what it draws. */
-function Steps() {
-  return (
-    <ol className="steps">
-      <li className="tile step">
-        <span className="step-n">1</span>
-        <h3 className="tile-h">You list your places</h3>
-        <p className="tile-p">The sections of your app, primary ones first, and any actions such as Share.</p>
-        <pre className="step-code"><code>{"items: [Home, Inbox,\n  Calendar, …]"}</code></pre>
-      </li>
-      <li className="tile step">
-        <span className="step-n">2</span>
-        <h3 className="tile-h">Duet measures the room</h3>
-        <p className="tile-p">The free strip beside your page, from the device, the browser and the window. It changes when you fold, turn or split the screen.</p>
-        <div className="step-room" aria-hidden><span>8 taps</span></div>
-      </li>
-      <li className="tile step">
-        <span className="step-n">3</span>
-        <h3 className="tile-h">Duet draws the controls</h3>
-        <p className="tile-p">The biggest controls that fit: tabs, “…” for the rest, or a menu.</p>
-        <div className="step-forms" aria-hidden><span>Tabs</span><span>“…”</span><span>Menu</span></div>
-      </li>
-    </ol>
-  );
-}
-
-// Each part of duet-ui, credited by name: a still of it on the stage's 3D Duo (tools/media/duo3d-stills.mjs), a
-// button that plays it on the stage (a Moment, or an example page at one), and its docs.
-const CONTROLS = [
-  { h: "Tabs", p: "Your places in a column, one tap each.", still: "form-tabs", play: "fit", href: `${DOC}/api.md#tabs-or-burger` },
-  { h: "“…”", p: "Whatever doesn't fit, in one list.", still: "form-more", play: "folded", href: `${DOC}/api.md#tabs-or-burger` },
-  { h: "Menu", p: "One button opens a sidebar with every place.", still: "control-menu", play: "burger", href: `${DOC}/api.md#duet` },
-  { h: "Buttons", p: "Your actions, such as Share, as round icons.", still: "form-menu", play: "burger", href: `${DOC}/api.md#the-template` },
-  { h: "Main button", p: "One tinted button, such as Book. A tap asks to confirm.", still: "control-main", play: "fold", src: "/book", href: `${DOC}/api.md#call-to-action` },
-  { h: "Close", p: "A sheet is open: the controls hold just an X.", still: "control-close", play: "burger", src: "/sheet", href: "/sheet" },
-];
-
-function Controls() {
-  const show = (c: (typeof CONTROLS)[number]) => {
-    dispatchEvent(c.src ? new CustomEvent("duet:example", { detail: { src: c.src, moment: c.play } }) : new CustomEvent("duet:moment", { detail: c.play }));
-    document.querySelector(".stage")?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
-  return (
-    <div className="tiles">
-      {CONTROLS.map((c) => (
-        <div key={c.still} className="tile rule control">
-          <div className="rule-shot"><img src={`/media/${c.still}.webp`} alt={`${c.h} on the Duo`} loading="lazy" /></div>
-          <h3 className="tile-h">{c.h}</h3>
-          <p className="tile-p">{c.p}</p>
-          <div className="rule-row">
-            <button className="rule-show" onClick={() => show(c)}>Show on the Duo</button>
-            <a className="rule-link" href={c.href}>Docs</a>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Our own apps on the stage's 3D Duo (tools/media/duo3d-apps.mjs). The private ones run on mock data.
+/** Our own apps on the Duo, on demo or mock data. */
 const APPS = [
-  { h: "RegTail", k: "Demo data", p: "Car checks. Unfolded, the report's sections are tabs, the rest go in “More”.", still: "app-regtail" },
-  { h: "Dashboard", k: "Mock data", p: "Server monitoring. Unfolded, its five pages are tabs in the column.", still: "app-dashboard" },
-  { h: "Wealth", k: "Mock data", p: "Personal finance. Folded, its nine sections go in the Menu.", still: "app-wealth" },
+  { name: "regtail", title: "RegTail", text: "Car checks. Open, the report's sections are tabs." },
+  { name: "dashboard", title: "Dashboard", text: "Server monitoring. Its five pages fit as tabs." },
+  { name: "wealth", title: "Wealth", text: "Personal finance. Closed, nine sections go in the Sidebar." },
+];
+/** Where Duet puts its controls. */
+const MODES = [
+  { name: "strip", title: "Strip", where: "Home Screen app", text: "In the strip iOS gives the app beside the page." },
+  { name: "column", title: "Column", where: "Safari", text: "In the empty part of Safari's column. The page keeps its full width." },
+  { name: "inline", title: "Inline", where: "Everywhere else", text: "A slim strip inside the page, beside the content." },
 ];
 
-function Apps() {
+/** The home page: the live Duo and its tour, the examples, the docs. */
+export function Home({ installs, clips }: { installs: InstallStats | null; clips: Clips }) {
   return (
-    <div className="tiles">
-      {APPS.map((a) => (
-        <div key={a.still} className="tile rule app">
-          <div className="rule-shot"><img src={`/media/${a.still}.webp`} alt={`${a.h} on the Duo`} loading="lazy" /></div>
-          <p className="tile-k">{a.k}</p>
-          <h3 className="tile-h">{a.h}</h3>
-          <p className="tile-p">{a.p}</p>
-        </div>
-      ))}
-    </div>
+    <>
+      <SiteNav />
+      <main className="home">
+        <section className="hero" data-testid="hero">
+          <div className="hero-copy wrap">
+            <h1 className="display">Native side controls for your web app on the <em>iPhone Duo.</em></h1>
+            <p className="lede">You pass the places in your app. Duet measures the free space beside your page and draws the largest controls that fit. No device checks in your code.</p>
+            <div className="actions">
+              <div className="ctas"><AgentPrompt /><Npm /></div>
+              <Stats installs={installs} />
+            </div>
+          </div>
+          <Tour />
+        </section>
+
+        <section id="examples" className="section wrap">
+          <h2 className="h2">Examples</h2>
+          <p className="lede lede-l">Three small apps, one file each. Open one to try it on the 3D Duo in every posture.</p>
+          <div className="cards">
+            {EXAMPLES.map((e) => (
+              <a key={e.name} className="card ex-card-link" href={`/examples/${e.name}`}>
+                <LoopVideo name={`example-${e.name}`} available={!!clips[`example-${e.name}`]} label={`${e.title} on the iPhone Duo`} />
+                <h3 className="card-h">{e.title}<ArrowUpRight size={18} aria-hidden /></h3>
+                <p className="card-p">{e.text}</p>
+              </a>
+            ))}
+          </div>
+          <h3 className="h3">In real apps</h3>
+          <p className="lede lede-l">Three of our apps, on the same Duo.</p>
+          <div className="cards">
+            {APPS.map((a) => (
+              <div key={a.name} className="card">
+                <LoopVideo name={`app-${a.name}`} available={!!clips[`app-${a.name}`]} still={`/media/app-${a.name}.webp`} label={`${a.title} on the iPhone Duo`} />
+                <h3 className="card-h">{a.title}</h3>
+                <p className="card-p">{a.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="docs" className="section wrap">
+          <h2 className="h2">Docs</h2>
+          <p className="lede lede-l">Install, wrap your app, list your places most used first.</p>
+          <h3 className="h3">Install</h3>
+          <div className="ctas ctas-l"><Npm /><AgentPrompt /></div>
+          <h3 className="h3">Usage</h3>
+          <Integrate />
+          <h3 className="h3">Modes</h3>
+          <p className="lede lede-l">Duet picks where the controls go from the device and the browser.</p>
+          <div className="modes">
+            {MODES.map((m) => (
+              <div key={m.name} className="mode">
+                <LoopVideo name={`mode-${m.name}`} available={!!clips[`mode-${m.name}`]} label={`${m.title} mode on the iPhone Duo`} />
+                <div><p className="mode-k">{m.where}</p><h3 className="card-h">{m.title}</h3><p className="card-p">{m.text}</p></div>
+              </div>
+            ))}
+          </div>
+          <h3 className="h3">Reference</h3>
+          <p className="lede lede-l">Every control, its variants and its props, then the full API.</p>
+          <div className="ctas ctas-l">
+            <a href="/components" className="pill pill-solid">Components</a>
+            <a href={`${DOC}/api.md`} className="pill" target="_blank" rel="noreferrer">API reference</a>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </>
   );
 }
 
-/** The OpenMake footer shared with RegTail and OpenTraces: credit on the left, product wordmark on the right. */
-/** The installs line and its faint area, after the OpenTraces hero: relative momentum, so no axes. */
 function Sparkline({ values }: { values: number[] }) {
   const W = 240, H = 56, PAD = 6;
   const min = Math.min(...values), span = Math.max(...values) - min || 1;
@@ -315,24 +158,6 @@ function Footer() {
       <p>Made by <a href="https://github.com/JayFarei" target="_blank" rel="noreferrer">Gabriele Farei</a> · <a href="https://farei.me/posts" target="_blank" rel="noreferrer">Blog</a></p>
       <p>MIT licensed. Not affiliated with Apple.</p>
     </footer>
-  );
-}
-
-function GitHub() {
-  return (
-    <svg width={22} height={22} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M12 .3a12 12 0 0 0-3.8 23.38c.6.12.83-.26.83-.57L9 21.07c-3.34.72-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.08-.74.09-.73.09-.73 1.2.09 1.84 1.24 1.84 1.24 1.07 1.83 2.8 1.3 3.49 1 .1-.78.42-1.3.76-1.6-2.67-.31-5.47-1.34-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.14-.3-.54-1.52.1-3.18 0 0 1-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.64 1.66.24 2.88.12 3.18a4.65 4.65 0 0 1 1.23 3.22c0 4.61-2.8 5.63-5.48 5.92.42.36.81 1.1.81 2.22l-.01 3.29c0 .31.2.69.82.57A12 12 0 0 0 12 .3" />
-    </svg>
-  );
-}
-
-function Section({ id, title, lede, children }: { id: string; title: string; lede: string; children: ReactNode }) {
-  return (
-    <section id={id} className="section" style={column(980, 20)}>
-      <h2 className="h2">{title}</h2>
-      <p className="lede lede-l">{lede}</p>
-      {children}
-    </section>
   );
 }
 
@@ -382,20 +207,10 @@ function AgentPrompt() {
 
 function Npm() {
   const [copied, setCopied] = useState(false);
-  const copy = () => navigator.clipboard?.writeText("npm i duet-ui").then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
+  const copy = () => navigator.clipboard?.writeText("pnpm add duet-ui").then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); });
   return (
     <button className="pill pill-solid npm" onClick={copy} aria-label="Copy the install command">
-      <code>npm i duet-ui</code><span className="npm-hint">{copied ? "Copied" : "Copy"}</span>
+      <code>pnpm add duet-ui</code><span className="npm-hint">{copied ? "Copied" : "Copy"}</span>
     </button>
-  );
-}
-
-/** A screen recording of the real device in its frame: silent, looping, poster first. Each clip is composed twice,
- *  on the card colour of each theme (`name` and `name-dark`), so the device sits on the card with no seam. */
-function Clip({ name, style }: { name: string; style?: CSSProperties }) {
-  const src = useTheme().dark ? `${name}-dark` : name;
-  return (
-    <video key={src} src={`/media/${src}.mp4`} poster={`/media/${src}.jpg`} autoPlay muted loop playsInline preload="metadata" aria-hidden
-      style={{ display: "block", width: "100%", height: "auto", aspectRatio: "4 / 5", objectFit: "contain", background: "var(--card)", borderRadius: 18, ...style }} />
   );
 }

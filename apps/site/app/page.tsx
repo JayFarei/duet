@@ -1,4 +1,7 @@
+import { clips } from "./clip";
 import { Home, type InstallStats } from "./home";
+
+const CLIPS = ["example-inbox", "example-checkout", "example-reader", "app-regtail", "app-dashboard", "app-wealth", "mode-strip", "mode-column", "mode-inline"];
 
 const METRICS = "https://opentraces-metrics.fareiunastrage.workers.dev/v1/projects/duet";
 
@@ -21,5 +24,5 @@ async function installs(): Promise<InstallStats | null> {
 }
 
 export default async function Page() {
-  return <Home installs={await installs()} />;
+  return <Home installs={await installs()} clips={clips(CLIPS)} />;
 }

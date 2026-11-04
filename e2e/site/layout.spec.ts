@@ -20,7 +20,8 @@ for (const path of PAGES) {
       });
       expect(gutters, "text keeps a 16px gutter").toEqual([]);
     }
-    const shot = await page.screenshot({ fullPage: true });
+    // CSS pixels: at 3x a long page passes the GPU's largest texture (16384 px) and Chromium cannot capture it.
+    const shot = await page.screenshot({ fullPage: true, scale: "css" });
     await info.attach(`${path.replace(/\//g, "_") || "home"}-${info.project.name}.png`, { body: shot, contentType: "image/png" });
   });
 }

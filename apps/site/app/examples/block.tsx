@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Duo3D } from "../duo3d/duo3d";
 import type { ClipPosture } from "../duo3d/clips";
-import { useTheme } from "../theme";
+import { LoopVideo } from "../loop-video";
 import "./examples.css";
 
 const POSTURES: [ClipPosture, string][] = [["closed", "Closed"], ["open", "Open"], ["laptop", "Laptop"], ["sideways", "Sideways"]];
@@ -22,10 +22,8 @@ export function Block({ name, title, intro, code, app, loop }: { name: string; t
   const wide = useSyncExternalStore(onResize, wideNow, () => null);
   const [posture, setPosture] = useState<ClipPosture>("closed");
   const [tab, setTab] = useState<"preview" | "code">("preview");
-  const dark = useTheme().dark;
   const href = `/examples/${name}?plain`;
   if (plain) return <>{app}</>;
-  const clip = `/media/clip/example-${name}-${dark ? "dark" : "light"}`;
 
   return (
     <div className="ex-page">
@@ -49,7 +47,7 @@ export function Block({ name, title, intro, code, app, loop }: { name: string; t
       <div className="ex-frame">
         {tab === "code" ? <pre className="code ex-code"><code dangerouslySetInnerHTML={{ __html: code }} /></pre>
           : wide ? <Duo3D embed chrome={false} live posture={posture} src={href} />
-          : wide === false && loop ? <video key={clip} className="ex-loop" src={`${clip}.mp4`} poster={`${clip}.jpg`} autoPlay muted loop playsInline preload="metadata" aria-label={`${title} on the iPhone Duo`} />
+          : wide === false && loop ? <LoopVideo className="ex-loop" name={`example-${name}`} available label={`${title} on the iPhone Duo`} />
           : wide === false ? <div className="ex-card"><p>{title} runs on the iPhone Duo. Open it on its own to try it here.</p><a href={href}>Open</a></div>
           : <div className="ex-wait" />}
       </div>

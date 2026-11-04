@@ -124,6 +124,17 @@ export async function tap(page: Page, selector: string) {
   throw new Error(`no shown Duet frame lets a tap reach ${selector}: ${last}`);
 }
 
+/** For specs that drive the 3D stage: headless Chromium draws WebGL in software (SwiftShader) unless told to use the
+ *  GPU, and the stage then takes ~8 s instead of ~1 s to boot, so the tour's steps time out. A visitor's browser has a
+ *  GPU; on a Mac use Metal. Per spec, not in the config: the GPU rasterizes the glass rim a few levels dimmer (T1). */
+export const GPU = process.platform === "darwin" ? { launchOptions: { args: ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] } } : {};
+
+/** Waits until the home tour's stage has its screens up and measuring. Headless Chromium draws the 3D Duo in
+ *  software, so its first measure can take several seconds after load. */
+export async function stageReady(page: Page) {
+  await page.locator('[data-testid="tour-stage"][data-ready]').waitFor({ state: "attached", timeout: 30_000 });
+}
+
 /** Navigation's fit and the set of control kinds Duet shows, per frame running Duet. */
 export async function duetState(page: Page) {
   const out: { fit: string | null; controls: string[] }[] = [];

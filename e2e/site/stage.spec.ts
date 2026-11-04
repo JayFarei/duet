@@ -1,6 +1,8 @@
 // T3: one live stage per page, so one WebGL context, and it stops rendering off screen (PLAN 5). Red until step 5.
 import { expect, test } from "@playwright/test";
-import { COUNT_WEBGL, EXAMPLES, scrollPage, scrollThrough } from "./site";
+import { COUNT_WEBGL, EXAMPLES, GPU, scrollPage, scrollThrough } from "./site";
+
+test.use(GPU);
 
 for (const path of ["/", ...EXAMPLES]) {
   test(`one WebGL context on ${path}`, async ({ page }) => {

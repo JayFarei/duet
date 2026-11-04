@@ -4,7 +4,7 @@
 
 export type ClipPosture = "closed" | "open" | "laptop" | "sideways";
 /** A control to press: a `data-duet-control` kind (the first one), or a CSS selector in the page. */
-export type Press = { id: string } | { selector: string };
+export type Press = ({ id: string } | { selector: string }) & { retry?: boolean };
 export interface Step { at: number; posture?: ClipPosture; src?: string; duet?: boolean; press?: Press }
 export interface Clip { src: string; posture: ClipPosture; app?: "safari" | "home" | "sheet"; steps: Step[]; length: number }
 

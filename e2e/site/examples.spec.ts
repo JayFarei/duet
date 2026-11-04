@@ -1,6 +1,8 @@
 // T6: the three example blocks, each exercising its nouns on the live stage (PLAN 6). Red until step 4.
 import { expect, test, type Page } from "@playwright/test";
-import { duetFrames, duetState, tap } from "./site";
+import { GPU, duetFrames, duetState, tap } from "./site";
+
+test.use(GPU);
 
 // The live stage loads a 3D scene and four nested pages before Duet runs, slow under parallel workers.
 test.describe.configure({ timeout: 120_000 });
@@ -22,6 +24,7 @@ test.describe("Inbox", () => {
   // The Laptop's inner screen stands taller than the open one, so it holds all nine tabs and the Actions too.
   test("Closed gives sidebar, Open and Laptop give tabs", async ({ page }) => {
     await page.goto("/examples/inbox");
+    await duet(page);
     await posture(page, "Closed");
     expect((await duetState(page)).map((s) => s.fit)).toContain("sidebar");
     await posture(page, "Open");

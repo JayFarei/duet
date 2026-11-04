@@ -55,8 +55,11 @@ const POSTURES: [Posture, string, () => ReactNode][] = [
  *  under it puts it back that way. */
 /** chrome: false leaves only the device (an example block, a clip). posture: the block's picker drives it. idle: the
  *  device sways and breathes while nothing else moves it (the landing page). live: it takes touches from the start. */
-export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chrome = true, posture: wanted, idle = false, live = false, clip }: {
-  embed?: boolean; src?: string; chrome?: boolean; posture?: ClipPosture; idle?: boolean; live?: boolean; clip?: string;
+/** scene: the home tour's step, a page in a posture and the control it presses once there. Leaving a step presses its
+ *  `undo` first (More or a sheet closed again), so the next step starts from the page's resting state. */
+export type Scene = { src: string; posture: ClipPosture; app?: "safari" | "home"; press?: Press; undo?: Press };
+export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chrome = true, posture: wanted, idle = false, live = false, clip, scene }: {
+  embed?: boolean; src?: string; chrome?: boolean; posture?: ClipPosture; idle?: boolean; live?: boolean; clip?: string; scene?: Scene;
 } = {}) {
   const film = clip ? CLIPS[clip] : undefined;
   // The landing page opens on a Moment: the closed Home Screen, seven tabs and "…".
@@ -214,6 +217,30 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
   const takeRef = useRef(take);
   takeRef.current = take;
   useEffect(() => { if (wanted) takeRef.current(wanted); }, [wanted]);
+
+  // The tour's step: Duet on, the step's page, its posture and app, then its press once the page has drawn it.
+  const stageTo = (sc: Scene) => {
+    setPage("");
+    setDuet(true);
+    setSite(sc.src);
+    if (sc.posture === "laptop" || sc.posture === "sideways") take(sc.posture);
+    else go({ posture: sc.posture, app: sc.app ?? "safari", turn: 0, upside: false }, "flat");
+  };
+  const stageRef = useRef(stageTo);
+  stageRef.current = stageTo;
+  const lastScene = useRef<Scene | null>(null);
+  const sceneKey = scene ? JSON.stringify(scene) : "";
+  useEffect(() => {
+    if (!scene) return;
+    const prev = lastScene.current, timers: ReturnType<typeof setTimeout>[] = [];
+    lastScene.current = scene;
+    const apply = () => {
+      stageRef.current(scene);
+      if (scene.press) timers.push(setTimeout(() => pressIt({ ...scene.press!, retry: true }), 600));
+    };
+    if (prev?.undo) { pressIt(prev.undo); timers.push(setTimeout(apply, 450)); } else apply();
+    return () => timers.forEach(clearTimeout);
+  }, [sceneKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A clip plays once, from the moment duo shows the device: duet:clip-start and duet:clip-end mark it in the log.
   useEffect(() => {

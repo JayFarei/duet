@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } fr
 import { detect, type Mode, type Signals } from "duet-ui/geometry";
 import { Island, SCREEN, fit, island, scene } from "../duo/web-duo";
 import { channel, type Sync } from "./shared";
+import { useTheme } from "../theme";
 
 const EASE = "cubic-bezier(0.32, 0.72, 0, 1)";
 // Opening: a touch past full and back, over about the time the 3D hinge takes to lay flat.
@@ -12,6 +13,8 @@ const SPRING = "cubic-bezier(0.3, 1.22, 0.45, 1)";
 // One of the device's displays, as the 2D web Duo draws its screen: the inner one always in the open layout, the
 // outer one always closed, both live through the fold the way iOS holds a session on both. Scaled to duo's panel.
 export function Screen() {
+  // The host page's light or dark pick reaches this display through localStorage's storage event.
+  useTheme();
   const display = useSyncExternalStore(() => () => {}, () => new URLSearchParams(location.search).get("display") === "outer" ? "outer" : "inner", () => "inner");
   const here = useSyncExternalStore(() => () => {}, () => location.host, () => "");
   // A page loaded through /duo3d/web says where it really is, for Safari's address bar.
@@ -154,16 +157,25 @@ export function Screen() {
   );
 }
 
-/** A host's `duet:press`: the control pressed as a finger would, pointer down and up, then the click Duet acts on. */
-function press(el: HTMLIFrameElement | null, p: { id?: string; selector?: string }) {
+/** A host's `duet:press`: the control pressed as a finger would, pointer down and up, then one click. */
+function press(el: HTMLIFrameElement | null, p: { id?: string; selector?: string; retry?: boolean }, tries = p.retry ? 20 : 0) {
   const doc = el?.contentDocument, win = el?.contentWindow as (Window & typeof globalThis) | null;
-  if (!doc || !win) return;
+  if (!doc || !win) { if (tries > 0) setTimeout(() => press(el, p, tries - 1), 200); return; }
   const sel = p.selector ?? `.duet-group:not([data-leaving]) [data-duet-control="${p.id}"]`;
   const t = doc.querySelector<HTMLElement>(sel);
-  if (!t) return;
+  // Not drawn yet (the page still loading, Duet laying out a new posture): try again for a few seconds.
+  if (!t) { if (tries > 0) setTimeout(() => press(el, p, tries - 1), 200); return; }
   const r = t.getBoundingClientRect(), at = { bubbles: true, cancelable: true, composed: true, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2, pointerId: 1, pointerType: "touch", isPrimary: true };
   t.dispatchEvent(new win.PointerEvent("pointerdown", at));
-  setTimeout(() => { t.dispatchEvent(new win.PointerEvent("pointerup", at)); t.click(); }, 90);
+  // Duet's own press runs the button's click itself, 40 ms after a touch's release; anything else (a page row) gets the
+  // click here. Both would toggle a list open and shut again.
+  setTimeout(() => {
+    let clicked = false;
+    const saw = () => { clicked = true; };
+    doc.addEventListener("click", saw, true);
+    t.dispatchEvent(new win.PointerEvent("pointerup", at));
+    setTimeout(() => { doc.removeEventListener("click", saw, true); if (!clicked) t.click(); }, 150);
+  }, 90);
 }
 
 /** Duet's column in the page: its fit, the room its groups leave free along it, and each group's box. */
