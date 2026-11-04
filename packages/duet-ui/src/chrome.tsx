@@ -38,7 +38,7 @@ export interface DuetProps<T extends string = string, U extends string = string>
   /** The app's places: the burger, first in the column, opens them in a sidebar and slides the page aside. The ids are
    *  typed from `items`: declare them `as const` and `onSelect` gets the union. Each place keeps its own scroll
    *  position in the inner scroller. In the in-app preview (one button of room), or with `burger: false`, they lead "…"
-   *  under "Menu" instead. */
+   *  under "Places" instead. */
   menu?: { selected?: NoInfer<T>; onSelect: (id: NoInfer<T>) => void; burger?: boolean } & (
     | { items: readonly DuetMenuItem<T>[]; tabs?: false }
     /** Tabs in the capsule (`placeTabs`), the actions and primary folding first. When not all of them fit, the first
@@ -90,6 +90,8 @@ const envInset = (side: Side) => { const e = emulatedSignals(); return e ? `${si
 // Inline: the side is the user's, remembered per site, and apart for split view (Safari's column is on the pane's
 // outer edge, which the page cannot see, so the controls follow it once moved there).
 const sideKey = (split: boolean) => split ? "duet-side-split" : "duet-side";
+/** Each button's control, by its glossary name, as data-duet-control: tests and app styles key on it, never on labels. */
+const CONTROL: Record<Slot["kind"], string> = { place: "navigation", menu: "sidebar", more: "more", action: "actions", primary: "primary", close: "close" };
 const preferred = new Map<string, Side | null>();
 const listeners = new Set<() => void>();
 // Off unless the app passes moveControls: a side stored by an earlier visit stays unread.
@@ -557,7 +559,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     const burger = !!p.menu && p.menu.burger !== false && !tabbed;
     const always = folded.length + destructive.length + (move ? 1 : 0) + (p.menu && !burger && !tabbed ? 1 : 0) + (overflow ? 1 : 0);
     const a = template(f, { room: p.menu?.tabs ? landingRoom(c) : undefined, close: !!p.close, menu: burger, places: tabbed?.shown ?? 0, actions: actions.length, primary: !!p.primary, rest: always > 0, sidebar: sidebar === "open" && !tabbed, tabPitch: tabbed?.pitch, overflow }), placed = a.placed;
-    // No burger (the preview): the app's places close "…" under "Menu". Tabs: the places that did not fit.
+    // No burger (the preview): the app's places close "…" under "Places". Tabs: the places that did not fit.
     const places = !p.menu ? [] : tabbed ? menuItems.slice(tabbed.shown) : placed.some((g) => g.group.some((s) => s.kind === "menu")) ? [] : menuItems;
     const askAt = placed.find((g) => g.group.some((s) => s.kind === "primary")), moreAt = placed.find((g) => g.group.some((s) => s.kind === "more"));
     // Sharing a capsule with "…", the primary is in the capsule that turns into the list, so the list leads with it.
@@ -573,7 +575,9 @@ export function Duet<T extends string = string, U extends string = string>(props
     const placesFirst = !!p.menu?.tabs;
     // The selected place folded: "…" holds the bubble a tab would.
     const moreSelected = (overflow && places.some((m) => m.id === p.menu!.selected)) || actions.slice(a.shown).some((t) => t.tab && t.selected);
-    return { f, placed, places, list, moreAt, askAt, placesFirst, moreSelected };
+    // Navigation's form, for tests and styling: every place a tab, tabs with the rest in "…", or the sidebar button.
+    const fit = tabbed ? (overflow ? "tabs-more" : "tabs") : placed.some((g) => g.group.some((s) => s.kind === "menu")) ? "sidebar" : undefined;
+    return { f, placed, places, list, moreAt, askAt, placesFirst, moreSelected, fit };
   };
 
   const reserve = p.reserve !== false;
@@ -690,7 +694,7 @@ export function Duet<T extends string = string, U extends string = string>(props
 
   const theme = { ...themeVars(p), "--duet-slide": SLIDE.easing, "--duet-slide-ms": `${SLIDE.ms}ms`, "--duet-group": GROUP.easing, "--duet-group-ms": `${GROUP.ms}ms`, "--duet-press-rise": PRESS.rise.easing, "--duet-press-rise-ms": `${PRESS.rise.ms}ms`, "--duet-press-fall": PRESS.fall.easing, "--duet-press-fall-ms": `${PRESS.fall.ms}ms` } as CSSProperties;
   const badge = (a: { badge?: number | string; badgeTone?: string }) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge" data-tone={a.badgeTone === "neutral" ? "neutral" : undefined}>{a.badge}</span>;
-  const label = (s: Slot) => s.kind === "place" ? menuItems[s.index].label : s.kind === "menu" ? "Menu" : s.kind === "more" ? "More" : s.kind === "close" ? (p.close && p.close.label) || "Close"
+  const label = (s: Slot) => s.kind === "place" ? menuItems[s.index].label : s.kind === "menu" ? "Sidebar" : s.kind === "more" ? "More" : s.kind === "close" ? (p.close && p.close.label) || "Close"
     : s.kind === "primary" ? p.primary!.label : actions[s.index].label;
   const icon = (s: Slot) => s.kind === "place" ? menuItems[s.index].icon : s.kind === "menu" ? <Menu size={22} /> : s.kind === "more" ? <Ellipsis size={22} /> : s.kind === "close" ? <X size={22} strokeWidth={2.2} />
     : s.kind === "primary" ? <span className="duet-cta-icon" style={p.primary!.tint ? { "--duet-tint": p.primary!.tint } as CSSProperties : undefined}>{p.primary!.icon}</span> : actions[s.index].icon;
@@ -707,7 +711,7 @@ export function Duet<T extends string = string, U extends string = string>(props
   };
 
   const bar = (side: Side, i: number) => {
-    const { f, placed, places, list, moreAt, askAt, placesFirst, moreSelected } = layout(side);
+    const { f, placed, places, list, moreAt, askAt, placesFirst, moreSelected, fit } = layout(side);
     // Folded into "…", the primary arms in place (its row turns to `confirm`, the menu stays open) and runs on the
     // second tap, like its own capsule.
     const pick = (a: DuetItem) => () => {
@@ -720,13 +724,13 @@ export function Duet<T extends string = string, U extends string = string>(props
     // Folded places alone: their section is the whole list, with no empty one after it.
     const pageHead = list.length > 0 || !placesFirst;
     const placeRows = places.length > 0 && <>
-      <div className="duet-menu-head">Menu</div>
+      <div className="duet-menu-head">Places</div>
       {places.map((m) => (
         <button key={m.id} className="duet-row" role="menuitemradio" aria-checked={m.id === selected} onClick={() => select(m.id)}>{m.icon}<span>{m.label}</span>{badge(m)}</button>
       ))}
     </>;
     return (
-      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden ?? (p.menu?.tabs && !ctx.confidence ? "pending" : undefined)} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
+      <nav key={side} ref={i ? nav2 : nav} className="duet" data-mode={ctx.mode} data-side={side} data-duet-fit={fit} data-settling={!settled || ctx.confidence !== "sure" || undefined} data-hidden={ctx.hidden ?? (p.menu?.tabs && !ctx.confidence ? "pending" : undefined)} data-confidence={ctx.confidence} data-keyboard={ctx.keyboard || undefined} style={{ ...theme, ...(split && i ? { left: column } : undefined) }}>
         <Presence>{placed.map((g, gi) => {
           const rect = g.rect;
           return (
@@ -736,7 +740,7 @@ export function Duet<T extends string = string, U extends string = string>(props
               <i className="duet-edge" aria-hidden />
               <i className="duet-rim" aria-hidden />
               {g.group.map((s, j) => (
-                <button key={s.kind === "action" ? actions[s.index].id : s.kind === "place" ? `place-${menuItems[s.index].id}` : s.kind} className="duet-btn" aria-label={label(s)} data-destructive={undefined} data-tab={s.kind === "place" || s.kind === "action" && actions[s.index].tab || undefined} aria-current={(s.kind === "place" && menuItems[s.index].id === selected) || (s.kind === "action" && actions[s.index].selected) || (s.kind === "more" && moreSelected) ? "page" : undefined}
+                <button key={s.kind === "action" ? actions[s.index].id : s.kind === "place" ? `place-${menuItems[s.index].id}` : s.kind} className="duet-btn" data-duet-control={CONTROL[s.kind]} aria-label={label(s)} data-destructive={undefined} data-tab={s.kind === "place" || s.kind === "action" && actions[s.index].tab || undefined} aria-current={(s.kind === "place" && menuItems[s.index].id === selected) || (s.kind === "action" && actions[s.index].selected) || (s.kind === "more" && moreSelected) ? "page" : undefined}
                   aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : s.kind === "primary" && p.primary!.confirm !== false ? ask === "open" : undefined}
                   style={{ top: j * g.pitch, width: rect.w }} onClick={() => press(s)}>
                   {icon(s)}
@@ -751,7 +755,7 @@ export function Duet<T extends string = string, U extends string = string>(props
         {drawsMenu && moreAt && (
           <Morph open={more === "open"} from={moreAt.rect} pitch={moreAt.pitch} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, (places.length ? 1 : 0) + (pageHead ? 1 : 0))} fit={!!p.menu?.tabs} onClosed={() => setMore("closed")}>
             {placesFirst && placeRows}
-            {pageHead && <div className="duet-menu-head">{f.kind === "column" ? "This page" : "More"}</div>}
+            {pageHead && <div className="duet-menu-head">Actions</div>}
             {list.map((a) => {
               const arm = a === p.primary && armed;
               return (
@@ -785,9 +789,9 @@ export function Duet<T extends string = string, U extends string = string>(props
   return (
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.menu && p.menu.burger !== false && (
-        <nav className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Menu"
+        <nav className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Sidebar"
           style={{ ...theme, width: `calc(${ctx.mode === "column" ? ctx.width : slide}px + ${clear})` }} inert={sidebar !== "open" || undefined}>
-          <div className="duet-side-head">Menu</div>
+          <div className="duet-side-head">Sidebar</div>
           {menuItems.map((m) => (
             <button key={m.id} className="duet-side-row" aria-current={m.id === selected ? "page" : undefined} tabIndex={sidebar === "open" ? 0 : -1} onClick={() => select(m.id)}>
               {m.icon}<span>{m.label}</span>{badge(m)}

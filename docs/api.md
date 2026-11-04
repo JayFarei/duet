@@ -24,7 +24,7 @@ Props, theming, the call to action, `useDuet()` and the lower-level exports.
 
 ## The template
 
-One template on every layout, the same in Safari's column, the strip, inline and split view: the burger first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time; then the primary takes the burger's slot above "…", whose list ends with a "Menu" section (the places), and only where one button is all that fits does it fold into "…" itself. The in-app preview's gap holds one button, so it shows only "…", whose list leads with "This page", then a "Menu" section (the places). "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `placeTabs`, `placesFit`, `menuBox`, `confirmBox`) for tests and custom chrome.
+One template on every layout, the same in Safari's column, the strip, inline and split view: the Sidebar button first, then the actions while they fit, then "…", which closes the group, and the primary in its own group. Where the band shrinks, actions move into "…" one at a time; then the primary takes the burger's slot above "…", whose list ends with a "Places" section, and only where one button is all that fits does it fold into "…" itself. The in-app preview's gap holds one button, so it shows only "…", whose list leads with an "Actions" section, then a "Places" section. "…" grows into its list on one interruptible spring, open and close; any tap outside closes it. The pure layout is exported (`template`, `allocate`, `frame`, `place`, `placeTabs`, `placesFit`, `menuBox`, `confirmBox`) for tests and custom chrome.
 
 ## Tabs or burger
 
@@ -35,7 +35,7 @@ Pass `tabs: true` on `menu` and the app's places are tabs at the head of the cap
 ```
 
 - Put the primary places first: the order is yours, and tabs never reorder or swap on selection. 9 places on a wide Home Screen are 7 tabs and "…" holding the other 2.
-- "…" lists only the folded places, in a section ahead of folded actions and destructive items. That second section is headed "This page" in Safari's column and "More" elsewhere. When the selected place is folded, "…" shows the selected bubble and the list marks the place. The set never splits between tabs and sidebar.
+- "…" lists only the folded places, in a section ahead of folded actions and destructive items. That second section is headed "Actions" everywhere. When the selected place is folded, "…" shows the selected bubble and the list marks the place. The set never splits between tabs and sidebar.
 - The app's actions and primary fold into "…" first. The burger takes over only where fewer than three tabs would show, closed Safari and the right of Split View.
 - Where the band holds one button (closed Safari turned, in Safari's column), a page with actions shows only "…", with the places first in its list. Without actions it shows the burger.
 - Tabs behave like the `tabs` prop: the selected one sits in a bubble in `tint`, with the same press.
@@ -92,7 +92,7 @@ A page with one thing to do (book, buy, join) passes it as its primary, and fold
 
 - The primary is a tinted button in a slot of the controls, 49pt like every other, showing its icon. Its `label` is its accessible name and shows when it opens. Controls never leave the column, so nothing sits over the page at rest.
 - A tap grows the button into a confirmation box beside the column, on the same spring as "…": the icon and `label`, then a tinted button reading `confirm` (or `label`). The button runs `onPress` and the box folds back into the button, which now shows whatever the page passes next (a green Booked check, say). A tap anywhere else closes the box. `confirm: false` runs on the first tap, with no box.
-- Where its own group does not fit (the closed column with a menu), it takes the burger's slot, above "…" in one capsule, and the places move into the "…" list, in a "Menu" section after the page's own. With `menu.tabs` the section comes first. Where one button is all that fits, it folds into "…".
+- Where its own group does not fit (the closed column with a menu), it takes the burger's slot, above "…" in one capsule, and the places move into the "…" list, in a "Places" section after the "Actions" one. With `menu.tabs` the section comes first. Where one button is all that fits, it folds into "…".
 - Folded into "…" (no room for its own group), it arms the same way: the first tap tints its row and turns its label to `confirm`, the list stays open, the second tap runs it and closes the list. Closing the list disarms it. See [Folded primary runs at once](edge-cases.md#folded-primary-runs-at-once).
 - `tint` on the primary overrides the accent for it alone. Change `label`, `icon`, `tint` or `folded` at any time, from state like any prop.
 

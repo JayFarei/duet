@@ -15,7 +15,7 @@ const TMP = mkdtempSync(join(tmpdir(), "duo3d-"));
 const SHOTS = [
   ["duet:moment", "fit", "form-tabs"], ["duet:moment", "folded", "form-more"], ["duet:moment", "burger", "form-menu"],
   // The controls, each caught in use: the sidebar open, the main button's confirmation, a sheet's X in the column.
-  ["duet:example", { src: "/skeleton", moment: "burger" }, "control-menu", ['.duet-btn[aria-label="Menu"]']],
+  ["duet:example", { src: "/skeleton", moment: "burger" }, "control-menu", ['.duet-btn[aria-label="Sidebar"]']],
   ["duet:example", { src: "/book", moment: "fold" }, "control-main", ['.duet-btn[aria-label="Book"]']],
   ["duet:example", { src: "/sheet", moment: "burger" }, "control-close", ["main button"]],
 ];

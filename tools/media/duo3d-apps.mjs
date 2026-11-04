@@ -17,7 +17,7 @@ const TMP = mkdtempSync(join(tmpdir(), "duo3d-apps-"));
 const APPS = [
   ["regtail", "http://127.0.0.1:8795", "/app", "fit", ["text=See a sample report"]],
   ["dashboard", "http://127.0.0.1:3591", "/", "fit", []],
-  ["wealth", "http://127.0.0.1:8292", "/", "burger", ['.duet-btn[aria-label="Menu"]']],
+  ["wealth", "http://127.0.0.1:8292", "/", "burger", ['.duet-btn[aria-label="Sidebar"]']],
 ];
 const pick = process.argv.slice(2);
 

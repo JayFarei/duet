@@ -19,10 +19,19 @@ test("the edge ring sits under the glass, so its backdrop is the page", () => {
   assert.match(rule, /backdrop-filter:\s*var\(--duet-edge-filter\)/);
 });
 
-test("both light themes darken the edge and dodge the rim, all three dark themes opt out", () => {
+test("both light themes darken the edge and take the light rim, all three dark themes opt out", () => {
   assert.equal(count(css, "--duet-edge-filter: contrast(1.75) brightness(0.505)"), 2);
-  assert.equal(count(css, "--duet-rim-blend: color-dodge"), 2);
+  assert.equal(count(css, "--duet-rim-blend: var(--duet-rim-blend-light)"), 2);
+  assert.equal(count(css, "--duet-glass-rim: var(--duet-glass-rim-light)"), 2);
   assert.equal(count(css, "--duet-edge-filter: none"), 3);
   assert.equal(count(css, "--duet-rim-blend: normal"), 3);
   assert.equal(count(css, "--duet-glass-inset: 0px"), 3);
+});
+
+test("the light rim blends normally off iOS, and only iOS keeps the colour dodge", () => {
+  assert.match(css, /--duet-rim-blend-light: normal;/);
+  const ios = css.match(/@supports \(-webkit-touch-callout: none\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(ios, "@supports (-webkit-touch-callout: none) block");
+  assert.match(ios, /--duet-rim-blend-light: color-dodge/);
+  assert.equal(count(css, "color-dodge;"), 1, "the dodge lives only in the iOS block");
 });

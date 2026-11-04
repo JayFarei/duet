@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Light mode rim off iOS: desktop Safari, Chrome and other engines drew black caps on each capsule. They now get white highlights at normal blend; iOS keeps its dodge rim under `@supports (-webkit-touch-callout: none)`. Dark mode is unchanged.
+- **Behaviour change:** the "…" list heads its sections "Places" and "Actions" (was "Menu" and "This page" or "More"), and the sidebar button and sidebar are named "Sidebar" (was "Menu"). Tests that find the button by `aria-label="Menu"` need updating.
+- `nav.duet` carries `data-duet-fit` (`tabs`, `tabs-more`, `sidebar`) and each button `data-duet-control` (`navigation`, `sidebar`, `more`, `actions`, `primary`, `close`), for tests and styles.
+
 ## 0.8.0
 
 Since 0.7.1, Duet shows the largest form of controls that fits, from its own measure of the space; apps carry no device logic.
