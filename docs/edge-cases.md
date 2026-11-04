@@ -848,3 +848,27 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** nothing, this is the site. `tools/media/check-media.mjs` runs after `next build` (`build:site`), requests every page, collects each `src`, `poster`, `srcset` and `<source>` under `/media` plus every path in the clip list, and fails on any response that is not 200 or has the wrong content type.
 - **You do:** record media before the build, never into `public` while a server runs, and rebuild after.
 - **Status:** `e2e/site/media.spec.ts`, `pnpm --filter @duet/site check:media`.
+
+## Sidebar off screen on a scrolled page in Safari's column
+
+- **You see:** on a Duo, in Safari's column, with `<Duet>` given no children (the document scrolls), the Sidebar button works at the top of the page and seems to do nothing once you scroll down.
+- **Cause:** in column mode the overlay sidebar is `position: absolute` at the document top, while the controls follow the scroll. It opened, but above the viewport.
+- **Duet does:** the overlay sidebar rides the same follow as the controls (the `duet-follow` scroll timeline, or the `translateY(scrollY)` fallback), so it opens where the reader is.
+- **You do:** nothing.
+- **Status:** `e2e/site/home.spec.ts` ("in Safari's column", emulated column signals in a 466x678 frame).
+
+## Overlay sidebar pops in and snaps out
+
+- **You see:** the sidebar over the page appears half drawn, and closing it hangs half faded, then vanishes.
+- **Cause:** the closed sidebar rests at 60% opacity, which suits a sidebar the page slides away from, not one drawn over the page. Visibility flips it on and off at 60%.
+- **Duet does:** the overlay sidebar rests at opacity 0, so it fades from and to nothing.
+- **You do:** nothing.
+- **Status:** `e2e/site/home.spec.ts` ("the sidebar fades in and out from nothing").
+
+## Black caps on the column capsule in light mode
+
+- **You see:** on iOS Safari, light theme, a page without children (the document scrolls), the group in Safari's column has black bars along its top and bottom edge.
+- **Cause:** the light rim uses dark sources with `color-dodge`, which brightens the page beneath. The column layer that follows the scroll runs a transform animation, so it is its own compositing layer and the dodge has nothing beneath it: the dark sources paint as they are.
+- **Duet does:** under `@supports (-webkit-touch-callout: none)`, `.duet[data-follow]` takes the white rim at normal blend, the same rim every other engine uses.
+- **You do:** nothing.
+- **Status:** `packages/duet-ui/test/glass.test.mjs` ("on iOS a column layer that follows the scroll drops the dodge"), checked on the Duo e2e 2 simulator.

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode, type RefObject } from "react";
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, columnBand, controlsShown, isSplit, pageInsets, sheetLayout, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
@@ -229,7 +229,7 @@ const useLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
 // window (inline), the document kept scrollX -84 with nothing to scroll, and Safari then painted the pill's glass but
 // not its unselected tab icons (e2e round 4, splitturn-left-to90). So when the mode leaves the column (not while the
 // column is only hidden mid-turn), the scroll goes back to 0, again as Safari restores the old offset on the resize.
-function useColumnLayer(on: boolean, split: boolean, left: boolean, column: number, inColumn: boolean) {
+function useColumnLayer(on: boolean, split: boolean, left: boolean, column: number, inColumn: boolean, rider: RefObject<HTMLElement | null>) {
   const refs = [useRef<HTMLElement>(null), useRef<HTMLElement>(null)] as const;
   const was = useRef(inColumn);
   useEffect(() => {
@@ -247,6 +247,8 @@ function useColumnLayer(on: boolean, split: boolean, left: boolean, column: numb
   useLayout(() => {
     const els = refs.map((r) => r.current).filter((el): el is HTMLElement => !!el);
     if (!on || !els.length) return;
+    // The overlay sidebar is at the document top too: it rides the same follow, or it opened off screen on a scrolled page.
+    if (rider.current) els.push(rider.current);
     const html = document.documentElement.style, prev = html.touchAction;
     html.touchAction = "pan-y"; // the layer widens the document; keep the page from panning sideways
     const root = document.documentElement;
@@ -648,7 +650,8 @@ export function Duet<T extends string = string, U extends string = string>(props
   useEffect(() => { if (!askable) setAsk("closed"); }, [askable]);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
-  const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column");
+  const sidebarEl = useRef<HTMLElement>(null);
+  const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column", sidebarEl);
   const open = more !== "closed" || armed || ask !== "closed";
   useEffect(() => {
     // Any touch outside the chrome closes "…" and disarms the primary, like a native context menu.
@@ -789,7 +792,7 @@ export function Duet<T extends string = string, U extends string = string>(props
   return (
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.menu && p.menu.burger !== false && (
-        <nav className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Sidebar"
+        <nav ref={inner ? undefined : sidebarEl} className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Sidebar"
           style={{ ...theme, width: `calc(${ctx.mode === "column" ? ctx.width : slide}px + ${clear})` }} inert={sidebar !== "open" || undefined}>
           <div className="duet-side-head">Sidebar</div>
           {menuItems.map((m) => (

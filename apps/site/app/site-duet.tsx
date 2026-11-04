@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BookOpen, Download, LayoutGrid, Moon, Play, Sun } from "lucide-react";
-import { Duet, isDuo, readSignals, type DuetMenuItem } from "duet-ui";
+import { Duet, isDuo, readSignals, watchSignals, type DuetMenuItem } from "duet-ui";
 import { GitHub, REPO } from "./site-nav";
 import { useTheme } from "./theme";
 
@@ -22,7 +22,8 @@ export function SiteDuet() {
   const theme = useTheme();
   const [duo, setDuo] = useState(false);
   const [place, setPlace] = useState<Place>("simulator");
-  useEffect(() => setDuo(isDuo(readSignals())), []);
+  // Signals can change after load: a web Duo host sends its own once the page says it is ready.
+  useEffect(() => { const read = () => setDuo(isDuo(readSignals())); read(); return watchSignals(read); }, []);
   // The place follows the section under the top third of the window.
   useEffect(() => {
     if (!duo) return;

@@ -40,7 +40,8 @@
   --duet-badge: #ff3b30; --duet-badge-neutral: #6e6e73; --duet-badge-ink: #fff;
   --duet-glass-lg: transparent; --duet-glass-sharp: contrast(0.25) brightness(1.3925) saturate(2.2); --duet-glass-base: blur(30px) brightness(1.0544) contrast(1.1438) saturate(0.943); --duet-glass-blend: lighten;
   --duet-glass-edge: 0 0 0 0 transparent; --duet-edge-filter: contrast(1.75) brightness(0.505); --duet-glass-inset: 0.6px;
-  --duet-glass-rim-light: inset 0 1px 0.5px rgb(255 255 255 / 0.7), inset 0 -1px 0.5px rgb(255 255 255 / 0.35), inset 0 12px 8px -8px rgb(255 255 255 / 0.16), inset 0 -10px 8px -8px rgb(255 255 255 / 0.08); --duet-rim-blend-light: normal;
+  --duet-glass-rim-white: inset 0 1px 0.5px rgb(255 255 255 / 0.7), inset 0 -1px 0.5px rgb(255 255 255 / 0.35), inset 0 12px 8px -8px rgb(255 255 255 / 0.16), inset 0 -10px 8px -8px rgb(255 255 255 / 0.08);
+  --duet-glass-rim-light: var(--duet-glass-rim-white); --duet-rim-blend-light: normal;
   --duet-glass-rim: var(--duet-glass-rim-light); --duet-rim-filter: none; --duet-rim-blend: var(--duet-rim-blend-light); --duet-rim-band: 16px;
   --duet-shadow-control: 0 8px 15px rgb(0 0 0 / 0.02); --duet-shadow-overlay: 0 8px 48px rgb(0 0 0 / 0.12);
   color: var(--duet-ink);
@@ -91,6 +92,9 @@
     --duet-glass-rim-light: inset 0 2.2px 1.4px -1.5px rgb(72 72 72), inset 0 -2.2px 1.4px -1.5px rgb(48 48 48), inset 0 17px 10px -8px rgb(17 17 17), inset 0 -15px 10px -8px rgb(11 11 11);
     --duet-rim-blend-light: color-dodge;
   }
+  /* A column layer that follows the scroll runs a transform animation, its own compositing layer: the dodge has no
+     page under it to brighten and paints its dark sources as black caps (Duo sim, home page, light). */
+  .duet[data-follow] { --duet-glass-rim-light: var(--duet-glass-rim-white); --duet-rim-blend-light: normal; }
 }
 .duet button, .duet-sidebar button {
   appearance: none; border: 0; background: none; color: inherit; padding: 0; margin: 0; cursor: pointer; font: inherit;
@@ -250,6 +254,8 @@ html[data-duet-mode="column"] .duet-sidebar { position: absolute; height: var(--
 html[data-duet-mode="column"] .duet-sidebar[data-open] { box-shadow: 0 240px 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 0 0 var(--duet-solid), var(--duet-sidebar-inset, 0px) 240px 0 var(--duet-solid); }
 /* No inner scroller to slide: the sidebar comes over the page instead, under the controls. */
 .duet-sidebar[data-overlay] { z-index: 49; box-shadow: 0 0 40px rgba(0, 0, 0, 0.2); }
+/* Over the page it fades from and to nothing: a 60% rest suits a sidebar the page uncovers, here it pops in and snaps out. */
+.duet-sidebar[data-overlay]:not([data-open]) { opacity: 0; }
 .duet-sidebar[data-open] { opacity: 1; translate: 0 0; visibility: visible; transition: translate var(--duet-slide-ms) var(--duet-slide), opacity 300ms ease; }
 .duet-side-head { font: 600 13px/1 -apple-system, system-ui, sans-serif; color: var(--duet-dim); padding: 4px 10px 8px; text-transform: uppercase; letter-spacing: 0.04em; }
 .duet-sidebar .duet-side-row { justify-content: flex-start; gap: 12px; width: 100%; height: 44px; padding: 0 10px; border-radius: 12px; text-align: left; font-size: 17px; white-space: nowrap; position: relative; }
@@ -387,7 +393,7 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 /* No children (no .duet-scroller): the document scrolls, and the layer rides it on a scroll timeline that Safari
    runs with the scroll itself, so it holds through momentum and smooth scrollTo/scrollIntoView (chrome.tsx sets
    data-follow and --duet-scroll-max, the document's scroll range, or a transform where this is unsupported). */
-.duet[data-mode="column"][data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
+.duet[data-mode="column"][data-follow], html[data-duet-mode="column"] .duet-sidebar[data-follow] { animation: duet-follow linear both; animation-timeline: scroll(root block); }
 @keyframes duet-follow { from { transform: translateY(0); } to { transform: translateY(var(--duet-scroll-max, 0px)); } }
 /* The rubber band at either end moves the document past its scroll range, where the timeline (clamped to it) cannot
    follow, so the layer rode the bounce: up to 160pt over Safari's own column buttons, or out of the column (#76). The

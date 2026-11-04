@@ -5,6 +5,8 @@
 - Light mode rim off iOS: desktop Safari, Chrome and other engines drew black caps on each capsule. They now get white highlights at normal blend; iOS keeps its dodge rim under `@supports (-webkit-touch-callout: none)`. Dark mode is unchanged.
 - **Behaviour change:** the "…" list heads its sections "Places" and "Actions" (was "Menu" and "This page" or "More"), and the sidebar button and sidebar are named "Sidebar" (was "Menu"). Tests that find the button by `aria-label="Menu"` need updating.
 - `nav.duet` carries `data-duet-fit` (`tabs`, `tabs-more`, `sidebar`) and each button `data-duet-control` (`navigation`, `sidebar`, `more`, `actions`, `primary`, `close`), for tests and styles.
+- Safari's column, page without children (the document scrolls): the sidebar opened at the document top, off screen once the page was scrolled, so the Sidebar button seemed dead below the first screen. It now rides the same scroll follow as the controls. And over the page it fades from and to nothing; it rested at 60% opacity, so it popped in half drawn and snapped out from half faded.
+- Light mode on iOS, a page whose document scrolls: the column capsule showed black caps top and bottom. The layer that follows the scroll is its own compositing layer, so the dodge rim had no page under it to brighten. That layer now takes the white rim at normal blend.
 
 ## 0.8.0
 

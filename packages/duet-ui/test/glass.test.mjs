@@ -35,3 +35,11 @@ test("the light rim blends normally off iOS, and only iOS keeps the colour dodge
   assert.match(ios, /--duet-rim-blend-light: color-dodge/);
   assert.equal(count(css, "color-dodge;"), 1, "the dodge lives only in the iOS block");
 });
+
+test("on iOS a column layer that follows the scroll drops the dodge for the white rim", () => {
+  const ios = css.match(/@supports \(-webkit-touch-callout: none\) \{[\s\S]*?\n\}/)?.[0];
+  const follow = ios?.match(/\.duet\[data-follow\] \{([^}]*)\}/)?.[1];
+  assert.ok(follow, ".duet[data-follow] rule in the iOS block");
+  assert.match(follow, /--duet-rim-blend-light: normal/);
+  assert.match(follow, /--duet-glass-rim-light: var\(--duet-glass-rim-white\)/);
+});
