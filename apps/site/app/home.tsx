@@ -36,9 +36,9 @@ const EXAMPLES = [
 ];
 /** Our own apps on the Duo, on demo or mock data. */
 const APPS = [
-  { name: "regtail", title: "RegTail", text: "Car checks. Open, the report's sections are tabs." },
-  { name: "dashboard", title: "Dashboard", text: "Server monitoring. Its five pages fit as tabs." },
-  { name: "wealth", title: "Wealth", text: "Personal finance. Closed, nine sections go in the Sidebar." },
+  { name: "regtail", title: "RegTail", data: "Demo data", text: "Car checks. Open, the report's sections are tabs." },
+  { name: "dashboard", title: "Dashboard", data: "Mock data", text: "Server monitoring. Its five pages fit as tabs." },
+  { name: "wealth", title: "Wealth", data: "Mock data", text: "Personal finance. Closed, nine sections go in the Sidebar." },
 ];
 /** Where Duet puts its controls. */
 const MODES = [
@@ -82,8 +82,8 @@ export function Home({ installs, clips }: { installs: InstallStats | null; clips
           <div className="cards">
             {APPS.map((a) => (
               <div key={a.name} className="card">
-                <LoopVideo name={`app-${a.name}`} available={!!clips[`app-${a.name}`]} still={`/media/app-${a.name}.webp`} label={`${a.title} on the iPhone Duo`} />
-                <h3 className="card-h">{a.title}</h3>
+                <LoopVideo name={`app-${a.name}`} available={!!clips[`app-${a.name}`]} label={`${a.title} on the iPhone Duo`} />
+                <h3 className="card-h">{a.title}<span className="card-k">{a.data}</span></h3>
                 <p className="card-p">{a.text}</p>
               </div>
             ))}

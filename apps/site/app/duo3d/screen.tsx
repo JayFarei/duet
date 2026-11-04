@@ -69,7 +69,7 @@ export function Screen() {
     return () => removeEventListener("message", on);
   }, [sync?.src]);
 
-  // Duet off and on: the page swaps layouts itself, morphing each control (skeleton-app.tsx). A Moment's selected
+  // Duet off and on: the page swaps layouts itself, morphing each control (examples/inbox/app.tsx). A Moment's selected
   // place rides along, and whether to open the More list.
   const selected = sync?.selected;
   useEffect(() => {

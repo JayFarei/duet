@@ -9,6 +9,16 @@ import { CLIPS, type ClipPosture, type Press } from "./clips";
 // This page's displays, told apart from another tab's.
 const ID = Math.random().toString(36).slice(2);
 
+/** The recorder's marks: with `?mark=<url>` on a loopback host (tools/media/record.mjs listens there), a clip posts
+ *  its start, its end and each measure of what Duet drew, stamped with the wall clock, so a screen recording made
+ *  outside the browser (the iOS simulator) can be trimmed to the clip and its cues timed. Logged to the console too. */
+let markTo: string | null = null;
+function mark(kind: string, data: Record<string, unknown>) {
+  const body = JSON.stringify({ kind, at: Date.now(), ...data });
+  if (kind !== "measure") console.log(`duet:${kind}`, body);
+  if (markTo) fetch(markTo, { method: "POST", mode: "no-cors", body, keepalive: true }).catch(() => {});
+}
+
 const SWAP = 450; // the interface turns upright this far into the device's turn
 
 /** One-tap views of the rule Duet follows with the Inbox example's nine folders: the expected controls are the docs'
@@ -253,20 +263,22 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
       takeRef.current(film.posture);
       timers.push(setTimeout(() => {
         const t0 = performance.now();
-        console.log("duet:clip-start", JSON.stringify({ clip, t: 0, at: Date.now() }));
+        mark("clip-start", { clip, t: 0 });
         for (const st of film.steps) timers.push(setTimeout(() => {
           if (st.posture) takeRef.current(st.posture);
           if (st.duet !== undefined) setDuet(st.duet);
           if (st.src) setSite(st.src);
           if (st.press) pressIt(st.press);
         }, st.at));
-        timers.push(setTimeout(() => console.log("duet:clip-end", JSON.stringify({ clip, t: Math.round(performance.now() - t0), at: Date.now() })), film.length));
+        timers.push(setTimeout(() => mark("clip-end", { clip, t: Math.round(performance.now() - t0) }), film.length));
       }, 1200));
     };
     const hi = (e: MessageEvent) => { if (e.source === duo.current?.contentWindow && e.data?.ready) start(); };
+    const measured = (e: Event) => mark("measure", { clip, ...(e as CustomEvent<Record<string, unknown>>).detail });
     addEventListener("message", hi);
+    addEventListener("duet:measure", measured);
     timers.push(setTimeout(start, 8000));
-    return () => { removeEventListener("message", hi); timers.forEach(clearTimeout); };
+    return () => { removeEventListener("message", hi); removeEventListener("duet:measure", measured); timers.forEach(clearTimeout); };
   }, [clip]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -475,10 +487,15 @@ function Square42({ label, on, off, onClick, children }: { label: string; on?: b
 }
 
 
-/** /duo3d: the card, or with `?clip=<name>&theme=light|dark&chrome=0` one clip played once for the recorder. */
+/** /duo3d: the card, or with `?clip=<name>&theme=light|dark&chrome=0[&mark=<loopback url>]` one clip played once
+ *  for the recorder. */
 export function Duo3DPage() {
   const q = useSyncExternalStore(() => () => {}, () => location.search, () => null);
-  const p = new URLSearchParams(q ?? ""), clip = p.get("clip"), theme = p.get("theme");
+  const p = new URLSearchParams(q ?? ""), clip = p.get("clip"), theme = p.get("theme"), to = p.get("mark");
+  try { if (to && /^(127\.0\.0\.1|localhost)$/.test(new URL(to).hostname)) markTo = to; } catch { /* not a URL */ }
+  // A clip's theme is the site's pick too, so the Duo's frames and the pages on its screens (each its own document,
+  // light by the iframes' color-scheme) draw in it. Set before they load: they read it once, then on storage events.
+  if (clip && (theme === "light" || theme === "dark")) try { localStorage.setItem("duet-theme", theme); } catch { /* storage blocked */ }
   useEffect(() => {
     if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-lg-theme", theme);
   }, [theme]);

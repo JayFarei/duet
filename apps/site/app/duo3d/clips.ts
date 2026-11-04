@@ -6,10 +6,11 @@ export type ClipPosture = "closed" | "open" | "laptop" | "sideways";
 /** A control to press: a `data-duet-control` kind (the first one), or a CSS selector in the page. */
 export type Press = ({ id: string } | { selector: string }) & { retry?: boolean };
 export interface Step { at: number; posture?: ClipPosture; src?: string; duet?: boolean; press?: Press }
-export interface Clip { src: string; posture: ClipPosture; app?: "safari" | "home" | "sheet"; steps: Step[]; length: number }
+/** upstream: an app clip's mock server. tools/media/record.mjs serves it and the site under one loopback origin, so `src` is
+ *  that app's own path; the clip plays only there, never on the site itself. */
+export interface Clip { src: string; posture: ClipPosture; app?: "safari" | "home" | "sheet"; steps: Step[]; length: number; upstream?: string }
 
 const INBOX = "/examples/inbox?plain", CHECKOUT = "/examples/checkout?plain", READER = "/examples/reader?plain";
-const web = (url: string) => `/duo3d/web?url=${encodeURIComponent(url)}`;
 const cta: Press = { selector: ".duet-row[data-cta]" };
 
 export const CLIPS: Record<string, Clip> = {
@@ -24,14 +25,14 @@ export const CLIPS: Record<string, Clip> = {
   "primary-folded": { src: CHECKOUT, posture: "sideways", steps: [{ at: 1500, press: { id: "more" } }, { at: 2700, press: cta }, { at: 3700, press: cta }], length: 5500 },
   close: { src: INBOX, posture: "closed", steps: [{ at: 1500, press: { selector: '[data-testid="inbox-row"]' } }, { at: 3200, press: { id: "close" } }], length: 5000 },
   "pane-bar": { src: READER, posture: "open", steps: [{ at: 1500, press: { selector: '.duet-pane-bar [aria-label="Full screen"]' } }, { at: 3000, press: { selector: '.duet-pane-bar [aria-label="Exit full screen"]' } }], length: 4500 },
-  "mode-strip": { src: INBOX, posture: "closed", app: "home", steps: [], length: 3500 },
-  "mode-column": { src: INBOX, posture: "closed", steps: [], length: 3500 },
-  "mode-inline": { src: INBOX, posture: "closed", app: "sheet", steps: [], length: 3500 },
+  "mode-strip": { src: INBOX, posture: "closed", app: "home", steps: [], length: 4500 },
+  "mode-column": { src: INBOX, posture: "closed", steps: [], length: 4500 },
+  "mode-inline": { src: INBOX, posture: "closed", app: "sheet", steps: [], length: 4500 },
   "example-inbox": { src: INBOX, posture: "closed", steps: [{ at: 1500, posture: "open" }, { at: 3500, posture: "laptop" }, { at: 5500, posture: "closed" }], length: 7500 },
   "example-checkout": { src: CHECKOUT, posture: "open", steps: [{ at: 1500, press: { id: "primary" } }, { at: 3500, posture: "sideways" }], length: 6000 },
   "example-reader": { src: READER, posture: "closed", steps: [{ at: 1500, posture: "open" }, { at: 3500, press: { selector: '.duet-pane-bar [aria-label="Full screen"]' } }], length: 6000 },
-  // Our own apps, on their mock servers only (synthetic data): the recorder checks they answer first.
-  "app-regtail": { src: web("http://127.0.0.1:8795/"), posture: "open", steps: [], length: 4000 },
-  "app-dashboard": { src: web("http://127.0.0.1:3591/"), posture: "open", steps: [], length: 4000 },
-  "app-wealth": { src: web("http://127.0.0.1:8292/"), posture: "open", steps: [], length: 4000 },
+  // Our own apps, on their local mock servers only (synthetic data): the recorder checks they answer first.
+  "app-regtail": { src: "/app", upstream: "http://127.0.0.1:8795", posture: "open", steps: [{ at: 2500, posture: "closed" }], length: 5500 },
+  "app-dashboard": { src: "/", upstream: "http://127.0.0.1:3591", posture: "open", steps: [{ at: 2500, posture: "closed" }], length: 5500 },
+  "app-wealth": { src: "/", upstream: "http://127.0.0.1:8292", posture: "open", steps: [{ at: 2500, posture: "closed" }], length: 5500 },
 };

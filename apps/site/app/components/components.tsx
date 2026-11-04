@@ -94,7 +94,7 @@ function Section({ noun, prev, next, clips }: { noun: Noun; prev?: Noun; next?: 
       </div>
       <div className="cmp-frame">
         {view === "preview"
-          ? <><LoopVideo name={v.clip} available={!!clips[v.clip]} label={`${noun.name}: ${v.label}, on the iPhone Duo`} /><p className="cmp-cue">{v.cue}</p></>
+          ? <><LoopVideo name={v.clip} available={!!clips[v.clip]} counter label={`${noun.name}: ${v.label}, on the iPhone Duo`} /><p className="cmp-cue">{v.cue}</p></>
           : <pre className="code"><code dangerouslySetInnerHTML={{ __html: highlight(v.code) }} /></pre>}
       </div>
       <h3>Props</h3>

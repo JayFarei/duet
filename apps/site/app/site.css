@@ -229,13 +229,14 @@ html[data-duet-close] .sheet-x { display: none; }
 @media (max-width: 560px) { .mode { grid-template-columns: minmax(0, 1fr); } }
 .mode-k { margin: 0 6px; color: var(--dim); font: 600 13px/1.2 -apple-system, system-ui; }
 .mode .card-h { margin-top: 4px; }
+.card-k { margin-left: auto; padding: 4px 9px; border-radius: 99px; box-shadow: inset 0 0 0 1px var(--line); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; letter-spacing: 0; }
 
 /* A recorded loop (loop-video.tsx): poster first, or a plain box until the clip is recorded. */
-.loop { position: relative; aspect-ratio: 4 / 5; overflow: hidden; border-radius: 16px; background: var(--bg); }
-.loop video, .loop .loop-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.loop { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; background: var(--bg); }
+.loop video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .loop:not([data-ready]) video { visibility: hidden; }
-.loop:not([data-ready]):not(:has(.loop-still))::after { content: ""; position: absolute; inset: 22% 30%; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--line); }
-.loop-still { padding: 16px; box-sizing: border-box; }
+.loop:not([data-ready])::after { content: ""; position: absolute; inset: 22% 30%; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--line); }
+.loop-count { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 4px 10px; border-radius: 99px; background: var(--card); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; font-variant-numeric: tabular-nums; }
 
 /* /components: the nouns down a sidebar (a row of chips on a phone), each with Preview | Code and its variants. */
 .cmp { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 40px; padding-top: 24px; }
@@ -252,7 +253,7 @@ html[data-duet-close] .sheet-x { display: none; }
 .seg button { height: 32px; padding: 0 14px; border: 0; border-radius: 99px; background: none; color: var(--ink); font: 500 14px/1 -apple-system, system-ui; cursor: pointer; white-space: nowrap; }
 .seg button[aria-selected="true"] { background: color-mix(in srgb, var(--ink), transparent 88%); }
 .cmp-frame { margin-top: 12px; border-radius: 22px; background: var(--card); padding: 12px; }
-.cmp-frame .loop { max-width: 420px; margin: 0 auto; }
+.cmp-frame .loop { max-width: 640px; margin: 0 auto; }
 .cmp-frame .code { margin: 0; background: var(--code); border-radius: 14px; }
 .cmp-cue { margin: 10px 4px 0; color: var(--dim); font: 500 13px/1.4 ui-monospace, "SF Mono", Menlo, monospace; text-align: center; }
 .cmp-sec h3 { margin: 24px 0 8px; font: 600 15px/1.2 -apple-system, system-ui; }

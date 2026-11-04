@@ -16,8 +16,10 @@ const onResize = (f: () => void) => { const m = matchMedia(WIDE); m.addEventList
 
 /** One example: its app live on the 3D Duo with a posture picker, its single source file, and a link to the bare app.
  *  `?plain` renders the app alone (the stage's screens load that, and so does "Open in new tab"). Below 768px the
- *  block plays its recorded loop instead of the stage. */
-export function Block({ name, title, intro, code, app, loop }: { name: string; title: string; intro: ReactNode; code: string; app: ReactNode; loop: boolean }) {
+ *  block plays its recorded loop instead of the stage. Under it, the other examples' loops link to them. */
+const OTHERS = [["inbox", "Inbox"], ["checkout", "Checkout"], ["reader", "Reader"]] as const;
+export function Block({ name, title, intro, code, app, loops }: { name: string; title: string; intro: ReactNode; code: string; app: ReactNode; loops: Record<string, boolean> }) {
+  const loop = !!loops[name];
   const plain = useSyncExternalStore(() => () => {}, plainNow, () => false);
   const wide = useSyncExternalStore(onResize, wideNow, () => null);
   const [posture, setPosture] = useState<ClipPosture>("closed");
@@ -50,6 +52,15 @@ export function Block({ name, title, intro, code, app, loop }: { name: string; t
           : wide === false && loop ? <LoopVideo className="ex-loop" name={`example-${name}`} available label={`${title} on the iPhone Duo`} />
           : wide === false ? <div className="ex-card"><p>{title} runs on the iPhone Duo. Open it on its own to try it here.</p><a href={href}>Open</a></div>
           : <div className="ex-wait" />}
+      </div>
+      <h2 className="ex-more-h">Other examples</h2>
+      <div className="ex-more">
+        {OTHERS.filter(([id]) => id !== name).map(([id, h]) => (
+          <a key={id} className="ex-item" href={`/examples/${id}`}>
+            <LoopVideo name={`example-${id}`} available={!!loops[id]} label={`${h} on the iPhone Duo`} />
+            <h2>{h}</h2>
+          </a>
+        ))}
       </div>
     </div>
   );

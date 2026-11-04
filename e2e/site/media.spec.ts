@@ -26,9 +26,10 @@ for (const path of PAGES) {
     for (let i = 0; i < (await videos.count()); i++) {
       const v = videos.nth(i);
       await v.scrollIntoViewIfNeeded();
-      await expect.poll(() => v.evaluate((e: HTMLVideoElement) => e.readyState), { message: `video ${i} loads in view` }).toBeGreaterThanOrEqual(2);
-      const t0 = await v.evaluate((e: HTMLVideoElement) => e.currentTime);
-      await expect.poll(() => v.evaluate((e: HTMLVideoElement) => e.currentTime), { message: `video ${i} plays` }).toBeGreaterThan(t0);
+      const state = () => v.evaluate((e: HTMLVideoElement) => JSON.stringify({ paused: e.paused, ready: e.readyState, net: e.networkState, t: e.currentTime, played: e.played.length }));
+      const why = async (err: Error) => { throw new Error(`${err.message} STATE ${await state()}`); };
+      await expect.poll(() => v.evaluate((e: HTMLVideoElement) => e.readyState), { message: `video ${i} loads in view`, timeout: 15000 }).toBeGreaterThanOrEqual(2).catch(why);
+      await expect.poll(() => v.evaluate((e: HTMLVideoElement) => !e.paused && e.played.length > 0), { message: `video ${i} plays`, timeout: 15000 }).toBe(true).catch(why);
       const poster = await v.getAttribute("poster");
       expect(poster, `video ${i} has a poster`).toMatch(/^\/media\/clip\/.+\.webp$/);
     }

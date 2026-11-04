@@ -36,13 +36,13 @@ function routes() {
     .sort();
 }
 
-/** /media paths and clip names written in app/clips.ts, the list the tour and the recorder share. */
+/** /media paths and clip names written in app/duo3d/clips.ts, the list the stage and the recorder share. */
 function clipPaths() {
-  const file = join(SITE, "app/clips.ts");
+  const file = join(SITE, "app/duo3d/clips.ts");
   if (!existsSync(file)) return [];
   const src = readFileSync(file, "utf8");
   const literal = [...src.matchAll(/["'`](\/media\/[^"'`$\s]+)["'`]/g)].map((m) => m[1]);
-  const names = [...src.matchAll(/\bname:\s*["']([a-z0-9-]+)["']/g)].map((m) => m[1]);
+  const names = [...src.matchAll(/^\s+"?([a-z0-9-]+)"?: \{ src:/gm)].map((m) => m[1]);
   return [...literal, ...names.flatMap((n) => THEMES.flatMap((t) => CLIP_FILES.map((x) => `/media/clip/${n}-${t}.${x}`)))];
 }
 
