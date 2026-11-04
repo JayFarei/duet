@@ -7,6 +7,8 @@ import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
 import { Duo } from "./duo/duo";
+import { ExDemo } from "./ex-demo";
+import { SiteDuet } from "./site-duet";
 import { GitHub, REPO, SiteNav } from "./site-nav";
 
 const DOC = `${REPO}/blob/main/docs`;
@@ -55,6 +57,7 @@ export function Home({ installs, sources }: { installs: InstallStats | null; sou
   return (
     <>
       <SiteNav />
+      <SiteDuet />
       <main className="home">
         <header className="intro wrap" data-testid="hero">
           <h1 className="display">Native side controls for your web app on the <em>iPhone Duo.</em></h1>
@@ -86,6 +89,7 @@ export function Home({ installs, sources }: { installs: InstallStats | null; sou
           <div className="exs">
             {EXAMPLES.map((e) => (
               <article key={e.name} className="card ex">
+                <ExDemo name={e.name} />
                 <h3 className="card-h">{e.title}</h3>
                 <p className="card-p">{e.text}</p>
                 <div className="ex-acts">

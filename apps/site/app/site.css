@@ -218,3 +218,74 @@ html[data-duet-close] .sheet-x { display: none; }
 .loop:not([data-ready])::after { content: ""; position: absolute; inset: 22% 30%; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--line); }
 .loop-play { position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 99px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .loop-count { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 4px 10px; border-radius: 99px; background: var(--card); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; font-variant-numeric: tabular-nums; }
+
+/* Example demos (ex-demo.tsx): a page, the controls Duet draws beside it, and what they do, looping. Like anime.js's
+ * documentation previews: a small panel, its label in the corner, the moving part in the middle. */
+.exd { position: relative; height: 184px; overflow: hidden; border-radius: 16px; background: var(--bg); color: var(--ink); --exd-cta: var(--cta); }
+.exd-label, .exd-cap { position: absolute; top: 12px; font: 600 11px/1 -apple-system, system-ui; letter-spacing: 0.04em; }
+.exd-label { left: 14px; color: var(--dim); text-transform: uppercase; }
+.exd-cap { right: 14px; }
+.exd-page { position: absolute; top: 36px; bottom: 14px; left: 14px; right: 80px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
+.exd-page::before { content: ""; position: absolute; top: 14px; left: 14px; width: 58%; height: 48px; border-radius: 3px; background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
+.exd-group { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px; border-radius: 99px; background: var(--wd-glass); box-shadow: 0 0 0 0.5px var(--line), 0 4px 14px rgb(0 0 0 / 0.08); }
+.exd-group > svg { position: relative; display: block; }
+.exd-one { padding: 9px; }
+.exd-step { position: absolute; top: 36px; bottom: 14px; right: 14px; width: 52px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+
+/* Inbox: Tabs while all fit, then Tabs + More, then one Sidebar button. Three states, three seconds each. */
+.exd-s2, .exd-s3 { opacity: 0; }
+[data-demo="inbox"] .exd-s1, [data-demo="inbox"] .exd-s2, [data-demo="inbox"] .exd-s3 { animation: exd-phase 9s ease both infinite; }
+[data-demo="inbox"] .exd-s2 { animation-delay: 3s; }
+[data-demo="inbox"] .exd-s3 { animation-delay: 6s; }
+@keyframes exd-phase { 0% { opacity: 0; transform: scale(0.8); filter: blur(4px); } 5%, 29% { opacity: 1; transform: none; filter: none; } 33%, 100% { opacity: 0; transform: scale(0.8); filter: blur(4px); } }
+.exd-sel { position: absolute; top: 3px; left: 50%; width: 22px; height: 22px; margin-left: -11px; border-radius: 99px; background: color-mix(in srgb, var(--exd-cta) 24%, transparent); animation: exd-sel 9s cubic-bezier(0.3, 1.4, 0.5, 1) infinite; }
+@keyframes exd-sel { 0%, 9% { translate: 0 0; } 13%, 20% { translate: 0 19px; } 24%, 100% { translate: 0 38px; } }
+
+/* Checkout: Pay is tapped, asks to confirm, and turns into a check. */
+.exd-pay { position: absolute; top: calc(50% + 11px); right: 23px; height: 34px; width: 34px; translate: 0 -50%; overflow: hidden; border-radius: 99px; background: var(--exd-cta); color: #fff; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); animation: exd-pay 6s ease infinite; }
+.exd-pay > span { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; }
+.exd-pay-icon, .exd-pay-done { right: 0; width: 34px; justify-content: center; }
+.exd-pay-text { left: 14px; font: 600 13px/1 -apple-system, system-ui; white-space: nowrap; opacity: 0; animation: exd-pay-text 6s ease infinite; }
+.exd-pay-icon { animation: exd-pay-icon 6s ease infinite; }
+.exd-pay-done { opacity: 0; animation: exd-pay-done 6s ease infinite; }
+@keyframes exd-pay { 0%, 15% { width: 34px; scale: 1; background: var(--exd-cta); } 18% { scale: 0.9; } 21% { scale: 1; width: 34px; } 30%, 55% { width: 104px; scale: 1; background: var(--exd-cta); } 58% { scale: 0.94; } 61% { scale: 1; width: 104px; } 67%, 90% { width: 34px; background: #34c759; } 97%, 100% { width: 34px; background: var(--exd-cta); } }
+@keyframes exd-pay-icon { 0%, 21% { opacity: 1; } 25%, 92% { opacity: 0; } 98%, 100% { opacity: 1; } }
+@keyframes exd-pay-text { 0%, 24% { opacity: 0; } 30%, 56% { opacity: 1; } 60%, 100% { opacity: 0; } }
+@keyframes exd-pay-done { 0%, 62% { opacity: 0; } 67%, 88% { opacity: 1; } 93%, 100% { opacity: 0; } }
+.exd-tap { position: absolute; top: calc(50% + 11px); right: 23px; width: 34px; height: 34px; translate: 0 -50%; border-radius: 99px; box-shadow: 0 0 0 2px var(--ink); opacity: 0; pointer-events: none; animation: exd-tap 6s ease-out infinite; }
+@keyframes exd-tap { 0%, 14% { opacity: 0; scale: 0.5; } 17% { opacity: 0.45; scale: 0.8; } 24% { opacity: 0; scale: 1.5; } 53% { opacity: 0; scale: 0.5; } 56% { opacity: 0.45; scale: 0.8; } 63%, 100% { opacity: 0; scale: 1.5; } }
+.exd-c2, .exd-c3 { opacity: 0; }
+[data-demo="checkout"] .exd-c1 { animation: exd-c1 6s ease infinite; }
+[data-demo="checkout"] .exd-c2 { animation: exd-c2 6s ease infinite; }
+[data-demo="checkout"] .exd-c3 { animation: exd-c3 6s ease infinite; }
+@keyframes exd-c1 { 0%, 22% { opacity: 1; } 26%, 96% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes exd-c2 { 0%, 24% { opacity: 0; } 28%, 58% { opacity: 1; } 62%, 100% { opacity: 0; } }
+@keyframes exd-c3 { 0%, 61% { opacity: 0; } 65%, 90% { opacity: 1; } 95%, 100% { opacity: 0; } }
+
+/* Reader: a second pane opens with its Pane bar beside it, goes full screen, and closes. */
+.exd-pane { position: absolute; top: 36px; bottom: 14px; right: 80px; width: calc((100% - 94px) / 2); border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line), -6px 0 18px rgb(0 0 0 / 0.1); animation: exd-pane 8s cubic-bezier(0.3, 1.1, 0.5, 1) infinite; }
+.exd-pane::before { content: ""; position: absolute; top: 14px; left: 12px; right: 12px; height: 34px; border-radius: 3px; background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
+@keyframes exd-pane { 0%, 8% { opacity: 0; translate: 24px 0; width: calc((100% - 94px) / 2); } 16%, 40% { opacity: 1; translate: 0 0; width: calc((100% - 94px) / 2); } 50%, 70% { opacity: 1; width: calc(100% - 94px); } 78% { opacity: 1; translate: 0 0; width: calc((100% - 94px) / 2); } 86%, 100% { opacity: 0; translate: 24px 0; width: calc((100% - 94px) / 2); } }
+.exd-panebar { position: absolute; top: calc(50% + 11px); right: 23px; translate: 0 -50%; padding: 9px; gap: 12px; animation: exd-panebar 8s ease infinite; }
+.exd-panebar > svg { border-radius: 99px; outline: 0 solid transparent; animation: exd-key 8s ease infinite; }
+.exd-panebar > svg:last-child { animation-name: exd-key-full; }
+@keyframes exd-panebar { 0%, 10% { opacity: 0; scale: 0.8; } 16%, 80% { opacity: 1; scale: 1; } 86%, 100% { opacity: 0; scale: 0.8; } }
+@keyframes exd-key { 0%, 72% { box-shadow: 0 0 0 0 transparent; } 75% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ink) 18%, transparent); } 80%, 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes exd-key-full { 0%, 41% { box-shadow: 0 0 0 0 transparent; } 44% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ink) 18%, transparent); } 49%, 100% { box-shadow: 0 0 0 0 transparent; } }
+.exd-r2, .exd-r3 { opacity: 0; }
+[data-demo="reader"] .exd-r1 { animation: exd-r1 8s ease infinite; }
+[data-demo="reader"] .exd-r2 { animation: exd-r2 8s ease infinite; }
+[data-demo="reader"] .exd-r3 { animation: exd-r3 8s ease infinite; }
+@keyframes exd-r1 { 0%, 40% { opacity: 1; } 44%, 100% { opacity: 0; } }
+@keyframes exd-r2 { 0%, 42% { opacity: 0; } 46%, 70% { opacity: 1; } 74%, 100% { opacity: 0; } }
+@keyframes exd-r3 { 0%, 72% { opacity: 0; } 76%, 94% { opacity: 1; } 98%, 100% { opacity: 0; } }
+
+/* Still for readers who ask for less motion: the first state of each. */
+@media (prefers-reduced-motion: reduce) { .exd *, .exd *::before { animation: none !important; } }
+
+/* On a Duo the home page wears Duet's controls (site-duet.tsx): the top bar keeps the name only, and in inline mode
+ * the page keeps clear of the controls on its edge. */
+html[data-duet-mode] .nav-links, html[data-duet-mode] .nav-end { display: none; }
+html[data-duet-mode] .nav { justify-content: center; }
+.nav, .wrap, .stage { padding-left: calc(20px + var(--duet-inset-left, 0px)); padding-right: calc(20px + var(--duet-inset-right, 0px)); }
+@media (max-width: 760px) { .stage { padding-left: calc(16px + var(--duet-inset-left, 0px)); padding-right: calc(16px + var(--duet-inset-right, 0px)); } }

@@ -8,7 +8,8 @@ Public pages: `/`, `/examples` (index), `/examples/inbox`, `/examples/checkout`,
 
 | Part | Selector | What it does |
 |---|---|---|
-| Top bar | `header.nav` | Duet mark, links to How it works (`/#how`), Examples (`/#examples`) and Install (`/#install`), GitHub. Plain links, no Duet controls. |
+| Top bar | `header.nav` | Duet mark, links to How it works (`/#how`), Examples (`/#examples`) and Install (`/#install`), GitHub. Plain links off a Duo. On a Duo (`html[data-duet-mode]`) the links, GitHub and the theme toggle hide and the bar keeps the centred mark. |
+| Duo controls | `apps/site/app/site-duet.tsx`, `[data-duet-control]` | Only when `isDuo(readSignals())`. Duet with no children: places are the sections (Try it, How it works, Examples, Install), following the section under the top third and scrolling to it on select; actions are GitHub and the theme. Off a Duo it renders nothing. |
 | Theme toggle | `header.nav button[aria-label="Dark mode"]` (or `"Light mode"`) | Flips light and dark, stored in `localStorage` `duet-theme`. The simulator's screens follow. |
 
 ## Home page (`apps/site/app/home.tsx`)
@@ -20,7 +21,7 @@ One short page, four sections in order under an intro (`main > section[id]`): th
 | Intro | `[data-testid="hero"]` | Title, lede, install line, copy prompt for coding agents, version and install stats. |
 | Simulator | `#simulator`, `[data-testid="simulator"]` | The live 3D Duo (`Duo embed src="/skeleton"`) with the skeleton site in Safari and its own controls, as on prod: turns, fold and lock, then Device, Surface, Layout and System UI, then With or Without Duet. No presets. The device box keeps one height (`min(width × 0.85, 600, 62% of the window)`), so the controls under it hold still as the posture changes. It stops drawing off screen (`window.__duoFrames` stops). Without WebGL 2 it falls back to the flat WebDuo (`[data-testid="web-duo"]`). |
 | How it works | `#how` | Four steps (`ol.how`): wrap your app, Duet measures, it draws what fits, it steps aside. Then the glossary `table.glossary`, one row per noun in glossary order. |
-| Examples | `#examples article` | One card per example. Open goes to `/examples/<name>`, Show code (`details.ex-src`) opens its one source file. |
+| Examples | `#examples article` | One card per example, led by a looping demo (`.exd[data-demo]`, `apps/site/app/ex-demo.tsx`, keyframes in `site.css` "Example demos") of what its controls do: inbox Tabs to Tabs + More to Sidebar, checkout Pay to Confirm to Paid, reader Pane bar Full screen and Close. Still under reduced motion. Open goes to `/examples/<name>`, Show code (`details.ex-src`) opens its one source file. |
 | Install | `#install` | Install line, copy prompt, the usage code, links to the API reference, How Duet decides and GitHub. |
 
 ## Examples (`apps/site/app/examples/`)
