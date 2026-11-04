@@ -1,6 +1,6 @@
 # Duet
 
-Native-feeling controls for React web apps on the foldable iPhone (the "iPhone Duo"). Your page and its control strip, playing together.
+Native-feeling controls for React web apps on the foldable iPhone (the "iPhone Duo"). Your page reports its places, Duet draws the largest controls that fit.
 
 ```sh
 npm i duet-ui
@@ -8,7 +8,7 @@ npm i duet-ui
 
 | Strip | Column | Inline |
 | --- | --- | --- |
-| ![Strip: a Home Screen app with the burger menu](docs/media/strip.webp) | ![Column: Safari's empty column holds the controls, burger and "…"](docs/media/column.webp) | ![Inline: unfolded, the strip drags to either side](docs/media/inline-drag.webp) |
+| ![Strip: a Home Screen app with the Sidebar button](docs/media/strip.webp) | ![Column: Safari's empty column holds the controls, Sidebar and More](docs/media/column.webp) | ![Inline: unfolded, the strip drags to either side](docs/media/inline-drag.webp) |
 
 Recorded on the iPhone Duo simulator, framed by [`tools/media`](tools/media).
 
@@ -16,7 +16,7 @@ Recorded on the iPhone Duo simulator, framed by [`tools/media`](tools/media).
 
 On the closed Duo, iOS puts navigation in a vertical strip at the screen's edge, not a bottom tab bar. A Home Screen web app gets that strip as a safe-area inset. In a Safari tab, Safari owns the strip for its own buttons and leaves part of it empty. A web page that ignores this ends up with its own bar fighting Safari's, or its buttons under the camera.
 
-`<Duet>` draws your menu (a burger opening a sidebar), actions and primary action where a native app would, picks one of three layouts (`strip`, `column`, `inline`) from the window geometry, keeps every control inside the space it may use, and folds what does not fit into a "…" menu. `<DuetPanes>` shows one screen of a path when the page is narrow and two side by side when it is wide. `useDuet()` tells your own code what Duet decided, including whether this looks like an iPhone Duo.
+`<Duet>` draws your Navigation (Tabs, Tabs + More, or a Sidebar button that slides the page aside), Actions and a Primary where a native app would, picks one of three layouts (`strip`, `column`, `inline`) from the window geometry, keeps every control inside the space it may use, and folds what does not fit into More (the "…" button). `<DuetPanes>` shows one screen of a path when the page is narrow and two side by side when it is wide. `useDuet()` tells your own code what Duet decided, including whether this looks like an iPhone Duo.
 
 Everything is inferred from web signals (window and screen sizes, safe-area insets, display mode, user agent). iOS gives a web page no API for the device model, the fold, Safari's buttons or the Dynamic Island, so detection is a heuristic built from measurements, and column mode relies on WebKit behaviour that is not a supported API. See [Limitations](docs/how-duet-decides.md#limitations).
 
@@ -58,7 +58,7 @@ export function App() {
 }
 ```
 
-Icons are yours, from any library (this example uses `lucide-react`): 21 to 22pt on round buttons match the system. `as const` types the menu ids, so `onSelect` takes `setPlace` without a cast. Each place keeps its own scroll position. `menu={{ ..., burger: false }}` drops the burger and lists the places in "…" under "Menu". `menu={{ ..., tabs: true }}` shows the places as tabs in the capsule, the first ones when not all of them fit with the rest in "…", and the burger only where fewer than three tabs would show. `moveControls` offers "Move controls left/right" in "…" and the drag across the page, off by default. Pass the page as `children`: it then scrolls in an inner scroller, which keeps the controls still during momentum scroll and lets the burger slide it aside. Without `children` the document scrolls and the controls follow it (see [Column mode](docs/how-duet-decides.md#column-mode-how-it-works)).
+Icons are yours, from any library (this example uses `lucide-react`): 21 to 22pt on round buttons match the system. `as const` types the menu ids, so `onSelect` takes `setPlace` without a cast. Each place keeps its own scroll position. `menu={{ ..., burger: false }}` drops the Sidebar button and lists the places in More under "Places". `menu={{ ..., tabs: true }}` shows the places as Tabs in the Group, the first ones when not all of them fit with the rest in More (Tabs + More), and the Sidebar button only where fewer than three tabs would show. `moveControls` offers "Move controls left/right" in "…" and the drag across the page, off by default. Pass the page as `children`: it then scrolls in an inner scroller, which keeps the controls still during momentum scroll and lets the Sidebar slide it aside. Without `children` the document scrolls and the controls follow it (see [Column mode](docs/how-duet-decides.md#column-mode-how-it-works)).
 
 On phones and browsers that are not an iPhone Duo in Safari or a Home Screen app, the same code renders the `inline` layout, so you may want to render `<Duet>` only where `useDuet().duo` is true (see [Server rendering](docs/server-rendering.md#server-rendering-and-hydration)).
 
@@ -66,7 +66,7 @@ On phones and browsers that are not an iPhone Duo in Safari or a Home Screen app
 
 | You want to | Read |
 | --- | --- |
-| See every prop, theme it, add a call to action, or read `useDuet()` | [API](docs/api.md) |
+| See every prop, theme it, add a Primary, or read `useDuet()` | [API](docs/api.md) |
 | Keep content clear of the controls, or show two panes when unfolded | [Layout and panes](docs/layout.md) |
 | Render on the server without a flash, or use the pre-paint boot | [Server rendering](docs/server-rendering.md) |
 | Add a sheet or modal in column mode | [Modals and sheets](docs/how-duet-decides.md#modals-and-sheets-in-column-mode) |
@@ -78,7 +78,7 @@ On phones and browsers that are not an iPhone Duo in Safari or a Home Screen app
 
 | App | Shows | Run |
 | --- | --- | --- |
-| [Almanac](examples/almanac) | Reading app on `<DuetPanes>`: the list beside the story unfolded, a pane bar, a menu of places, sticky title with `bleed` | `pnpm --filter @duet/example-almanac dev`, port 3101 |
+| [Almanac](examples/almanac) | Reading app on `<DuetPanes>`: the list beside the story unfolded, a Pane bar, Navigation, sticky title with `bleed` | `pnpm --filter @duet/example-almanac dev`, port 3101 |
 | [Encore](examples/encore) | Music player: badges, an in-page docked mini player, carousels with `bleed` | `pnpm --filter @duet/example-encore dev`, port 3103 |
 | [Meridian](examples/meridian) | Transit map on Vite: `leading`, a full-screen map with `bleed(false)` | `pnpm --filter @duet/example-meridian dev`, port 3102 |
 

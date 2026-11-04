@@ -1,9 +1,9 @@
 // T5: one word per thing (PLAN 2). The library part (headings, Sidebar label, data-duet-fit, data-duet-control) is
 // green from the lib stage on the plain Inbox example; the site part goes green with /components and the home rewrite.
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { BANNED, CLIPS, CONTROLS, FITS, NOUNS, PAGES } from "./site";
+import { BANNED, CLIPS, CONTROLS, FITS, NOUNS, PAGES, TOUR } from "./site";
 
 test.describe("site", () => {
   test("/components lists the glossary in order", async ({ page }) => {
@@ -71,3 +71,27 @@ for (const path of ["/book", "/examples/inbox?plain"]) {
     });
   });
 }
+
+// The docs speak the glossary too: no retired word in prose (code spans and fences hold public API names such as
+// `burger`, which do not change), and the feature map covers every tour step and noun, with no retired route or still.
+const ROOT = join(__dirname, "../..");
+const DOCS = ["README.md", "docs/api.md", "docs/how-duet-decides.md", "docs/feature-map.md"];
+const prose = (md: string) => md.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "").replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+
+test.describe("docs", () => {
+  for (const doc of DOCS) {
+    test(`${doc} uses glossary names`, () => {
+      const text = prose(readFileSync(join(ROOT, doc), "utf8"));
+      const hits = text.split("\n").filter((l) => BANNED.test(l) || /^#+\s*(Menu|Buttons)\b/.test(l) || l.includes("—"));
+      expect(hits, "retired word, Menu or Buttons heading, or long dash").toEqual([]);
+    });
+  }
+
+  test("feature map covers the site and nothing retired", () => {
+    const map = readFileSync(join(ROOT, "docs/feature-map.md"), "utf8");
+    for (const s of TOUR) expect(map, `tour step ${s.caption}`).toContain(s.caption);
+    for (const n of NOUNS) expect(map, `noun ${n}`).toContain(n);
+    for (const p of [...PAGES, "/duo3d?clip=", "record.mjs", "compose.sh", "check-media.mjs"]) expect(map, p).toContain(p);
+    for (const gone of ["/skeleton", "form-", "control-", "duo3d-stills", "duo3d-apps", "#rules"]) expect(map, gone).not.toContain(gone);
+  });
+});

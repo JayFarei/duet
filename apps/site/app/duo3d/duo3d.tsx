@@ -83,9 +83,9 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
   const [manual, setManual] = useState(live), [box, setBox] = useState({ w: 0, h: 0 });
   const stage = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
-  // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
+  // The page in Safari: the Inbox example, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
-  // An example from the landing page (`duet:example`), shown in place of the skeleton until the next Moment.
+  // An example from the landing page (`duet:example`), shown in place of the Inbox until the next Moment.
   const [site, setSite] = useState<string | null>(null);
   const src = page ? `/duo3d/web?url=${encodeURIComponent(page)}` : site ?? film?.src ?? home;
   const duo = useRef<HTMLIFrameElement>(null), spin = useRef(0);
@@ -307,7 +307,7 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
     setSite(null);
     setDuet(true);
     go({ ...m.state, turn: 0, upside: false }, "flat");
-    // Selected shows More holding the selection for a beat, then opens its list (skeleton-app.tsx).
+    // Selected shows More holding the selection for a beat, then opens its list (examples/inbox/app.tsx).
     setSelected({ id: m.selected, at: Date.now(), open: id === "folded" });
   };
   const momentRef = useRef(moment);
@@ -367,7 +367,7 @@ export function Duo3D({ embed = false, src: home = "/examples/inbox?plain", chro
             {/* Before and after: the same site as a plain mobile site, then with Duet. */}
             <form onSubmit={(e) => { e.preventDefault(); setPage(String(new FormData(e.currentTarget).get("url") ?? "").trim()); }} style={{ ...group, alignItems: "center", gap: 6, padding: "0 6px 0 14px" }}>
               <Globe size={16} style={{ color: "var(--dim)", flexShrink: 0 }} />
-              <input name="url" type="text" inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="Any URL, or empty for the skeleton" defaultValue={page}
+              <input name="url" type="text" inputMode="url" autoCapitalize="off" spellCheck={false} placeholder="Any URL, or empty for the Inbox" defaultValue={page}
                 style={{ flex: 1, minWidth: 0, height: 36, border: 0, background: "transparent", color: "var(--ink)", font: "400 15px -apple-system, system-ui", outline: "none" }} />
               <button type="submit" aria-label="Load in Safari" style={{ ...control, width: 36, height: 36, display: "grid", placeItems: "center", background: "transparent" }}><ArrowRight size={16} /></button>
             </form>

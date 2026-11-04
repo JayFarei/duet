@@ -637,7 +637,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, an app chooses `tabs` or `menu` once. Tabs fold into "…" one at a time where room runs out, and a burger hides five places on a screen with room for all of them.
 - **Cause:** tabs merged into the actions, so nothing could turn them into a burger.
-- **Duet does:** with `menu.tabs`, `placeTabs` keeps the places as tabs, folding the last ones into "…" when the window is short, and the burger with its sidebar only below three tabs. Actions and primary fold first. An item without an icon keeps the burger. See [Tabs or burger](how-duet-decides.md#tabs-or-burger) for the measured counts.
+- **Duet does:** with `menu.tabs`, `placeTabs` keeps the places as tabs, folding the last ones into "…" when the window is short, and the burger with its sidebar only below three tabs. Actions and primary fold first. An item without an icon keeps the burger. See [Navigation fit](how-duet-decides.md#navigation-fit) for the measured counts.
 - **You do:** pass `tabs: true` with an icon on every item, and inline `bootScript`.
 - **Status:** `test/places-tabs.test.mjs`, and on the Duo simulator at 2, 3, 5, 6 and 7 places in Safari wide and tall, Home Screen wide and tall, Split View both sides, closed Safari and closed Home Screen. An open sidebar closes on unfolding into tabs. A rotation at the margin (7 places on the Home Screen) shows the old form for one frame, under 5ms, as the window lands. Live Activities are modelled. Not yet seen on a device.
 
