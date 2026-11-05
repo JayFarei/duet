@@ -1,0 +1,17 @@
+{
+  "source": "transcribed",
+  "transcribed": "Not captured by a script: the numbers are copied from the Duet Space Map as issue #189 quotes it and as commit 66ba654 (site/duo-mock-real) applied them. Replace with a capture from tools/e2e (slot rects from the e2e reporter, native frames from SafariViewService) when the harness can run on a free Duo e2e clone.",
+  "device": "Duo Lab simulator, iPhone Duo",
+  "ios": "27.1",
+  "measured": "2026-10-28",
+  "duetUi": "0.4.x to 0.5.0-rc (before 0.8.0-rc.1, f2d9243, moved the Duo inline foot to DUO.bottom)",
+  "units": "points. band.bottom: where Duet's inline band ended on the sim, screen points, kept as measured; it depends on the duet-ui release, so it is not diffed. signals: what the page saw, derived from band.bottom by the rule of that release (bottom = height - max(insetBottom, 11), page reaching the screen's foot): the mock must post the same. native.*.top: the preview's own button tops, window points (the sheet's top left is 0,0).",
+  "contexts": [
+    { "id": "open-safari-wide", "label": "Open Safari tab, wide (951x669)", "state": { "posture": "open", "app": "safari", "turn": 0 }, "mode": "inline", "band": { "bottom": 635 }, "signals": { "insetBottom": 34 } },
+    { "id": "open-safari-tall", "label": "Open Safari tab, tall (669x951)", "state": { "posture": "open", "app": "safari", "turn": 90 }, "mode": "inline", "band": { "bottom": 917 }, "signals": { "insetBottom": 34 } },
+    { "id": "preview-closed", "label": "Closed in-app preview, upright", "state": { "posture": "closed", "app": "sheet", "turn": 0 }, "mode": "column", "native": { "close": { "top": 174 }, "back": { "top": 428 } } },
+    { "id": "preview-closed-live", "label": "Closed in-app preview, upright, Live Activity", "state": { "posture": "closed", "app": "sheet", "turn": 0, "live": true }, "mode": "column", "native": { "close": { "top": 174 }, "back": { "top": 428 } } },
+    { "id": "preview-open-wide", "label": "Open preview sheet, wide", "state": { "posture": "open", "app": "sheet", "turn": 0 }, "mode": "inline" },
+    { "id": "preview-open-tall", "label": "Open preview sheet, tall", "state": { "posture": "open", "app": "sheet", "turn": 90 }, "mode": "inline" }
+  ]
+}

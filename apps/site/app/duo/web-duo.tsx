@@ -1121,11 +1121,11 @@ function SafariColumn({ x, h, col, back, clock, pill, over, forward }: { x: numb
   return (
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
       {clock !== undefined && <Status x={cx} top={clock} />}
-      <div data-wd-system data-wd-col style={{ ...column, ...at(back), height: backH, display: "flex", flexDirection: "column", justifyContent: "space-around", transition: `top ${MOVE}ms ${ease}, height ${MOVE}ms ${ease}` }}>
+      <div data-wd-system data-wd-col data-wd-native="back" style={{ ...column, ...at(back), height: backH, display: "flex", flexDirection: "column", justifyContent: "space-around", transition: `top ${MOVE}ms ${ease}, height ${MOVE}ms ${ease}` }}>
         <Glyph d="m15 18-6-6 6-6" />{forward && <Glyph d="m9 18 6-6-6-6" />}
       </div>
-      <div data-wd-system data-wd-col style={{ ...column, ...at(reader) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
-      <div data-wd-system data-wd-col style={{ ...at(pill.top), width: DUO.control, height: pill.h, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
+      <div data-wd-system data-wd-col data-wd-native="reader" style={{ ...column, ...at(reader) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
+      <div data-wd-system data-wd-col data-wd-native="pill" style={{ ...at(pill.top), width: DUO.control, height: pill.h, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" /><Glyph d="M8 8h12v12H8zM4 16V4h12" />
       </div>
     </div>
@@ -1137,7 +1137,7 @@ const CLOSE = "M18 6 6 18M6 6l12 12", MENU = "M5 12h.01M12 12h.01M19 12h.01", BA
 /** The preview's share, reload and open-in-Safari buttons, one glass pill (48pt a button, 54 apart). */
 function PreviewPill({ across, style }: { across?: boolean; style: CSSProperties }) {
   return (
-    <div data-wd-system data-wd-col style={{ ...style, width: across ? 157 : DUO.control, height: across ? 48 : 156, borderRadius: 99, display: "flex", flexDirection: across ? "row" : "column", justifyContent: "space-around", alignItems: "center" }}>
+    <div data-wd-system data-wd-col data-wd-native="pill" style={{ ...style, width: across ? 157 : DUO.control, height: across ? 48 : 156, borderRadius: 99, display: "flex", flexDirection: across ? "row" : "column", justifyContent: "space-around", alignItems: "center" }}>
       <Glyph d={SHARE} style={{ margin: 0 }} /><Glyph d={RELOAD} style={{ margin: 0 }} /><Glyph d={SAFARI_ICON} style={{ margin: 0 }} />
     </div>
   );
@@ -1151,9 +1151,9 @@ function PreviewColumn({ x, top, h, col, clock, at, over }: { x: number; top: nu
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none" }}>
       {!over && <div style={{ position: "absolute", inset: 0, top, background: "var(--card)" }} />}
       {clock !== undefined && <Status x={cx} top={clock} />}
-      <div data-wd-system data-wd-col style={{ ...column, ...pos(at.close) }}><Glyph d={CLOSE} /></div>
-      <div data-wd-system data-wd-col style={{ ...column, ...pos(at.close + DUO.control + DUO.gap) }}><Glyph d={MENU} style={{ strokeWidth: 3 } as CSSProperties} /></div>
-      <div data-wd-system data-wd-col style={{ ...column, ...pos(at.back) }}><Glyph d={BACK} /></div>
+      <div data-wd-system data-wd-col data-wd-native="close" style={{ ...column, ...pos(at.close) }}><Glyph d={CLOSE} /></div>
+      <div data-wd-system data-wd-col data-wd-native="menu" style={{ ...column, ...pos(at.close + DUO.control + DUO.gap) }}><Glyph d={MENU} style={{ strokeWidth: 3 } as CSSProperties} /></div>
+      <div data-wd-system data-wd-col data-wd-native="back" style={{ ...column, ...pos(at.back) }}><Glyph d={BACK} /></div>
       <PreviewPill style={pos(at.pill)} />
     </div>
   );
