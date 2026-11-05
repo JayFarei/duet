@@ -649,6 +649,9 @@ export function Duet<T extends string = string, U extends string = string>(props
   // The box goes with its capsule: a primary that runs away or loses its capsule (a new page, no room) takes it along.
   const askable = !!layout(ctx.side).askAt;
   useEffect(() => { if (!askable) send({ type: "gone", surface: "ask" }); }, [askable]);
+  // "…" likewise: a row's action that takes "…" off the page (a new page, no room) closes it under its morph (#262).
+  const moreable = !!layout(split ? menuSide : ctx.side).moreAt;
+  useEffect(() => { if (!moreable) send({ type: "gone", surface: "more" }); }, [moreable]);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
   const sidebarEl = useRef<HTMLElement>(null);

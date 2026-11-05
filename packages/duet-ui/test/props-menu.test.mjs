@@ -3,6 +3,7 @@
 // only while its capsule is drawn, and a capsule leaving the template sends "gone". DUET_PBT_RUNS overrides the run count.
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import fc from "fast-check";
 import { CLOSED, menus } from "../src/menu.ts";
 
@@ -104,7 +105,7 @@ class Env {
 const envs = [new Env("moreGroup", true), new Env("moreGroup", false), new Env("primary", "capsule"), new Env("primary", "row"), new Env("primary", "none")];
 
 const model = () => ({ more: false, ask: false, sidebar: false, armed: false });
-const arb = fc.commands([...commands, ...envs].map((c) => fc.constant(c)), { maxCommands: 40 });
+const arb = fc.commands([...commands, ...envs].map((c) => fc.constant(c)), { maxCommands: 40, size: "max" });
 
 // Replays a named sequence, for the pinned counterexamples.
 const play = (...names) => {
@@ -113,16 +114,24 @@ const play = (...names) => {
   return r;
 };
 
-test("menu model: random taps, springs and template changes keep every invariant", { todo: "#262: gone more is a no-op, a closing surface swallows" }, () => {
+test("menu model: random taps, springs and template changes keep every invariant", () => {
   fc.assert(fc.property(arb, (cmds) => { fc.modelRun(() => ({ model: model(), real: fresh() }), cmds); }), { numRuns: runs });
 });
 
 // #262: a row's action takes "…" off the page mid-close. Its morph unmounts, the spring never settles, and every later
 // outside tap was swallowed.
-test("#262: \"…\" leaving mid-close settles it, the next outside tap reaches the page", { todo: "#262" }, () => {
+test("#262: \"…\" leaving mid-close settles it, the next outside tap reaches the page", () => {
   const r = play("more", "row", "moreGroup=false");
   assert.equal(r.s.more, "closed");
   assert.equal(send(r, { type: "outside" }), false);
+});
+
+// The model assumes chrome sends "gone" when a capsule leaves the template; the box did, "…" did not (#262).
+test("#262: chrome sends \"gone\" when \"…\" or the box leaves the template", () => {
+  const chrome = readFileSync(new URL("../src/chrome.tsx", import.meta.url), "utf8");
+  assert.match(chrome, /useEffect\(\(\) => \{ if \(!askable\) send\(\{ type: "gone", surface: "ask" \}\); \}, \[askable\]\);/);
+  assert.match(chrome, /const moreable = !!layout\(split \? menuSide : ctx\.side\)\.moreAt;/);
+  assert.match(chrome, /useEffect\(\(\) => \{ if \(!moreable\) send\(\{ type: "gone", surface: "more" \}\); \}, \[moreable\]\);/);
 });
 
 // #253a: the tap that dismisses an open "…" stops there (swallowClick); the next one reaches the page.
@@ -136,9 +145,21 @@ test("#253a: the dismiss tap of an open \"…\" is swallowed, the next is not", 
 
 // Armed (the folded primary's first tap) then "Move controls": "…" goes at once, nothing is drawn open, so the next
 // outside tap only disarms and reaches the page.
-test("armed then Move: the outside tap with nothing open reaches the page", { todo: "swallow follows listening, not an open surface" }, () => {
+test("armed then Move: the outside tap with nothing open reaches the page", () => {
   const r = play("primary=row", "more", "row-arm", "move");
   assert.equal(r.s.armed, true);
   assert.equal(send(r, { type: "outside" }), false);
   assert.equal(r.s.armed, false);
+});
+
+// Shrunk counterexamples from the model on the pre-fix reducer.
+test("model counterexample [more, moreGroup=false]: \"…\" open when its capsule goes is closed, not left open", () => {
+  const r = play("more", "moreGroup=false");
+  assert.equal(r.s.more, "closed");
+});
+
+test("model counterexample [more, primary-at-once, outside]: a tap during the close spring reaches the page", () => {
+  const r = play("more", "primary-at-once");
+  assert.equal(r.s.more, "closing");
+  assert.equal(send(r, { type: "outside" }), false);
 });

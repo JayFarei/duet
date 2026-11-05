@@ -75,14 +75,16 @@ function next(s: Menus, e: MenuEvent): Menus {
     case "reset": return reset(s);
     case "sheet": case "tabs": return { ...s, sidebar: "closed" };
     case "close": return { ...reset(s), sidebar: shut(s.sidebar) };
-    case "gone": return e.surface === "ask" ? { ...s, ask: "closed" } : s;
+    // Its morph unmounts with it, so the close spring never settles: closed now (#262).
+    case "gone": return e.surface === "ask" ? { ...s, ask: "closed" } : { ...s, more: "closed", armed: false };
   }
 }
 
 const same = (a: Menus, b: Menus) => a.more === b.more && a.sidebar === b.sidebar && a.ask === b.ask && a.armed === b.armed;
 
-/** The next state, the same object when nothing changed (so React bails out), and whether the touch's click stops. */
+/** The next state, the same object when nothing changed (so React bails out), and whether the touch's click stops:
+ *  only the tap that dismisses an open surface (#253a), never one while it closes or once it is gone (#262). */
 export function menus(s: Menus, e: MenuEvent): Step {
   const n = next(s, e);
-  return { state: same(s, n) ? s : n, swallow: e.type === "outside" && listening(s) };
+  return { state: same(s, n) ? s : n, swallow: e.type === "outside" && (s.more === "open" || s.ask === "open") };
 }
