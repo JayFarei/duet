@@ -79,6 +79,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Primary in its own capsule](#primary-in-its-own-capsule)
 - [Selected tab in the column](#selected-tab-in-the-column)
 - [Light capsule with a white band](#light-capsule-with-a-white-band)
+- [Dark capsule with a lighter ring over a light page](#dark-capsule-with-a-lighter-ring-over-a-light-page)
 - [Light capsule edge reads as a seam](#light-capsule-edge-reads-as-a-seam)
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
 - [Tabs a little too tall for the room](#tabs-a-little-too-tall-for-the-room)
@@ -563,6 +564,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** turns off the ring's backdrop filter in light mode (`--duet-rim-filter`). Safari's own light buttons have no band: measured on the Duo, they have a thin edge line and a soft shade.
 - **You do:** nothing.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251).
+
+## Dark capsule with a lighter ring over a light page
+
+- **You see:** without the handling, with the system in dark mode and a light page (no `data-lg-theme`), each capsule has a ring about 5pt wide inside its edge, lighter than the fill, with a hard step where it ends. Measured on the Duo: 192 in the ring against 178 in the fill, on a 236 page.
+- **Cause:** the rim ring's backdrop filter kept `brightness(1.08)` in dark mode after it was dropped in light mode. It brightens the darkened fill under the band by 8%. Over a dark page that is about 2 levels and unseen; over a light page the fill is mid grey and the step is about 14 levels.
+- **Duet does:** keeps only the blur in the ring's filter in all three dark themes (`--duet-rim-filter: blur(2.5px)`), as in light mode.
+- **You do:** nothing.
+- **Status:** [#271](https://github.com/JayFarei/duet/issues/271). Desktop WebKit does not composite the dark glass like iOS, so this is checked on the Duo, not in the rim oracle.
 
 ## Light capsule edge reads as a seam
 
