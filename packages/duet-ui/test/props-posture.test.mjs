@@ -7,7 +7,7 @@ import fc from "fast-check";
 import { detect, inTransit, pageInsets, stable, LAND_HOLD, WIDE } from "../src/geometry.ts";
 import { placeTabs } from "../src/template.ts";
 import { settling, watchSignals } from "../src/signals.ts";
-import { LAUNCHES, POSTURES, at, drive, expected, landed, place, runs, timeline, traceArb } from "./arb-posture.mjs";
+import { LAUNCHES, LOADS, POSTURES, at, drive, expected, landed, place, runs, timeline, traceArb } from "./arb-posture.mjs";
 
 const FLIP_WINDOW = 2000;
 const px = (v) => Number.parseFloat(v);
@@ -46,6 +46,8 @@ export function check(tl, { reads, final, spin }) {
     // No controls at the closed screen's places on the open screen while a Home Screen app lands.
     if (shown && r.s.standalone && Math.max(r.s.outerWidth, r.s.outerHeight) >= 950 && (Math.abs(r.s.innerWidth - 466) <= 1 || Math.abs(r.s.innerWidth - 867) <= 1))
       return `closed screen's places: ${show(r)}`;
+    // Never a tab's controls over the in-app preview's own buttons, as it loads (#143) or after.
+    if (shown && POSTURES[r.entry.posture].kind === "preview" && !c.preview) return `a tab's controls on the preview: ${show(r)}`;
     // No tabs then a burger: a Home Screen app allocates its tabs the same in a window from its first shown read.
     if (shown && r.s.standalone && !c.keyboard && windowKey(r.s) === windowKey(landed(r.entry.posture))) {
       const want = placeTabs(detect(landed(r.entry.posture)), 7, false), got = placeTabs(c, 7, false);
@@ -80,21 +82,22 @@ export function check(tl, { reads, final, spin }) {
 }
 
 const property = (starts, extra = {}) => fc.property(traceArb(starts), fc.option(fc.constantFrom("launch wide", "launch wide 867", "launch tall", "launch tall, cold"), { nil: undefined }), (tr, launch) => {
-  const t = { ...tr, ...(tr.start.startsWith("H") && extra.launch && launch ? { launch, start: launch.includes("wide") ? "HW" : "HT" } : {}) };
+  const t = { ...tr, ...(tr.start.startsWith("H") && extra.launch && launch ? { launch, start: launch.includes("wide") ? "HW" : "HT" } : {}),
+    ...(LOADS[tr.start] && extra.load && launch ? { launch: "load" } : {}) };
   const tl = timeline(t), err = check(tl, drive(tl));
   if (err) throw new Error(err);
 });
 
 const TABS = ["P", "L90", "L270", "S", "U", "T"];
 test("posture traces, Safari tab: every read holds the invariants", () => fc.assert(property(TABS), runs(500)));
-test("posture traces, in-app preview and Open in Safari", () => fc.assert(property(["V", "VS", "VS90", "VS270"]), runs(300)));
+test("posture traces, in-app preview and Open in Safari", () => fc.assert(property(["V", "VS", "VS90", "VS270"], { load: true }), runs(300)));
 test("posture traces, Home Screen app, launched on the inner screen or running", () => fc.assert(property(["HC", "HW", "HT"], { launch: true }), runs(300)));
 
 // Pinned counterexamples.
 
 const step = (o) => ({ move: 0, gaps: [1, 1, 1, 1, 1, 1], cut: null, dwell: 0, chrome: 50, kbShrink: 155, banner: false, loop: 4, ...o });
 const replay = (tr, launch) => {
-  const t = { ...tr, ...(launch ? { launch, start: launch.includes("wide") ? "HW" : "HT" } : {}) }, tl = timeline(t);
+  const t = { ...tr, ...(launch === "load" ? { launch } : launch ? { launch, start: launch.includes("wide") ? "HW" : "HT" } : {}) }, tl = timeline(t);
   assert.equal(check(tl, drive(tl)), undefined);
 };
 
@@ -153,3 +156,13 @@ test("a turn while a feedback loop polls past the cap still settles (its transit
   off();
   mock.timers.reset();
 });
+
+// Each found with its fix reverted in stable().
+test("trace: the column loop flips 35 times in one window (oscillating without the pin, ae590b2)", () => replay({ start: "P", steps: [
+  step({ move: 605134466, gaps: [1, 1, 1, 1, 9, 1], loop: 35 })] }));
+test("trace: upright to turned left, shown the frame it lands (flash without LAND_HOLD, 5d9b39a)", () => replay({ start: "P", steps: [step()] }));
+test("trace: the sheet preview turned, its insets mid-turn (296px without the last geometry kept, 5d9b39a)", () => replay({ start: "VS", steps: [step()] }));
+test("trace: a wide launch, nothing else (over the clock without launching, 503ad1e)", () => replay({ start: "HC", steps: [] }, "launch wide"));
+test("trace: the open Home Screen app turned wide, its strip late (over the clock without toWide, 89466d1)", () => replay({ start: "HC", steps: [
+  step(), step({ gaps: [22, 3, 1, 1, 1, 1], dwell: 72 }), step()] }));
+test("trace: the full screen preview loading (a tab's controls on it without previewPending, 9d37db9, 12abe27)", () => replay({ start: "V", steps: [] }, "load"));

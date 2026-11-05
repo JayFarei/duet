@@ -90,6 +90,12 @@ export const LAUNCHES = {
   "launch tall": [at("HT", { innerWidth: 466, innerHeight: 678, insetBottom: 0 })],
   "launch tall, cold": [at("HT", { innerWidth: 980, innerHeight: 1424, insetBottom: 0 }), at("HT", { innerWidth: 466, innerHeight: 678 })],
 };
+/** The in-app preview loading: the whole closed screen first, inset 0 (the sheet's inside its 450x670 window, ~70ms,
+ *  e2e pvl01; the full screen's ~200ms, j37), then its own size before the bottom inset lands (~100ms, #143). */
+export const LOADS = {
+  V: [at("V", { innerWidth: 466, innerHeight: 678, visualHeight: 678, insetBottom: 0 }), at("V", { insetBottom: 0 })],
+  VS: [at("VS", { innerWidth: 466, innerHeight: 678, visualHeight: 678, insetBottom: 0 }), at("VS", { insetBottom: 0 })],
+};
 
 /** What may happen next in posture `p`: [name, destination or undefined for drift]. */
 export function moves(p) {
@@ -122,7 +128,7 @@ export function timeline({ start, steps, launch }) {
     if (!inTransit(s)) allowed.add(place(detect(s)));
     out.push({ t, s, epoch, posture: p, allowed: [...allowed] });
   };
-  if (launch) for (const s of LAUNCHES[launch]) { push(s); t += 60; }
+  for (const s of launch === "load" ? LOADS[start] : launch ? LAUNCHES[launch] : []) { push(s); t += 60; }
   // The page boots landed: the first step comes after its settle.
   push(landed(p, dr)); t += SETTLE.quiet + SETTLE.poll;
   for (const st of steps) {
