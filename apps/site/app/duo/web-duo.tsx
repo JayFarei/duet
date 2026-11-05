@@ -236,7 +236,8 @@ function place(s: State, W: number, H: number, host: string, modeOf: (s: Signals
         : "Turned sideways, Safari keeps its column on the camera's side and moves its buttons. Duet follows them into the gap between.",
     };
   }
-  const page = less({ w: W, h: H - OPEN_BAR }), signals = vis(sig(page, full, { screen: safariScreen(page) }), OPEN_BAR + drop);
+  // The home indicator keeps a 34pt bottom inset under the page (real sim: Duet's band ends at 635, not 658).
+  const page = less({ w: W, h: H - OPEN_BAR }), signals = vis(sig(page, full, { insetBottom: 34, screen: safariScreen(page) }), OPEN_BAR + drop);
   return {
     clip: screen, frame: { x: 0, y: OPEN_BAR + drop, ...page }, signals, mode: modeOf(signals),
     chrome: <><OpenSafari w={W} host={host} forward={s.forward} />{drop > 0 && <SharedBar left={0} top={OPEN_BAR} width={W} h={drop} />}</>,
@@ -267,11 +268,12 @@ function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signa
     };
   }
   // Closed: window-relative tops of the column's buttons (close, page menu, back, the pill), clear of the camera
-  // turned. Upright close follows Live Activities as Safari's buttons do (how far is not yet measured).
+  // turned (real sim: close 174, back 428 upright). Live Activities do not push them, unlike a tab's column; the
+  // island then holds the column's top and the clock would sit on close, so it is left out (inferred, not measured).
   const col: Side = portrait || s.turn > 0 ? "right" : "left", angle = portrait ? 0 : s.turn > 0 ? 270 : 90;
   const win = portrait ? { x: 8, y: 4, w: 450, h: 670 } : { x: 8, y: 4, w: 662, h: 458 };
   const page = portrait ? { w: 366, h: 600 } : { w: 578, h: 388 }, band = win.h - page.h, colW = win.w - page.w, pageX = col === "left" ? colW : 0;
-  const close = portrait ? DUO.top + push - win.y : col === "left" ? 78 : 28;
+  const close = portrait ? 174 : col === "left" ? 78 : 28;
   const at = { close, back: close + (portrait ? 254 : 134), pill: close + (portrait ? 314 : 194) };
   const address = portrait ? { x: 26, w: 330 } : col === "left" ? { x: 86, w: 482 } : { x: 94, w: 482 };
   const signals = vis(sig(page, win, { insetBottom: 34, screen: safariScreen(page), angle }), win.y + band), mode = modeOf(signals);
@@ -281,7 +283,7 @@ function preview(s: State, W: number, H: number, host: string, modeOf: (s: Signa
     frame: mode === "column" ? { x: 0, y: band, w: win.w, h: page.h } : { x: pageX, y: band, ...page },
     chrome: sheet(win, <>
       <PreviewBand width={win.w} h={band} host={host} address={address} />
-      <PreviewColumn x={col === "left" ? 0 : page.w} top={band} h={win.h} col={col} clock={portrait ? 84 + push - win.y : undefined} at={at} over={mode === "column"} />
+      <PreviewColumn x={col === "left" ? 0 : page.w} top={band} h={win.h} col={col} clock={portrait && !push ? 84 - win.y : undefined} at={at} over={mode === "column"} />
     </>),
     note: portrait
       ? "A link from Messages opens in a page sheet with its own column, like a tab's with different buttons. Duet paints its controls into the free gap between its menu and back buttons."
@@ -1121,11 +1123,11 @@ function SafariColumn({ x, h, col, back, clock, pill, over, forward }: { x: numb
   return (
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none", background: over ? undefined : "var(--card)" }}>
       {clock !== undefined && <Status x={cx} top={clock} />}
-      <div data-wd-system data-wd-col style={{ ...column, ...at(back), height: backH, display: "flex", flexDirection: "column", justifyContent: "space-around", transition: `top ${MOVE}ms ${ease}, height ${MOVE}ms ${ease}` }}>
+      <div data-wd-system data-wd-col data-wd-native="back" style={{ ...column, ...at(back), height: backH, display: "flex", flexDirection: "column", justifyContent: "space-around", transition: `top ${MOVE}ms ${ease}, height ${MOVE}ms ${ease}` }}>
         <Glyph d="m15 18-6-6 6-6" />{forward && <Glyph d="m9 18 6-6-6-6" />}
       </div>
-      <div data-wd-system data-wd-col style={{ ...column, ...at(reader) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
-      <div data-wd-system data-wd-col style={{ ...at(pill.top), width: DUO.control, height: pill.h, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
+      <div data-wd-system data-wd-col data-wd-native="reader" style={{ ...column, ...at(reader) }}><Glyph d="M12 7v14M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></div>
+      <div data-wd-system data-wd-col data-wd-native="pill" style={{ ...at(pill.top), width: DUO.control, height: pill.h, borderRadius: 99, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
         <Glyph d="M5 12h14M12 5v14" /><Glyph d="M8 8h12v12H8zM4 16V4h12" />
       </div>
     </div>
@@ -1137,7 +1139,7 @@ const CLOSE = "M18 6 6 18M6 6l12 12", MENU = "M5 12h.01M12 12h.01M19 12h.01", BA
 /** The preview's share, reload and open-in-Safari buttons, one glass pill (48pt a button, 54 apart). */
 function PreviewPill({ across, style }: { across?: boolean; style: CSSProperties }) {
   return (
-    <div data-wd-system data-wd-col style={{ ...style, width: across ? 157 : DUO.control, height: across ? 48 : 156, borderRadius: 99, display: "flex", flexDirection: across ? "row" : "column", justifyContent: "space-around", alignItems: "center" }}>
+    <div data-wd-system data-wd-col data-wd-native="pill" style={{ ...style, width: across ? 157 : DUO.control, height: across ? 48 : 156, borderRadius: 99, display: "flex", flexDirection: across ? "row" : "column", justifyContent: "space-around", alignItems: "center" }}>
       <Glyph d={SHARE} style={{ margin: 0 }} /><Glyph d={RELOAD} style={{ margin: 0 }} /><Glyph d={SAFARI_ICON} style={{ margin: 0 }} />
     </div>
   );
@@ -1151,9 +1153,9 @@ function PreviewColumn({ x, top, h, col, clock, at, over }: { x: number; top: nu
     <div style={{ position: "absolute", left: x, top: 0, width: STRIP, height: h, color: "var(--ink)", pointerEvents: "none" }}>
       {!over && <div style={{ position: "absolute", inset: 0, top, background: "var(--card)" }} />}
       {clock !== undefined && <Status x={cx} top={clock} />}
-      <div data-wd-system data-wd-col style={{ ...column, ...pos(at.close) }}><Glyph d={CLOSE} /></div>
-      <div data-wd-system data-wd-col style={{ ...column, ...pos(at.close + DUO.control + DUO.gap) }}><Glyph d={MENU} style={{ strokeWidth: 3 } as CSSProperties} /></div>
-      <div data-wd-system data-wd-col style={{ ...column, ...pos(at.back) }}><Glyph d={BACK} /></div>
+      <div data-wd-system data-wd-col data-wd-native="close" style={{ ...column, ...pos(at.close) }}><Glyph d={CLOSE} /></div>
+      <div data-wd-system data-wd-col data-wd-native="menu" style={{ ...column, ...pos(at.close + DUO.control + DUO.gap) }}><Glyph d={MENU} style={{ strokeWidth: 3 } as CSSProperties} /></div>
+      <div data-wd-system data-wd-col data-wd-native="back" style={{ ...column, ...pos(at.back) }}><Glyph d={BACK} /></div>
       <PreviewPill style={pos(at.pill)} />
     </div>
   );
