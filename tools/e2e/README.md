@@ -2,6 +2,8 @@
 
 Automated placement checks for Duet on the iPhone Duo simulator: Safari tab in every rotation path, in-app preview (SFSafariViewController) in all three sheet styles and rotations, the preview across unfold, turn and fold (and opened unfolded), preview -> "Open in Safari" from portrait and both landscapes and then unfolded, fold and unfold in every posture, split view (left pane, right pane, moving between panes, back to full width, turning and folding from split view), largest Dynamic Type, and dark mode. Each step records every sample of the page's own Duet state during the transition, the native button frames, a screenshot and, for transitions, a video and contact sheet, then asserts it against [EXPECTED.md](EXPECTED.md).
 
+What the suite must guarantee, and how, is locked in [CONTRACT.md](CONTRACT.md): the gap map, the placement invariant, three-valued results, where and when it runs.
+
 ## Run
 
 ```sh
