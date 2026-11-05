@@ -81,6 +81,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
 - [Tabs a little too tall for the room](#tabs-a-little-too-tall-for-the-room)
 - [Tapping away from "…" pressed what was underneath](#tapping-away-from--pressed-what-was-underneath)
+- [Every tap swallowed after a "…" row changed the page](#every-tap-swallowed-after-a--row-changed-the-page)
 - [A dark circle as "…" comes back](#a-dark-circle-as--comes-back)
 - [Page content jumps 84pt on an inline Duo page](#page-content-jumps-84pt-on-an-inline-duo-page)
 - [Page with children clipped in the right split pane](#page-with-children-clipped-in-the-right-split-pane)
@@ -752,6 +753,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** the click of the dismissing tap stops at the window, once. A scroll or a later tap is unaffected.
 - **You do:** nothing.
 - **Status:** reproduced and checked on the Duo simulator.
+
+## Every tap swallowed after a "…" row changed the page
+
+- **You see:** a row in "…" whose action leaves a page without "…" (a new page, no room), and then no tap on the page does anything.
+- **Cause:** without the handling, "…" waited in "closing" for its morph's spring, but the morph went with its capsule and never settled. The outside listener stayed up and stopped every tap's click as a dismiss tap (#262).
+- **Duet does:** "…" leaving the template closes it at once and disarms the primary, as the confirmation box already did. Only the tap that dismisses an open surface stops; one during the close spring, or with only an armed primary, reaches the page.
+- **You do:** nothing.
+- **Status:** found and pinned by the menu model test (`test/props-menu.test.mjs`), counterexample `[more, row, moreGroup=false, outside]`.
 
 ## A dark circle as "…" comes back
 
