@@ -569,6 +569,10 @@ export const KEYBOARD_DOWN = 1000;
  *  matching (Open in Safari). */
 export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: number, settling = false, epoch = 0): Context {
   const key = `${s.outerWidth}x${s.outerHeight}`;
+  // A deadline passed is gone, whichever way this read returns: the caller re-reads at pendingUntil, and one left in
+  // the past re-armed its timer at 0ms on every read until the settle ended.
+  const wasPending = d.pendingUntil !== undefined;
+  if (wasPending && now >= d.pendingUntil!) d.pendingUntil = undefined;
   // The keyboard going down: focus leaves first, while iOS still holds the layout viewport scrolled up by the
   // keyboard (visual viewport 286 of 618, offset 107), so the inline rail shown then was drawn 107px high for a
   // frame, its top item off the screen (e2e kb02-03, #126). A keyboard that was up stays up until the viewport grows.
@@ -587,7 +591,6 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
     if (d.lastKey === key) {
       const keyboard = keyboardUp(s) || undefined;
       // A Home Screen launch passes through a scale of 2.04, its closed width drawn across the open screen.
-      if (d.pendingUntil !== undefined && now >= d.pendingUntil) d.pendingUntil = undefined;
       return { ...d.last, keyboard, confidence: "held", ...(d.pendingUntil === undefined ? {} : { hidden: "pending" as const }) };
     }
     s = { ...s, scale: 1 };
@@ -652,7 +655,7 @@ export function stable(d: Damper, s: Signals, preferred: Side | undefined, now: 
   // scroll settled dropped the controls off the rail for good. Inline to column still moves, so a wrong inline heals.
   // A context hidden as pending was never shown, so there is nothing to hold: its insets landing moves it.
   const columnHeld = d.last?.mode === "column" && c.mode === "inline" && !d.pinned;
-  if (d.last && c.mode !== d.last.mode && (settling || columnHeld) && stableKey === d.stableKey && !!d.last.preview === preview && d.pendingUntil === undefined) {
+  if (d.last && c.mode !== d.last.mode && (settling || columnHeld) && stableKey === d.stableKey && !!d.last.preview === preview && !wasPending) {
     const { width, height, insetTop, insetBottom, keyboard, visualBottom } = c;
     return { ...d.last, width, height, insetTop, insetBottom, keyboard, visualBottom, confidence: "held" };
   }

@@ -35,7 +35,7 @@ test("other devices have no sheet layout to lose: their output does not change",
 });
 
 test("the sheet closes on that change", () => {
-  assert.match(chrome, /useEffect\(\(\) => \{ setSidebar\("closed"\); \}, \[sheet\]\);/);
+  assert.match(chrome, /useEffect\(\(\) => \{ send\(\{ type: "sheet" \}\); \}, \[sheet\]\);/);
 });
 
 test("in the column the open sheet paints down behind Safari's bar, with its rows still ending above it", () => {
