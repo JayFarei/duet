@@ -15,7 +15,7 @@ Possible false positives: an iPad (which also sends a Mac user agent with touch)
 
 ## Which mode
 
-Duet re-reads the signals on resize, orientation change (including `screen.orientation` change: turning from one landscape to the other keeps the window size), visual viewport resize, `pageshow` and `visibilitychange` (so a page handed from the in-app preview to a Safari tab re-reads). The window size and insets settle late (after a fold `outerWidth` can land up to ~2s after the viewport, with no event), so after each event Duet polls every 100ms until the sizes hold for 500ms, re-reading on every change, for at most 2s. It picks the first mode that matches:
+Duet re-reads the signals on resize, orientation change (including `screen.orientation` change: turning from one landscape to the other keeps the window size), visual viewport resize, `pageshow` and `visibilitychange` (so a page handed from the in-app preview to a Safari tab re-reads). The window size and insets settle late (after a fold `outerWidth` can land up to ~2s after the viewport, with no event), so after each event Duet polls every 100ms until the sizes hold for 500ms, re-reading on every change, for at most 2s after the last window change (outer size or turn). It picks the first mode that matches:
 
 | Order | Mode | Conditions (all must hold) | Controls |
 | --- | --- | --- | --- |

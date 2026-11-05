@@ -213,7 +213,7 @@ test("a Home Screen tabs app allocates its actions from the strip's room while t
 });
 
 test("a new window on a Duo closes \"…\", other devices keep what they did", () => {
-  assert.match(chrome, /setMore\("closed"\); setArmed\(false\); setAsk\("closed"\); \}, \[tabsKey, ctx\.duo && `\$\{ctx\.mode\} \$\{ctx\.width\}`\]\)/);
+  assert.match(chrome, /send\(\{ type: "reset" \}\); \}, \[tabsKey, ctx\.duo && `\$\{ctx\.mode\} \$\{ctx\.width\}`\]\)/);
 });
 
 test("one button of room in a tabs app: the places lead \"…\"", () => {

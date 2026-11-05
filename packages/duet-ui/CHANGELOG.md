@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.2
+
+Everything from 0.8.2-rc.1, plus a simple desktop glass for demos.
+
+- Desktop glass (#273): off iOS, the capsules and the menu draw plain frosted glass, a blur under a flat tint, so they stay legible in either theme over light and dark pages. Desktop engines do not composite iOS's darken and lighten blends, which left dark glass near white over a light page. iOS is unchanged. Retune with `--duet-glass-fill-light` and `--duet-glass-fill-dark`.
+
+## 0.8.2-rc.1
+
+- Dark mode over a light page: each capsule had a lighter ring about 5pt wide inside its edge, with a hard step (#271). The ring's backdrop filter now keeps only its blur, as in light mode. Over a dark page nothing visible changes.
+- Column mode: "…" no longer stays closing when its capsule leaves the template mid-close, so outside taps reach the page again (#262). With nothing open, an outside tap always reaches the page; only the tap that dismisses an open "…" or confirm box is swallowed.
+- **Behaviour change:** a tap during the close spring, or with only the primary armed, now reaches the page. It used to be swallowed.
+- Posture detection: a launch's passed pending deadline is cleared on every read, so its timers no longer spin, and the settle cap counts from the last window change.
+
 ## 0.8.1
 
 Everything from 0.8.1-rc.1, plus the last two fixes listed under it (the overlay sidebar in Safari's column, and the iOS follow-layer rim), which landed after rc.1 was published.

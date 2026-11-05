@@ -37,6 +37,8 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [In-app preview sheet](#in-app-preview-sheet)
 - [In-app preview filling the open screen](#in-app-preview-filling-the-open-screen)
 - [Turning or folding mid-transition](#turning-or-folding-mid-transition)
+- [Turning while a page resizes itself in a loop](#turning-while-a-page-resizes-itself-in-a-loop)
+- [Refresh loop after a launch's wait](#refresh-loop-after-a-launchs-wait)
 - [Unfolding the in-app preview](#unfolding-the-in-app-preview)
 - [Text field focus and the on-screen keyboard](#text-field-focus-and-the-on-screen-keyboard)
 - [Inline controls with the keyboard up](#inline-controls-with-the-keyboard-up)
@@ -77,10 +79,13 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Primary in its own capsule](#primary-in-its-own-capsule)
 - [Selected tab in the column](#selected-tab-in-the-column)
 - [Light capsule with a white band](#light-capsule-with-a-white-band)
+- [Dark capsule with a lighter ring over a light page](#dark-capsule-with-a-lighter-ring-over-a-light-page)
+- [Dark glass vanishes on desktop over a light page](#dark-glass-vanishes-on-desktop-over-a-light-page)
 - [Light capsule edge reads as a seam](#light-capsule-edge-reads-as-a-seam)
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
 - [Tabs a little too tall for the room](#tabs-a-little-too-tall-for-the-room)
 - [Tapping away from "…" pressed what was underneath](#tapping-away-from--pressed-what-was-underneath)
+- [Every tap swallowed after a "…" row changed the page](#every-tap-swallowed-after-a--row-changed-the-page)
 - [A dark circle as "…" comes back](#a-dark-circle-as--comes-back)
 - [Page content jumps 84pt on an inline Duo page](#page-content-jumps-84pt-on-an-inline-duo-page)
 - [Page with children clipped in the right split pane](#page-with-children-clipped-in-the-right-split-pane)
@@ -173,9 +178,25 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** without the handling, the controls flash at the wrong edge during a turn, fold, unfold or split move, the page insets jump (up to 296px on a turn, -485px on an unfold), or Safari zooms the page to fit (scale 1.14).
 - **Cause:** there is no fold signal, and mid-transition the window passes through sizes no landed window has (inner and outer orientations disagree). The window size can land up to ~2s after the viewport, with no event. The column layer still carries the old posture's positions, which widen the document past the new window.
-- **Duet does:** keeps the last placement and hides the controls (`hidden` and `confidence` are `"moving"`) until the window lands and holds for 150ms (`LAND_HOLD`). The insets keep their last values, and the column layer is clipped out of the document width, so it adds no width until the landing. After each event it polls every 100ms until the sizes hold for 500ms, for at most 2s.
+- **Duet does:** keeps the last placement and hides the controls (`hidden` and `confidence` are `"moving"`) until the window lands and holds for 150ms (`LAND_HOLD`). The insets keep their last values, and the column layer is clipped out of the document width, so it adds no width until the landing. After each event it polls every 100ms until the sizes hold for 500ms, for at most 2s after the last window change.
 - **You do:** nothing. If your own code reacts to `useDuet()`, ignore readings with `confidence: "moving"`.
 - **Status:** [#68](https://github.com/JayFarei/duet/issues/68), [#69](https://github.com/JayFarei/duet/issues/69), [PR #70](https://github.com/JayFarei/duet/pull/70), 0.4.0-rc.1. See [Which mode](how-duet-decides.md#which-mode).
+
+## Turning while a page resizes itself in a loop
+
+- **You see:** without the handling, a page whose layout keeps resizing Safari's viewport (the column and full width in turn) for more than 2s, then turned or folded: the controls flash inline, then on the column, then inline again within about 80ms mid-turn, and the flips count toward the oscillation pin.
+- **Cause:** the settle after an event ends at 2s even while sizes still move, so a feedback loop cannot hold it open. The turn's events only extended that capped settle, so its half-turned readings counted as settled: not hidden, and flips counted.
+- **Duet does:** counts the 2s from the last window change (outer size or turn), not from the first event. A loop keeps its window, so it still cannot hold the settle open, while a fold or turn during the loop, or late in a long settle, settles and hides its transit as usual.
+- **You do:** nothing.
+- **Status:** found by the posture model tests (`test/props-posture.test.mjs`, shrunk from a random trace), pinned there against `signals.ts` with a stubbed browser. Not seen on a device or simulator.
+
+## Refresh loop after a launch's wait
+
+- **You see:** nothing visible. Without the handling, the page re-ran Duet's reading every few milliseconds, for up to 2s, after a Home Screen launch or a preview's wait ended on a reading caught halfway (a turn to wide, a transit, `LAND_HOLD`).
+- **Cause:** the controls re-read at the end of the launch wait (`pendingUntil`). That reading returned early, before the deadline was cleared, so the deadline stayed in the past and re-armed its timer at 0ms on every read until the settle ended.
+- **Duet does:** clears a passed deadline at the start of every reading, whichever way it returns.
+- **You do:** nothing.
+- **Status:** found by the posture model tests (`test/props-posture.test.mjs`, "timers spin"), pinned there. Not seen on a device or simulator.
 
 ## Unfolding the in-app preview
 
@@ -545,6 +566,22 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **You do:** nothing.
 - **Status:** [#251](https://github.com/JayFarei/duet/issues/251).
 
+## Dark capsule with a lighter ring over a light page
+
+- **You see:** without the handling, with the system in dark mode and a light page (no `data-lg-theme`), each capsule has a ring about 5pt wide inside its edge, lighter than the fill, with a hard step where it ends. Measured on the Duo: 192 in the ring against 178 in the fill, on a 236 page.
+- **Cause:** the rim ring's backdrop filter kept `brightness(1.08)` in dark mode after it was dropped in light mode. It brightens the darkened fill under the band by 8%. Over a dark page that is about 2 levels and unseen; over a light page the fill is mid grey and the step is about 14 levels.
+- **Duet does:** keeps only the blur in the ring's filter in all three dark themes (`--duet-rim-filter: blur(2.5px)`), as in light mode.
+- **You do:** nothing.
+- **Status:** [#271](https://github.com/JayFarei/duet/issues/271). Desktop WebKit does not composite the dark glass like iOS, so this is checked on the Duo, not in the rim oracle.
+
+## Dark glass vanishes on desktop over a light page
+
+- **You see:** without the handling, in desktop Safari or Chrome with the system in dark mode and a light page, each capsule is nearly white and its white icons all but vanish. With the system light and a dark page, the capsule is dark grey under black icons.
+- **Cause:** the glass base is tuned to iOS, where it blends over the sharp layer with `darken` (dark) or `lighten` (light). Desktop engines do not composite those blends over a backdrop like iOS: dark glass over a 237 page paints about 237, against 178 on the Duo.
+- **Duet does:** off iOS, draws a plain frosted glass for demos (the docs site, Mac screenshots): the base blends normally under a flat tint, white at 50% in light, black at 55% in dark (`--duet-glass-fill-light`, `--duet-glass-fill-dark`). On iOS (`@supports (-webkit-touch-callout: none)`) the tint is transparent and the blends stay, so the Duo is unchanged.
+- **You do:** nothing. To retune the desktop glass, set `--duet-glass-fill-light` and `--duet-glass-fill-dark` on `.duet`.
+- **Status:** [#273](https://github.com/JayFarei/duet/issues/273). Not matched to native, by design.
+
 ## Light capsule edge reads as a seam
 
 - **You see:** without the handling, on a light page, a capsule has a washed out fill, a pale seam at its top and bottom caps, and an edge line that is thicker on the left. On a saturated page the colour drains, red fill G 173 falling to 155 at the side against native's flat 152.
@@ -752,6 +789,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** the click of the dismissing tap stops at the window, once. A scroll or a later tap is unaffected.
 - **You do:** nothing.
 - **Status:** reproduced and checked on the Duo simulator.
+
+## Every tap swallowed after a "…" row changed the page
+
+- **You see:** a row in "…" whose action leaves a page without "…" (a new page, no room), and then no tap on the page does anything.
+- **Cause:** without the handling, "…" waited in "closing" for its morph's spring, but the morph went with its capsule and never settled. The outside listener stayed up and stopped every tap's click as a dismiss tap (#262).
+- **Duet does:** "…" leaving the template closes it at once and disarms the primary, as the confirmation box already did. Only the tap that dismisses an open surface stops; one during the close spring, or with only an armed primary, reaches the page.
+- **You do:** nothing.
+- **Status:** found and pinned by the menu model test (`test/props-menu.test.mjs`), counterexample `[more, row, moreGroup=false, outside]`.
 
 ## A dark circle as "…" comes back
 

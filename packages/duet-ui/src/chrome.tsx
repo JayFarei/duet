@@ -8,6 +8,7 @@ import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead,
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
 import { unboot } from "./boot.ts";
 import { PRESS, listenPress } from "./press.ts";
+import { CLOSED, listening, menus, type MenuEvent, type Menus } from "./menu.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
 import "./duet.css";
 
@@ -492,18 +493,21 @@ function Morph({ open, from, pitch, slots, box, fit, onClosed, children, role = 
   );
 }
 
-type Phase = "open" | "closing" | "closed";
-
 export function Duet<T extends string = string, U extends string = string>(props: DuetProps<T, U>) {
   const p = props as unknown as DuetProps; // menu ids are only typed at the boundary
   const ctx = useDuet();
   const scroller = useRef<HTMLDivElement>(null);
-  // The sidebar stays "closing" while the page slides back, so the card keeps its background and radius.
-  const [sidebar, setSidebar] = useState<Phase>("closed");
-  const [more, setMore] = useState<Phase>("closed");
-  const [armed, setArmed] = useState(false);
-  // The primary's confirmation box, its whole capsule growing like "…" grows into its list.
-  const [ask, setAsk] = useState<Phase>("closed");
+  // "…", the sidebar and the primary's confirmation box (its whole capsule growing like "…" grows into its list), one
+  // reducer (menu.ts). The sidebar stays "closing" while the page slides back, so the card keeps its background and radius.
+  // `send` reads and writes the ref, so events sent in one handler see each other, as functional updates did.
+  const [menuState, setMenuState] = useState<Menus>(CLOSED);
+  const menuRef = useRef(menuState);
+  const send = (e: MenuEvent) => {
+    const r = menus(menuRef.current, e);
+    if (r.state !== menuRef.current) { menuRef.current = r.state; setMenuState(r.state); }
+    return r.swallow;
+  };
+  const { sidebar, more, armed, ask } = menuState;
   // The first render is the server's guess (ssr) and the window geometry settles over the next second (subscribe):
   // until then the controls jump to where they belong instead of gliding in from the guess.
   const [settled, setSettled] = useState(false);
@@ -520,20 +524,17 @@ export function Duet<T extends string = string, U extends string = string>(props
   }, []);
   useEffect(() => {
     if (sidebar !== "closing") return;
-    const t = setTimeout(() => setSidebar("closed"), SLIDE.ms);
+    const t = setTimeout(() => send({ type: "slid" }), SLIDE.ms);
     return () => clearTimeout(t);
   }, [sidebar]);
-  const closeMore = () => setMore((m) => (m === "open" ? "closing" : m));
-  const closeSidebar = () => setSidebar((s) => (s === "open" ? "closing" : s));
-  const closeAsk = () => setAsk((a) => (a === "open" ? "closing" : a));
-  const dismiss = () => { closeMore(); setArmed(false); closeAsk(); };
+  const dismiss = () => { send({ type: "miss" }); };
 
   const tabs = (p.tabs?.items ?? []).map((t): Action => ({ ...t, tab: true, selected: t.id === p.tabs!.selected, onPress: t.id === p.tabs!.selected ? undefined : () => p.tabs!.onSelect(t.id) }));
   const actions: Action[] = [...tabs, ...(p.actions ?? []).filter((a) => !a.destructive && !a.folded)], destructive = (p.actions ?? []).filter((a) => a.destructive);
   const folded = (p.actions ?? []).filter((a) => a.folded && !a.destructive);
   const menuItems = p.menu?.items ?? [];
   const sheet = sheetLayout(ctx);
-  useEffect(() => { setSidebar("closed"); }, [sheet]);
+  useEffect(() => { send({ type: "sheet" }); }, [sheet]);
   // Split pane in column mode: the controls are drawn in both of Safari's possible columns (useColumnLayer).
   const split = ctx.mode === "column" && !!ctx.split, column = ctx.screenWidth - ctx.width;
   const sides: Side[] = split ? ["left", "right"] : [ctx.side];
@@ -549,9 +550,9 @@ export function Duet<T extends string = string, U extends string = string>(props
   };
   // A switch leaves nothing open: "…" lists something else now, and with no burger left nothing could close the sheet.
   const asTabs = sides.map(sideTabs), tabsKey = asTabs.map((t) => t?.shown).join();
-  useLayout(() => { if (asTabs.every(Boolean)) setSidebar("closed"); }, [tabsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- tabsKey is asTabs
+  useLayout(() => { if (asTabs.every(Boolean)) send({ type: "tabs" }); }, [tabsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- tabsKey is asTabs
   // So does a new window on a Duo: an open menu's geometry is fixed when it opens, so a fold or turn would leave it at its old place, off the screen.
-  useLayout(() => { setMore("closed"); setArmed(false); setAsk("closed"); }, [tabsKey, ctx.duo && `${ctx.mode} ${ctx.width}`]);
+  useLayout(() => { send({ type: "reset" }); }, [tabsKey, ctx.duo && `${ctx.mode} ${ctx.width}`]);
 
   // The template for one side: its groups, where they go, and what "…" lists.
   const layout = (side: Side) => {
@@ -568,7 +569,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     const list: DuetItem[] = [
       ...(askAt && askAt === moreAt ? [p.primary!] : []), ...actions.slice(a.shown), ...(p.primary && !a.primary ? [p.primary] : []), ...folded,
       ...(move ? [{ id: "duet-side", label: `Move controls ${side === "left" ? "right" : "left"}`, icon: <ArrowLeftRight size={20} />, onPress: () => {
-        setMore("closed");
+        send({ type: "move" });
         if (nav.current) switchSide(nav.current, side === "left" ? "right" : "left");
       } }] : []),
       ...destructive,
@@ -644,26 +645,29 @@ export function Duet<T extends string = string, U extends string = string>(props
     return () => document.documentElement.removeAttribute("data-duet-close");
   }, [closeShown]);
   // A sheet takes over the column: nothing else stays open under it.
-  useEffect(() => { if (p.close) { setMore("closed"); setArmed(false); setAsk("closed"); closeSidebar(); } }, [!!p.close]);
+  useEffect(() => { if (p.close) send({ type: "close" }); }, [!!p.close]);
   // The box goes with its capsule: a primary that runs away or loses its capsule (a new page, no room) takes it along.
   const askable = !!layout(ctx.side).askAt;
-  useEffect(() => { if (!askable) setAsk("closed"); }, [askable]);
+  useEffect(() => { if (!askable) send({ type: "gone", surface: "ask" }); }, [askable]);
+  // "…" likewise: a row's action that takes "…" off the page (a new page, no room) closes it under its morph (#262).
+  const moreable = !!layout(split ? menuSide : ctx.side).moreAt;
+  useEffect(() => { if (!moreable) send({ type: "gone", surface: "more" }); }, [moreable]);
   // Mid-turn the layer is clipped out of the document (duet.css) and lets go of the sideways scroll; the landing
   // takes it up again, scrolled one column across for a left column.
   const sidebarEl = useRef<HTMLElement>(null);
   const [nav, nav2] = useColumnLayer(ctx.mode === "column" && ctx.hidden !== "moving", split, ctx.side === "left", column, ctx.mode === "column", sidebarEl);
-  const open = more !== "closed" || armed || ask !== "closed";
+  const open = listening(menuState);
   useEffect(() => {
     // Any touch outside the chrome closes "…" and disarms the primary, like a native context menu.
     if (!open) return;
     const close = (e: PointerEvent) => {
-      if (![nav, nav2].some((n) => n.current?.contains(e.target as Node)) && e.clientX >= 0 && e.clientX < innerWidth) { dismiss(); swallowClick(); }
+      if (![nav, nav2].some((n) => n.current?.contains(e.target as Node)) && e.clientX >= 0 && e.clientX < innerWidth && send({ type: "outside" })) swallowClick();
     };
     columnMiss = dismiss;
     addEventListener("pointerdown", close);
     return () => { removeEventListener("pointerdown", close); if (columnMiss === dismiss) columnMiss = null; };
   }, [open, nav, nav2]); // eslint-disable-line react-hooks/exhaustive-deps -- dismiss only sets state
-  useSideDrag(movable(ctx) ? ctx.side : null, nav, () => { setMore("closed"); setArmed(false); setAsk("closed"); });
+  useSideDrag(movable(ctx) ? ctx.side : null, nav, () => { send({ type: "reset" }); });
   const pressCtx = useRef(ctx);
   pressCtx.current = ctx;
   useEffect(() => listenPress(() => [nav.current, nav2.current], (el) => {
@@ -688,7 +692,7 @@ export function Duet<T extends string = string, U extends string = string>(props
   const scrolls = useRef(new Map<string, number>());
   const select = (id: string) => {
     const el = scroller.current;
-    closeSidebar(); dismiss();
+    send({ type: "place" });
     if (id === selected) return;
     if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop);
     p.menu!.onSelect(id);
@@ -703,14 +707,15 @@ export function Duet<T extends string = string, U extends string = string>(props
     : s.kind === "primary" ? <span className="duet-cta-icon" style={p.primary!.tint ? { "--duet-tint": p.primary!.tint } as CSSProperties : undefined}>{p.primary!.icon}</span> : actions[s.index].icon;
   const press = (s: Slot) => {
     if (s.kind === "place") select(menuItems[s.index].id);
-    else if (s.kind === "menu") { dismiss(); setSidebar((v) => (v === "open" ? "closing" : "open")); }
-    else if (s.kind === "more") { if (split) setMenuSide(tapSide); setArmed(false); closeAsk(); setMore((m) => (m === "open" ? "closing" : "open")); }
+    else if (s.kind === "menu") send({ type: "burger" });
+    else if (s.kind === "more") { if (split) setMenuSide(tapSide); send({ type: "more" }); }
     else if (s.kind === "close") p.close && p.close.onPress();
     else if (s.kind === "primary") {
-      closeMore();
-      if (p.primary!.confirm === false) p.primary!.onPress?.();
-      else { if (split) setMenuSide(tapSide); setAsk((a) => (a === "open" ? "closing" : "open")); }
-    } else { dismiss(); actions[s.index].onPress?.(); }
+      const confirm = p.primary!.confirm !== false;
+      if (confirm && split) setMenuSide(tapSide);
+      send({ type: "primary", confirm });
+      if (!confirm) p.primary!.onPress?.();
+    } else { send({ type: "action" }); actions[s.index].onPress?.(); }
   };
 
   const bar = (side: Side, i: number) => {
@@ -718,8 +723,9 @@ export function Duet<T extends string = string, U extends string = string>(props
     // Folded into "…", the primary arms in place (its row turns to `confirm`, the menu stays open) and runs on the
     // second tap, like its own capsule.
     const pick = (a: DuetItem) => () => {
-      if (a === p.primary && primaryTap(armed, p.primary.confirm) === "arm") return setArmed(true);
-      dismiss(); a.onPress?.();
+      const arm = a === p.primary && primaryTap(armed, p.primary.confirm) === "arm";
+      send({ type: "row", arm });
+      if (!arm) a.onPress?.();
     };
     const drawsMenu = more !== "closed" && moreAt && (!split || side === menuSide);
     const drawsAsk = ask !== "closed" && askAt && (!split || side === menuSide);
@@ -756,7 +762,7 @@ export function Duet<T extends string = string, U extends string = string>(props
           );
         })}</Presence>
         {drawsMenu && moreAt && (
-          <Morph open={more === "open"} from={moreAt.rect} pitch={moreAt.pitch} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, (places.length ? 1 : 0) + (pageHead ? 1 : 0))} fit={!!p.menu?.tabs} onClosed={() => setMore("closed")}>
+          <Morph open={more === "open"} from={moreAt.rect} pitch={moreAt.pitch} slots={moreAt.group.map(icon)} box={menuBox(f, moreAt.rect, places.length + list.length, (places.length ? 1 : 0) + (pageHead ? 1 : 0))} fit={!!p.menu?.tabs} onClosed={() => send({ type: "closed", surface: "more" })}>
             {placesFirst && placeRows}
             {pageHead && <div className="duet-menu-head">Actions</div>}
             {list.map((a) => {
@@ -772,9 +778,9 @@ export function Duet<T extends string = string, U extends string = string>(props
           </Morph>
         )}
         {drawsAsk && askAt && (
-          <Morph open={ask === "open"} from={askAt.rect} pitch={askAt.pitch} slots={askAt.group.map(icon)} box={confirmBox(f, askAt.rect)} fit={!!p.menu?.tabs} onClosed={() => setAsk("closed")} role="dialog" label={p.primary!.label}>
+          <Morph open={ask === "open"} from={askAt.rect} pitch={askAt.pitch} slots={askAt.group.map(icon)} box={confirmBox(f, askAt.rect)} fit={!!p.menu?.tabs} onClosed={() => send({ type: "closed", surface: "ask" })} role="dialog" label={p.primary!.label}>
             <div className="duet-confirm-head" style={tint}>{p.primary!.icon}<span>{p.primary!.label}</span></div>
-            <button className="duet-row duet-confirm" style={tint} onClick={() => { setAsk("closing"); p.primary!.onPress?.(); }}>
+            <button className="duet-row duet-confirm" style={tint} onClick={() => { send({ type: "confirm" }); p.primary!.onPress?.(); }}>
               <span>{p.primary!.confirm || p.primary!.label}</span>
             </button>
           </Morph>
@@ -803,7 +809,7 @@ export function Duet<T extends string = string, U extends string = string>(props
         </nav>
       )}
       {p.children !== undefined && (
-        <div ref={scroller} className="duet-scroller" data-slid={slid || undefined} onPointerDownCapture={slid ? closeSidebar : undefined}
+        <div ref={scroller} className="duet-scroller" data-slid={slid || undefined} onPointerDownCapture={slid ? () => send({ type: "page" }) : undefined}
           style={{ ...theme, translate: slid && sidebar === "open" ? `calc(${slide}px + ${clear}) 0` : undefined }}>{p.children}</div>
       )}
       {sides.map(bar)}

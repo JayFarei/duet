@@ -43,3 +43,21 @@ test("on iOS a column layer that follows the scroll drops the dodge for the whit
   assert.match(follow, /--duet-rim-blend-light: normal/);
   assert.match(follow, /--duet-glass-rim-light: var\(--duet-glass-rim-white\)/);
 });
+
+test("no theme brightens the rim band, so its inner edge shows no step over the fill (#271)", () => {
+  const filters = [...css.matchAll(/--duet-rim-filter:\s*([^;]+);/g)].map((m) => m[1]);
+  assert.equal(filters.length, 5);
+  for (const f of filters) assert.doesNotMatch(f, /brightness/, `--duet-rim-filter: ${f}`);
+  assert.equal(count(css, "--duet-rim-filter: blur(2.5px);"), 3, "all three dark themes keep only the blur");
+});
+
+test("off iOS the glass base blends normally under a tint, only iOS keeps darken and lighten (#273)", () => {
+  assert.match(css, /--duet-glass-blend-light: normal; --duet-glass-blend-dark: normal;/);
+  assert.match(css, /--duet-glass-fill-light: rgb\(255 255 255 \/ 0\.5\); --duet-glass-fill-dark: rgb\(0 0 0 \/ 0\.55\);/);
+  const ios = css.match(/@supports \(-webkit-touch-callout: none\) \{[\s\S]*?\n\}/)?.[0];
+  assert.match(ios, /--duet-glass-blend-light: lighten; --duet-glass-blend-dark: darken; --duet-glass-fill-light: transparent; --duet-glass-fill-dark: transparent;/);
+  assert.doesNotMatch(css, /--duet-glass-blend: (darken|lighten)/, "themes pick the blend through the -light and -dark vars");
+  assert.equal(count(css, "--duet-glass-blend: var(--duet-glass-blend-dark); --duet-glass-fill: var(--duet-glass-fill-dark)"), 3);
+  assert.equal(count(css, "--duet-glass-blend: var(--duet-glass-blend-light); --duet-glass-fill: var(--duet-glass-fill-light)"), 2);
+  assert.match(css, /::after \{[^}]*background: var\(--duet-glass-fill, transparent\); mix-blend-mode: var\(--duet-glass-blend\)/);
+});
