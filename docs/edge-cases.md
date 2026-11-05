@@ -80,6 +80,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [Selected tab in the column](#selected-tab-in-the-column)
 - [Light capsule with a white band](#light-capsule-with-a-white-band)
 - [Dark capsule with a lighter ring over a light page](#dark-capsule-with-a-lighter-ring-over-a-light-page)
+- [Dark glass vanishes on desktop over a light page](#dark-glass-vanishes-on-desktop-over-a-light-page)
 - [Light capsule edge reads as a seam](#light-capsule-edge-reads-as-a-seam)
 - [Capsule far from the fingers on the open screen](#capsule-far-from-the-fingers-on-the-open-screen)
 - [Tabs a little too tall for the room](#tabs-a-little-too-tall-for-the-room)
@@ -572,6 +573,14 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** keeps only the blur in the ring's filter in all three dark themes (`--duet-rim-filter: blur(2.5px)`), as in light mode.
 - **You do:** nothing.
 - **Status:** [#271](https://github.com/JayFarei/duet/issues/271). Desktop WebKit does not composite the dark glass like iOS, so this is checked on the Duo, not in the rim oracle.
+
+## Dark glass vanishes on desktop over a light page
+
+- **You see:** without the handling, in desktop Safari or Chrome with the system in dark mode and a light page, each capsule is nearly white and its white icons all but vanish. With the system light and a dark page, the capsule is dark grey under black icons.
+- **Cause:** the glass base is tuned to iOS, where it blends over the sharp layer with `darken` (dark) or `lighten` (light). Desktop engines do not composite those blends over a backdrop like iOS: dark glass over a 237 page paints about 237, against 178 on the Duo.
+- **Duet does:** off iOS, draws a plain frosted glass for demos (the docs site, Mac screenshots): the base blends normally under a flat tint, white at 50% in light, black at 55% in dark (`--duet-glass-fill-light`, `--duet-glass-fill-dark`). On iOS (`@supports (-webkit-touch-callout: none)`) the tint is transparent and the blends stay, so the Duo is unchanged.
+- **You do:** nothing. To retune the desktop glass, set `--duet-glass-fill-light` and `--duet-glass-fill-dark` on `.duet`.
+- **Status:** [#273](https://github.com/JayFarei/duet/issues/273). Not matched to native, by design.
 
 ## Light capsule edge reads as a seam
 

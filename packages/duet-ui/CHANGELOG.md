@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Desktop glass (#273): off iOS, the capsules and the menu draw plain frosted glass, a blur under a flat tint, so they stay legible in either theme over light and dark pages. Desktop engines do not composite iOS's darken and lighten blends, which left dark glass near white over a light page. iOS is unchanged. Retune with `--duet-glass-fill-light` and `--duet-glass-fill-dark`.
+
 ## 0.8.2-rc.1
 
 - Dark mode over a light page: each capsule had a lighter ring about 5pt wide inside its edge, with a hard step (#271). The ring's backdrop filter now keeps only its blur, as in light mode. Over a dark page nothing visible changes.
