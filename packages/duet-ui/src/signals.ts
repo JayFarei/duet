@@ -42,21 +42,29 @@ export function readSignals(): Signals {
  *  ms, re-reading on each change and once at the end. A page far narrower or wider than its window (more than `lag`
  *  apart: Safari's column is 84) is a fold caught halfway, so it does not count as holding until `cap`. After `cap` ms
  *  settling() turns false even if sizes still move, but polling goes on until they hold, so a real feedback loop
- *  cannot keep restarting the settle. */
+ *  cannot keep restarting the settle. A loop keeps its window, so `cap` counts from the last window change (outer size
+ *  or turn): a fold or rotation while a loop polls, or late in a long settle, still settles. */
 export const SETTLE = { poll: 100, quiet: 500, cap: 2000, lag: 100 } as const;
 const subs = new Set<() => void>();
-let settle: { start: number; since: number; last: string; capped: boolean; timer: ReturnType<typeof setInterval> } | undefined;
+let settle: { start: number; since: number; last: string; win: string; capped: boolean; timer: ReturnType<typeof setInterval> } | undefined;
 // Insets count too: the bottom inset lands only after viewport-fit=cover is set, and the preview rule reads it.
 const insets = () => { if (!probe) return ""; const p = getComputedStyle(probe); return `${p.paddingBottom} ${p.paddingLeft} ${p.paddingRight}`; };
 const sizes = () => `${outerWidth}x${outerHeight} ${innerWidth}x${innerHeight} ${visualViewport?.height ?? innerHeight} ${insets()}`;
+const win = () => `${outerWidth}x${outerHeight} ${screen.orientation?.angle ?? 0}`;
 const notify = () => subs.forEach((f) => f());
+/** Another window: the cap starts again, so its transit reads as settling (hidden), not as a loop. */
+function renew(s: NonNullable<typeof settle>, now: number) {
+  if (s.win !== win()) Object.assign(s, { start: now, win: win(), capped: false });
+}
 function kick() {
-  if (settle) { settle.since = Date.now(); return; }
   const now = Date.now();
-  settle = { start: now, since: now, last: sizes(), capped: false, timer: setInterval(tick, SETTLE.poll) };
+  if (settle) { settle.since = now; renew(settle, now); return; }
+  settle = { start: now, since: now, last: sizes(), win: win(), capped: false, timer: setInterval(tick, SETTLE.poll) };
 }
 function tick() {
-  const s = settle!, now = Date.now(), k = sizes(), capped = now - s.start >= SETTLE.cap;
+  const s = settle!, now = Date.now();
+  renew(s, now);
+  const k = sizes(), capped = now - s.start >= SETTLE.cap;
   const changed = k !== s.last, lagging = Math.abs(outerWidth - innerWidth) > SETTLE.lag;
   if (changed) [s.last, s.since] = [k, now];
   if (now - s.since >= SETTLE.quiet && (!lagging || capped)) { clearInterval(s.timer); settle = undefined; return notify(); }
