@@ -45,7 +45,39 @@ cd packages/duet-ui && node test/capture-golden.mjs
 
 ## Model-based tests (MBT)
 
-Stateful parts, such as the settling damper (`stable`) and the "…" open, closing and closed states, are better tested as a model. A test generates a random sequence of commands (signal changes, taps, unmounts), runs each command against both a small reference model and the real code, and checks they agree after every step. fast-check's `fc.commands` and `fc.modelRun` do this. The geometry tests above are stateless and do not need it.
+Stateful parts are tested as a model: a test generates a random sequence of commands (taps, spring ends, signal changes, template changes), runs it against the real code and checks invariants after every step.
+
+### Menu state (`test/props-menu.test.mjs`)
+
+"…", the sidebar and the primary's confirmation box are one pure reducer (`src/menu.ts`); `chrome.tsx` sends it every tap, spring end and layout change. An `fc.commands` model drives random taps, springs and template changes (the "…" capsule leaving, the primary moving into "…" or away) against a boolean model. Invariants:
+
+- After settling, nothing is stuck "closing".
+- With nothing open, an outside tap reaches the page; only the dismiss tap of an open "…" or box is swallowed.
+- "…" and the box are never both open.
+- A capsule leaving the template closes its surface and disarms the primary.
+
+Pinned: #262, #253a, armed then Move, and the shrunk counterexamples. A source-grep test checks `chrome.tsx` sends "gone" for both capsules, which the model cannot see.
+
+### Posture traces (`test/props-signals.test.mjs`, `test/props-posture.test.mjs`)
+
+`test/arb-posture.mjs` holds the landed windows (`POSTURES`, from the measured fixtures), the transition paths each fold, unfold, turn or split passes through, Home Screen launches (`LAUNCHES`), the in-app preview loading (`LOADS`), drift (Safari's bar 50 to 110, the banner, the simulator and real Duo keyboards, the top inset), and `drive()`, which feeds `stable()` the way `chrome.tsx` does: a read on each event, on the `signals.ts` settle poll, and at the damper's timers.
+
+- props-signals: a Safari tab in the column (P, L90, L270, S) under scroll and keyboard drift, read through `drive()` and directly with random settling, plus any bar from 0 to 150 after landing. Every read stays in the column, on its side, shown (#132).
+- props-posture: random traces of folds, turns, split view, the keyboard, the bar, the preview handed to a tab and Home Screen launches, with events cutting into transitions. On every read: a placement this stretch landed in, insets 0 to 88px, never over the status clock, never at the closed screen's places on the open screen, a Home Screen app's tabs the same from its first shown read, never a tab's controls on the preview, no flash under `LAND_HOLD` after a transit, at most 3 settled mode changes per 2s per window, no timer spin. At the end, settled on what `detect()` says.
+
+Proven by reverting 0b89ebb, ae590b2, 5d9b39a, 503ad1e, 89466d1 and 9d37db9/12abe27, each counterexample pinned. Not modeled: the layout viewport's scroll offset (#126, `KEYBOARD_DOWN`).
+
+## Pixel and differential oracles (e2e)
+
+`e2e/site/rim.spec.ts` checks the glass rim pixel by pixel. It samples rings 1.5, 4 and 8px inside every drawn control (inline group, open "…", the closed Duo's column capsule through `/space`) in light and dark, on WebKit and Chromium at 390x844 and 1440x900, against the page 6px outside on the same normal. Light fails on luminance under 0.15 over a lighter page, dark on over 0.85 over a darker one. Replay an older stylesheet without a rebuild:
+
+```sh
+git show v0.8.0:packages/duet-ui/src/duet.css > /tmp/old.css && DUET_CSS=/tmp/old.css pnpm exec playwright test -c playwright.site.config.ts rim.spec.ts
+```
+
+That fails on the v0.8.0 black caps (worst 28 to 36). The iOS-only `.duet[data-follow]` rim cannot be checked on desktop engines; use the Duo Lab sim.
+
+`e2e/site/space.spec.ts` diffs the site's web Duo mock against the real sim's space map in `e2e/site/fixtures/space-map.json`: mode, the signals the mock posts (`/space?s=<state>` exposes them as `data-space-signals`) and the preview's native button tops (`data-wd-native`), 1pt tolerance, with a markdown table attached. It also checks #110's placement invariant per scene: every shown group inside the screen and window, clear of every native button. The fixture is transcribed from #189, not captured; recapture with `tools/e2e` on a free Duo e2e clone and set `"source"` accordingly. Run against a built site with `SITE_PORT=<port> SITE_REUSE=1`, specs `space.spec.ts --project chromium-1440 --project webkit-1440`.
 
 ## Runs and replay
 
