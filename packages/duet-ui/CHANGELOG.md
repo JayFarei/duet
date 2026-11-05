@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.2
+
+Everything from 0.8.2-rc.1, plus a simple desktop glass for demos.
 
 - Desktop glass (#273): off iOS, the capsules and the menu draw plain frosted glass, a blur under a flat tint, so they stay legible in either theme over light and dark pages. Desktop engines do not composite iOS's darken and lighten blends, which left dark glass near white over a light page. iOS is unchanged. Retune with `--duet-glass-fill-light` and `--duet-glass-fill-dark`.
 
