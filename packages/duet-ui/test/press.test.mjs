@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { HOP, LENS, PRESS, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
+import { HOP, LENS, PRESS, heldShape, lensAt, lensStep, pressShape, refractMap, swellShape } from "../src/press.ts";
 import { TEMPLATE, frame, landingRoom, placeTabs, spring, template } from "../src/template.ts";
 import { columnBand, detect } from "../src/geometry.ts";
 
@@ -147,5 +147,25 @@ test("lens: a release on any tab's resting centre names that tab, at the normal 
   assert.ok(checked > 30, "covers the long capsules, 12 places with actions and a primary in tall Safari among them");
   // and the press opens exactly this shape, from the rest, the count and the band alone
   const src = readFileSync(new URL("../src/press.ts", import.meta.url), "utf8");
-  assert.match(src, /shape: pressShape\(rest, n, band\(h\.nav\)\)/);
+  assert.match(src, /shape: heldShape\(rest, n, pitch, band\(h\.nav\), held\)/);
+});
+
+// Gabriele (2026-11-22): on the Home Screen, prod's capsule opened to 78.8pt from 49 (1.6x, 1.69x with the spring) and
+// its centre moved 10pt, which reads as the column leaving its rail. There it only swells, about its centre.
+test("held, Home Screen: the capsule keeps its swell, within PRESS.bound and in place; Safari's open is unchanged", () => {
+  const pitch = TEMPLATE.item, r = { x: 393.5, y: 244, w: 49, h: TEMPLATE.control + 6 * pitch };
+  const s = heldShape(r, 7, pitch, { top: 16, bottom: 641 }, true);
+  assert.deepEqual(s, swellShape(r, pitch));
+  assert.ok(s.w / r.w <= PRESS.bound && s.h / r.h <= PRESS.bound);
+  assert.ok(Math.abs(s.x + s.w / 2 - (r.x + r.w / 2)) < 1e-9 && Math.abs(s.y + s.h / 2 - (r.y + r.h / 2)) < 1e-9);
+  assert.deepEqual(heldShape(r, 7, pitch, { top: 16, bottom: 641 }, false), pressShape(r, 7, { top: 16, bottom: 641 }));
+  for (let k = 0; k < 7; k++) assert.equal(lensAt(r.y + TEMPLATE.control / 2 + k * pitch - s.y, 7, s.pitch, s.top).index, k);
+});
+
+test("held, Home Screen: the lens stays inside the capsule, and a lone button swells no more than a capsule", () => {
+  const css = readFileSync(new URL("../src/duet.css", import.meta.url), "utf8");
+  assert.match(css, /\.duet-group\[data-press-bound\]:has\(> \.duet-lens\) \{ overflow: hidden; \}/);
+  assert.match(css, /\.duet-group\[data-press="down"\]\[data-press-bound\]:not\(:has\(> \.duet-btn:nth-of-type\(2\)\)\) \{ scale: 1\.06; \}/);
+  const src = readFileSync(new URL("../src/chrome.tsx", import.meta.url), "utf8");
+  assert.match(src, /\(\) => pressCtx\.current\.standalone\), \[nav, nav2\]\)/);
 });

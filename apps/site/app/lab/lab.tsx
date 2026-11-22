@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Bell, Bookmark, Pencil, Plus, Share, Trash2 } from "lucide-react";
 import { Duet, bleed, useDuet, type DuetItem, type DuetMenuItem } from "duet-ui";
 import { Feed } from "./feed";
@@ -19,16 +19,18 @@ const PLACES: DuetMenuItem[] = [
 const BACKDROPS = ["", "linear-gradient(#7f00ff, #e100ff, #ff4e50)",
   "repeating-linear-gradient(#ff3b30 0 24px, #ffcc00 24px 48px, #34c759 48px 72px, #007aff 72px 96px)",
   "repeating-linear-gradient(#000 0 16px, #fff 16px 18px)"];
+type Iconed = DuetMenuItem & { icon: ReactNode }; // every lab place has one, so bar=1 can show them as tabs
 const ICONS = [Bell, Share, Bookmark, Trash2, Pencil];
 const NAMES = ["Alerts", "Share", "Save", "Delete", "Edit"];
 
 // Query keys. menu=N places (tabs=N is the 0.5 name, still read), searchTab=1 adds a Search place, back=1 opens a
 // detail with a Back action first, leading=N more actions before them, actions=N, primary=1, confirm=1 (the primary
-// arms as "Confirm new"), close=1 (a sheet).
+// arms as "Confirm new"), close=1 (a sheet), move=1 (moveControls), bar=1 (the places as tabs), read=1 (a .duet-column
+// reading column).
 // Keys of removed props (accessory, minimize, search, morph) are ignored, so old capture URLs still load.
-type S = Record<"menu" | "back" | "actions" | "primary" | "confirm" | "close" | "title" | "leading" | "searchTab" | "list" | "dark" | "feed" | "bg", number>;
+type S = Record<"menu" | "back" | "actions" | "primary" | "confirm" | "close" | "title" | "leading" | "searchTab" | "list" | "dark" | "feed" | "bg" | "move" | "bar" | "read", number>;
 function parse(q: string): S {
-  const s = { menu: 0, back: 0, actions: 0, primary: 0, confirm: 0, close: 0, title: 0, leading: 0, searchTab: 0, list: 0, dark: 0, feed: 0, bg: 0 };
+  const s = { menu: 0, back: 0, actions: 0, primary: 0, confirm: 0, close: 0, title: 0, leading: 0, searchTab: 0, list: 0, dark: 0, feed: 0, bg: 0, move: 0, bar: 0, read: 0 };
   for (const kv of q.replace(/^\?/, "").split(/[,&]/)) {
     const [k0, v] = kv.split("="), k = k0 === "tabs" ? "menu" : k0;
     if (k in s) s[k as keyof S] = Number(v) || 0;
@@ -76,6 +78,7 @@ html,body{margin:0;background:var(--bg)}
   };
   const name = depth ? "Detail" : s.menu ? PLACES[Number(tab)]?.label ?? "Search" : "Root";
   const places = [...PLACES.slice(0, s.menu), ...(s.searchTab ? [{ id: "99", label: "Search", icon: <SearchIcon /> }] : [])];
+  const pick = { selected: tab, onSelect: (id: string) => { setTab(id); setTapped(`place ${id}`); } };
   const [sheet, setSheet] = useState(false);
   useEffect(() => { setSheet(s.close > 0); }, [s.close]);
 
@@ -84,7 +87,8 @@ html,body{margin:0;background:var(--bg)}
       <style>{theme}</style>
       <Duet
         dark={s.dark ? s.dark > 0 : undefined}
-        menu={places.length ? { items: places, selected: tab, onSelect: (id) => { setTab(id); setTapped(`place ${id}`); } } : undefined}
+        moveControls={s.move > 0}
+        menu={!places.length ? undefined : s.bar > 0 ? { ...pick, items: places as Iconed[], tabs: true } : { ...pick, items: places }}
         actions={[
           ...(depth > 0 ? [{ id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: () => { setDepth(0); setTapped("Back"); } }] : []),
           ...Array.from({ length: s.leading }, (_, i) => action(i + 2, "l")),
@@ -98,6 +102,11 @@ html,body{margin:0;background:var(--bg)}
         </div>}
         {s.bg > 0 && <div style={{ position: "fixed", inset: 0, zIndex: -1, background: BACKDROPS[s.bg] }} />}
         {s.feed > 0 && <Feed />}
+        {s.read > 0 && (
+          <main className="duet-column" style={{ font: "17px/1.5 -apple-system, system-ui", padding: "24px 0" }}>
+            {Array.from({ length: 6 }, (_, i) => <p key={i}>Paragraph {i + 1}. A reading column at most 680 wide, centred on the whole window, kept clear of the controls.</p>)}
+          </main>
+        )}
         {s.list > 0 && (
           <ul style={{ listStyle: "none", margin: 0, padding: "8px 0 120px" }}>
             {Array.from({ length: 40 }, (_, i) => (

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { isPreview, previewReason, readSignals } from "duet-ui";
 
 // e2e only (tools/e2e): with ?e2e in the URL (or once seen in this tab), posts Duet's full state to the local
@@ -86,6 +86,14 @@ function targets() {
   return out;
 }
 
+function inspectorState() {
+  return {
+    level: document.documentElement.getAttribute("data-duet-inspector") ?? "closed",
+    selected: document.querySelector("[data-inspector-selected]")?.getAttribute("data-inspector-selected") ?? null,
+    title: document.querySelector("aside.duet-inspector h2")?.textContent ?? null,
+  };
+}
+
 function sample(s: string | null) {
   const sig = readSignals();
   const navs = [...document.querySelectorAll("nav.duet")].map((n) => ({
@@ -93,7 +101,7 @@ function sample(s: string | null) {
     hidden: n.getAttribute("data-hidden"), confidence: n.getAttribute("data-confidence"),
     keyboard: n.getAttribute("data-keyboard"), rect: rect(n), shown: shown(n),
     slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({
-      slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), buttons: buttons(s), expanded: s.getAttribute("data-expanded"),
+      slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), visibleLabels: buttons(s).map((b) => b.label), buttons: buttons(s), expanded: s.getAttribute("data-expanded"),
     })),
     // An open "…" or tab menu is drawn outside the slots: the driver taps its items (a back folded into "…") by label.
     menus: [...n.querySelectorAll("[role=menu]")].filter(shown).map((m) => ({ rect: rect(m), buttons: buttons(m) })),
@@ -151,9 +159,17 @@ function sample(s: string | null) {
     visible: document.visibilityState, frameAt, focus: document.hasFocus(),
     active: document.activeElement && document.activeElement !== document.body ? document.activeElement.tagName.toLowerCase() : null,
     sig, preview: isPreview(sig), reason: previewReason(sig) ?? null,
+    // Proof the page runs as a Home Screen web app, read from the browser itself, never from a query param (sa*).
+    standalone: { navigator: (navigator as { standalone?: boolean }).standalone === true, displayMode: matchMedia("(display-mode: standalone)").matches },
+    // The control column's groups (nav or DuetControlColumn) and anything a drag left behind: the sa* drags compare them.
+    column: {
+      groups: [...document.querySelectorAll(".duet .duet-group")].filter(shown).map((g) => ({ rect: rect(g), buttons: buttons(g) })),
+      dragLeft: [...document.querySelectorAll("[style*='--duet-drag'], [data-drag]")].map(label),
+    },
     html: { mode: h.getAttribute("data-duet-mode"), split: h.getAttribute("data-duet-split"), emulated: h.getAttribute("data-duet-emulated"), close: h.hasAttribute("data-duet-close"), pending: h.hasAttribute("data-duet-pending") },
     // The invisible edge guards (duet.css): e2e.py checks each still straddles its viewport edge (#147).
     guards: [...document.querySelectorAll(".duet-guard")].map((g) => ({ side: g.getAttribute("data-side"), rect: rect(g) })),
+    inspector: inspectorState(),
     navs,
     scroll: { scrollWidth: h.scrollWidth, clientWidth: W, bodyScrollWidth: document.body.scrollWidth, x: scrollX, y: scrollY },
     vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop, w: visualViewport.width, h: visualViewport.height, scale: visualViewport.scale } : null,
@@ -179,6 +195,7 @@ function lean() {
 }
 
 export function E2EReporter() {
+  const [gen, setGen] = useState(0);
   useEffect(() => {
     // The top page only: a same-origin iframe (/'s Duo demo of the Inbox example) shares the tab's sessionStorage, so it
     // would report under the run's token and the driver could follow it instead of the page (nav01-04, "the page is
@@ -215,8 +232,43 @@ export function E2EReporter() {
       }, 400);
       return () => { clearInterval(take); clearInterval(send); cancelAnimationFrame(raf); };
     }
+    const standalone = (navigator as { standalone?: boolean }).standalone === true || matchMedia("(display-mode: standalone)").matches;
+    if (!origin && standalone) {
+      // A Home Screen web app opens its fixed start URL with its own storage: no ?e2e, nothing kept from Safari. Follow
+      // the dev server's relay (/api/e2e-relay) instead: its beacon and run token, and the page the driver asks for.
+      let alive = true, timer = 0;
+      const poll = async () => {
+        try {
+          const r: { beacon: string | null; s: string | null; path: string | null } = await (await fetch("/api/e2e-relay", { cache: "no-store" })).json();
+          const b = r.beacon && loopback(r.beacon);
+          if (alive && b) {
+            sessionStorage.setItem(KEY, b);
+            if (r.s) sessionStorage.setItem(S_KEY, r.s);
+            if (r.path && r.path !== location.pathname + location.search) return location.replace(r.path);
+            setGen((g) => g + 1);
+            return;
+          }
+        } catch { /* dev server down or not dev: no reporting */ }
+        if (alive) timer = window.setTimeout(poll, 500);
+      };
+      poll();
+      return () => { alive = false; clearTimeout(timer); };
+    }
     if (!origin) return;
     if (early) early.stop = 1;
+    // Standalone: keep following the relay, so the driver can move the installed app to another page or run.
+    let follow = 0;
+    if (standalone) {
+      const check = async () => {
+        try {
+          const r: { path: string | null; s: string | null } = await (await fetch("/api/e2e-relay", { cache: "no-store" })).json();
+          if (r.s && r.s !== s) { sessionStorage.setItem(S_KEY, r.s); s = r.s; }
+          if (r.path && r.path !== location.pathname + location.search) return location.replace(r.path);
+        } catch { /* ignore */ }
+        follow = window.setTimeout(check, 500);
+      };
+      follow = window.setTimeout(check, 500);
+    }
     const url = origin + "/beacon";
     raf = requestAnimationFrame(frame);
     const touch = (e: Event) => {
@@ -229,25 +281,27 @@ export function E2EReporter() {
     for (const type of ["touchstart", "pointerdown", "click"]) addEventListener(type, touch, { capture: true, passive: true });
     const isNav = (n: Node) => n instanceof Element && (n.matches("nav.duet") || !!n.querySelector("nav.duet"));
     const mo = new MutationObserver((records) => {
-      if (!records.some((m) => m.type === "attributes" ? isNav(m.target) && (m.target as Element).matches("nav.duet") : [...m.addedNodes].some(isNav))) return;
+      const inspectorChange = document.querySelector("[data-inspector-selected]") && records.some((m) =>
+        m.target instanceof Element && (m.target.closest("nav.duet") || m.target.hasAttribute("data-inspector-selected")));
+      if (!inspectorChange && !records.some((m) => m.type === "attributes" ? isNav(m.target) && (m.target as Element).matches("nav.duet") : [...m.addedNodes].some(isNav))) return;
       prepaint.push({
-        t: Date.now(), visible: document.visibilityState, frameAt, sig: readSignals(), y: scrollY,
+        t: Date.now(), visible: document.visibilityState, frameAt, sig: readSignals(), y: scrollY, inspector: inspectorState(),
         vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop } : null,
         navs: [...document.querySelectorAll("nav.duet")].map((n) => ({
           mode: n.getAttribute("data-mode"), side: n.getAttribute("data-side"), hidden: n.getAttribute("data-hidden"), follow: n.hasAttribute("data-follow"),
-          slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((x) => ({ slot: x.getAttribute("data-duet-slot"), rect: rect(x) })),
+          slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((x) => ({ slot: x.getAttribute("data-duet-slot"), rect: rect(x), visibleLabels: buttons(x).map((b) => b.label) })),
         })),
       });
       if (prepaint.length > 20) prepaint.shift();
     });
-    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-mode", "data-hidden"] });
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-mode", "data-hidden", "data-inspector-selected", "aria-label"] });
     const id = setInterval(() => {
       try { fetch(url, { method: "POST", body: JSON.stringify(sample(s)), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
     }, 40);
     return () => {
-      clearInterval(id); cancelAnimationFrame(raf); mo.disconnect();
+      clearInterval(id); cancelAnimationFrame(raf); mo.disconnect(); clearTimeout(follow);
       for (const type of ["touchstart", "pointerdown", "click"]) removeEventListener(type, touch, { capture: true });
     };
-  }, []);
+  }, [gen]);
   return null;
 }

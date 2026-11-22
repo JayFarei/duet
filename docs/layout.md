@@ -25,11 +25,13 @@ Neither value is enough alone. `--duet-inset-top` holds only the extra blur iOS 
 
 ### Status bar style for Home Screen apps
 
-Use `default`, or leave the meta out:
+On a Duo, Duet sets it to `black-translucent`, whatever the page set (`bootScript` before the first paint, and the mounted chrome after any later rewrite of the meta). Every other device keeps the page's own style: an iPad app can keep `black` or `default`. Set your own for the other devices, for example `default`, or leave the meta out:
 
 ```html
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 ```
+
+Why on a Duo: with `default` or `black`, a Home Screen app on the open Duo, wide, gets an 867pt page in the 951pt window. iOS keeps an 84pt band for the status column (clock, island) outside the page and paints it (black with `black`), and Duet's controls, with no inset to dock in, reserve another 84pt inside the page (`inline`): the content stops about 168pt short of the screen's edge, the controls float between it and the band. With `black-translucent` the page has the whole window, the status column is its safe-area inset, and the controls dock in that inset (`strip`): content padded by `--duet-inset-right` (or `-left`) ends at the rail, within `RAIL.gutter` (11pt).
 
 Measured on the Duo simulator's inner screen, tall:
 
@@ -39,7 +41,7 @@ Measured on the Duo simulator's inner screen, tall:
 | `black` | same as `default` | same as `default` |
 | `black-translucent` | 669x869, safe top 82, 82pt strip below the page | 669x930, safe top 82, 21pt strip below the page |
 
-No style or `viewport-fit` reaches the full 951pt. With `default` iOS fills the band with the colour at the page's top, so keep that colour at the viewport's top. With `black-translucent` the strip below the page is unreachable and shows the `html` and `body` background. The icon keeps the style it had when it was added to the Home Screen: remove it and add it again to change it. Next.js sets this with `appleWebApp.statusBarStyle`.
+Wide, `default` and `black` give the 867pt page above; `black-translucent` gives 951x669 launched wide and 951x648 rotated to wide (a 21pt strip below), its status column the 84pt safe-area inset on its side. The strip below the page is unreachable and shows the `html` and `body` background, so give both the page's own background. With `default` iOS fills the band with the colour at the page's top. The icon keeps the style it had when it was added to the Home Screen: remove it and add it again to change it (an icon added before Duet set the style keeps the band). Next.js sets the page's meta with `appleWebApp.statusBarStyle`.
 
 ### Column mode without children: Duet places the page
 
