@@ -26,7 +26,7 @@ function boot(s) {
     innerWidth: s.innerWidth, innerHeight: s.innerHeight, outerWidth: s.outerWidth, outerHeight: s.outerHeight, devicePixelRatio: 3,
     screen: { width: s.screenWidth, height: s.screenHeight, orientation: { angle: 0 } },
     navigator: { userAgent: s.userAgent, maxTouchPoints: s.touchPoints, standalone: s.standalone }, matchMedia: () => ({ matches: false }),
-    document: { documentElement: html, querySelector: () => null }, visualViewport: { height: s.innerHeight, scale: 1 },
+    document: { documentElement: html, querySelector: () => null, querySelectorAll: () => [], createElement: () => ({}), head: { appendChild() {} } }, visualViewport: { height: s.innerHeight, scale: 1 },
   };
   g.window = g; g.top = g;
   vm.runInNewContext(bootScript, g);

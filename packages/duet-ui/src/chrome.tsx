@@ -6,7 +6,7 @@ import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.
 import { DUO, columnBand, controlsShown, isSplit, pageInsets, sheetLayout, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
 import { CLEAR_MS, GROUP, MORPH_CLOSE, MORPH_OPEN, SLIDE, TEMPLATE, frame, lead, menuBox, confirmBox, morphHeight, landingRoom, canMoveControls, placeTabs, primaryTap, template, type Rect, type Slot } from "./template.ts";
 import { emulatedSignals, epoch, readSignals, settling, watchSignals } from "./signals.ts";
-import { unboot } from "./boot.ts";
+import { duoStatusBar, unboot } from "./boot.ts";
 import { PRESS, listenPress } from "./press.ts";
 import { CLOSED, listening, menus, type MenuEvent, type Menus } from "./menu.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
@@ -695,9 +695,10 @@ export function Duet<T extends string = string, U extends string = string>(props
   }, () => pressCtx.current.standalone), [nav, nav2]);
 
   // The safe areas only reach the page with viewport-fit=cover. Set on mount, not on import, so a page that only
-  // imports DuoCookie keeps its own viewport on other phones.
+  // imports DuoCookie keeps its own viewport on other phones. On a Duo the Home Screen status bar is translucent too
+  // (duoStatusBar), for a page without bootScript or one whose framework rewrites the meta after it.
   useLayout(() => {
-    const patch = () => { viewport("viewport-fit", "cover"); viewport("shrink-to-fit", "no"); };
+    const patch = () => { viewport("viewport-fit", "cover"); viewport("shrink-to-fit", "no"); duoStatusBar(readSignals()); };
     patch();
     // Keep them patched when the framework adds or rewrites a viewport meta later.
     const watch = new MutationObserver(patch);

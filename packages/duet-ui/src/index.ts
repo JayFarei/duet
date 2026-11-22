@@ -4,7 +4,7 @@ export { epoch, readSignals, settling, watchSignals } from "./signals.ts";
 export { bleed, column } from "./layout.ts";
 export { DuetPanes, DuetPaneBar, usePanes, type DuetPanesProps, type DuetPaneBarProps } from "./duet-panes.tsx";
 export { panes, backFrom, type PaneWindow } from "./panes.ts";
-export { browserOf, detect, deviceOf, isDuo, isIOS, isPreview, isSplit, previewReason, stable, PIN_MAX, PIN_TTL, columnBand, magnet, pageInsets, sidebarInset, DUO, INLINE_WIDTH, MAGNET, WIDE, type Browser, type Context, type Device, type Layout, type Mode, type Side, type Signals } from "./geometry.ts";
+export { browserOf, detect, deviceOf, isDuo, isIOS, isPreview, isSplit, previewReason, stable, PIN_MAX, PIN_TTL, columnBand, magnet, pageInsets, sidebarInset, DUO, INLINE_WIDTH, MAGNET, RAIL, WIDE, type Browser, type Context, type Device, type Layout, type Mode, type Side, type Signals } from "./geometry.ts";
 export { inspector, initialInspector, canSplit, stepCard, paneCommands, SPLIT_WIDTH, type InspectorState, type InspectorEvent, type InspectorContext, type InspectorHistory, type InspectorStep, type PaneCommand, type PaneCommandId } from "./inspector.ts";
 export { hitsControl, inspectorKey, isTyping, withEntry, readEntry, needsRepair, inOrder, viewerStep, rootAttrs, scrollToTop, INTERACTIVE, TYPING, HISTORY_KEY } from "./organisms.ts";
 export { useInspector, DuetInspector, type UseInspectorOptions, type Inspector, type DuetInspectorProps } from "./inspector-ui.tsx";

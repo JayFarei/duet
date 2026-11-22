@@ -24,6 +24,7 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - [White strip beside the open sidebar in the right split pane](#white-strip-beside-the-open-sidebar-in-the-right-split-pane)
 - [Header in the status bar after rotating a Home Screen app](#header-in-the-status-bar-after-rotating-a-home-screen-app)
 - [Blank strip below a Home Screen app](#blank-strip-below-a-home-screen-app)
+- [Dead gutter beside a Home Screen app in landscape](#dead-gutter-beside-a-home-screen-app-in-landscape)
 - [Burger mid-page on a wide window](#burger-mid-page-on-a-wide-window)
 - [Split view pane, or the closed Duo turned left](#split-view-pane-or-the-closed-duo-turned-left)
 - [Right split pane holds two buttons](#right-split-pane-holds-two-buttons)
@@ -762,9 +763,17 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 
 - **You see:** an empty strip below the page that does not scroll: 82pt launched tall, 21pt rotated to tall or wide.
 - **Cause:** the icon was added with `black-translucent`. The viewport starts at the screen's top and ends short of its foot. The other styles do not do this.
-- **Duet does:** nothing it can: the style is read when the icon is added, and it is not Duet's meta.
-- **You do:** use `default` and add the icon again. If you keep `black-translucent`, the `html` and `body` background paints the strip. See [Status bar style](layout.md#status-bar-style-for-home-screen-apps).
+- **Duet does:** on a Duo it sets `black-translucent` itself, since the other styles cost a dead gutter wide (see [Dead gutter beside a Home Screen app in landscape](#dead-gutter-beside-a-home-screen-app-in-landscape)). The strip is the smaller cost: it shows the page's own background.
+- **You do:** give `html` and `body` the page's background, so the strip reads as the page. On other devices use `default` if you do not want it. See [Status bar style](layout.md#status-bar-style-for-home-screen-apps).
 - **Status:** observed on the Duo simulator, bare page and fixture. Manifest display modes through a real Add to Home Screen were not tested.
+
+## Dead gutter beside a Home Screen app in landscape
+
+- **You see:** a Home Screen app on the open Duo, wide: the content stops well short of the edge (cards at ~785 of 951pt), the controls float in a black strip beside the clock column.
+- **Cause:** the icon was added with the status bar style `black` or `default`. iOS then gives the page 867 of the 951pt window and keeps an 84pt band for the status column outside it, with no safe-area inset on that side. Duet, with no inset to dock in, reserves 84pt more inside the page (`inline`).
+- **Duet does:** on a Duo it sets `apple-mobile-web-app-status-bar-style` to `black-translucent` (`bootScript`, and the mounted chrome). The page gets the whole window, the status column is its safe-area inset, and the controls dock there (`strip`); `--duet-inset-left/right` is that inset. Other devices keep the page's style.
+- **You do:** pad content by `--duet-inset-left/right` so it ends at the rail (within `RAIL.gutter`, 11pt). Remove the icon and add it again: an icon keeps the style it was added with. Give `html` and `body` the page's background for the strip below (see [Blank strip below a Home Screen app](#blank-strip-below-a-home-screen-app)).
+- **Status:** reported on a real Duo (Gabriele, 2026-11-22, the dashboard, `black`). The fix is unit-tested (`gutter.test.mjs`, `boot.test.mjs`). The `gutter` and `gutter-app` e2e scenarios (tools/e2e/EXPECTED.md, folded and unfolded, turned 90 and 270) have not yet given a Home Screen verdict on the Duo simulator: their Add to Home Screen setup blocked.
 
 ## Burger mid-page on a wide window
 

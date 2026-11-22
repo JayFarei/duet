@@ -54,8 +54,10 @@ export const SAFARI = { rows: 2, forward: DUO.groupItem + 2, pill: DUO.pillPad +
   landscape: { left: { top: 81.5, pill: 327 }, right: { top: 23.5, pill: 279 } } } as const;
 
 /** How close one group may come to Safari's column buttons where the band is short (a lone group may take all
- *  but `gap` of the usual gap on each side). */
-export const RAIL = { gap: 5 } as const;
+ *  but `gap` of the usual gap on each side). `gutter`: the most room a page's content may leave between its outer
+ *  edge and the controls' rail (the page inset on their side, `--duet-inset-left/right`), the usual gap between two
+ *  groups (DUO.gap); anything wider reads as a dead gutter. */
+export const RAIL = { gap: 5, gutter: 11 } as const;
 
 export interface Signals {
   innerWidth: number;

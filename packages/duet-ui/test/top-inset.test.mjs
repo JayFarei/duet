@@ -23,9 +23,14 @@ test("the docs give the sum, and say which status bar style to use", () => {
   assert.match(doc, /`black-translucent`/);
 });
 
-test("the edge cases list both Home Screen entries", () => {
+test("on a Duo the library sets the translucent style, in the boot script and on mount", () => {
+  assert.match(read("../src/boot.ts"), /finally { duoStatusBar\(s\); }/);
+  assert.match(read("../src/chrome.tsx"), /duoStatusBar\(readSignals\(\)\)/);
+});
+
+test("the edge cases list the Home Screen entries", () => {
   const doc = read("../../../docs/edge-cases.md");
-  for (const h of ["Header in the status bar after rotating a Home Screen app", "Blank strip below a Home Screen app"]) {
+  for (const h of ["Header in the status bar after rotating a Home Screen app", "Blank strip below a Home Screen app", "Dead gutter beside a Home Screen app in landscape"]) {
     assert.ok(doc.includes(`## ${h}`));
     assert.ok(doc.includes(`[${h}](#`));
   }
