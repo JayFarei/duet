@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # run with pytho
 from sim import Sim, SimError  # noqa: E402
 import catalogue  # noqa: E402
 import workbench  # noqa: E402
+from inspector_checks import capsule_flash, outcome as inspector_outcome
 from catalogue import TAB, LANDSCAPE_TOP_BARS, PREVIEW, preview_expect, UNFOLDED, UNFOLDED_PREVIEW, SPLIT  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -535,6 +536,15 @@ class Run:
             allr = [r for r in allr if r["rx"] not in unpainted] or allr[-1:]
         if stale:
             note.append(f"{len(stale)} samples of the hidden layout in the first render after the page was shown again, not judged")
+        # Inspector endpoint checks are pure so saved reports retain them on --rerender too.
+        bad.extend(inspector_outcome(allr[-1], res.get("check") or {}))
+        for r in allr:
+            if r["rx"] in stale or r["rx"] in unpainted:
+                continue
+            wrong = capsule_flash(r)
+            if wrong:
+                bad.append(wrong)
+                break
         last = allr[-1]
         g, n = last["sig"], nav(last)
         res["final"] = {"angle": g["angle"], "inner": f'{g["innerWidth"]}x{g["innerHeight"]}', "outer": f'{g["outerWidth"]}x{g["outerHeight"]}',
@@ -606,6 +616,9 @@ class Run:
                 seen.add(e["t"])
                 if e.get("frameAt") and e["t"] - e["frameAt"] > UNPAINTED_S * 1000:
                     continue
+                wrong = capsule_flash(e)
+                if wrong and wrong not in bad:
+                    bad.append(wrong)
                 o = s.offscreen(e, kind)
                 if o:
                     pre.append((rx - t0, o[0]))
@@ -1428,6 +1441,7 @@ class Run:
         if r is None:
             bad.append("outcome not checked: no sample from the page")
         else:
+            bad.extend(inspector_outcome(r, check))
             labels = [l for l, _ in duet_buttons(r)]
             want = [v for k, v in check.items() if k in ("label", "no_label")]
             if any(v not in labels for v in want) and opener(r):
@@ -1614,6 +1628,10 @@ class Run:
         k = action[0]
         if k in catalogue.DEVICE_OPS:
             return s.journey_action(tok, action, state)
+        if k == "split":
+            return s.to_split(tok, action[1])
+        if k == "split-full":
+            return s.split_to_full(tok)
         kind = "tab" if state[0] == "tab" else "preview"
         s.target_display = s.display()
 
@@ -1776,10 +1794,13 @@ class Run:
                 s.log(f"[{res['id']}] {res['desc']}\n  BLOCKED {res['reasons'][0]}")
             else:
                 t, cur = s.tok(sid0), start
+                split = False
                 for k, (a, nxt, words, exp_en, check) in enumerate(steps, 1):
+                    if a[0] in ("split", "split-full"):
+                        split = a[0] == "split"
                     act = s.journey_action(t, a, cur) if a[0] == "open" else s.suite_action(t, a, cur, check)
                     res = s.step(f"{sid0}-{k:02}", "tab" if nxt[0] == "tab" else "preview", t, act,
-                                 lambda sig, st=nxt, kb=(check or {}).get("keyboard"): catalogue.expect(st, sig, kb), words, video=True,
+                                 lambda sig, st=nxt, kb=(check or {}).get("keyboard"), sp=split: {"preview": False, **SPLIT} if sp else catalogue.expect(st, sig, kb), words, video=True,
                                  extra={"journey": sid0, "expect_en": exp_en, "check": check or None, "state": list(nxt), "live": live[k - 1]}, check=check)
                     rec["steps"].append(res["id"])
                     cur = nxt

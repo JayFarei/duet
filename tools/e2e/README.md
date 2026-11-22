@@ -106,3 +106,19 @@ The second app is always `DuoE2EHost` (`dev.duolab.e2e.host`), never another Hom
 - One render after a viewport resize is not judged off screen: the page samples the new size before React has re-placed the controls (`pvu-tall`, round 3). A JS-positioned layout always has that frame.
 - Only the simulator: physical Duo devices are not driven. Real-device geometry is pinned in unit fixtures (`packages/duet-ui/test/`).
 - The simulator helper is a single client process per run; other agents' helpers on other simulators are unaffected, but never kill runners or helpers by name (`pkill`): an earlier round did and stopped another agent's runner.
+
+## Inspector (0.9.0-rc.1)
+
+The dev-only `/lab/inspector?plain&e2e=1` page uses the root e2e reporter. `plain` keeps the page out of the desktop Duo mock. `ins01` opens Rent folded, unfolds, chooses Side by side, folds, turns 90/270, and closes back to Household. `ins02` repeats in dark appearance; `ins03` repeats at the largest Dynamic Type setting. `ins04` opens the card and moves Safari into the left and right split panes, then back to full width. Split and taps need the simulator helper; a missing helper is BLOCKED. All four suites assert the inspector level and selected card, with sampled and prepaint capsule ownership checks in addition to the existing placement checks. These are measured checks, not a guarantee about frames absent from the trace.
+
+```sh
+DUO_UDID=BB2EDBE8-442B-40EA-80A2-3451BE035BF5 nice -n 10 tools/e2e/run.sh --catalogue --only ins01,ins02,ins03,ins04
+DUO_UDID=BB2EDBE8-442B-40EA-80A2-3451BE035BF5 nice -n 10 tools/e2e/run.sh --only tab,fold
+python3 -m unittest discover -s tools/e2e -p 'test_*.py'
+```
+
+On this Mac use the already booted **Fix Duo**, not the default Duo Lab. Set `DEVELOPER_DIR` to the installed Duo-capable Xcode if the default Xcode 27.1 path is absent. Run serially; do not run `matrix.sh` on the loaded machine. The Python checks are synthetic assertion tests, not simulator runs.
+
+The reducer preserves full screen when a window grows. Accordingly, unfolding exposes Side by side; the next tap performs full→pane without adding a history level. Shrinking forces full screen. This suite intentionally follows the documented reducer contract rather than changing resize semantics.
+
+TODO: add a real Home Screen installation/launch driver in `e2e.py`, assert `navigator.standalone`/display-mode from the reporter, replay the inspector scenarios, and restore only state created by the run. Safari with a query parameter is not standalone proof. Deferred in phase 3.

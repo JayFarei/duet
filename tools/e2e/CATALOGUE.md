@@ -388,6 +388,49 @@ Not covered yet:
 5. Unfold to the inner screen. Expect: controls inline on the right.
 6. Fold to the outer screen. Expect: controls in a column on the right.
 
+## ins01: Inspector: folded, unfolded pane, folded and turned
+
+1. Open /lab/inspector?plain in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right; inspector is closed; Duet offers "Household".
+2. Open Rent folded; places give way to card commands. Expect: controls in a column on the right; inspector is full; selected card is rent; Duet offers "Close"; Duet no longer offers "Household".
+3. Unfold to the inner screen. Expect: controls inline on the right; inspector is full; selected card is rent; Duet offers "Side by side".
+4. Give Rent a pane beside the overview. Expect: controls inline on the right; inspector is split; selected card is rent; Duet offers "Full screen".
+5. Fold to the outer screen. Expect: controls in a column on the right; inspector is full; selected card is rent.
+6. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; inspector is full; selected card is rent.
+7. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right; inspector is full; selected card is rent.
+8. Close Rent; restore places. Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right; inspector is closed; Duet offers "Household"; Duet no longer offers "Next card".
+
+## ins02: Inspector: dark appearance (dark True)
+
+1. Open /lab/inspector?plain in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right; inspector is closed; Duet offers "Household".
+2. Open Rent folded; places give way to card commands. Expect: controls in a column on the right; inspector is full; selected card is rent; Duet offers "Close"; Duet no longer offers "Household".
+3. Unfold to the inner screen. Expect: controls inline on the right; inspector is full; selected card is rent; Duet offers "Side by side".
+4. Give Rent a pane beside the overview. Expect: controls inline on the right; inspector is split; selected card is rent; Duet offers "Full screen".
+5. Fold to the outer screen. Expect: controls in a column on the right; inspector is full; selected card is rent.
+6. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; inspector is full; selected card is rent.
+7. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right; inspector is full; selected card is rent.
+8. Close Rent; restore places. Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right; inspector is closed; Duet offers "Household"; Duet no longer offers "Next card".
+
+## ins03: Inspector: largest Dynamic Type (content_size accessibility-extra-extra-extra-large)
+
+1. Open /lab/inspector?plain in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right; inspector is closed; Duet offers "Household".
+2. Open Rent folded; places give way to card commands. Expect: controls in a column on the right; inspector is full; selected card is rent; Duet offers "Close"; Duet no longer offers "Household".
+3. Unfold to the inner screen. Expect: controls inline on the right; inspector is full; selected card is rent; Duet offers "Side by side".
+4. Give Rent a pane beside the overview. Expect: controls inline on the right; inspector is split; selected card is rent; Duet offers "Full screen".
+5. Fold to the outer screen. Expect: controls in a column on the right; inspector is full; selected card is rent.
+6. Turn the phone on its side, landscape right (90). Expect: controls in a column on the left; if Safari keeps its bars at the top (no column), inline on the right; inspector is full; selected card is rent.
+7. Turn the phone on its side, landscape left (270). Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right; inspector is full; selected card is rent.
+8. Close Rent; restore places. Expect: controls in a column on the right; if Safari keeps its bars at the top (no column), inline on the right; inspector is closed; Duet offers "Household"; Duet no longer offers "Next card".
+
+## ins04: Inspector: Safari split view left and right
+
+1. Open /lab/inspector?plain in a Safari tab, folded, on the outer screen, upright, no music. Expect: controls in a column on the right; inspector is closed; Duet offers "Household".
+2. Open Rent folded; places give way to card commands. Expect: controls in a column on the right; inspector is full; selected card is rent; Duet offers "Close"; Duet no longer offers "Household".
+3. Unfold to the inner screen. Expect: controls inline on the right; inspector is full; selected card is rent; Duet offers "Side by side".
+4. Give Rent a pane beside the overview. Expect: controls inline on the right; inspector is split; selected card is rent; Duet offers "Full screen".
+5. Move Safari to the left split pane. Expect: controls in the split pane; inspector is full; selected card is rent.
+6. Move Safari to the right split pane. Expect: controls in the split pane; inspector is full; selected card is rent.
+7. Return Safari to full width. Expect: controls inline on the right; inspector is full; selected card is rent.
+
 # Journeys
 
 ## j01: a Safari tab, opened folded, on the outer screen, upright, no music

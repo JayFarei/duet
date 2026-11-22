@@ -23,3 +23,11 @@ Per state (docs/how-duet-decides.md "Which mode" table is the spec):
 
 User notes:
 - 2026-10-26: preview placement = gap in the preview's column (see above). The left inline strip is wrong.
+
+## Inspector
+
+The inspector suites (`ins01`–`ins04`, `/lab/inspector?plain`) start with Household in the places capsule and no open inspector. Opening Rent folded gives it the full window and replaces places with the card commands. Each endpoint records `inspector.level` and `inspector.selected`; missing evidence fails the assertion. Closing restores Household and removes the card commands.
+
+Unfolding preserves full screen and exposes Side by side. Tapping it gives the card a pane beside the overview, with Full screen as the toggle. Folding or entering a narrow split-view pane forces full screen; the same card remains selected through folding, turns 90/270, and left/right split. A grown window does not automatically undo full screen. Split must land in the requested native pane (the existing split driver checks this), or the step is BLOCKED.
+
+Every eligible visible sample and recorded prepaint mutation must have the correct capsule owner: Household must not appear while a card is selected; card command labels must not appear after closing. Hidden/transit controls and background or rendering-held samples follow the existing exclusions. Folded commands are checked through the existing menu driver at the endpoint. The usual placement, clipping, native overlap, icon paint and settling checks still apply. Dark appearance and largest Dynamic Type repeat the same interaction expectations; they are simulator settings, not CSS viewport emulations.
