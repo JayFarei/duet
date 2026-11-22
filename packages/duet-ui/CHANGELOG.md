@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Card inspector core: `inspector`, a pure reducer for one card open over an overview, beside it where two panes fit and full screen where they do not, with one history entry per level so Back, Escape and the browser's Back step down one level at a time. Also `initialInspector`, `canSplit` (Duet's `layout === "wide"` on a Duo, 1050 wide elsewhere, `SPLIT_WIDTH`), `stepCard` and `paneCommands` (Close, the layout toggle, Previous and Next card, in a stable order). No React: import it alone from `duet-ui/inspector`. See [Inspector](../../docs/api.md#inspector).
+- Pane glyphs: `paneGlyph`, plus the Lucide path data `X`, `Maximize2`, `Columns2`, `ChevronUp`, `ChevronDown` and `PANE_GLYPHS`. The existing glyphs are unchanged.
+
 ## 0.8.2
 
 Everything from 0.8.2-rc.1, plus a simple desktop glass for demos.

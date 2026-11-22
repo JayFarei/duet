@@ -105,13 +105,36 @@ A page with one thing to do (book, buy, join) passes it as its Primary, and fold
 
 Between pages the controls move like a native bar: a group that appears scales up out of a blur, one that goes away shrinks into one and is kept for 450ms so it can, and the rest slide to their new places on the same spring. With reduced motion, controls crossfade in place.
 
+## Inspector
+
+The card inspector is a pure reducer for one card open at a time over an overview of cards: beside it where two panes fit, full screen where they do not. It has no React and no DOM, so a vanilla page can import it from `duet-ui/inspector` (also exported from `duet-ui`). The React organisms that draw the pane come later.
+
+```ts
+import { inspector, initialInspector, canSplit, paneCommands, detect, readSignals } from "duet-ui";
+
+const ctx = { ids: cards.map((c) => c.id), canSplit: canSplit(detect(readSignals())), wrap: true };
+const { state, history } = inspector(prev, { type: "open", id: "rent" }, ctx);
+if (history === "push") window.history.pushState(state, "");
+else if (history === "replace") window.history.replaceState(state, "");
+else if (history) window.history.go(history.go);
+addEventListener("popstate", (e) => apply(inspector(current, { type: "pop", state: e.state }, ctx).state));
+```
+
+- `InspectorState` is `{ selected, full, depth }`: the open card's id (null on the overview), whether it has the whole window, and how many history entries the inspector holds above the overview's (0, 1, or 2 for full screen over the pane). `initialInspector` is the overview.
+- Events: `open` (from the overview it opens; while open it swaps the card on the same level), `toggle` (side by side and full screen), `back` (Back or Escape, one level down), `close` (straight to the overview), `step` with `delta` 1 or -1 (Next and Previous over `ids`), `pop` (the browser moved; pass `event.state`), and `resize` with the new `canSplit`.
+- `inspector(state, event, ctx)` returns `{ state, history }`. `history` is what the app does: `"push"`, `"replace"`, `{ go: n }` or null. After a `go` the returned state is the level the browser lands on; feed the popstate it causes back as a `pop`, which adopts the landing entry's card. When nothing changed the same state object comes back, so React bails out. Unknown ids, a `pop` entry that is not an inspector state, and commands with nothing open never throw: they change nothing or return to the overview.
+- `canSplit(context, { offDuo })` decides beside or full screen with one rule. On a Duo it is Duet's own `layout === "wide"`: the open screen either way up, and the closed screen turned at its full 678. Elsewhere it is the window's width against `offDuo`, by default `SPLIT_WIDTH` (1050), so an iPad in landscape and most desktop windows split and an iPad in portrait does not. Where there is no room, the card is always full screen, and a `resize` that takes the room away turns an open pane full screen.
+- `stepCard(ids, id, delta, wrap = true)` is the card `delta` steps away, going round the ends. With `wrap: false` it is undefined past them. From an id not in the list, Next goes to the first card and Previous to the last.
+- `paneCommands({ canSplit, full, count, wrap, index })` lists the open pane's commands in a stable order: Close; the layout toggle where two panes fit, labelled "Full screen" or "Side by side" for the layout a tap goes to; and "Previous card" and "Next card" while there is more than one card. Stepping never adds or removes a command, so nothing moves under the finger. With `wrap: false`, `index` marks the end commands `disabled`. Each has `id`, `label` and `icon`; add `onPress` and a glyph to make a `DuetItem`.
+- Glyphs: `paneGlyph(icon, { size, strokeWidth })` draws a command's icon. The Lucide path data is exported as `X`, `Maximize2`, `Columns2`, `ChevronUp` and `ChevronDown`, and `PANE_GLYPHS` maps each `PaneIcon` to its paths, for drawing them without React.
+
 ## `useDuet()`
 
 Returns the current `Context`: `mode`, `side`, `duo`, `browser`, `layout` (`"wide"` when `innerWidth` is at least 600px, else `"narrow"`), `split`, `preview` and `keyboard` (when true), `hidden` (`"moving"`, `"preview"` or `"pending"` when the controls are not drawn), `confidence`, `width` and `height` (the page viewport), `stableHeight` (the smallest page height seen at this window width and orientation, like CSS `svh`: it does not grow when Safari's URL bar collapses), plus the screen size and insets the placement uses. It works outside `<Duet>`. Until hydration it returns the server snapshot, which describes the closed Duo, see [Server rendering](server-rendering.md).
 
 ## Lower-level exports
 
-`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`, `groupHeight`, `placeTabs`, `placesFit` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React.
+`isDuo`, `isIOS`, `isSplit`, `browserOf`, `detect`, `columnBand`, `magnet`, `panes`, `backFrom` and the measured constants (`DUO`, `INLINE_WIDTH`, `MAGNET`, `WIDE`) are exported for your own signals and tests, along with `isPreview`. The column template is exported too: `template`, `allocate`, `frame`, `place`, `menuBox`, `confirmBox`, `groupHeight`, `placeTabs`, `placesFit` and `TEMPLATE`. `duet-ui/geometry` exports the geometry module alone, without React, and `duet-ui/inspector` the [inspector](#inspector).
 
 `readSignals()` returns the current `Signals` from the window, the same reading the chrome uses (browser only). `watchSignals(cb)` calls `cb` whenever they may have changed, with the triggers and settle polling described in [Which mode](how-duet-decides.md#which-mode), and returns the unsubscribe. Together with `detect` they let a page act on the mode before React mounts:
 
