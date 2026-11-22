@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, Bell, Bookmark, Pencil, Plus, Share, Trash2 } from "lucide-react";
 import { Duet, bleed, useDuet, type DuetItem, type DuetMenuItem } from "duet-ui";
 import { Feed } from "./feed";
@@ -19,6 +19,7 @@ const PLACES: DuetMenuItem[] = [
 const BACKDROPS = ["", "linear-gradient(#7f00ff, #e100ff, #ff4e50)",
   "repeating-linear-gradient(#ff3b30 0 24px, #ffcc00 24px 48px, #34c759 48px 72px, #007aff 72px 96px)",
   "repeating-linear-gradient(#000 0 16px, #fff 16px 18px)"];
+type Iconed = DuetMenuItem & { icon: ReactNode }; // every lab place has one, so bar=1 can show them as tabs
 const ICONS = [Bell, Share, Bookmark, Trash2, Pencil];
 const NAMES = ["Alerts", "Share", "Save", "Delete", "Edit"];
 
@@ -77,6 +78,7 @@ html,body{margin:0;background:var(--bg)}
   };
   const name = depth ? "Detail" : s.menu ? PLACES[Number(tab)]?.label ?? "Search" : "Root";
   const places = [...PLACES.slice(0, s.menu), ...(s.searchTab ? [{ id: "99", label: "Search", icon: <SearchIcon /> }] : [])];
+  const pick = { selected: tab, onSelect: (id: string) => { setTab(id); setTapped(`place ${id}`); } };
   const [sheet, setSheet] = useState(false);
   useEffect(() => { setSheet(s.close > 0); }, [s.close]);
 
@@ -86,7 +88,7 @@ html,body{margin:0;background:var(--bg)}
       <Duet
         dark={s.dark ? s.dark > 0 : undefined}
         moveControls={s.move > 0}
-        menu={places.length ? { items: places, selected: tab, tabs: s.bar > 0, onSelect: (id) => { setTab(id); setTapped(`place ${id}`); } } : undefined}
+        menu={!places.length ? undefined : s.bar > 0 ? { ...pick, items: places as Iconed[], tabs: true } : { ...pick, items: places }}
         actions={[
           ...(depth > 0 ? [{ id: "back", label: "Back", icon: <ArrowLeft size={22} />, onPress: () => { setDepth(0); setTapped("Back"); } }] : []),
           ...Array.from({ length: s.leading }, (_, i) => action(i + 2, "l")),
