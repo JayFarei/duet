@@ -9,7 +9,7 @@ html[data-duet-inspector="split"] .ilab-overview { margin-right: var(--duet-insp
 .ilab-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); column-gap: 32px; }
 .ilab-cards > li { padding: 14px 0 22px; border-top: 0.5px solid var(--line); cursor: pointer; }
 .ilab-cards > li[data-open] h2 { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1.5px; }
-.ilab-card-head { display: flex; align-items: center; justify-content: space-between; margin-right: -12px; }
+.ilab-card-head { display: flex; align-items: center; justify-content: space-between; }
 .ilab-cards h2 { margin: 0; font: 600 20px/1.2 -apple-system, system-ui; }
 .ilab-amount { margin: 4px 0 10px; font: 400 40px/1 var(--serif, Georgia), serif; font-variant-numeric: tabular-nums; }
 .ilab-note { margin: 10px 0 0; color: var(--dim); font: 400 15px/1.4 -apple-system, system-ui; }

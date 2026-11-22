@@ -768,7 +768,11 @@ class Run:
                 overs.append({**o, "over": ov})
         for o in [o for o in overs if o["text"]][:4]:
             bad.append(f'clipped text {o["el"][:60]} by {o["over"]}pt')
-        for o in [o for o in overs if not o["text"] and not o["el"].startswith(("div.duet-scroller", "main", "section.stage", "span.duet-guard"))][:3]:
+        # A text-free block from the left edge exactly as wide as the document is a page wrapper spanning the documented
+        # column bleed (like main or the scroller), not an overflow.
+        sw = last["scroll"]["scrollWidth"]
+        bleed = lambda o: abs(o["rect"]["x"] - lo) <= 1 and abs(o["rect"]["w"] - sw) <= 1
+        for o in [o for o in overs if not o["text"] and not bleed(o) and not o["el"].startswith(("div.duet-scroller", "main", "section.stage", "span.duet-guard"))][:3]:
             bad.append(f'overflowing block {o["el"][:60]} by {o["over"]}pt')
         # The edge guards must cover the points Safari samples for an overlay to fill its column with: 4px in from the
         # left and right of the rect fixed boxes are laid out in, clipped to the document, at mid-height
