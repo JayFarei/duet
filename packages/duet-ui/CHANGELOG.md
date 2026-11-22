@@ -4,6 +4,12 @@
 
 - Card inspector core: `inspector`, a pure reducer for one card open over an overview, beside it where two panes fit and full screen where they do not, with one history entry per level so Back, Escape and the browser's Back step down one level at a time. Also `initialInspector`, `canSplit` (Duet's `layout === "wide"` on a Duo, 1050 wide elsewhere, `SPLIT_WIDTH`), `stepCard` and `paneCommands` (Close, the layout toggle, Previous and Next card, in a stable order). No React: import it alone from `duet-ui/inspector`. See [Inspector](../../docs/api.md#inspector).
 - Pane glyphs: `paneGlyph`, plus the Lucide path data `X`, `Maximize2`, `Columns2`, `ChevronUp`, `ChevronDown` and `PANE_GLYPHS`. The existing glyphs are unchanged.
+- Inspector organisms: `useInspector` (state, history entries kept beside the router's, popstate, Escape and ↑/↓, focus back to the trigger, a pane turning full screen when the room goes, `repairHistory`), `DuetInspector` (the open card, a dialog beside the overview or modal full screen with the page inert), `DuetControlColumn` (the commands in a glass toolbar on the window's edge off a Duo), `DuetInspectButton` and `inspectable`. See [Inspector organisms](../../docs/api.md#inspector-organisms).
+- `DuetViewer` and `DuetViewerGroup`: one thing full screen in a native modal dialog with Close, Previous and Next, focus held inside and returned, Escape and the arrows, stepping in document order.
+- `useDuetActions`: an organism inside `<Duet>` hands its commands to Duet's controls. Duet's `actions` prop wins.
+- `DuetItem.disabled`: `aria-disabled`, a tap does nothing, no visual change.
+- `<Duet scrollTopOnSelect>` (a place picked in the controls opens at its top) and `<Duet rootAttrs="data-app">` (device, layout and mode on `<html>`). Both off by default.
+- The organisms' pure parts (`hitsControl`, `inspectorKey`, `isTyping`, `withEntry`, `readEntry`, `needsRepair`, `inOrder`, `viewerStep`, `rootAttrs`, `scrollToTop`) on `duet-ui/inspector` too, still React-free.
 
 ## 0.8.2
 

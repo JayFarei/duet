@@ -18,9 +18,11 @@ Props, theming, the Primary, `useDuet()` and the lower-level exports.
 | `tint` | `string` | Accent for the selected place, the Primary and checked rows in More, like iOS's `tintColor`. Default: system blue |
 | `icons` | `{ size?, weight?, color? }` | How your icons are drawn. See [Theming](#theming) |
 | `reserve` | `boolean` | Default `true`: the page keeps clear of the controls (`--duet-inset-*`, `<html>` margins). `false` lets it run under them |
+| `scrollTopOnSelect` | `boolean` | Default `false`. `true`: a `menu` place picked in Duet's own controls (its tab, sidebar row or More row) opens at its top, the scroller and the window at 0, instead of the scroll position Duet keeps for each place. A `selected` the app changes itself keeps the kept position |
+| `rootAttrs` | `string` | A prefix: Duet writes its `device`, `layout` and `mode` on `<html>` as `${prefix}-device`, `${prefix}-layout` and `${prefix}-mode` (`"data-app"` gives `data-app-device` and so on), for app CSS, and removes them on unmount. Not `"data-duet"`, whose `data-duet-mode` Duet writes itself. Default: none |
 | `children` | `ReactNode` | Page content, in an inner scroller so the document never scrolls and the controls stay still |
 
-`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey. `DuetMenuItem<T>` is `{ id: T, label, icon?, badge?, badgeTone? }`. `DuetPrimary` is a `DuetItem` plus `confirm?: string | false`: the confirmation box's button label (default `label`), or `false` to run on the first tap.
+`DuetItem` is `{ id, label, icon, onPress?, badge?, badgeTone?, tint?, destructive?, folded?, disabled? }`: `badge` is a number or short text in a badge, red by default; `badgeTone: "neutral"` makes it grey; `disabled` keeps the button in place, marked `aria-disabled`, and a tap does nothing (it looks the same). `DuetMenuItem<T>` is `{ id: T, label, icon?, badge?, badgeTone? }`. `DuetPrimary` is a `DuetItem` plus `confirm?: string | false`: the confirmation box's button label (default `label`), or `false` to run on the first tap.
 
 ## The template
 
@@ -107,7 +109,7 @@ Between pages the controls move like a native bar: a group that appears scales u
 
 ## Inspector
 
-The card inspector is a pure reducer for one card open at a time over an overview of cards: beside it where two panes fit, full screen where they do not. It has no React and no DOM, so a vanilla page can import it from `duet-ui/inspector` (also exported from `duet-ui`). The React organisms that draw the pane come later.
+The card inspector is a pure reducer for one card open at a time over an overview of cards: beside it where two panes fit, full screen where they do not. It has no React and no DOM, so a vanilla page can import it from `duet-ui/inspector` (also exported from `duet-ui`). React apps use the organisms over it, see [Inspector organisms](#inspector-organisms).
 
 ```ts
 import { inspector, initialInspector, canSplit, paneCommands, detect, readSignals } from "duet-ui";
@@ -127,6 +129,49 @@ addEventListener("popstate", (e) => apply(inspector(current, { type: "pop", stat
 - `stepCard(ids, id, delta, wrap = true)` is the card `delta` steps away, going round the ends. With `wrap: false` it is undefined past them. From an id not in the list, Next goes to the first card and Previous to the last.
 - `paneCommands({ canSplit, full, count, wrap, index })` lists the open pane's commands in a stable order: Close; the layout toggle where two panes fit, labelled "Full screen" or "Side by side" for the layout a tap goes to; and "Previous card" and "Next card" while there is more than one card. Stepping never adds or removes a command, so nothing moves under the finger. With `wrap: false`, `index` marks the end commands `disabled`. Each has `id`, `label` and `icon`; add `onPress` and a glyph to make a `DuetItem`.
 - Glyphs: `paneGlyph(icon, { size, strokeWidth })` draws a command's icon. The Lucide path data is exported as `X`, `Maximize2`, `Columns2`, `ChevronUp` and `ChevronDown`, and `PANE_GLYPHS` maps each `PaneIcon` to its paths, for drawing them without React.
+
+### Inspector organisms
+
+React components and a hook over the core, from `duet-ui`. On a Duo inside `<Duet>` the open card's commands go to Duet's own controls; elsewhere they stand in a glass column of the same capsule on the window's edge. `apps/site/app/lab/inspector` is a working page (dev only, `/lab/inspector`).
+
+```tsx
+import { Duet, DuetInspector, DuetInspectButton, inspectable, useInspector } from "duet-ui";
+
+function Cards() {
+  const ins = useInspector({ ids: cards.map((c) => c.id), repairHistory: true });
+  const card = cards.find((c) => c.id === ins.selected);
+  return (
+    <div>
+      <main>
+        {cards.map((c) => (
+          <article key={c.id} {...inspectable((t) => ins.open(c.id, t))}>
+            <h2>{c.title}</h2>
+            <DuetInspectButton label={`Inspect ${c.title}`} expanded={ins.selected === c.id} onPress={(t) => ins.open(c.id, t)} />
+          </article>
+        ))}
+      </main>
+      <DuetInspector {...ins.paneProps} title={card?.title} fullOnly={<Details />}>{card && <Summary card={card} />}</DuetInspector>
+    </div>
+  );
+}
+// <Duet><Cards /></Duet>
+```
+
+- `useInspector({ ids, value?, onChange?, history = "push", keyboard = true, canSplit?, wrap = true, repairHistory = false, historyKey = "duetInspector" })` runs the reducer and does what it says. It returns the state (`selected`, `full`, `depth`) and `open(id, trigger?)`, `close`, `back`, `toggle`, `step(delta)`, `dispatch`, `canSplit`, `commands` (`paneCommands`), `run(id)`, `actions` (the commands as `DuetItem`s, glyph and handler included) and `paneProps` (spread on `DuetInspector`). It owns:
+  - History: one entry per level, the level written under `history.state[historyKey]` beside whatever the router keeps there (Next.js needs its own keys kept), and popstate read back, so the browser's Back and Forward walk the levels. A reload while open adopts the entry's level. `history: "none"` leaves history alone.
+  - `repairHistory`: a router that rewrites the entry and drops the key (Next.js can) has it written back, checked after each render and every 150ms while a card is open.
+  - Keys on the window: Escape is Back, ↑ and ↓ are Previous and Next. Nothing with a modifier held, in a field (the arrows), with a viewer open, or for a key the page already took (`defaultPrevented`).
+  - Focus: back to `trigger` (default: what had focus) when the inspector closes, however it closed.
+  - The room for two panes: by default the core's `canSplit` over `useDuet()`, so a window narrowed below 1050 turns an open pane full screen. Pass `canSplit` to decide yourself.
+  - Controlled with `value` and `onChange`, else its own state.
+- `<DuetInspector open full title eyebrow? caption? onClose commands header? fullOnly? edge?>` draws the open card, nothing when closed: an `aside` with `role="dialog"` named by its `h2` title, which takes focus on open. Beside the overview it is `--duet-inspector-width` wide (default `min(50vw, 640px)`) on the right; full screen it covers the window, carries `aria-modal`, and makes its siblings `inert`. While open `<html>` carries `data-duet-inspector="split"` or `"full"`, so the overview makes room: `html[data-duet-inspector="split"] main { margin-right: var(--duet-inspector-width) }`. `fullOnly` shows only full screen, after the body. Colours: `--duet-inspector-bg`, `--duet-inspector-ink`, `--duet-inspector-line` (default `Canvas`, `CanvasText`).
+- `<DuetControlColumn commands run? edge="right" label="Card controls">`: the column on its own, a `role="toolbar"` with `aria-orientation="vertical"`, centred in the height clear of the safe areas and Duet's insets. Icon-only buttons 49pt tall (above the 44pt minimum), named by `aria-label` and `title`, each with `data-duet-control="actions"` and `data-command` (its id). `commands` are `DuetItem`s or `PaneCommand`s (their `icon` drawn with `paneGlyph`); one without `onPress` runs `run(id)`. A `disabled` command is `aria-disabled` and does nothing.
+- `<DuetInspectButton label expanded? onPress size? className?>`: a card's 44pt icon button (Maximize2), `aria-expanded` while its card is open, `data-duet-control="inspect"`. It hands itself to `onPress`, for focus to return to.
+- `inspectable(onOpen)`: props for a card that a tap anywhere opens, `{...inspectable(open)}`. A tap on a `button`, `a`, `input`, `select`, `textarea`, `[data-duet-control]` or `[contenteditable]` inside it is that element's, and a drag that selects text is not a tap. `onOpen` gets the card's inspect button, else the card, as the trigger.
+- `useDuetActions(items | null)`: an organism inside `<Duet>` hands its commands to Duet's controls, which show them as its Actions; null takes them back, as does unmounting. The last one handed over shows. Duet's own `actions` prop wins over any. Returns whether a `<Duet>` is there to take them. `DuetInspector` uses it on a Duo.
+- `<DuetViewer open onOpenChange title id? group? trigger? edge? labels?>`: one thing (a chart, a table, a photo) full screen in a native modal `<dialog>`, named by its `h2` title, with Close in the column. The page is inert while it is up, Tab and Shift-Tab go round inside it, Escape closes it, and focus goes back to the trigger (or what had focus). `trigger` is a button rendered in place, given `onClick`, `aria-haspopup="dialog"` and `aria-expanded`.
+- `<DuetViewerGroup wrap?>`: viewers inside step through each other with Previous and Next in the column, and ↑ and ↓, in document order, from the group's own registry (no DOM query). A step closes one and opens the next, and focus goes back to the first trigger only when the last one closes. `wrap` (default true) goes round the ends; without it the end commands are disabled. `group={false}` keeps a viewer out of its group.
+- Pure helpers for a vanilla page, also on `duet-ui/inspector`: `hitsControl(target, card)` (the `inspectable` rule), `inspectorKey(event, typing)` and `isTyping(target)` (the keys), `withEntry`, `readEntry` and `needsRepair` (the history entry), `inOrder` and `viewerStep` (the viewer group's order), `rootAttrs` and `scrollToTop`.
 
 ## `useDuet()`
 
