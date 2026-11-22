@@ -349,7 +349,7 @@ function useSideDrag(side: Side | null, nav: React.RefObject<HTMLElement | null>
     const el = nav.current;
     if (!side || !el) return;
     let x0: number | null = null, y0 = 0, dragging = false, free = false;
-    const down = (e: PointerEvent) => { if ((e.target as Element).closest(".duet-glass:not(.duet-menu)")) { x0 = e.clientX; y0 = e.clientY; dragging = false; } };
+    const down = (e: PointerEvent) => { if ((e.target as Element).closest(".duet-group")) { x0 = e.clientX; y0 = e.clientY; dragging = false; } };
     const move = (e: PointerEvent) => {
       if (x0 === null) return;
       // Only a deliberate sideways swipe picks the strip up: a scrub along the rail, or a wobbly tap, never does.

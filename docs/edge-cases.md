@@ -917,3 +917,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** under `@supports (-webkit-touch-callout: none)`, `.duet[data-follow]` takes the white rim at normal blend, the same rim every other engine uses.
 - **You do:** nothing.
 - **Status:** `packages/duet-ui/test/glass.test.mjs` ("on iOS a column layer that follows the scroll drops the dodge"), checked on the Duo e2e 2 simulator.
+
+## Dragging the inline controls does not move them
+
+- **You see:** with `moveControls`, inline (open Duo, split pane, closed landscape), a sideways drag on a control does nothing: the strip stays on its side and "Move controls" in More is the only way across.
+- **Cause:** the drag starts only on a pointerdown inside a capsule, and the handler still looked for the pre-0.6.0 `.duet-glass` class. Since the templated column the capsules are `.duet-group`, so no drag ever began.
+- **Duet does:** starts the drag on a pointerdown inside any `.duet-group` (the open menu is a separate `.duet-blob`, so it never starts one).
+- **You do:** nothing.
+- **Status:** `e2e/layout.spec.ts` ("dragging a control across the middle moves the strip, and the side is remembered"), WebKit.
