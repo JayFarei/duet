@@ -158,7 +158,7 @@ test("repairHistory writes the level back after a router drops it", async ({ pag
   expect(await title(page)).toBe("Groceries");
 });
 
-for (const size of [{ width: 820, height: 1180 }, { width: 1180, height: 820 }, { width: 1049, height: 820 }, { width: 1050, height: 820 }, { width: 1440, height: 900 }]) {
+for (const size of [{ width: 820, height: 1180 }, { width: 1180, height: 820 }, { width: 1032, height: 1376 }, { width: 1376, height: 1032 }, { width: 1049, height: 820 }, { width: 1050, height: 820 }, { width: 1051, height: 820 }, { width: 1440, height: 900 }]) {
   test(`the column stands inside the window with 44pt targets at ${size.width}x${size.height}`, async ({ page }) => {
     await load(page, size);
     await page.getByRole("button", { name: "Inspect Rent" }).click();

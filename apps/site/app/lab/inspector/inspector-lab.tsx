@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Duet, DuetInspectButton, DuetInspector, DuetViewer, DuetViewerGroup, inspectable, useInspector } from "duet-ui";
+import { Duet, DuetInspectButton, DuetInspector, DuetViewer, DuetViewerGroup, inspectable, useInspector, paneGlyph } from "duet-ui";
 import { Duo } from "../../duo/duo";
 import { useDesktop } from "../../duo/web-duo";
 import "./inspector-lab.css";
@@ -25,7 +25,7 @@ const FIGURES = [
 
 export function InspectorLab() {
   const desktop = useDesktop();
-  return desktop ? <Duo src="/lab/inspector" /> : <div className={desktop === null ? "ssr-site" : undefined}><Duet><Ledger /></Duet></div>;
+  return desktop ? <Duo src="/lab/inspector" /> : <div className={desktop === null ? "ssr-site" : undefined}><Ledger /></div>;
 }
 
 function Bars({ weeks, tall }: { weeks: number[]; tall?: boolean }) {
@@ -42,51 +42,53 @@ function Ledger() {
   const card = CARDS.find((c) => c.id === ins.selected);
   const [figure, setFigure] = useState<string | null>(null);
   return (
-    <div className="ilab">
-      <main className="ilab-overview">
-        <p className="ilab-eyebrow">October</p>
-        <h1>Household</h1>
-        <p className="ilab-lede">Tap a card, or its inspect button, to open it beside the month. Escape, Back and the arrows step through.</p>
-        <ol className="ilab-cards">
-          {CARDS.map((c) => (
-            <li key={c.id} data-card={c.id} data-open={ins.selected === c.id || undefined} {...inspectable((t) => ins.open(c.id, t))}>
-              <div className="ilab-card-head">
-                <span className="ilab-eyebrow">{c.section}</span>
-                <DuetInspectButton label={`Inspect ${c.title}`} expanded={ins.selected === c.id} onPress={(t) => ins.open(c.id, t)} />
-              </div>
-              <h2>{c.title}</h2>
-              <p className="ilab-amount">{c.amount}</p>
-              <Bars weeks={c.weeks} />
-              <p className="ilab-note">{c.note} <a href={`#${c.id}-source`} data-source={c.id}>Source</a></p>
-            </li>
-          ))}
-        </ol>
-        <section className="ilab-figures" aria-label="Figures">
-          <h2>Figures</h2>
-          <DuetViewerGroup>
-            {FIGURES.map((f) => (
-              <DuetViewer key={f.id} id={f.id} title={f.title} open={figure === f.id} onOpenChange={(o) => setFigure((at) => (o ? f.id : at === f.id ? null : at))}
-                trigger={<button type="button" className="ilab-figure" data-figure={f.id}>{f.title}</button>}>
-                <p className="ilab-note">{f.caption}</p>
-                <Bars weeks={CARDS.map((c) => c.weeks.reduce((a, b) => a + b, 0))} tall />
-              </DuetViewer>
+    <Duet menu={ins.selected ? undefined : { items: [{ id: "household", label: "Household", icon: paneGlyph("split") }], tabs: true, selected: "household", onSelect: () => window.scrollTo(0, 0) }}>
+      <div className="ilab" data-inspector-selected={ins.selected ?? ""}>
+        <main className="ilab-overview">
+          <p className="ilab-eyebrow">October</p>
+          <h1>Household</h1>
+          <p className="ilab-lede">Tap a card, or its inspect button, to open it beside the month. Escape, Back and the arrows step through.</p>
+          <ol className="ilab-cards">
+            {CARDS.map((c) => (
+              <li key={c.id} data-card={c.id} data-open={ins.selected === c.id || undefined} {...inspectable((t) => ins.open(c.id, t))}>
+                <div className="ilab-card-head">
+                  <span className="ilab-eyebrow">{c.section}</span>
+                  <DuetInspectButton label={`Inspect ${c.title}`} expanded={ins.selected === c.id} onPress={(t) => ins.open(c.id, t)} />
+                </div>
+                <h2>{c.title}</h2>
+                <p className="ilab-amount">{c.amount}</p>
+                <Bars weeks={c.weeks} />
+                <p className="ilab-note">{c.note} <a href={`#${c.id}-source`} data-source={c.id}>Source</a></p>
+              </li>
             ))}
-          </DuetViewerGroup>
-        </section>
-      </main>
-      <DuetInspector {...ins.paneProps} title={card?.title} eyebrow={card?.section} caption={card ? `${card.amount} this month` : undefined}
-        fullOnly={card && (
-          <table className="ilab-weeks">
-            <caption>By week</caption>
-            <tbody>{card.weeks.map((w, i) => <tr key={i}><th scope="row">Week {i + 1}</th><td>{w}</td></tr>)}</tbody>
-          </table>
-        )}>
-        {card && <>
-          <p>{card.note}</p>
-          <Bars weeks={card.weeks} tall />
-          <label className="ilab-field">Note <input type="text" placeholder="Add a note" /></label>
-        </>}
-      </DuetInspector>
-    </div>
+          </ol>
+          <section className="ilab-figures" aria-label="Figures">
+            <h2>Figures</h2>
+            <DuetViewerGroup>
+              {FIGURES.map((f) => (
+                <DuetViewer key={f.id} id={f.id} title={f.title} open={figure === f.id} onOpenChange={(o) => setFigure((at) => (o ? f.id : at === f.id ? null : at))}
+                  trigger={<button type="button" className="ilab-figure" data-figure={f.id}>{f.title}</button>}>
+                  <p className="ilab-note">{f.caption}</p>
+                  <Bars weeks={CARDS.map((c) => c.weeks.reduce((a, b) => a + b, 0))} tall />
+                </DuetViewer>
+              ))}
+            </DuetViewerGroup>
+          </section>
+        </main>
+        <DuetInspector {...ins.paneProps} title={card?.title} eyebrow={card?.section} caption={card ? `${card.amount} this month` : undefined}
+          fullOnly={card && (
+            <table className="ilab-weeks">
+              <caption>By week</caption>
+              <tbody>{card.weeks.map((w, i) => <tr key={i}><th scope="row">Week {i + 1}</th><td>{w}</td></tr>)}</tbody>
+            </table>
+          )}>
+          {card && <>
+            <p>{card.note}</p>
+            <Bars weeks={card.weeks} tall />
+            <label className="ilab-field">Note <input type="text" placeholder="Add a note" /></label>
+          </>}
+        </DuetInspector>
+      </div>
+    </Duet>
   );
 }

@@ -86,6 +86,14 @@ function targets() {
   return out;
 }
 
+function inspectorState() {
+  return {
+    level: document.documentElement.getAttribute("data-duet-inspector") ?? "closed",
+    selected: document.querySelector("[data-inspector-selected]")?.getAttribute("data-inspector-selected") ?? null,
+    title: document.querySelector("aside.duet-inspector h2")?.textContent ?? null,
+  };
+}
+
 function sample(s: string | null) {
   const sig = readSignals();
   const navs = [...document.querySelectorAll("nav.duet")].map((n) => ({
@@ -93,7 +101,7 @@ function sample(s: string | null) {
     hidden: n.getAttribute("data-hidden"), confidence: n.getAttribute("data-confidence"),
     keyboard: n.getAttribute("data-keyboard"), rect: rect(n), shown: shown(n),
     slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((s) => ({
-      slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), buttons: buttons(s), expanded: s.getAttribute("data-expanded"),
+      slot: s.getAttribute("data-duet-slot"), rect: rect(s), icons: icons(s), labels: labels(s), visibleLabels: buttons(s).map((b) => b.label), buttons: buttons(s), expanded: s.getAttribute("data-expanded"),
     })),
     // An open "…" or tab menu is drawn outside the slots: the driver taps its items (a back folded into "…") by label.
     menus: [...n.querySelectorAll("[role=menu]")].filter(shown).map((m) => ({ rect: rect(m), buttons: buttons(m) })),
@@ -154,6 +162,7 @@ function sample(s: string | null) {
     html: { mode: h.getAttribute("data-duet-mode"), split: h.getAttribute("data-duet-split"), emulated: h.getAttribute("data-duet-emulated"), close: h.hasAttribute("data-duet-close"), pending: h.hasAttribute("data-duet-pending") },
     // The invisible edge guards (duet.css): e2e.py checks each still straddles its viewport edge (#147).
     guards: [...document.querySelectorAll(".duet-guard")].map((g) => ({ side: g.getAttribute("data-side"), rect: rect(g) })),
+    inspector: inspectorState(),
     navs,
     scroll: { scrollWidth: h.scrollWidth, clientWidth: W, bodyScrollWidth: document.body.scrollWidth, x: scrollX, y: scrollY },
     vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop, w: visualViewport.width, h: visualViewport.height, scale: visualViewport.scale } : null,
@@ -229,18 +238,20 @@ export function E2EReporter() {
     for (const type of ["touchstart", "pointerdown", "click"]) addEventListener(type, touch, { capture: true, passive: true });
     const isNav = (n: Node) => n instanceof Element && (n.matches("nav.duet") || !!n.querySelector("nav.duet"));
     const mo = new MutationObserver((records) => {
-      if (!records.some((m) => m.type === "attributes" ? isNav(m.target) && (m.target as Element).matches("nav.duet") : [...m.addedNodes].some(isNav))) return;
+      const inspectorChange = document.querySelector("[data-inspector-selected]") && records.some((m) =>
+        m.target instanceof Element && (m.target.closest("nav.duet") || m.target.hasAttribute("data-inspector-selected")));
+      if (!inspectorChange && !records.some((m) => m.type === "attributes" ? isNav(m.target) && (m.target as Element).matches("nav.duet") : [...m.addedNodes].some(isNav))) return;
       prepaint.push({
-        t: Date.now(), visible: document.visibilityState, frameAt, sig: readSignals(), y: scrollY,
+        t: Date.now(), visible: document.visibilityState, frameAt, sig: readSignals(), y: scrollY, inspector: inspectorState(),
         vv: visualViewport ? { x: visualViewport.offsetLeft, y: visualViewport.offsetTop } : null,
         navs: [...document.querySelectorAll("nav.duet")].map((n) => ({
           mode: n.getAttribute("data-mode"), side: n.getAttribute("data-side"), hidden: n.getAttribute("data-hidden"), follow: n.hasAttribute("data-follow"),
-          slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((x) => ({ slot: x.getAttribute("data-duet-slot"), rect: rect(x) })),
+          slots: [...n.querySelectorAll("[data-duet-slot]")].filter(shown).map((x) => ({ slot: x.getAttribute("data-duet-slot"), rect: rect(x), visibleLabels: buttons(x).map((b) => b.label) })),
         })),
       });
       if (prepaint.length > 20) prepaint.shift();
     });
-    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-mode", "data-hidden"] });
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-mode", "data-hidden", "data-inspector-selected", "aria-label"] });
     const id = setInterval(() => {
       try { fetch(url, { method: "POST", body: JSON.stringify(sample(s)), headers: { "content-type": "text/plain" }, keepalive: true }).catch(() => {}); } catch { /* ignore */ }
     }, 40);
