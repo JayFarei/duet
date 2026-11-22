@@ -1252,6 +1252,256 @@ class Run:
         s.step("fold-fold-to-270", "tab", t, s.fold_closed(t, 270), LANDSCAPE_TOP_BARS, "fold into closed 270 (Safari keeps its top bars, no column)", video=True)
         s.step("fold-270to0", "tab", t, s.rotate(t, 0), {"preview": False, "mode": "column", "side": "right"}, "closed 270 after the fold, turn to portrait", video=True)
 
+    # ---- Home Screen web app (standalone, sa*; EXPECTED.md, Standalone) ---------------------------------------------
+    SA_CLIP = "Duet"  # SpringBoard identifier of the clip added from "/": the share sheet proposes the page's title
+    SA_LAB = "/lab?tabs=5,searchTab=1,back=1,actions=2,title=1,feed=1,bar=1"
+    SA_INSPECTOR = "/lab/inspector?plain"
+    # Page point -> lit display point: the web app fills the screen from its top in every posture measured (the 21pt it
+    # leaves unfolded is the home indicator, below the page). Each drag checks it against the touchstart the page saw
+    # and re-aims once from that.
+    SA_OFF = (0, 0)
+
+    @staticmethod
+    def relay(body):
+        req = urllib.request.Request(SITE + "/api/e2e-relay", method="POST", data=json.dumps(body).encode(), headers={"content-type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=10) as r:
+                return json.loads(r.read() or b"null")
+        except OSError:
+            return None
+
+    def sa_install(s):
+        """Adds the site to the Home Screen through Safari's share sheet (closed portrait). The sheet runs in its own
+        process, outside the runner's reach: fixed points of the 466x678 screen, found by hand (README, Standalone)."""
+        openurl(s.udid, SITE + "/")
+        time.sleep(8)  # a dev server compiles "/" on first load; the menu needs the page's title
+        for pt, wait in (((48, 620), 2.0), ((143, 156), 3.0), ((318, 565), 2.5), ((163, 597), 3.0), ((335, 48), 3.0)):
+            s.sim.tap(*pt, hold=0.1)  # Page Menu, Share, View More, Add to Home Screen, Add
+            time.sleep(wait)
+        s.sim.button("HOME")
+        time.sleep(1.5)
+        return s.sim.springboard_find(s.SA_CLIP) is not None or s.sb_tap(s.SA_CLIP, tries=4, page=True)
+
+    def sa_remove(s):
+        """Deletes the clip this run added: long-press, Delete Bookmark, Delete."""
+        sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+        s.sim.button("HOME")
+        time.sleep(1.5)
+        if not s.sb_tap(s.SA_CLIP, hold=1.5, page=True):
+            return False
+        time.sleep(1.0)
+        if not s.sb_tap("com.apple.springboardhome.application-shortcut-item.delete-app", tries=3):
+            return False
+        time.sleep(1.0)
+        btn = next((e for e in s.sim.app_ui(s.sim.pid("com.apple.SpringBoard")) if e["label"] == "Delete" and e["type"] == "Button"), None)
+        s.sim.tap(*((btn["x"] + btn["w"] / 2, btn["y"] + btn["h"] / 2) if btn else (265, 368)), hold=0.1)  # the alert's Delete
+        time.sleep(1.5)
+        s.sim.button("HOME")
+        return s.sim.springboard_find(s.SA_CLIP) is None
+
+    def sa_wait(s, sid, tok, path, t0, cond=lambda r: True, timeout=STATE_TIMEOUT):
+        """A sample of the installed app, proved standalone by the browser itself, on `path`, with the column drawn."""
+        r = s.wait(sid, tok, lambda r: (r.get("standalone") or {}).get("navigator") and (r.get("standalone") or {}).get("displayMode")
+                   and address(r["path"]) == path and (r.get("column") or {}).get("groups") and cond(r), t0, timeout)
+        if r is None:
+            s.why = f"no standalone sample of {path} with the column in {timeout}s"
+        return r
+
+    def sa_go(s, sid, tok, path, position, angle, t0):
+        """Into a posture and onto a page: fold.bin, then the relay moves the app's page."""
+        if (s.position, s.angle) != (position, angle) and not s.fold(position, angle):
+            return None
+        s.angle = angle
+        s.relay({"beacon": BEACON, "s": tok, "path": path})
+        done = time.time() * 1000
+        big = lambda g: max(g["outerWidth"], g["outerHeight"]) > 900
+        fits = {("closed", 0): lambda g: not big(g) and g["innerHeight"] > g["innerWidth"],
+                ("open", 0): lambda g: g["outerWidth"] > 900}.get((position, angle), lambda g: g["outerHeight"] > 900)
+        r = s.sa_wait(sid, tok, path, t0, lambda r: r["rx"] >= done and fits(r["sig"]))
+        time.sleep(1.2)  # the turn's settle
+        return s.sa_last(sid, tok, path, t0) if r else None
+
+    def sa_last(s, sid, tok, path, t0):
+        rs = [r for r in samples(sid, t0) if mine(r, tok) and address(r["path"]) == path and (r.get("column") or {}).get("groups")]
+        return rs[-1] if rs else None
+
+    def sa_drag(s, sid, tok, path, r, kind):
+        """One drag a person makes on the column's last button: "side" across the page to 40pt from the far edge, "long"
+        down (or up) the rail to 40pt from the far end, 1.5s each. Returns (samples during and after, aim notes)."""
+        g, W, H = r["column"]["groups"][-1], r["sig"]["innerWidth"], r["sig"]["innerHeight"]
+        b = g["buttons"][-1]["rect"] if g["buttons"] else g["rect"]
+        px, py = b["x"] + b["w"] / 2, b["y"] + b["h"] / 2
+        tx, ty = (40 if px > W / 2 else W - 40, py + 6) if kind == "side" else (px, H - 40 if py < H / 2 else 40)
+        off, notes = s.sa_off, []
+        for attempt in (0, 1):
+            t1 = time.time() * 1000
+            s.sim.drag(px + off[0], py + off[1], tx + off[0], ty + off[1], ms=1500, steps=30, end_hold_ms=200)
+            time.sleep(1.5)  # the release, a snap, the press feedback
+            rs = [x for x in samples(sid, t1) if mine(x, tok) and address(x["path"]) == path]
+            down = next((t for x in rs for t in x.get("taps") or [] if t["t"] >= t1 - 50 and t["type"] in ("touchstart", "pointerdown")), None)
+            hit = down and any(q["rect"]["x"] - 2 <= down["x"] <= q["rect"]["x"] + q["rect"]["w"] + 2 and q["rect"]["y"] - 2 <= down["y"] <= q["rect"]["y"] + q["rect"]["h"] + 2
+                               for q in r["column"]["groups"])
+            if hit or not down or attempt:
+                if not hit:
+                    notes.append(f"{kind} drag: touch at page {down and (down['x'], down['y'])} for button at {px:.0f},{py:.0f}: missed the column")
+                return rs, notes, bool(hit)
+            off = s.sa_off = (px + off[0] - down["x"], py + off[1] - down["y"])  # re-aim from what the page saw
+            notes.append(f"re-aimed: page->screen offset {off[0]:.0f},{off[1]:.0f}")
+            time.sleep(1.0)
+
+    # press.ts opens the held capsule to PRESS.width (78.8pt) centred on its rest x, taller, with a ~15% spring
+    # overshoot, and drifts it a little with the finger. That is the press feedback, not the column leaving its rail.
+    SA_PRESS_W = 92
+
+    @classmethod
+    def sa_assess(cls, res, rs):
+        """sa*: judge one posture's samples. res["drags"] gives each drag's start (sample rx); a drag's samples run to
+        the next one's start. During a drag the column stays in its rail: each group's centre x within 4pt of its rest
+        (a side switch moves it a whole window), centre y within 40pt, no wider than the opened press, inside the
+        window. After each release: the same rects as before, nothing left with --duet-drag or data-drag. Every sample
+        standalone."""
+        before = [tuple(q) for q in res["before"]]
+        ctr = lambda q: (q[0] + q[2] / 2, q[1] + q[3] / 2)
+        drags = res.get("drags") or []
+        for i, d in enumerate(drags):
+            end_t = drags[i + 1]["t"] if i + 1 < len(drags) else float("inf")
+            seg = [x for x in rs if d["t"] <= x["rx"] < end_t]
+            kind = d["kind"]
+            if not seg:
+                res["reasons"].append(f"{kind} drag: no samples")
+                continue
+            proof = [x for x in seg if not ((x.get("standalone") or {}).get("navigator") and (x.get("standalone") or {}).get("displayMode"))]
+            if proof:
+                res["reasons"].append(f"{kind} drag: {len(proof)} samples not standalone")
+            def off_rail(x):
+                got, gw, gh = cls.sa_rects(x), x["sig"]["innerWidth"], x["sig"]["innerHeight"]
+                return len(got) != len(before) or any(
+                    abs(ctr(a)[0] - ctr(b)[0]) > 4 or abs(ctr(a)[1] - ctr(b)[1]) > 40 or a[2] > max(cls.SA_PRESS_W, b[2] * 1.15)
+                    or a[3] > gh + 0.5 or a[0] < -0.5 or a[0] + a[2] > gw + 0.5 for a, b in zip(got, before))
+            moved = [cls.sa_rects(x) for x in seg if off_rail(x)]
+            if moved:
+                res["reasons"].append(f"{kind} drag: the column left its rail in {len(moved)}/{len(seg)} samples, first {moved[0]} vs {before}")
+            same = [cls.sa_rects(x) for x in seg if len(cls.sa_rects(x)) == len(before)]
+            grow = max((a[2] / b[2] for g in same for a, b in zip(g, before)), default=1)
+            drift = max((abs(ctr(a)[1] - ctr(b)[1]) for g in same for a, b in zip(g, before)), default=0)
+            if grow > 1.01:
+                res["notes"].append(f"{kind} drag: press feedback {grow:.2f}x wide in place, centre y drift {drift:.0f}pt")
+            end = seg[-1]
+            if cls.sa_rects(end) != before:
+                res["reasons"].append(f"{kind} drag: rects after the release {cls.sa_rects(end)} != before {before}")
+            left = end["column"].get("dragLeft") or []
+            if left:
+                res["reasons"].append(f"{kind} drag: left behind --duet-drag/data-drag on {left}")
+
+    @staticmethod
+    def sa_rects(r):
+        return [(round(q["rect"]["x"] * 2) / 2, round(q["rect"]["y"] * 2) / 2, round(q["rect"]["w"] * 2) / 2, round(q["rect"]["h"] * 2) / 2) for q in r["column"]["groups"]]
+
+    def sa_step(s, sid, tok, path, position, angle, desc, prepare=None):
+        """sa*: one posture of the installed app. The column must be docked (inside the window) and stay put through a
+        sideways and a long vertical drag: no sample out of its rects by more than 16pt (no flash), the same rects after
+        each release, nothing left with --duet-drag or data-drag, every sample standalone."""
+        s.log(f"[{sid}] {desc}")
+        http("POST", "/step", {"id": sid})
+        res = {"id": sid, "kind": "standalone", "desc": desc, "status": "PASS", "reasons": [], "notes": [], "position": position}
+        t0 = time.time() * 1000
+        s.why, s.early = "no sample from the page", []
+        rec = s.record(sid, 3 if position == "open" else 1) if s.a.video else None
+        try:
+            r = s.sa_go(sid, tok, path, position, angle, t0)
+            if r and prepare:
+                r = prepare(sid, tok, path, r, t0)
+        except (subprocess.CalledProcessError, SimError) as x:
+            r, s.why = None, f"{x}"[:200]
+        if r is None:
+            rec and s.stop_record(rec)
+            res.update(status="BLOCKED", reasons=["state not reached: " + s.why])
+            s.finish(res, [], [], None)
+            return res
+        s.sa_off = s.SA_OFF
+        before, W, H = s.sa_rects(r), r["sig"]["innerWidth"], r["sig"]["innerHeight"]
+        res["final"] = {"angle": r["sig"].get("angle"), "inner": f'{W}x{H}', "shown": True, "mode": r["html"]["mode"], "standalone": r["standalone"]}
+        res["before"] = before
+        out = [q for q in before if q[0] < -0.5 or q[1] < -0.5 or q[0] + q[2] > W + 0.5 or q[1] + q[3] > H + 0.5]
+        if out:
+            res["reasons"].append(f"not docked before the drags: {out} outside {W}x{H}")
+        allr, res["drags"] = [r], []
+        for kind in ("side", "long"):
+            rs, notes, hit = s.sa_drag(sid, tok, path, r, kind)
+            res["notes"] += notes
+            res["drags"].append({"kind": kind, "t": rs[0]["rx"] if rs else time.time() * 1000, "hit": hit})
+            allr += rs
+            if not hit:
+                res["status"] = "BLOCKED"
+            r = rs[-1] if rs else r
+        s.sa_assess(res, allr)
+        if res["reasons"]:
+            res["status"] = "FAIL"
+        shot = s.screenshot(sid)
+        rec and s.stop_record(rec, t0)
+        s.finish(res, allr, [], None)  # no overlay: it draws Safari's slots, not the column's groups
+        res["shot"] = shot and os.path.relpath(shot, s.out)
+        return res
+
+    def sa_inspect(s, sid, tok, path, r, t0):
+        """Opens the inspector pane: the first card's inspect button (the page's own control, by rect)."""
+        if r["inspector"]["level"] != "closed":
+            return r
+        b = next((x for x in r.get("targets") or [] if x["name"].startswith("Inspect ")), None)
+        if not b:
+            s.why = "no Inspect button on the inspector lab"
+            return None
+        off = s.SA_OFF
+        s.sim.tap(b["rect"]["x"] + b["rect"]["w"] / 2 + off[0], b["rect"]["y"] + b["rect"]["h"] / 2 + off[1], hold=0.1)
+        got = s.sa_wait(sid, tok, path, t0, lambda x: x["inspector"]["level"] != "closed", timeout=10)
+        if got is None:
+            s.why = f"the inspector pane did not open ({b['name']})"
+            return None
+        time.sleep(1.0)
+        return s.sa_last(sid, tok, path, t0)
+
+    def scenario_standalone(s):
+        """The site as a Home Screen web app: added through Safari's share sheet unless already there, opened from its
+        icon, driven by the dev server's relay (/api/e2e-relay). Removes only the clip it added."""
+        t = s.tok("sa")
+        s.relay({})
+        added = False
+        if s.sim.springboard_find(s.SA_CLIP) is None:
+            s.sim.button("HOME"); time.sleep(1.5)
+            if not s.sb_tap(s.SA_CLIP, tries=4, page=True):
+                if not s.sa_install():
+                    s.results.append({"id": "sa-setup", "kind": "setup", "desc": "Add to Home Screen", "status": "BLOCKED", "reasons": ["the clip did not install: " + s.why], "notes": []})
+                    return
+                added = True
+        s.log(f"  clip {'added by this run' if added else 'already on the Home Screen'}")
+        try:
+            s.relay({"beacon": BEACON, "s": t, "path": s.SA_LAB})
+            sh("xcrun", "simctl", "terminate", s.udid, SAFARI, check=False)
+            sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+            s.sim.button("HOME"); time.sleep(1.5)
+            if not s.sb_tap(s.SA_CLIP, page=True):
+                s.results.append({"id": "sa-setup", "kind": "setup", "desc": "open the clip", "status": "BLOCKED", "reasons": [s.why], "notes": []})
+                return
+            time.sleep(3)
+            L, I = s.SA_LAB, s.SA_INSPECTOR
+            s.sa_step("sa01", t, L, "closed", 0, "lab column, standalone, folded portrait")
+            s.sa_step("sa02", t, L, "open", 0, "lab column, standalone, unfolded wide")
+            s.sa_step("sa03", t, L, "open", 90, "lab column, standalone, unfolded, turn 90")
+            s.sa_step("sa04", t, L, "open", 270, "lab column, standalone, unfolded, turn 270")
+            s.fold("closed", 0); s.angle = 0
+            s.sa_step("sa05", t, I, "closed", 0, "inspector lab, standalone, folded portrait")
+            s.sa_step("sa06", t, I, "open", 0, "inspector lab, standalone, unfolded wide")
+            s.sa_step("sa07", t, I, "open", 0, "inspector lab, standalone, unfolded wide, pane open", prepare=s.sa_inspect)
+            s.sa_step("sa08", t, I, "open", 90, "inspector lab, standalone, pane open, turn 90", prepare=s.sa_inspect)
+            s.sa_step("sa09", t, I, "open", 270, "inspector lab, standalone, pane open, turn 270", prepare=s.sa_inspect)
+        finally:
+            s.relay({})
+            s.fold("closed", 0); s.position, s.angle = "closed", 0
+            time.sleep(1)
+            if added and not s.sa_remove():
+                s.results.append({"id": "sa-teardown", "kind": "setup", "desc": "remove the clip", "status": "BLOCKED", "reasons": ["the clip this run added is still on the Home Screen"], "notes": []})
+            sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+
     def scenario_split(s):
         """Split view in every way the user moves through it, wide inner display (the only posture with split view)."""
         t = s.tok("split")
@@ -1864,6 +2114,7 @@ class Run:
         "open-in-safari-90": lambda s: s.scenario_open_safari(90),
         "open-in-safari-270": lambda s: s.scenario_open_safari(270),
         "fold": lambda s: s.scenario_fold(),
+        "standalone": lambda s: s.scenario_standalone(),
         "dark": lambda s: s.scenario_dark(),
         "preview-unfolded": lambda s: s.scenario_preview_unfolded(),
         "open-in-safari-unfold": lambda s: s.scenario_open_safari_unfold(),
@@ -1877,8 +2128,8 @@ class Run:
         "live-preview-default": lambda s: s.scenario_live("default"),
         "live-preview-full": lambda s: s.scenario_live("full"),
     }
-    NEEDS_SIM = {"split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
-    EXPERIMENTAL = {"split-drag"}  # run only when named with --only
+    NEEDS_SIM = {"standalone", "split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
+    EXPERIMENTAL = {"split-drag", "standalone"}  # run only when named with --only
 
     def main(s):
         only = set(s.a.only.split(",")) if s.a.only else None
@@ -2086,6 +2337,15 @@ if __name__ == "__main__":
                 res.update(status="PASS", reasons=[], notes=[])
                 r.assess(res, res["samples"], res.get("native", []), res["expect"], t0, res["kind"], res.get("prev"))
                 r.check_icons(res, os.path.join(r.out, res["shot"]) if res.get("shot") else None)
+            elif res.get("kind") == "standalone" and res.get("before") is not None and res.get("samples"):
+                if not res.get("drags"):  # before drags were saved: the page's own last two touchstarts, side then long
+                    ts = sorted({t["t"] for x in res["samples"] for t in x.get("taps") or [] if t["type"] == "touchstart" and t["t"] >= res["samples"][0]["rx"]})[-2:]
+                    res["drags"] = [{"kind": k, "t": t} for k, t in zip(("side", "long"), ts)]
+                blocked = res["status"] == "BLOCKED"
+                notes = [n for n in res.get("notes", []) if "press feedback" not in n]
+                res.update(status="PASS", reasons=[], notes=notes)
+                Run.sa_assess(res, res["samples"])
+                res["status"] = "FAIL" if res["reasons"] else "BLOCKED" if blocked else "PASS"
             r.results.append(res)
             print(f'{res["id"]:28} {res["status"]:11} {"; ".join(res.get("reasons", []))[:240]}')
         r.report()
