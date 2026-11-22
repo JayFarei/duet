@@ -7,6 +7,8 @@ import type { Layout } from "./geometry.ts";
 import type { PaneIcon } from "./glyphs.ts";
 
 export { PANE_GLYPHS, type PaneIcon } from "./glyphs.ts";
+// The organisms' pure parts (the inspectable tap, keys, the history entry, the viewer group's order), for a vanilla page.
+export { hitsControl, inspectorKey, isTyping, withEntry, readEntry, needsRepair, inOrder, viewerStep, rootAttrs, scrollToTop, INTERACTIVE, TYPING, HISTORY_KEY } from "./organisms.ts";
 
 /** `selected`: the open card, null on the overview. `full`: the card has the whole window (always, where two panes
  *  do not fit). `depth`: how many history entries the inspector has above the overview's, 0 when closed. */

@@ -161,8 +161,10 @@ test("unknown ids and commands with no card open change nothing", () => {
 });
 
 // The core bundles for an app without React (the wealth app's vanilla adaptive.js): it imports types only.
-test("inspector.ts loads only glyphs.ts at run time, and glyphs.ts nothing", () => {
+// organisms.ts (the organisms' pure parts, re-exported on `duet-ui/inspector`) stays inside the same closed set.
+test("inspector.ts loads only glyphs.ts and organisms.ts at run time, organisms.ts only inspector.ts, glyphs.ts nothing", () => {
   const runtime = (f) => [...readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8").matchAll(/^(import|export)\s(?!type\s)[^;]*?from\s+"([^"]+)"/gm)].map((m) => m[2]);
-  assert.deepEqual(runtime("inspector.ts"), ["./glyphs.ts"]);
+  assert.deepEqual(runtime("inspector.ts"), ["./glyphs.ts", "./organisms.ts"]);
+  assert.deepEqual(runtime("organisms.ts"), ["./inspector.ts"]);
   assert.deepEqual(runtime("glyphs.ts"), []);
 });

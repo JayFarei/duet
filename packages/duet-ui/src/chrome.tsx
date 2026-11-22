@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode, type RefObject } from "react";
+import { Fragment, cloneElement, isValidElement, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactElement, type ReactNode, type RefObject } from "react";
 import { ArrowLeftRight, Ellipsis, Menu, X } from "./icons.tsx";
 import { glassTheme, themeVars, type Appearance, type DuetIcons } from "./theme.ts";
 import { DUO, columnBand, controlsShown, isSplit, pageInsets, sheetLayout, sidebarInset, magnet, stable, staleLayoutWidth, type Context, type Damper, type Side, type Signals } from "./geometry.ts";
@@ -10,6 +10,8 @@ import { unboot } from "./boot.ts";
 import { PRESS, listenPress } from "./press.ts";
 import { CLOSED, listening, menus, type MenuEvent, type Menus } from "./menu.ts";
 import { GlassProvider } from "./glassyui/glass-provider.tsx";
+import { DuetActionsContext } from "./actions.tsx";
+import { rootAttrs, scrollToTop } from "./organisms.ts";
 import "./duet.css";
 
 export interface DuetItem {
@@ -24,6 +26,8 @@ export interface DuetItem {
   destructive?: boolean;
   /** Lives in "…" even where the column has room for it, after the actions that folded for room. */
   folded?: boolean;
+  /** Shown but not pressable (aria-disabled): a tap does nothing. Looks the same as when absent. */
+  disabled?: boolean;
 }
 /** The page's call to action (Pay $48.00), a tinted button in the controls showing its icon. A tap grows it into a box
  *  beside the column, its label over a `confirm` button (default: the label) that calls onPress and collapses the box
@@ -82,6 +86,12 @@ export interface DuetProps<T extends string = string, U extends string = string>
    *  edge (`canMoveControls`), and honours the side the user chose. Default `false`: the controls stay on the default
    *  side, whatever an earlier visit stored, and this adds nothing to "…". */
   moveControls?: boolean;
+  /** A place chosen on purpose (a tap in the menu, the tabs or the sidebar) opens at its top: Duet's scroller and the
+   *  window scroll to 0, over the position Duet keeps for each place. Default `false`. */
+  scrollTopOnSelect?: boolean;
+  /** Writes Duet's device, layout and mode on <html> as `${prefix}-device`, `${prefix}-layout` and `${prefix}-mode`
+   *  ("data-app" gives data-app-device and so on), for app CSS. Default: none. */
+  rootAttrs?: string;
 }
 
 // --- context ------------------------------------------------------------------------------------
@@ -530,8 +540,15 @@ export function Duet<T extends string = string, U extends string = string>(props
   const dismiss = () => { send({ type: "miss" }); };
 
   const tabs = (p.tabs?.items ?? []).map((t): Action => ({ ...t, tab: true, selected: t.id === p.tabs!.selected, onPress: t.id === p.tabs!.selected ? undefined : () => p.tabs!.onSelect(t.id) }));
-  const actions: Action[] = [...tabs, ...(p.actions ?? []).filter((a) => !a.destructive && !a.folded)], destructive = (p.actions ?? []).filter((a) => a.destructive);
-  const folded = (p.actions ?? []).filter((a) => a.folded && !a.destructive);
+  // Actions an organism inside handed over (useDuetActions), unless the app passes its own: the last one published wins.
+  const [published, setPublished] = useState<{ owner: object; items: DuetItem[] }[]>([]);
+  const publish = useCallback((owner: object, items: DuetItem[] | null) => setPublished((all) => {
+    const rest = all.filter((x) => x.owner !== owner);
+    return items ? [...rest, { owner, items }] : rest.length === all.length ? all : rest;
+  }), []);
+  const appActions = p.actions ?? published.at(-1)?.items;
+  const actions: Action[] = [...tabs, ...(appActions ?? []).filter((a) => !a.destructive && !a.folded)], destructive = (appActions ?? []).filter((a) => a.destructive);
+  const folded = (appActions ?? []).filter((a) => a.folded && !a.destructive);
   const menuItems = p.menu?.items ?? [];
   const sheet = sheetLayout(ctx);
   useEffect(() => { send({ type: "sheet" }); }, [sheet]);
@@ -687,17 +704,32 @@ export function Duet<T extends string = string, U extends string = string>(props
     watch.observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ["content"] });
     return () => watch.disconnect();
   }, []);
+  // rootAttrs: the device, layout and mode on <html> for app CSS, removed with Duet or a new prefix.
+  const attrs = p.rootAttrs ? rootAttrs(p.rootAttrs, ctx) : undefined, attrsKey = attrs && JSON.stringify(attrs);
+  useLayout(() => {
+    if (!attrs) return;
+    const h = document.documentElement;
+    for (const [k, v] of Object.entries(attrs)) h.setAttribute(k, v);
+    return () => { for (const k of Object.keys(attrs)) h.removeAttribute(k); };
+  }, [attrsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- attrsKey is attrs
   const selected = p.menu?.selected;
   // Each place keeps its own scroll position in the inner scroller.
   const scrolls = useRef(new Map<string, number>());
+  // A place chosen in Duet's own controls, so scrollTopOnSelect opens it at its top. A selection the app makes itself
+  // (a link, history) keeps the place's remembered position.
+  const chosen = useRef(false);
   const select = (id: string) => {
     const el = scroller.current;
     send({ type: "place" });
     if (id === selected) return;
     if (el && selected !== undefined) scrolls.current.set(selected, el.scrollTop);
+    chosen.current = !!p.scrollTopOnSelect;
     p.menu!.onSelect(id);
   };
-  useLayout(() => { if (scroller.current && selected !== undefined) scroller.current.scrollTop = scrolls.current.get(selected) ?? 0; }, [selected]);
+  useLayout(() => {
+    if (chosen.current) { chosen.current = false; scrollToTop(scroller.current, window); return; }
+    if (scroller.current && selected !== undefined) scroller.current.scrollTop = scrolls.current.get(selected) ?? 0;
+  }, [selected]);
 
   const theme = { ...themeVars(p), "--duet-slide": SLIDE.easing, "--duet-slide-ms": `${SLIDE.ms}ms`, "--duet-group": GROUP.easing, "--duet-group-ms": `${GROUP.ms}ms`, "--duet-press-rise": PRESS.rise.easing, "--duet-press-rise-ms": `${PRESS.rise.ms}ms`, "--duet-press-fall": PRESS.fall.easing, "--duet-press-fall-ms": `${PRESS.fall.ms}ms` } as CSSProperties;
   const badge = (a: { badge?: number | string; badgeTone?: string }) => a.badge !== undefined && a.badge !== "" && <span className="duet-badge" data-tone={a.badgeTone === "neutral" ? "neutral" : undefined}>{a.badge}</span>;
@@ -715,7 +747,7 @@ export function Duet<T extends string = string, U extends string = string>(props
       if (confirm && split) setMenuSide(tapSide);
       send({ type: "primary", confirm });
       if (!confirm) p.primary!.onPress?.();
-    } else { send({ type: "action" }); actions[s.index].onPress?.(); }
+    } else { send({ type: "action" }); if (!actions[s.index].disabled) actions[s.index].onPress?.(); }
   };
 
   const bar = (side: Side, i: number) => {
@@ -725,7 +757,7 @@ export function Duet<T extends string = string, U extends string = string>(props
     const pick = (a: DuetItem) => () => {
       const arm = a === p.primary && primaryTap(armed, p.primary.confirm) === "arm";
       send({ type: "row", arm });
-      if (!arm) a.onPress?.();
+      if (!arm && !a.disabled) a.onPress?.();
     };
     const drawsMenu = more !== "closed" && moreAt && (!split || side === menuSide);
     const drawsAsk = ask !== "closed" && askAt && (!split || side === menuSide);
@@ -749,7 +781,7 @@ export function Duet<T extends string = string, U extends string = string>(props
               <i className="duet-edge" aria-hidden />
               <i className="duet-rim" aria-hidden />
               {g.group.map((s, j) => (
-                <button key={s.kind === "action" ? actions[s.index].id : s.kind === "place" ? `place-${menuItems[s.index].id}` : s.kind} className="duet-btn" data-duet-control={CONTROL[s.kind]} aria-label={label(s)} data-destructive={undefined} data-tab={s.kind === "place" || s.kind === "action" && actions[s.index].tab || undefined} aria-current={(s.kind === "place" && menuItems[s.index].id === selected) || (s.kind === "action" && actions[s.index].selected) || (s.kind === "more" && moreSelected) ? "page" : undefined}
+                <button key={s.kind === "action" ? actions[s.index].id : s.kind === "place" ? `place-${menuItems[s.index].id}` : s.kind} className="duet-btn" data-duet-control={CONTROL[s.kind]} aria-label={label(s)} aria-disabled={(s.kind === "action" && actions[s.index].disabled) || undefined} data-destructive={undefined} data-tab={s.kind === "place" || s.kind === "action" && actions[s.index].tab || undefined} aria-current={(s.kind === "place" && menuItems[s.index].id === selected) || (s.kind === "action" && actions[s.index].selected) || (s.kind === "more" && moreSelected) ? "page" : undefined}
                   aria-expanded={s.kind === "more" ? more === "open" : s.kind === "menu" ? sidebar === "open" : s.kind === "primary" && p.primary!.confirm !== false ? ask === "open" : undefined}
                   style={{ top: j * g.pitch, width: rect.w }} onClick={() => press(s)}>
                   {icon(s)}
@@ -768,7 +800,7 @@ export function Duet<T extends string = string, U extends string = string>(props
             {list.map((a) => {
               const arm = a === p.primary && armed;
               return (
-                <button key={a.id} className="duet-row" role="menuitem" data-destructive={a.destructive || undefined} data-armed={arm || undefined} data-cta={a === p.primary || undefined}
+                <button key={a.id} className="duet-row" role="menuitem" aria-disabled={a.disabled || undefined} data-destructive={a.destructive || undefined} data-armed={arm || undefined} data-cta={a === p.primary || undefined}
                   style={a === p.primary ? tint : undefined} onClick={pick(a)}>
                   {a.icon}<span>{(arm && p.primary!.confirm) || a.label}</span>{badge(a)}
                 </button>
@@ -796,6 +828,7 @@ export function Duet<T extends string = string, U extends string = string>(props
   const slid = sidebar !== "closed";
   const clear = "var(--duet-sidebar-inset, 0px)";
   return (
+    <DuetActionsContext.Provider value={publish}>
     <GlassProvider defaultTheme={glassTheme(p.appearance, p.dark)}>
       {p.menu && p.menu.burger !== false && (
         <nav ref={inner ? undefined : sidebarEl} className="duet duet-sidebar" data-open={sidebar === "open" || undefined} data-overlay={!inner || undefined} aria-label="Sidebar"
@@ -818,5 +851,6 @@ export function Duet<T extends string = string, U extends string = string>(props
           overlay once it is back (#119). */}
       {ctx.duo && ctx.browser === "safari" && !emulatedSignals() && (["left", "right"] as const).map((side) => <span key={side} className="duet-guard" data-side={side} aria-hidden />)}
     </GlassProvider>
+    </DuetActionsContext.Provider>
   );
 }
