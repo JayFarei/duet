@@ -1349,17 +1349,34 @@ class Run:
             notes.append(f"re-aimed: page->screen offset {off[0]:.0f},{off[1]:.0f}")
             time.sleep(1.0)
 
-    # press.ts opens the held capsule to PRESS.width (78.8pt) centred on its rest x, taller, with a ~15% spring
-    # overshoot, and drifts it a little with the finger. That is the press feedback, not the column leaving its rail.
-    SA_PRESS_W = 92
+    # Gabriele's bound for the press feedback: the held capsule may scale up to 1.13x its rest size, in place, its
+    # centre at most 1pt from where it rested. Anything past that, on screen, is the column out of its rail. press.ts's
+    # designed open (PRESS.width 78.8 from 49, ~1.6x, its pitch spread, a spring overshoot) is past it and fails.
+    SA_SCALE, SA_DRIFT = 1.13, 1.0
+
+    @classmethod
+    def sa_off_rail(cls, got, before, W, H):
+        """Why the first group of `got` (screen rects) is out of its rail against `before`, or None."""
+        if len(got) != len(before):
+            return f"{len(got)} groups, {len(before)} before"
+        for a, b in zip(got, before):
+            dx, dy = a[0] + a[2] / 2 - (b[0] + b[2] / 2), a[1] + a[3] / 2 - (b[1] + b[3] / 2)
+            # + 0.5pt: both rects are rounded to half points
+            if abs(dx) > cls.SA_DRIFT + 0.5 or abs(dy) > cls.SA_DRIFT + 0.5:
+                return f"centre moved {dx:+.1f},{dy:+.1f}pt"
+            if a[2] > b[2] * cls.SA_SCALE + 0.5 or a[3] > b[3] * cls.SA_SCALE + 0.5:
+                return f"scaled {a[2] / b[2]:.2f}x wide, {a[3] / b[3]:.2f}x tall"
+            if a[0] < -0.5 or a[1] < -0.5 or a[0] + a[2] > W + 0.5 or a[1] + a[3] > H + 0.5:
+                return f"outside {W}x{H}"
+        return None
 
     @classmethod
     def sa_assess(cls, res, rs):
         """sa*: judge one posture's samples. res["drags"] gives each drag's start (sample rx); a drag's samples run to
-        the next one's start. During a drag the column stays in its rail: each group's centre x within 4pt of its rest
-        (a side switch moves it a whole window), centre y within 40pt, no wider than the opened press, inside the
-        window. After each release: the same rects as before, nothing left with --duet-drag or data-drag. Every sample
-        standalone."""
+        the next one's start. During a drag the column stays in its rail, on screen (the visual viewport applied, so a
+        zoomed or panned page counts): each group at most 1.13x its rest width and height, its centre within 1pt of its
+        rest, inside the window. After each release: the same rects as before, nothing left with --duet-drag or
+        data-drag. Every sample standalone. res["press"] keeps each drag's largest scale and drift."""
         before = [tuple(q) for q in res["before"]]
         ctr = lambda q: (q[0] + q[2] / 2, q[1] + q[3] / 2)
         drags = res.get("drags") or []
@@ -1373,19 +1390,17 @@ class Run:
             proof = [x for x in seg if not ((x.get("standalone") or {}).get("navigator") and (x.get("standalone") or {}).get("displayMode"))]
             if proof:
                 res["reasons"].append(f"{kind} drag: {len(proof)} samples not standalone")
-            def off_rail(x):
-                got, gw, gh = cls.sa_rects(x), x["sig"]["innerWidth"], x["sig"]["innerHeight"]
-                return len(got) != len(before) or any(
-                    abs(ctr(a)[0] - ctr(b)[0]) > 4 or abs(ctr(a)[1] - ctr(b)[1]) > 40 or a[2] > max(cls.SA_PRESS_W, b[2] * 1.15)
-                    or a[3] > gh + 0.5 or a[0] < -0.5 or a[0] + a[2] > gw + 0.5 for a, b in zip(got, before))
-            moved = [cls.sa_rects(x) for x in seg if off_rail(x)]
-            if moved:
-                res["reasons"].append(f"{kind} drag: the column left its rail in {len(moved)}/{len(seg)} samples, first {moved[0]} vs {before}")
+            off = [(x, why) for x in seg for why in [cls.sa_off_rail(cls.sa_rects(x), before, x["sig"]["innerWidth"], x["sig"]["innerHeight"])] if why]
+            if off:
+                res["reasons"].append(f"{kind} drag: the column left its rail in {len(off)}/{len(seg)} samples, first {off[0][1]}: {cls.sa_rects(off[0][0])} vs {before}")
             same = [cls.sa_rects(x) for x in seg if len(cls.sa_rects(x)) == len(before)]
-            grow = max((a[2] / b[2] for g in same for a, b in zip(g, before)), default=1)
-            drift = max((abs(ctr(a)[1] - ctr(b)[1]) for g in same for a, b in zip(g, before)), default=0)
-            if grow > 1.01:
-                res["notes"].append(f"{kind} drag: press feedback {grow:.2f}x wide in place, centre y drift {drift:.0f}pt")
+            if same:
+                pairs = [(a, b) for g in same for a, b in zip(g, before)]
+                big = {"w": round(max(a[2] / b[2] for a, b in pairs), 3), "h": round(max(a[3] / b[3] for a, b in pairs), 3),
+                       "dx": round(max(abs(ctr(a)[0] - ctr(b)[0]) for a, b in pairs), 1), "dy": round(max(abs(ctr(a)[1] - ctr(b)[1]) for a, b in pairs), 1)}
+                res.setdefault("press", {})[kind] = big
+                if max(big["w"], big["h"]) > 1.01 or max(big["dx"], big["dy"]) > 0.5:
+                    res["notes"].append(f"{kind} drag: largest press {big['w']:.2f}x wide, {big['h']:.2f}x tall, centre drift {big['dx']:.1f},{big['dy']:.1f}pt")
             end = seg[-1]
             if cls.sa_rects(end) != before:
                 res["reasons"].append(f"{kind} drag: rects after the release {cls.sa_rects(end)} != before {before}")
@@ -1395,7 +1410,12 @@ class Run:
 
     @staticmethod
     def sa_rects(r):
-        return [(round(q["rect"]["x"] * 2) / 2, round(q["rect"]["y"] * 2) / 2, round(q["rect"]["w"] * 2) / 2, round(q["rect"]["h"] * 2) / 2) for q in r["column"]["groups"]]
+        """The groups' rects on screen: page rects through the visual viewport (its offset, then its scale), rounded
+        to half points. A page zoomed or panned after a turn moves the column on screen with no change in its rects."""
+        v = r.get("vv") or {}
+        ox, oy, k = v.get("x") or 0, v.get("y") or 0, v.get("scale") or 1
+        return [(round((q["rect"]["x"] - ox) * k * 2) / 2, round((q["rect"]["y"] - oy) * k * 2) / 2, round(q["rect"]["w"] * k * 2) / 2, round(q["rect"]["h"] * k * 2) / 2)
+                for q in r["column"]["groups"]]
 
     def sa_step(s, sid, tok, path, position, angle, desc, prepare=None):
         """sa*: one posture of the installed app. The column must be docked (inside the window) and stay put through a
@@ -2342,7 +2362,7 @@ if __name__ == "__main__":
                     ts = sorted({t["t"] for x in res["samples"] for t in x.get("taps") or [] if t["type"] == "touchstart" and t["t"] >= res["samples"][0]["rx"]})[-2:]
                     res["drags"] = [{"kind": k, "t": t} for k, t in zip(("side", "long"), ts)]
                 blocked = res["status"] == "BLOCKED"
-                notes = [n for n in res.get("notes", []) if "press feedback" not in n]
+                notes = [n for n in res.get("notes", []) if "largest press" not in n]
                 res.update(status="PASS", reasons=[], notes=notes)
                 Run.sa_assess(res, res["samples"])
                 res["status"] = "FAIL" if res["reasons"] else "BLOCKED" if blocked else "PASS"
