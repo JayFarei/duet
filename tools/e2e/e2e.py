@@ -1271,17 +1271,18 @@ class Run:
         except OSError:
             return None
 
-    def sa_install(s):
-        """Adds the app's origin to the Home Screen through Safari's share sheet (closed portrait). The sheet runs in its own
-        process, outside the runner's reach: fixed points of the 466x678 screen, found by hand (README, Standalone)."""
-        openurl(s.udid, s.sa_origin + "/")
+    def sa_install(s, path="/", check=True):
+        """Adds the app's origin (from `path`, which becomes its start page) to the Home Screen through Safari's share
+        sheet (closed portrait). The sheet runs in its own process, outside the runner's reach: fixed points of the
+        466x678 screen, found by hand (README, Standalone). check: look for SA_CLIP after."""
+        openurl(s.udid, s.sa_origin + path)
         time.sleep(8)  # a dev server compiles "/" on first load; the menu needs the page's title
         for pt, wait in (((48, 620), 2.0), ((143, 156), 3.0), ((318, 565), 2.5), ((163, 597), 3.0), ((335, 48), 3.0)):
             s.sim.tap(*pt, hold=0.1)  # Page Menu, Share, View More, Add to Home Screen, Add
             time.sleep(wait)
         s.sim.button("HOME")
         time.sleep(1.5)
-        return s.sim.springboard_find(s.SA_CLIP) is not None or s.sb_tap(s.SA_CLIP, tries=4, page=True)
+        return not check or s.sim.springboard_find(s.SA_CLIP) is not None or s.sb_tap(s.SA_CLIP, tries=4, page=True)
 
     def sa_remove(s):
         """Deletes the clip this run added: long-press, Delete Bookmark, Delete."""
@@ -1330,7 +1331,7 @@ class Run:
         fits = {("closed", 0): lambda g: not big(g) and g["innerHeight"] > g["innerWidth"],
                 ("closed", 90): lambda g: not big(g) and g["innerWidth"] > g["innerHeight"] and g.get("angle") == 90,
                 ("closed", 270): lambda g: not big(g) and g["innerWidth"] > g["innerHeight"] and g.get("angle") == 270,
-                ("open", 0): lambda g: g["outerWidth"] > 900}.get((position, angle), lambda g: g["outerHeight"] > 900)
+                ("open", 0): lambda g: g["outerWidth"] > 900, ("open", 180): lambda g: g["outerWidth"] > 900}.get((position, angle), lambda g: g["outerHeight"] > 900)
         r = s.sa_wait(sid, tok, path, t0, lambda r: r["rx"] >= done and fits(r["sig"]))
         if r is None and again:
             why = s.why
@@ -1669,6 +1670,210 @@ class Run:
             sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
             proxy.terminate()
             s.sa_origin, s.SA_CLIP = SITE, Run.SA_CLIP
+
+    # sa20+: no dead gutter in a Home Screen web app turned landscape (folded 90/270, unfolded wide both ways). Gabriele,
+    # 2026-11: the dashboard's cards stopped at ~785 of a 951 window, the column floated beside them in a black strip.
+    # GUTTER: the most a page may leave between its content and the rail, Duet's rail gutter (geometry.ts RAIL.gutter).
+    SA_GUTTER = 11
+    SA_GUTTER_POSTURES = (  # (id offset, position, angle, cold launch, description)
+        (0, "closed", 90, True, "launched folded, turned 90"),
+        (1, "closed", 270, False, "folded, turn 270"),
+        (2, "open", 0, False, "unfold wide"),
+        (3, "open", 180, False, "unfolded wide, turn the other way"),
+        (4, "open", 0, True, "launched unfolded wide"),
+        (5, "open", 180, True, "launched unfolded wide, the other way"),
+        (6, "closed", 270, True, "launched folded, turned 270"))
+
+    @classmethod
+    def gutter_assess(cls, g, sig):
+        """sa20+: one posture's probe measure (probe-proxy.mjs gutter) -> reasons. (a) No band outside the page: the
+        window (outerWidth) at most 1pt wider than the page (innerWidth); iOS cuts a Home Screen page short of the
+        status column unless it is black-translucent. (b) A rail: Duet's page inset on its side >= the column's width,
+        and the column inside it [W - inset, W]. (c) The content meets the rail: (W - inset) - content edge <= GUTTER.
+        (d) Only the page background in the rail and the gap: every sample point off the column paints the page's
+        own background colour."""
+        reasons = []
+        if not g or g.get("error"):
+            return [f"no gutter measure ({(g or {}).get('error', 'none')})"]
+        W, side, d = g["W"], g["duet"].get("side") or "right", g["duet"]
+        band = g["outer"]["w"] - W
+        if band > 1:
+            reasons.append(f"a {band:g}pt band outside the page: window {g['outer']['w']}, page {W} (env {g['env']}, mode {d.get('mode')})")
+        inset = d.get("insetR" if side == "right" else "insetL") or 0
+        col, c = g.get("col"), g["content"]
+        if not col:
+            reasons.append("no column drawn")
+        else:
+            cw = col["r"] - col["x"]
+            lo, hi = (W - inset, W) if side == "right" else (0, inset)
+            if inset + 0.5 < cw:
+                reasons.append(f"no rail: Duet's {side} inset {inset:g}pt, narrower than the column's {cw:g}pt (mode {d.get('mode')})")
+            elif col["x"] < lo - 0.5 or col["r"] > hi + 0.5:
+                reasons.append(f"the column {col['x']:g}-{col['r']:g} outside its rail {lo:g}-{hi:g}")
+        edge = c["right"] if side == "right" else c["left"]
+        gap = (W - inset) - edge if side == "right" else edge - inset
+        if gap > cls.SA_GUTTER + 0.5:
+            reasons.append(f"the content stops {gap:g}pt short of the rail (edge {edge:g}, rail at {W - inset if side == 'right' else inset:g}, {c['who'][side]})")
+        page = g["paint"]["page"]
+        bad = [p for k in ("railR", "railL", "gapR", "gapL") for p in g["paint"].get(k) or [] if not p["duet"] and p["bg"] != page]
+        if bad:
+            reasons.append(f"{len(bad)} points in the rail or the gap paint {sorted({p['bg'] for p in bad})}, not the page's {page}: {bad[0]['el']} at {bad[0]['x']},{bad[0]['y']}")
+        return reasons
+
+    @staticmethod
+    def gutter_band(shot, g):
+        """The screenshot's colour where a band outside the page would be: the window's far columns (1pt in), at mid
+        height, on the side Duet docks. Evidence only, for the report."""
+        try:
+            from PIL import Image
+            im = Image.open(shot).convert("RGB")
+            ow, oh = g["outer"]["w"], g["outer"]["h"]
+            if (im.width > im.height) != (ow > oh):
+                im = im.rotate(90, expand=True)
+            k = im.width / ow
+            px = lambda x: im.getpixel((min(im.width - 1, max(0, round(x * k))), round(im.height / 2)))
+            return {"farLeft": px(1), "farRight": px(ow - 1), "pageEdgeRight": px(g["W"] - 1)}
+        except Exception as e:  # noqa: BLE001
+            return {"error": str(e)[:120]}
+
+    def gutter_step(s, sid, tok, path, position, angle, cold, desc, tab=False):
+        """sa20+: one posture, cold (quit, turn, launch from the icon) or warm (turned in place). Judged on the last
+        probe measure after the turn's settle (gutter_assess); the screenshot keeps what paints outside the page."""
+        s.log(f"[{sid}] {desc}")
+        http("POST", "/step", {"id": sid})
+        res = {"id": sid, "kind": "gutter", "desc": desc, "status": "PASS", "reasons": [], "notes": [], "position": position}
+        t0 = time.time() * 1000
+        s.why, s.early, s.sa_note = "no sample from the page", [], None
+        try:
+            if tab:
+                r = s.gutter_tab(sid, tok, path, position, angle, t0)
+            else:
+                r = (s.sa_cold if cold else s.sa_go)(sid, tok, path, position, angle, t0)
+        except (subprocess.CalledProcessError, SimError) as x:
+            r, s.why = None, f"{x}"[:200]
+        if r is not None:
+            time.sleep(2.5)  # past the probe's 1s measure and any launch transient
+            done = time.time() * 1000 - 1200
+            r = next((x for x in reversed(samples(sid, t0)) if mine(x, tok) and x.get("probe") and x.get("gutter") and x["gutter"].get("t", 0) >= done), None) or r
+        if r is None or not r.get("gutter"):
+            res.update(status="BLOCKED", reasons=["state not reached: " + (s.why if r is None else "no probe gutter measure")])
+            s.finish(res, [], [], None)
+            return res
+        if s.sa_note:
+            res["notes"].append(s.sa_note)
+        g = r["gutter"]
+        res["gutter"] = g
+        res["final"] = {"angle": r["sig"].get("angle"), "inner": f'{r["sig"]["innerWidth"]}x{r["sig"]["innerHeight"]}', "outer": f'{r["sig"]["outerWidth"]}x{r["sig"]["outerHeight"]}',
+                        "mode": g["duet"].get("mode"), "side": g["duet"].get("side"), "standalone": r["standalone"], **({"build": r["build"]} if r.get("build") else {})}
+        if tab:
+            res["notes"].append("Safari tab reference, not judged: " + ("; ".join(s.gutter_assess(g, r["sig"])) or "no gutter"))
+        else:
+            if not ((r.get("standalone") or {}).get("navigator") and (r.get("standalone") or {}).get("displayMode")):
+                res["reasons"].append("the sample is not standalone")
+            res["reasons"] += s.gutter_assess(g, r["sig"])
+        shot = s.screenshot(sid)
+        if shot:
+            res["band"] = s.gutter_band(shot, g)
+        res["status"] = "FAIL" if res["reasons"] else "PASS"
+        s.finish(res, [r], [], None)
+        res["shot"] = shot and os.path.relpath(shot, s.out)
+        return res
+
+    def gutter_tab(s, sid, tok, path, position, angle, t0):
+        """The same page in a Safari tab, the probe asked for (?duet-probe), in the same posture: the reference."""
+        q = path + ("&" if "?" in path else "?") + "duet-probe"
+        s.relay({"beacon": BEACON, "s": tok, "path": q})
+        if (s.position, s.angle) != (position, angle) and not s.fold(position, angle):
+            return None
+        s.angle = angle
+        done = time.time() * 1000
+        if not getattr(s, "tab_open", False):
+            openurl(s.udid, s.sa_origin + q)
+            s.tab_open = True
+        big = lambda g: max(g["outerWidth"], g["outerHeight"]) > 900
+        fits = (lambda g: big(g) and g["outerWidth"] > g["outerHeight"]) if position == "open" else (lambda g: not big(g) and g["innerWidth"] > g["innerHeight"])
+        return s.wait(sid, tok, lambda r: r.get("probe") and r["rx"] >= done and address(r["path"]) == address(q) and fits(r["sig"]), t0)
+
+    def gutter_build(s, n0, label, origin, tab):
+        """sa<n0>..: one build through the probe proxy, its own clip added fresh (iOS keeps a web app's status bar style
+        from when it was added), the postures of SA_GUTTER_POSTURES, the clip removed. tab: the Safari tab reference
+        first (sa<n0+7>t..)."""
+        u = urllib.parse.urlsplit(origin)
+        path = (u.path or "/") + (f"?{u.query}" if u.query else "")
+        s.relay({"upstream": f"{u.scheme}://{u.netloc}", "build": label})
+        t = s.tok(f"sag{label}")
+        sfx = "" if label == "site" else f"-{label}"
+        if tab:
+            s.tab_open = False
+            sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+            for i, pos, ang, _cold, desc in s.SA_GUTTER_POSTURES[:4]:
+                s.gutter_step(f"sa{n0 + 7 + i}t{sfx}", t, path, pos, ang, False, f"{label}, Safari tab, {desc}", tab=True)
+            sh("xcrun", "simctl", "terminate", s.udid, SAFARI, check=False)
+            s.fold("closed", 0); s.position, s.angle = "closed", 0
+        s.sim.button("HOME"); time.sleep(1.5)
+        present = [c for c in s.SA_GUTTER_CLIPS if s.sim.springboard_find(c)]
+        if present:
+            s.results.append({"id": f"sa{n0}-setup{sfx}", "kind": "setup", "desc": f"{label}: Add to Home Screen", "status": "BLOCKED",
+                              "reasons": [f"a clip {present} is already on the Home Screen: its status bar style is from when it was added, remove it first"], "notes": []})
+            return
+        s.relay({"beacon": None, "s": None, "path": None})
+        sh("xcrun", "simctl", "terminate", s.udid, SAFARI, check=False)
+        s.sa_install(path, check=False)
+        clip = next((c for c in s.SA_GUTTER_CLIPS if s.sim.springboard_find(c)), None)
+        if clip is None:
+            s.results.append({"id": f"sa{n0}-setup{sfx}", "kind": "setup", "desc": f"{label}: Add to Home Screen", "status": "BLOCKED", "reasons": [f"no clip named {s.SA_GUTTER_CLIPS} after the share sheet"], "notes": []})
+            return
+        s.SA_CLIP = clip
+        s.log(f"  {label}: clip {clip!r} added by this run, from {path}")
+        try:
+            sh("xcrun", "simctl", "terminate", s.udid, SAFARI, check=False)
+            for i, pos, ang, cold, desc in s.SA_GUTTER_POSTURES:
+                s.gutter_step(f"sa{n0 + i}{sfx}", t, path, pos, ang, cold, f"{label}, {desc}")
+        finally:
+            s.relay({})
+            s.fold("closed", 0); s.position, s.angle = "closed", 0
+            time.sleep(1)
+            if not s.sa_remove():
+                s.results.append({"id": f"sa{n0}-teardown{sfx}", "kind": "setup", "desc": "remove the clip", "status": "BLOCKED", "reasons": [f"the clip {clip!r} this run added is still on the Home Screen"], "notes": []})
+            sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+
+    SA_GUTTER_CLIPS = ("Duet Lab", "Monitoring", "Wealth", "Wealth management")
+
+    def gutter_run(s, n0, builds):
+        """Starts the probe proxy, plays gutter_build for each (label, origin+path), stops the proxy. E2E_GUTTER_TAB=1:
+        each build's Safari tab reference too."""
+        port = int(os.environ.get("E2E_GUTTER_PORT", "18461"))
+        log = open(os.path.join(s.out, "probe-proxy.log"), "a")
+        first = urllib.parse.urlsplit(builds[0][1])
+        proxy = subprocess.Popen(["node", os.path.join(HERE, "probe-proxy.mjs"), str(port), f"{first.scheme}://{first.netloc}", builds[0][0]], stdout=log, stderr=subprocess.STDOUT)
+        s.sa_origin = f"http://localhost:{port}"
+        try:
+            for _ in range(30):
+                if s.relay({}) is not None:
+                    break
+                time.sleep(0.5)
+            else:
+                s.results.append({"id": f"sa{n0}-setup", "kind": "setup", "desc": "probe proxy", "status": "BLOCKED", "reasons": [f"probe proxy not up on :{port}"], "notes": []})
+                return
+            for label, origin in builds:
+                s.gutter_build(n0, label, origin, os.environ.get("E2E_GUTTER_TAB") == "1")
+        finally:
+            proxy.terminate()
+            s.sa_origin, s.SA_CLIP = SITE, Run.SA_CLIP
+
+    def scenario_gutter(s):
+        """sa20-26: the site's lab (/lab, statusBarStyle "default") added to the Home Screen from its own page, through the
+        probe proxy, in each landscape posture: no dead gutter (gutter_assess). EXPECTED.md, Home Screen web app, sa20+."""
+        s.gutter_run(20, [("site", SITE + s.SA_LAB)])
+
+    def scenario_gutter_app(s):
+        """sa30-36-<label>: the same for each consumer build in $E2E_GUTTER, "label=http://127.0.0.1:port[/path],..."
+        (local servers, synthetic data only), each added fresh to the Home Screen from its path."""
+        builds = [b.split("=", 1) for b in os.environ.get("E2E_GUTTER", "").split(",") if "=" in b]
+        if not builds:
+            s.results.append({"id": "sa30-setup", "kind": "setup", "desc": "E2E_GUTTER", "status": "BLOCKED", "reasons": ["E2E_GUTTER names no build"], "notes": []})
+            return
+        s.gutter_run(30, builds)
 
     def scenario_split(s):
         """Split view in every way the user moves through it, wide inner display (the only posture with split view)."""
@@ -2284,6 +2489,8 @@ class Run:
         "fold": lambda s: s.scenario_fold(),
         "standalone": lambda s: s.scenario_standalone(),
         "standalone-wealth": lambda s: s.scenario_standalone_wealth(),
+        "gutter": lambda s: s.scenario_gutter(),
+        "gutter-app": lambda s: s.scenario_gutter_app(),
         "dark": lambda s: s.scenario_dark(),
         "preview-unfolded": lambda s: s.scenario_preview_unfolded(),
         "open-in-safari-unfold": lambda s: s.scenario_open_safari_unfold(),
@@ -2297,8 +2504,8 @@ class Run:
         "live-preview-default": lambda s: s.scenario_live("default"),
         "live-preview-full": lambda s: s.scenario_live("full"),
     }
-    NEEDS_SIM = {"standalone", "standalone-wealth", "split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
-    EXPERIMENTAL = {"split-drag", "standalone", "standalone-wealth"}  # run only when named with --only
+    NEEDS_SIM = {"standalone", "standalone-wealth", "gutter", "gutter-app", "split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
+    EXPERIMENTAL = {"split-drag", "standalone", "standalone-wealth", "gutter", "gutter-app"}  # run only when named with --only
 
     def main(s):
         only = set(s.a.only.split(",")) if s.a.only else None

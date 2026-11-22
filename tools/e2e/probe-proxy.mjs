@@ -7,6 +7,7 @@
 //   upstream bumps gen and the installed app reloads onto the other build, so one clip and one origin serve both.
 // Loopback only: the upstream and the beacon must be localhost. Usage: node probe-proxy.mjs <port> <upstream origin> [build]
 import http from "node:http";
+import net from "node:net";
 
 const port = Number(process.argv[2] ?? 18460);
 const loop = (o) => { try { const u = new URL(o); return /^(localhost|127\.0\.0\.1)$/.test(u.hostname) ? u.origin : null; } catch { return null; } };
@@ -16,7 +17,8 @@ let relay = { beacon: null, s: null, path: null, build: process.argv[4] ?? null,
 const PROBE = `(() => {
   if (window.top !== window) return;
   const standalone = navigator.standalone === true || matchMedia("(display-mode: standalone)").matches;
-  if (!standalone) return;
+  // ?duet-probe: a Safari tab reports too (the gutter scenario compares a tab's posture with the web app's).
+  if (!standalone && !/[?&]duet-probe/.test(location.search)) return;
   const PAGE = Math.random().toString(36).slice(2, 10);
   let beacon = null, s = null, build = null, gen = null, frameAt = 0;
   const taps = [];
@@ -25,9 +27,63 @@ const PROBE = `(() => {
   const shown = (el) => { const b = el.getBoundingClientRect(); if (b.width < 1 || b.height < 1) return false; const cs = getComputedStyle(el); return cs.visibility !== "hidden" && cs.display !== "none" && Number(cs.opacity) > 0.01; };
   const label = (el) => { const c = typeof el.className === "string" ? el.className.trim().split(/\\s+/).slice(0, 2).join(".") : ""; return el.tagName.toLowerCase() + (c ? "." + c : ""); };
   const buttons = (el) => [...el.querySelectorAll("button")].filter(shown).map((b) => ({ label: b.getAttribute("aria-label") || "", rect: rect(b) }));
+  // gutter (sa20+): where the page's content stops against the rail, and what paints between. Recomputed each second.
+  // env: the computed safe-area insets (a hidden fixed div padded by env()); duet: Duet's page insets and mode;
+  // col: the union of the column's groups; content: the outermost edges of painting non-Duet elements narrower than
+  // the viewport (a full-width header or body says nothing about the grid); paint: the effective background at sample
+  // points in the rail band and in the band between content and rail, against the page's own background.
+  let envEl = null, gutter = null, gutterAt = 0;
+  const bgOf = (el) => { for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const c = getComputedStyle(e).backgroundColor; if (c && c !== "transparent" && !/rgba\\(.*,\\s*0\\)$/.test(c)) return c; } return "none"; };
+  const measure = () => {
+    const h = document.documentElement, W = innerWidth, H = innerHeight;
+    if (!envEl) { envEl = document.createElement("div"); envEl.setAttribute("aria-hidden", "true"); envEl.style.cssText = "position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)"; document.body.appendChild(envEl); }
+    const ec = getComputedStyle(envEl), hc = getComputedStyle(h);
+    const env = { t: parseFloat(ec.paddingTop), r: parseFloat(ec.paddingRight), b: parseFloat(ec.paddingBottom), l: parseFloat(ec.paddingLeft) };
+    const px = (n) => { const v = parseFloat(hc.getPropertyValue(n)); return Number.isFinite(v) ? v : null; };
+    const nav = document.querySelector("nav.duet");
+    const duet = { mode: h.getAttribute("data-duet-mode"), side: nav ? nav.getAttribute("data-side") : null, insetL: px("--duet-inset-left"), insetR: px("--duet-inset-right"), gap: px("--duet-rail-gap") };
+    const gs = [...document.querySelectorAll(".duet .duet-group")].filter(shown).map((g) => g.getBoundingClientRect());
+    const col = gs.length ? { x: r1(Math.min(...gs.map((b) => b.left))), r: r1(Math.max(...gs.map((b) => b.right))), y: r1(Math.min(...gs.map((b) => b.top))), b: r1(Math.max(...gs.map((b) => b.bottom))) } : null;
+    let right = 0, left = W, who = { right: null, left: null }, n = 0;
+    const take = (b, el) => {
+      if (b.width < 1 || b.height < 1 || b.bottom < 0 || b.top > H || b.right < 0 || b.left > W) return;
+      if (b.right > right) { right = b.right; who.right = label(el); }
+      if (b.left < left) { left = b.left; who.left = label(el); }
+    };
+    const rg = document.createRange();
+    for (const el of document.body.querySelectorAll("*")) {
+      if (++n > 4000) break;
+      if (el === envEl || el.closest(".duet, [data-duet], script, style, noscript")) continue;
+      const b = el.getBoundingClientRect();
+      if (b.width < 1 || b.height < 1 || b.bottom < 0 || b.top > H || b.right < 0 || b.left > W) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) < 0.02 || cs.position === "fixed") continue;
+      // Text counts by its own extent, so a full-width paragraph still says where its words stop.
+      for (const t of el.childNodes) if (t.nodeType === 3 && t.textContent.trim()) { rg.selectNodeContents(t); for (const q of rg.getClientRects()) take(q, el); }
+      // A box (media, background, side border) counts by its rect, unless it spans the viewport (a page wrapper).
+      if (b.width >= W - 1) continue;
+      const box = /^(IMG|SVG|CANVAS|VIDEO|svg|PICTURE)$/.test(el.tagName) || (cs.backgroundColor !== "transparent" && !/rgba\\(.*,\\s*0\\)$/.test(cs.backgroundColor)) || cs.backgroundImage !== "none" || parseFloat(cs.borderLeftWidth) > 0 || parseFloat(cs.borderRightWidth) > 0;
+      if (box) take(b, el);
+    }
+    const page = bgOf(document.body) !== "none" ? bgOf(document.body) : bgOf(h);
+    const ys = [0.2, 0.4, 0.6, 0.8].map((f) => Math.round(H * f));
+    const at = (x) => ys.map((y) => { const el = document.elementFromPoint(x, y); return { x: Math.round(x), y, el: el ? label(el) : null, bg: el ? bgOf(el) : null, duet: !!(el && el.closest(".duet")) }; });
+    const insetR = duet.insetR ?? env.r, insetL = duet.insetL ?? env.l;
+    const paint = {
+      page,
+      railR: insetR > 2 ? at(W - insetR / 2) : [],
+      railL: insetL > 2 ? at(insetL / 2) : [],
+      gapR: insetR > 2 && right < W - insetR - 2 ? at((right + W - insetR) / 2) : [],
+      gapL: insetL > 2 && left > insetL + 2 ? at((left + insetL) / 2) : [],
+    };
+    return { t: Date.now(), W, H, outer: { w: outerWidth, h: outerHeight }, screen: { w: screen.width, h: screen.height }, env, duet, col, content: { left: r1(left), right: r1(right), who }, paint };
+  };
+  window.__duetProbeMeasure = measure; // for checking the probe by hand in a desktop browser
   const sample = () => {
     const h = document.documentElement, v = visualViewport;
+    if (Date.now() - gutterAt > 1000) { gutterAt = Date.now(); try { gutter = measure(); } catch (e) { gutter = { error: String(e) }; } }
     return {
+      probe: true, gutter,
       t: Date.now(), page: PAGE, path: location.pathname + location.search, s, build, visible: document.visibilityState, frameAt,
       sig: { innerWidth, innerHeight, outerWidth, outerHeight, angle: (screen.orientation && screen.orientation.angle) || 0 },
       standalone: { navigator: navigator.standalone === true, displayMode: matchMedia("(display-mode: standalone)").matches },
@@ -113,4 +169,20 @@ http.createServer(async (req, res) => {
   });
   up.on("error", (e) => { res.writeHead(502, { "content-type": "text/plain" }); res.end(`upstream ${upstream}: ${e.message}`); });
   up.end(data);
-}).listen(port, "127.0.0.1", () => console.log(`probe proxy on :${port} -> ${upstream}`));
+})
+  // WebSocket upgrades pass through as raw bytes: a Next dev upstream (the site's lab) hydrates only once its HMR
+  // socket (/_next/hmr) connects, so without this the lab stays blank behind the proxy.
+  .on("upgrade", (req, sock, head) => {
+    const u = new URL(upstream);
+    const up = net.connect(Number(u.port || 80), u.hostname, () => {
+      const lines = [`${req.method} ${req.url} HTTP/${req.httpVersion}`];
+      for (let i = 0; i < req.rawHeaders.length; i += 2)
+        lines.push(`${req.rawHeaders[i]}: ${/^host$/i.test(req.rawHeaders[i]) ? u.host : req.rawHeaders[i + 1]}`);
+      up.write(lines.join("\r\n") + "\r\n\r\n");
+      if (head?.length) up.write(head);
+      sock.pipe(up).pipe(sock);
+    });
+    up.on("error", () => sock.destroy());
+    sock.on("error", () => up.destroy());
+  })
+  .listen(port, "127.0.0.1", () => console.log(`probe proxy on :${port} -> ${upstream}`));

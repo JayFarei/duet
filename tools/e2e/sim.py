@@ -31,6 +31,17 @@ class Sim:
         s.p = subprocess.Popen([HELPER], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
 
     def call(s, op, timeout=30, **kw):
+        # An input the helper reports "was not sent" because its input connection is still starting up never reached
+        # the simulator, so it is safe to send again; the helper's own advice is about 10s, a few tries.
+        for i in range(5):
+            try:
+                return s._call(op, timeout, **kw)
+            except SimError as e:
+                if "still starting up" not in str(e) or i == 4:
+                    raise
+                time.sleep(10)
+
+    def _call(s, op, timeout=30, **kw):
         s._spawn()
         s.n += 1
         body = json.dumps({"id": s.n, "op": op, "udid": s.udid, **kw}).encode()
