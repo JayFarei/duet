@@ -61,12 +61,13 @@ async function grip(page: Page) {
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
 
-/** Mid-drag, still in its rail (tools/e2e/EXPECTED.md "Home Screen web app"): the held capsule may open to the press
- * width (press.ts PRESS.width 78.8, spring overshoot) centred on its rest x and drift a little with the finger; a side
- * switch moves its centre a whole window. */
-const PRESS_W = 92;
+/** Mid-drag, still in its rail (tools/e2e/EXPECTED.md "Home Screen web app", Gabriele 2026-11-22): a held capsule may
+ * scale up to 1.13x its rest width and height, in place, its centre at most 1pt from rest (plus the probe's 0.5pt
+ * rounding). Safari's open press (PRESS.width 78.8 from 49) is past this bound. */
+const BOUND = 1.13, DRIFT = 1, ROUND = 0.5;
 const inRail = (a: R[], b: R[]) => a.length === b.length && a.every((r, i) =>
-  Math.abs(r.x + r.w / 2 - (b[i].x + b[i].w / 2)) <= 4 && Math.abs(r.y + r.h / 2 - (b[i].y + b[i].h / 2)) <= 40 && r.w <= Math.max(PRESS_W, b[i].w * 1.15));
+  Math.abs(r.x + r.w / 2 - (b[i].x + b[i].w / 2)) <= DRIFT + ROUND && Math.abs(r.y + r.h / 2 - (b[i].y + b[i].h / 2)) <= DRIFT + ROUND
+  && r.w <= b[i].w * BOUND + ROUND && r.h <= b[i].h * BOUND + ROUND);
 
 type Target = { id: string; url: string; move?: boolean; app?: boolean; prepare?: (page: Page) => Promise<void> };
 const TARGETS: Target[] = [
