@@ -428,6 +428,30 @@ SUITES = [
         (("turn", 90), None, {}), (("turn", 270), None, {}), (("turn", 0), None, {}), (("unfold",), None, {}), (("fold",), None, {}),
     ]} for n, pg in enumerate(("/", "/book", "/scroll", "/sheet", "/probe"), 1)
 ]
+# Inspector: resize preserves full screen; explicitly choose Side by side after unfolding.
+INSPECTOR_STEPS = [
+    (("tap", "Inspect Rent"), "Open Rent folded; places give way to card commands", {"inspector": "full", "card": "rent", "label": "Close", "no_label": "Household"}),
+    (("unfold",), None, {"inspector": "full", "card": "rent", "label": "Side by side"}),
+    (("tap", "Side by side"), "Give Rent a pane beside the overview", {"inspector": "split", "card": "rent", "label": "Full screen"}),
+    (("fold",), None, {"inspector": "full", "card": "rent"}),
+    (("turn", 90), None, {"inspector": "full", "card": "rent"}),
+    (("turn", 270), None, {"inspector": "full", "card": "rent"}),
+    (("tap", "Close"), "Close Rent; restore places", {"inspector": "closed", "label": "Household", "no_label": "Next card"}),
+]
+SUITES += [
+    {"id": sid, "title": title, "page": "/lab/inspector?plain", "start": TAB0, "env": env, "open_check": {"inspector": "closed", "label": "Household"}, "steps": INSPECTOR_STEPS}
+    for sid, title, env in [
+        ("ins01", "Inspector: folded, unfolded pane, folded and turned", {}),
+        ("ins02", "Inspector: dark appearance", {"dark": True}),
+        ("ins03", "Inspector: largest Dynamic Type", {"content_size": "accessibility-extra-extra-extra-large"}),
+    ]
+]
+SUITES += [{"id": "ins04", "title": "Inspector: Safari split view left and right", "page": "/lab/inspector?plain", "start": TAB0,
+    "open_check": {"inspector": "closed", "label": "Household"}, "steps": INSPECTOR_STEPS[:3] + [
+        (("split", "left"), "Move Safari to the left split pane", {"inspector": "full", "card": "rent"}),
+        (("split", "right"), "Move Safari to the right split pane", {"inspector": "full", "card": "rent"}),
+        (("split-full",), "Return Safari to full width", {"inspector": "full", "card": "rent"}),
+    ]}]
 DEVICE_OPS = {"turn", "unfold", "fold", "music", "timer", "safari"}
 SUITE_GAPS = [
     "Safari's tab bar at the top vs the bottom: the setting is not reachable from the simulator yet.",
@@ -437,7 +461,7 @@ SUITE_GAPS = [
 def check_en(c):
     out = []
     for k, v in c.items():
-        out.append({"path": lambda: f"the address is {v}", "label": lambda: f'Duet offers "{v}"', "no_label": lambda: f'Duet no longer offers "{v}"',
+        out.append({"inspector": lambda: f"inspector is {v}", "card": lambda: f"selected card is {v}", "path": lambda: f"the address is {v}", "label": lambda: f'Duet offers "{v}"', "no_label": lambda: f'Duet no longer offers "{v}"',
                     "keyboard": lambda: "the keyboard is up (data-keyboard)" if v else "the keyboard is down",
                     "active": lambda: "the text field has focus" if v else "nothing has focus",
                     "dialog": lambda: "the dialog is open" if v else "the dialog is closed",
@@ -453,9 +477,13 @@ def check_en(c):
 def suite_steps(suite):
     """[(action, state after it, words, expected words, check)] for a suite, the open first."""
     cur = suite["start"]
-    out = [(("open",), cur, f'Open {suite["page"]} in {SURFACE_EN[cur[0]]}, {state_en(cur)}', expect_en(cur), {})]
+    initial = suite.get("open_check", {})
+    out = [(("open",), cur, f'Open {suite["page"]} in {SURFACE_EN[cur[0]]}, {state_en(cur)}', "; ".join([expect_en(cur)] + check_en(initial)), initial)]
     lit = {"music": cur[3], "timer": False}  # the Live Activities running; the state's last item is any of them
+    split = False
     for a, words, check in suite["steps"]:
+        if a[0] in ("split", "split-full"):
+            split = a[0] == "split"
         if a[0] in DEVICE_OPS:
             words = words or action_en(a, cur)
             if a[0] in lit:
@@ -463,7 +491,7 @@ def suite_steps(suite):
                 cur = cur[:3] + (any(lit.values()),)
             else:
                 cur = after(a, cur)
-        out.append((a, cur, words, "; ".join([expect_en(cur)] + check_en(check)), check))
+        out.append((a, cur, words, "; ".join(["controls in the split pane" if split else expect_en(cur)] + check_en(check)), check))
     return out
 
 

@@ -3,6 +3,7 @@
 // Paths from Lucide (ISC, https://lucide.dev): chevron-left, ellipsis, search, x, arrow-left-right,
 // maximize-2, minimize-2, menu, check.
 import type { ReactNode } from "react";
+import { PANE_GLYPHS, type PaneIcon } from "./glyphs.ts";
 
 const icon = (paths: ReactNode) => function Icon({ size = 22, strokeWidth = 2 }: { size?: number; strokeWidth?: number }) {
   return (
@@ -20,3 +21,13 @@ export const Maximize = icon(<><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><pat
 export const Minimize = icon(<><path d="M4 14h6v6" /><path d="M20 10h-6V4" /><path d="m14 10 7-7" /><path d="m3 21 7-7" /></>);
 export const Menu = icon(<><path d="M4 6h16" /><path d="M4 12h16" /><path d="M4 18h16" /></>);
 export const Check = icon(<path d="M20 6 9 17l-5-5" />);
+
+// The inspector's commands (glyphs.ts), one component each so React keeps the same element type between renders.
+const PANE = Object.fromEntries(Object.entries(PANE_GLYPHS).map(([name, paths]) => [name, icon(paths.map((d) => <path key={d} d={d} />))])) as Record<PaneIcon, ReturnType<typeof icon>>;
+
+/** A pane command's glyph (PaneCommand.icon), Lucide's X, Maximize2, Columns2, ChevronUp or ChevronDown drawn like the
+ *  chrome's own: `{ ...command, icon: paneGlyph(command.icon), onPress }` is a DuetItem. */
+export function paneGlyph(name: PaneIcon, o: { size?: number; strokeWidth?: number } = {}): ReactNode {
+  const Glyph = PANE[name];
+  return <Glyph {...o} />;
+}

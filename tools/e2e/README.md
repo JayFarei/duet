@@ -102,7 +102,25 @@ The second app is always `DuoE2EHost` (`dev.duolab.e2e.host`), never another Hom
 - Folding with the preview open (`pvu-fold`) intermittently leaves WebKit reporting a negative `visualViewport.height` (-78) until the next resize; the library treats a non-positive visual height as no keyboard (`keyboardUp`), else the controls hid as if the keyboard were up.
 - No split view in the tall posture, so there is nothing to place there; `split-turn` checks that Safari takes the screen.
 - `split-drag` (experimental, only with `--only split-drag`) tries a direct pane swap by dragging the pane's top handle. Round 4: blocked, the drag does not swap the panes and the simulator's accessibility tree exposes no pane handle to aim at (the dump is saved as `steps/<step>-ui.json`). `split` moves between panes through full width (quit the other app, open in split view on the other side), the path SpringBoard drives reliably.
+- `standalone` (experimental, only with `--only standalone`) drives the site as a Home Screen web app (EXPECTED.md "Home Screen web app"). The clip is added through Safari's share sheet at fixed points in closed portrait (Page Menu, Share, View More, Add to Home Screen, Add) and is named after the title of `/`, "Duet". The installed app keeps its own start URL, so the harness steers it through `/api/e2e-relay` (dev only, in memory, 404 in production): the reporter polls it when it has no beacon and follows `path` changes. Teardown clears the relay and deletes the clip only if this run added it. In the app, page and screen points coincide in every posture (no Safari chrome), so drags aim at page coordinates and re-aim once from the touch the page saw.
+- `gutter` and `gutter-app` (experimental, sa20+, EXPECTED.md "No dead gutter in landscape") measure the page against its rail in each landscape posture through the probe proxy's `gutter` measure (computed `env(safe-area-inset-*)`, Duet's `--duet-inset-*` and mode, the column's union, the content's outer edges, `elementFromPoint` paint samples in the rail and the gap). Each build gets a fresh clip from its own path, since iOS keeps the status bar style from when the clip was added. `gutter-app` example: `E2E_GUTTER="dash=http://127.0.0.1:3278,wealth=http://127.0.0.1:18453" E2E_SITE_PORT=3160 DUO_UDID=... nice -n 10 tools/e2e/run.sh --only gutter-app`. `?duet-probe` lets the probe report from a Safari tab too (`E2E_GUTTER_TAB=1`). Unit tests: `python tools/e2e/test_gutter_assess.py`.
 - Unfolded steps without native frames (the preview sheet unfolded) skip the overlap and icon checks: slot positions in the window come from the native frames.
 - One render after a viewport resize is not judged off screen: the page samples the new size before React has re-placed the controls (`pvu-tall`, round 3). A JS-positioned layout always has that frame.
 - Only the simulator: physical Duo devices are not driven. Real-device geometry is pinned in unit fixtures (`packages/duet-ui/test/`).
 - The simulator helper is a single client process per run; other agents' helpers on other simulators are unaffected, but never kill runners or helpers by name (`pkill`): an earlier round did and stopped another agent's runner.
+
+## Inspector (0.9.0-rc.1)
+
+The dev-only `/lab/inspector?plain&e2e=1` page uses the root e2e reporter. `plain` keeps the page out of the desktop Duo mock. `ins01` opens Rent folded, unfolds, chooses Side by side, folds, turns 90/270, and closes back to Household. `ins02` repeats in dark appearance; `ins03` repeats at the largest Dynamic Type setting. `ins04` opens the card and moves Safari into the left and right split panes, then back to full width. Split and taps need the simulator helper; a missing helper is BLOCKED. All four suites assert the inspector level and selected card, with sampled and prepaint capsule ownership checks in addition to the existing placement checks. These are measured checks, not a guarantee about frames absent from the trace.
+
+```sh
+DUO_UDID=BB2EDBE8-442B-40EA-80A2-3451BE035BF5 nice -n 10 tools/e2e/run.sh --catalogue --only ins01,ins02,ins03,ins04
+DUO_UDID=BB2EDBE8-442B-40EA-80A2-3451BE035BF5 nice -n 10 tools/e2e/run.sh --only tab,fold
+python3 -m unittest discover -s tools/e2e -p 'test_*.py'
+```
+
+On this Mac use the already booted **Fix Duo**, not the default Duo Lab. Set `DEVELOPER_DIR` to the installed Duo-capable Xcode if the default Xcode 27.1 path is absent. Run serially; do not run `matrix.sh` on the loaded machine. The Python checks are synthetic assertion tests, not simulator runs.
+
+The reducer preserves full screen when a window grows. Accordingly, unfolding exposes Side by side; the next tap performs full→pane without adding a history level. Shrinking forces full screen. This suite intentionally follows the documented reducer contract rather than changing resize semantics.
+
+TODO: add a real Home Screen installation/launch driver in `e2e.py`, assert `navigator.standalone`/display-mode from the reporter, replay the inspector scenarios, and restore only state created by the run. Safari with a query parameter is not standalone proof. Deferred in phase 3.

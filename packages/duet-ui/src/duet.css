@@ -151,6 +151,10 @@
 .duet-group[data-press="down"] { transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left 170ms ease-out, top 170ms ease-out, width 170ms ease-out, height 170ms ease-out, background 200ms ease; }
 .duet-group[data-press="down"]:has(> .duet-btn:nth-of-type(2)) .duet-btn { top: calc(var(--duet-p-top) + var(--duet-j) * var(--duet-p-pitch)) !important; transition: top 170ms ease-out; }
 .duet-group:has(> .duet-lens) { overflow: visible; }
+/* A Home Screen web app (press.ts heldShape): the capsule only swells, a lone button no more than a capsule, and the
+   lens stays inside it, so nothing of the column leaves its rail under a finger. */
+.duet-group[data-press-bound]:has(> .duet-lens) { overflow: hidden; }
+.duet-group[data-press="down"][data-press-bound]:not(:has(> .duet-btn:nth-of-type(2))) { scale: 1.06; }
 .duet-group:has(> .duet-lens) > .duet-btn {
   -webkit-mask: linear-gradient(#000 0 0), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 88' preserveAspectRatio='none'%3E%3Crect width='90' height='88' rx='40'/%3E%3C/svg%3E") center var(--duet-lens-dy) / var(--duet-hole-w) var(--duet-hole-h) no-repeat;
   -webkit-mask-composite: xor; mask-composite: exclude;
@@ -501,3 +505,53 @@ html:has(:read-write:focus) .duet[data-mode="column"] { overflow: clip; visibili
 }
 @keyframes duet-appear { from { opacity: 0; } }
 @keyframes duet-vanish { to { opacity: 0; } }
+
+/* The card inspector's organisms (controls.tsx, inspector-ui.tsx, viewer.tsx). Off a Duo the open card's commands sit
+   in a glass column on the window's edge: Duet's own capsule (.duet-group, its glass and rim above), 49pt buttons,
+   centred in the height clear of the safe areas and of Duet's insets. */
+:root { --duet-inspector-width: min(50vw, 640px); }
+/* The column's distance from its window edge (clear of the safe area and of Duet's insets); the pane and the viewer
+   keep that and the column and 12px more clear on that edge. */
+.duet-control-column, .duet-inspector, .duet-viewer {
+  --duet-column-r: max(12px, env(safe-area-inset-right, 0px), var(--duet-inset-right, 0px));
+  --duet-column-l: max(12px, env(safe-area-inset-left, 0px), var(--duet-inset-left, 0px));
+}
+.duet-control-column > .duet-group { top: calc(50% + (env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) / 2); translate: 0 -50%; }
+.duet-control-column[data-side="right"] > .duet-group { right: var(--duet-column-r); }
+.duet-control-column[data-side="left"] > .duet-group { left: var(--duet-column-l); }
+.duet-control-column .duet-btn:focus-visible { outline: 2px solid var(--duet-tint); outline-offset: -5px; border-radius: 22px; }
+.duet-control-column .duet-btn[aria-disabled="true"] { cursor: default; }
+/* A card's inspect button: icon only, a 44pt target, the card's own ink. */
+.duet-inspect {
+  appearance: none; border: 0; margin: 0; padding: 0; background: none; color: inherit; font: inherit; cursor: pointer;
+  display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; border-radius: 12px;
+}
+.duet-inspect:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.duet-inspect:focus-visible { outline: 2px solid var(--duet-tint, #0088ff); outline-offset: -4px; }
+/* The open card: a pane on the right of the window where two fit (--duet-inspector-width; html[data-duet-inspector="split"]
+   is the overview's cue to make room), the whole window full screen. The column's room is kept clear on its edge. */
+.duet-inspector {
+  position: fixed; z-index: 45; top: 0; bottom: 0; right: 0; width: var(--duet-inspector-width); box-sizing: border-box;
+  overflow: auto; overscroll-behavior: contain; background: var(--duet-inspector-bg, Canvas); color: var(--duet-inspector-ink, CanvasText);
+  padding: max(20px, env(safe-area-inset-top, 0px)) calc(var(--duet-column-r) + 61px) max(32px, env(safe-area-inset-bottom, 0px)) 24px;
+  box-shadow: -0.5px 0 0 var(--duet-inspector-line, rgb(128 128 128 / 0.3));
+}
+.duet-inspector[data-edge="left"] { padding-left: calc(var(--duet-column-l) + 61px); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+.duet-inspector[data-capsule] { padding-left: max(24px, var(--duet-inset-left, 0px)); padding-right: max(24px, var(--duet-inset-right, 0px)); }
+.duet-inspector[data-full] { left: 0; width: auto; box-shadow: none; }
+.duet-inspector-head { margin-bottom: 20px; }
+.duet-inspector-head h2, .duet-viewer > h2 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 600; }
+.duet-inspector-head h2:focus, .duet-viewer > h2:focus { outline: none; }
+.duet-inspector-eyebrow { margin: 0 0 4px; font-size: 13px; opacity: 0.65; }
+.duet-inspector-caption { margin: 6px 0 0; opacity: 0.75; }
+/* A full-screen viewer: a native modal dialog over the whole window, the column on its edge. */
+.duet-viewer {
+  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; box-sizing: border-box; overflow: auto;
+  background: var(--duet-viewer-bg, Canvas); color: var(--duet-viewer-ink, CanvasText);
+  padding: max(20px, env(safe-area-inset-top, 0px)) calc(var(--duet-column-r) + 61px) max(20px, env(safe-area-inset-bottom, 0px)) max(24px, env(safe-area-inset-left, 0px));
+}
+.duet-viewer[data-edge="left"] { padding-left: calc(var(--duet-column-l) + 61px); padding-right: max(24px, env(safe-area-inset-right, 0px)); }
+.duet-viewer[open] { display: flex; flex-direction: column; gap: 16px; }
+.duet-viewer::backdrop { background: rgb(0 0 0 / 0.5); }
+.duet-viewer-body { flex: 1; min-height: 0; }
+@media (prefers-reduced-motion: no-preference) { .duet-inspector:not([data-full]) { animation: duet-appear 0.18s ease-out; } }

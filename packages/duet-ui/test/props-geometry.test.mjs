@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import fc from "fast-check";
 import { columnBand, detect, DUO_SIZES, WIDE } from "../src/geometry.ts";
 import { FEWEST_TABS, TEMPLATE, TIGHTEST_TAB_PITCH, extra, frame, groupHeight, morphHeight, placeTabs } from "../src/template.ts";
-import { lensAt, pressShape } from "../src/press.ts";
+import { PRESS, heldShape, lensAt, pressShape } from "../src/press.ts";
 import { app, context, layout, opts, shown, sig } from "./arb.mjs";
 import { capture } from "./capture-golden.mjs";
 
@@ -143,6 +143,25 @@ const roundTrip = ({ c }, p) => {
 };
 test("press: a finger on a capsule item's resting centre names that item once the capsule opens", () => {
   fc.assert(fc.property(shown, app, roundTrip), opts());
+});
+
+// In a Home Screen web app the held capsule stays in its rail (Gabriele, 2026-11-22): at most PRESS.bound its rest
+// width and height, its centre where it rested, inside the window, and a finger on an item still names that item.
+const bounded = ({ c }, p) => {
+    for (const { group, rect, pitch } of layout(c, p).a.placed) {
+      const n = group.length;
+      const s = heldShape(rect, n, pitch, pressBand(c), true);
+      assert.ok(s.w <= rect.w * PRESS.bound + EPS && s.h <= rect.h * PRESS.bound + EPS, `${s.w}x${s.h} from ${rect.w}x${rect.h}`);
+      assert.ok(Math.abs(s.x + s.w / 2 - (rect.x + rect.w / 2)) < EPS && Math.abs(s.y + s.h / 2 - (rect.y + rect.h / 2)) < EPS, "in place");
+      assert.ok(s.x >= -EPS && s.y >= -EPS && s.x + s.w <= layerWidth(c) + EPS && s.y + s.h <= layerHeight(c) + EPS, `outside ${layerWidth(c)}x${layerHeight(c)}`);
+      for (let k = 0; n > 1 && k < n; k++) {
+        const at = rect.y + T.control / 2 + k * pitch;
+        assert.equal(lensAt(at - s.y, n, s.pitch, s.top).index, k, `item ${k} of ${n} at pitch ${pitch}`);
+      }
+    }
+};
+test("press: in a Home Screen web app a held capsule stays within 1.13x of its rest, in place, and names the item under the finger", () => {
+  fc.assert(fc.property(shown.filter(({ c }) => c.standalone), app, bounded), opts());
 });
 
 // 5. Default path: an app without menu.tabs lays out as 0.8.1 did (test/fixtures/default-path.json).

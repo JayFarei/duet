@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.0
+
+The card inspector and its organisms, plus two Home Screen web app fixes and a `moveControls` fix. 0.9.0-rc.1 was tested locally and never published.
+
+- Card inspector core: `inspector`, a pure reducer for one card open over an overview, beside it where two panes fit and full screen where they do not, with one history entry per level so Back, Escape and the browser's Back step down one level at a time. Also `initialInspector`, `canSplit` (Duet's `layout === "wide"` on a Duo, 1050 wide elsewhere, `SPLIT_WIDTH`), `stepCard` and `paneCommands` (Close, the layout toggle, Previous and Next card, in a stable order). No React: import it alone from `duet-ui/inspector`. See [Inspector](../../docs/api.md#inspector).
+- Pane glyphs: `paneGlyph`, plus the Lucide path data `X`, `Maximize2`, `Columns2`, `ChevronUp`, `ChevronDown` and `PANE_GLYPHS`. The existing glyphs are unchanged.
+- Inspector organisms: `useInspector` (state, history entries kept beside the router's, popstate, Escape and ↑/↓, focus back to the trigger, a pane turning full screen when the room goes, `repairHistory`), `DuetInspector` (the open card, a dialog beside the overview or modal full screen with the page inert), `DuetControlColumn` (the commands in a glass toolbar on the window's edge off a Duo), `DuetInspectButton` and `inspectable`. See [Inspector organisms](../../docs/api.md#inspector-organisms).
+- `DuetViewer` and `DuetViewerGroup`: one thing full screen in a native modal dialog with Close, Previous and Next, focus held inside and returned, Escape and the arrows, stepping in document order.
+- `useDuetActions`: an organism inside `<Duet>` hands its commands to Duet's controls. Duet's `actions` prop wins.
+- `DuetItem.disabled`: `aria-disabled`, a tap does nothing, no visual change.
+- `<Duet scrollTopOnSelect>` (a place picked in the controls opens at its top) and `<Duet rootAttrs="data-app">` (device, layout and mode on `<html>`). Both off by default.
+- The organisms' pure parts (`hitsControl`, `inspectorKey`, `isTyping`, `withEntry`, `readEntry`, `needsRepair`, `inOrder`, `viewerStep`, `rootAttrs`, `scrollToTop`) on `duet-ui/inspector` too, still React-free.
+- Fix: in a Home Screen web app a held capsule no longer opens past its rail. It used to widen to 78.8pt from 49 (about 1.6x, its centre moving up to 10pt), which on the Duo read as the column dragged out of its rail. There it now keeps its swell, at most 1.06x about its centre and never across the window's band, the lens stays inside it, and a lone button swells 1.06x. Safari tabs open as before.
+- Fix: a Home Screen web app on the open Duo, wide, no longer has a dead gutter beside its controls. With the page's status bar style `black` or `default`, iOS gave the page 867 of the 951pt window behind an 84pt band, and the controls reserved 84 more inside it. On a Duo Duet now sets `apple-mobile-web-app-status-bar-style` to `black-translucent` (`bootScript` and on mount), so the page has the whole window and the controls dock in the status column's safe-area inset; other devices keep the page's style. Icons added before keep their style until added again. New `RAIL.gutter` (11pt): the most a page's content may stop short of the rail. See [edge cases](../../docs/edge-cases.md#dead-gutter-beside-a-home-screen-app-in-landscape).
+- Fix: with `moveControls`, dragging an inline control across the page moves the controls again. The drag listened for a class the capsules lost in 0.6.0. See [edge cases](../../docs/edge-cases.md#dragging-the-inline-controls-does-not-move-them).
+
 ## 0.8.2
 
 Everything from 0.8.2-rc.1, plus a simple desktop glass for demos.

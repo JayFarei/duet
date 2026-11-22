@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Inline mode's layout invariant: page text lines up beside the strip, never under it, at every window size
 // the Duo produces and on both sides. Backgrounds may run under the strip (bleed); text and images may not.
-const LAB = "/lab?tabs=5,searchTab=1,back=1,actions=2,title=1,feed=1";
+const LAB = "/lab?tabs=5,searchTab=1,back=1,actions=2,title=1,feed=1,move=1,bar=1";
 const SIZES = [
   { name: "split-view pane", width: 385, height: 571 },
   { name: "open, portrait", width: 951, height: 543 },
@@ -13,14 +13,14 @@ async function open(page: Page, side: "left" | "right", url = LAB) {
   // Seed the side once per test; a reload must keep what the user chose.
   await page.addInitScript((s) => { try { if (!sessionStorage.getItem("seeded")) { localStorage.setItem("duet-side", s); sessionStorage.setItem("seeded", "1"); } } catch {} }, side);
   await page.goto(url);
-  await page.locator(".duet .duet-glass").first().waitFor();
+  await page.locator(".duet .duet-group").first().waitFor();
   await page.waitForTimeout(600); // let the detector settle (it re-reads on a short timer after load)
 }
 
 /** The strip's inner edge, and every text node in the page that crosses it. */
 function probe(page: Page) {
   return page.evaluate(() => {
-    const glass = [...document.querySelectorAll(".duet .duet-glass")].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
+    const glass = [...document.querySelectorAll(".duet .duet-group")].map((e) => e.getBoundingClientRect()).filter((r) => r.width);
     const right = glass[0].left > innerWidth / 2;
     const edge = right ? Math.min(...glass.map((r) => r.left)) : Math.max(...glass.map((r) => r.right));
     const root = document.querySelector(".duet-scroller") ?? document.body;
@@ -69,10 +69,10 @@ for (const size of SIZES) {
 test("dragging a control across the middle moves the strip, and the side is remembered", async ({ page }) => {
   await page.setViewportSize({ width: 951, height: 543 });
   await open(page, "right");
-  const pill = page.locator(".duet .duet-glass").last();
+  const pill = page.locator(".duet .duet-group").last();
   const box = (await pill.boundingBox())!;
   const y = box.y + box.height / 2;
-  const selected = () => page.locator(".duet .duet-tab[aria-selected=true]").getAttribute("aria-label");
+  const selected = () => page.locator(".duet .duet-btn[data-tab][aria-current=page]").getAttribute("aria-label");
   const before = await selected();
   await page.mouse.move(box.x + box.width / 2, y);
   await page.mouse.down();
@@ -91,7 +91,7 @@ test("a page in an iframe never claims Safari's column", async ({ page }) => {
   await page.setViewportSize({ width: 466, height: 678 });
   await page.goto("/mockup?scene=split");
   const frame = page.frameLocator("iframe");
-  await frame.locator(".duet .duet-glass").first().waitFor();
+  await frame.locator(".duet .duet-group").first().waitFor();
   expect(await frame.locator("html").getAttribute("data-duet-mode")).toBe("inline");
 });
 
@@ -100,7 +100,7 @@ test("a reading column centres on the whole window, not the space beside the str
   await page.setViewportSize({ width: 951, height: 543 });
   for (const side of ["right", "left"] as const) {
     await page.evaluate((s) => localStorage.setItem("duet-side", s), side).catch(() => {});
-    await open(page, side, "/?plain");
+    await open(page, side, "/lab?move=1,read=1");
     expect((await probe(page)).side).toBe(side);
     const mid = await page.evaluate(() => { const r = document.querySelector("main")!.getBoundingClientRect(); return (r.left + r.right) / 2 - innerWidth / 2; });
     expect(Math.abs(mid), `${side}: column off centre by ${mid}px`).toBeLessThan(2);
