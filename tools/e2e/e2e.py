@@ -1261,9 +1261,10 @@ class Run:
     # and re-aims once from that.
     SA_OFF = (0, 0)
 
-    @staticmethod
-    def relay(body):
-        req = urllib.request.Request(SITE + "/api/e2e-relay", method="POST", data=json.dumps(body).encode(), headers={"content-type": "application/json"})
+    sa_origin = SITE  # the installed app's origin: the site, or the probe proxy in front of a consumer app (sa10+)
+
+    def relay(s, body):
+        req = urllib.request.Request(s.sa_origin + "/api/e2e-relay", method="POST", data=json.dumps(body).encode(), headers={"content-type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 return json.loads(r.read() or b"null")
@@ -1271,9 +1272,9 @@ class Run:
             return None
 
     def sa_install(s):
-        """Adds the site to the Home Screen through Safari's share sheet (closed portrait). The sheet runs in its own
+        """Adds the app's origin to the Home Screen through Safari's share sheet (closed portrait). The sheet runs in its own
         process, outside the runner's reach: fixed points of the 466x678 screen, found by hand (README, Standalone)."""
-        openurl(s.udid, SITE + "/")
+        openurl(s.udid, s.sa_origin + "/")
         time.sleep(8)  # a dev server compiles "/" on first load; the menu needs the page's title
         for pt, wait in (((48, 620), 2.0), ((143, 156), 3.0), ((318, 565), 2.5), ((163, 597), 3.0), ((335, 48), 3.0)):
             s.sim.tap(*pt, hold=0.1)  # Page Menu, Share, View More, Add to Home Screen, Add
@@ -1307,8 +1308,19 @@ class Run:
             s.why = f"no standalone sample of {path} with the column in {timeout}s"
         return r
 
-    def sa_go(s, sid, tok, path, position, angle, t0):
-        """Into a posture and onto a page: fold.bin, then the relay moves the app's page."""
+    def sa_front(s, res=None):
+        """The installed app back in front: Home (which closes Control Center or a sheet first), then its icon."""
+        s.sim.button("HOME"); time.sleep(1.0)
+        s.sim.button("HOME"); time.sleep(1.0)
+        ok = s.sb_tap(s.SA_CLIP, page=True)
+        time.sleep(3)
+        if res is not None:
+            res["notes"].append(f"recovered: Home, then the {s.SA_CLIP!r} icon ({'ok' if ok else 'icon not found'})")
+        return ok
+
+    def sa_go(s, sid, tok, path, position, angle, t0, again=True):
+        """Into a posture and onto a page: fold.bin, then the relay moves the app's page. If the posture or the page is
+        not reached, once: the app brought back in front (sa_front), the fold redone."""
         if (s.position, s.angle) != (position, angle) and not s.fold(position, angle):
             return None
         s.angle = angle
@@ -1316,8 +1328,19 @@ class Run:
         done = time.time() * 1000
         big = lambda g: max(g["outerWidth"], g["outerHeight"]) > 900
         fits = {("closed", 0): lambda g: not big(g) and g["innerHeight"] > g["innerWidth"],
+                ("closed", 90): lambda g: not big(g) and g["innerWidth"] > g["innerHeight"] and g.get("angle") == 90,
+                ("closed", 270): lambda g: not big(g) and g["innerWidth"] > g["innerHeight"] and g.get("angle") == 270,
                 ("open", 0): lambda g: g["outerWidth"] > 900}.get((position, angle), lambda g: g["outerHeight"] > 900)
         r = s.sa_wait(sid, tok, path, t0, lambda r: r["rx"] >= done and fits(r["sig"]))
+        if r is None and again:
+            why = s.why
+            s.sa_front()
+            s.position = None  # fold again
+            got = s.sa_go(sid, tok, path, position, angle, time.time() * 1000, again=False)
+            s.why = why if got is None else s.why
+            if got is not None:
+                s.sa_note = f"recovered (Home, the icon, the fold again) after: {why}"
+            return got
         time.sleep(1.2)  # the turn's settle
         return s.sa_last(sid, tok, path, t0) if r else None
 
@@ -1325,25 +1348,54 @@ class Run:
         rs = [r for r in samples(sid, t0) if mine(r, tok) and address(r["path"]) == path and (r.get("column") or {}).get("groups")]
         return rs[-1] if rs else None
 
+    @staticmethod
+    def sa_rail_point(r):
+        """A point of the empty rail: the column's own x, in the gap below its groups (None if under 60pt). Never above
+        them: on the Duo the rail above the groups is the native status column (clock, battery, Carrier), where a touch
+        is iOS's own, a drag there opens Control Center and the page never sees it (p3d run 1, sa10)."""
+        gs = [q["rect"] for q in r["column"]["groups"]]
+        H = r["sig"]["innerHeight"]
+        x = sum(q["x"] + q["w"] / 2 for q in gs) / len(gs)
+        below = H - max(q["y"] + q["h"] for q in gs) - 30  # clear of the home indicator's 30pt
+        return (x, H - 30 - below / 2) if below >= 60 else None
+
     def sa_drag(s, sid, tok, path, r, kind):
-        """One drag a person makes on the column's last button: "side" across the page to 40pt from the far edge, "long"
-        down (or up) the rail to 40pt from the far end, 1.5s each. Returns (samples during and after, aim notes)."""
+        """One drag a person makes. On the column's last button: "side" across the page to 40pt from the far edge, "long"
+        down (or up) the rail to 40pt from the far end, 1.5s each, "flick" 160pt along the rail in 120ms. "rail-*": the
+        same from an empty point of the rail (sa_rail_point), off the groups. Returns (samples during and after, aim
+        notes, whether the page saw the touch land where aimed: on the column, or in the rail off it)."""
         g, W, H = r["column"]["groups"][-1], r["sig"]["innerWidth"], r["sig"]["innerHeight"]
-        b = g["buttons"][-1]["rect"] if g["buttons"] else g["rect"]
-        px, py = b["x"] + b["w"] / 2, b["y"] + b["h"] / 2
-        tx, ty = (40 if px > W / 2 else W - 40, py + 6) if kind == "side" else (px, H - 40 if py < H / 2 else 40)
+        rail, how = kind.startswith("rail-"), kind.removeprefix("rail-")
+        if rail:
+            pt = s.sa_rail_point(r)
+            if pt is None:
+                return [], [f"{kind} drag: skipped, no empty rail below the groups"], None
+            px, py = pt
+        else:
+            b = g["buttons"][-1]["rect"] if g["buttons"] else g["rect"]
+            px, py = b["x"] + b["w"] / 2, b["y"] + b["h"] / 2
+        if how == "side":
+            tx, ty = 40 if px > W / 2 else W - 40, py + 6
+        elif how == "long":
+            tx, ty = px, H - 40 if py < H / 2 else 40
+        else:  # flick
+            tx, ty = px, py + 160 if py < H / 2 else py - 160
+        ms, steps, hold = (120, 6, 0) if how == "flick" else (1500, 30, 200)
         off, notes = s.sa_off, []
         for attempt in (0, 1):
             t1 = time.time() * 1000
-            s.sim.drag(px + off[0], py + off[1], tx + off[0], ty + off[1], ms=1500, steps=30, end_hold_ms=200)
-            time.sleep(1.5)  # the release, a snap, the press feedback
+            s.sim.drag(px + off[0], py + off[1], tx + off[0], ty + off[1], ms=ms, steps=steps, end_hold_ms=hold)
+            time.sleep(1.5)  # the release, a snap, the press feedback, a flick's momentum
             rs = [x for x in samples(sid, t1) if mine(x, tok) and address(x["path"]) == path]
             down = next((t for x in rs for t in x.get("taps") or [] if t["t"] >= t1 - 50 and t["type"] in ("touchstart", "pointerdown")), None)
-            hit = down and any(q["rect"]["x"] - 2 <= down["x"] <= q["rect"]["x"] + q["rect"]["w"] + 2 and q["rect"]["y"] - 2 <= down["y"] <= q["rect"]["y"] + q["rect"]["h"] + 2
-                               for q in r["column"]["groups"])
+            on = lambda q, m: q["rect"]["x"] - m <= down["x"] <= q["rect"]["x"] + q["rect"]["w"] + m and q["rect"]["y"] - m <= down["y"] <= q["rect"]["y"] + q["rect"]["h"] + m
+            if rail:  # in the rail band (the column's x, 30pt either side), on no group
+                hit = down and abs(down["x"] - px) <= 30 and not any(on(q, 0) for q in r["column"]["groups"])
+            else:
+                hit = down and any(on(q, 2) for q in r["column"]["groups"])
             if hit or not down or attempt:
                 if not hit:
-                    notes.append(f"{kind} drag: touch at page {down and (down['x'], down['y'])} for button at {px:.0f},{py:.0f}: missed the column")
+                    notes.append(f"{kind} drag: touch at page {down and (down['x'], down['y'])} aimed at {px:.0f},{py:.0f}: missed {'the rail' if rail else 'the column'}")
                 return rs, notes, bool(hit)
             off = s.sa_off = (px + off[0] - down["x"], py + off[1] - down["y"])  # re-aim from what the page saw
             notes.append(f"re-aimed: page->screen offset {off[0]:.0f},{off[1]:.0f}")
@@ -1417,7 +1469,10 @@ class Run:
         return [(round((q["rect"]["x"] - ox) * k * 2) / 2, round((q["rect"]["y"] - oy) * k * 2) / 2, round(q["rect"]["w"] * k * 2) / 2, round(q["rect"]["h"] * k * 2) / 2)
                 for q in r["column"]["groups"]]
 
-    def sa_step(s, sid, tok, path, position, angle, desc, prepare=None):
+    SA_KINDS = ("side", "long")
+    SA_ALL = ("side", "long", "flick", "rail-side", "rail-long", "rail-flick")  # sa10+: on the column and on the empty rail
+
+    def sa_step(s, sid, tok, path, position, angle, desc, prepare=None, kinds=SA_KINDS, go=None):
         """sa*: one posture of the installed app. The column must be docked (inside the window) and stay put through a
         sideways and a long vertical drag: no sample out of its rects by more than 16pt (no flash), the same rects after
         each release, nothing left with --duet-drag or data-drag, every sample standalone."""
@@ -1425,10 +1480,10 @@ class Run:
         http("POST", "/step", {"id": sid})
         res = {"id": sid, "kind": "standalone", "desc": desc, "status": "PASS", "reasons": [], "notes": [], "position": position}
         t0 = time.time() * 1000
-        s.why, s.early = "no sample from the page", []
+        s.why, s.early, s.sa_note = "no sample from the page", [], None
         rec = s.record(sid, 3 if position == "open" else 1) if s.a.video else None
         try:
-            r = s.sa_go(sid, tok, path, position, angle, t0)
+            r = (go or s.sa_go)(sid, tok, path, position, angle, t0)
             if r and prepare:
                 r = prepare(sid, tok, path, r, t0)
         except (subprocess.CalledProcessError, SimError) as x:
@@ -1438,22 +1493,34 @@ class Run:
             res.update(status="BLOCKED", reasons=["state not reached: " + s.why])
             s.finish(res, [], [], None)
             return res
+        if s.sa_note:
+            res["notes"].append(s.sa_note)
         s.sa_off = s.SA_OFF
         before, W, H = s.sa_rects(r), r["sig"]["innerWidth"], r["sig"]["innerHeight"]
-        res["final"] = {"angle": r["sig"].get("angle"), "inner": f'{W}x{H}', "shown": True, "mode": r["html"]["mode"], "standalone": r["standalone"]}
+        n0 = nav(r)
+        res["final"] = {"angle": r["sig"].get("angle"), "inner": f'{W}x{H}', "shown": True, "mode": r["html"]["mode"], "side": n0.get("side"),
+                        "navMode": n0.get("mode"), "standalone": r["standalone"], **({"build": r["build"]} if r.get("build") else {})}
         res["before"] = before
         out = [q for q in before if q[0] < -0.5 or q[1] < -0.5 or q[0] + q[2] > W + 0.5 or q[1] + q[3] > H + 0.5]
         if out:
             res["reasons"].append(f"not docked before the drags: {out} outside {W}x{H}")
         allr, res["drags"] = [r], []
-        for kind in ("side", "long"):
+        for kind in kinds:
             rs, notes, hit = s.sa_drag(sid, tok, path, r, kind)
             res["notes"] += notes
+            if hit is None:  # skipped: no such point in this posture
+                continue
             res["drags"].append({"kind": kind, "t": rs[0]["rx"] if rs else time.time() * 1000, "hit": hit})
             allr += rs
             if not hit:
                 res["status"] = "BLOCKED"
+                if not any(t["t"] >= res["drags"][-1]["t"] - 50 for x in rs for t in x.get("taps") or []):
+                    s.sa_front(res)  # the page saw nothing: iOS took the touch (Control Center); the next drag needs the app
             r = rs[-1] if rs else r
+            if rs and not (rs[-1].get("column") or {}).get("groups"):
+                r = allr[0]  # the column gone (a reload, a hidden layer): aim the next drag at where it was
+        res["after"] = s.sa_rects(r) if (r.get("column") or {}).get("groups") else None
+        res["afterMode"] = {"mode": r.get("html", {}).get("mode"), "side": nav(r).get("side")}
         s.sa_assess(res, allr)
         if res["reasons"]:
             res["status"] = "FAIL"
@@ -1521,6 +1588,87 @@ class Run:
             if added and not s.sa_remove():
                 s.results.append({"id": "sa-teardown", "kind": "setup", "desc": "remove the clip", "status": "BLOCKED", "reasons": ["the clip this run added is still on the Home Screen"], "notes": []})
             sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+
+    # sa10+: a consumer app (wealth) as a Home Screen web app, behind the probe proxy (probe-proxy.mjs). Builds from
+    # $E2E_WEALTH, "label=origin,..." (local fixture servers, synthetic data only); one clip and one origin serve them all.
+    SA_WEALTH_CLIPS = ("Wealth", "Wealth management")  # manifest short_name, or the page title
+
+    def sa_cold(s, sid, tok, path, position, angle, t0):
+        """Turn first, then launch from the icon: the app quit, the posture set on the Home Screen, the clip tapped."""
+        sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+        s.sim.button("HOME"); time.sleep(1.0)
+        if not s.fold(position, angle):
+            return None
+        s.angle = angle
+        time.sleep(1.5)
+        s.relay({"beacon": BEACON, "s": tok, "path": path})
+        if not s.sb_tap(s.SA_CLIP, page=True):
+            return None
+        time.sleep(3)
+        return s.sa_go(sid, tok, path, position, angle, t0)
+
+    def scenario_standalone_wealth(s):
+        """The wealth app as a Home Screen web app, each build in $E2E_WEALTH (EXPECTED.md, Home Screen web app, sa10+):
+        (a) launched folded portrait, then turned 90 and 270; (b) unfolded wide, turned 90 and 270; (c) turned first, then
+        launched from the icon, folded and unfolded at 90 and 270. Each posture: the six drags of SA_ALL. Starts and
+        stops its own probe proxy; adds the clip only if absent and removes only the clip it added."""
+        builds = [b.split("=", 1) for b in os.environ.get("E2E_WEALTH", "prod=http://127.0.0.1:18452").split(",") if "=" in b]
+        port = int(os.environ.get("E2E_WEALTH_PORT", "18460"))
+        log = open(os.path.join(s.out, "probe-proxy.log"), "w")
+        proxy = subprocess.Popen(["node", os.path.join(HERE, "probe-proxy.mjs"), str(port), builds[0][1], builds[0][0]], stdout=log, stderr=subprocess.STDOUT)
+        s.sa_origin = f"http://localhost:{port}"
+        added = False
+        try:
+            for _ in range(30):
+                if s.relay({}) is not None:
+                    break
+                time.sleep(0.5)
+            else:
+                s.results.append({"id": "sa-wealth-setup", "kind": "setup", "desc": "probe proxy", "status": "BLOCKED", "reasons": [f"probe proxy not up on :{port}"], "notes": []})
+                return
+            s.sim.button("HOME"); time.sleep(1.5)
+            found = lambda: next((c for c in s.SA_WEALTH_CLIPS if s.sim.springboard_find(c)), None)
+            clip = found()
+            if clip is None:
+                for c in s.SA_WEALTH_CLIPS:  # maybe on another Home Screen page
+                    s.SA_CLIP = c
+                    if s.sb_tap(c, tries=4, page=True):
+                        clip = c
+                        break
+            if clip is None:
+                s.SA_CLIP = s.SA_WEALTH_CLIPS[0]
+                s.sa_install()
+                clip = found()
+                added = clip is not None
+            if clip is None:
+                s.results.append({"id": "sa-wealth-setup", "kind": "setup", "desc": "Add to Home Screen", "status": "BLOCKED", "reasons": [f"no clip named {s.SA_WEALTH_CLIPS} after the share sheet"], "notes": []})
+                return
+            s.SA_CLIP = clip
+            s.log(f"  clip {clip!r} {'added by this run' if added else 'already on the Home Screen'}")
+            P, A = "/", s.SA_ALL
+            for label, origin in builds:
+                s.relay({"upstream": origin, "build": label})
+                t = s.tok(f"saw{label}")
+                st = lambda n, pos, ang, desc, go=None: s.sa_step(f"sa{n}-{label}", t, P, pos, ang, f"wealth {label}, {desc}", kinds=A, go=go)
+                st(10, "closed", 0, "launched folded portrait", go=s.sa_cold)
+                st(11, "closed", 90, "folded, turn 90")
+                st(12, "closed", 270, "folded, turn 270")
+                st(13, "open", 0, "unfolded wide")
+                st(14, "open", 90, "unfolded, turn 90")
+                st(15, "open", 270, "unfolded, turn 270")
+                st(16, "closed", 90, "turned 90 first, then launched folded", go=s.sa_cold)
+                st(17, "closed", 270, "turned 270 first, then launched folded", go=s.sa_cold)
+                st(18, "open", 90, "unfolded turned 90 first, then launched", go=s.sa_cold)
+                st(19, "open", 270, "unfolded turned 270 first, then launched", go=s.sa_cold)
+        finally:
+            s.relay({})
+            s.fold("closed", 0); s.position, s.angle = "closed", 0
+            time.sleep(1)
+            if added and not s.sa_remove():
+                s.results.append({"id": "sa-wealth-teardown", "kind": "setup", "desc": "remove the clip", "status": "BLOCKED", "reasons": [f"the clip {s.SA_CLIP!r} this run added is still on the Home Screen"], "notes": []})
+            sh("xcrun", "simctl", "terminate", s.udid, "com.apple.webapp", check=False)
+            proxy.terminate()
+            s.sa_origin, s.SA_CLIP = SITE, Run.SA_CLIP
 
     def scenario_split(s):
         """Split view in every way the user moves through it, wide inner display (the only posture with split view)."""
@@ -2135,6 +2283,7 @@ class Run:
         "open-in-safari-270": lambda s: s.scenario_open_safari(270),
         "fold": lambda s: s.scenario_fold(),
         "standalone": lambda s: s.scenario_standalone(),
+        "standalone-wealth": lambda s: s.scenario_standalone_wealth(),
         "dark": lambda s: s.scenario_dark(),
         "preview-unfolded": lambda s: s.scenario_preview_unfolded(),
         "open-in-safari-unfold": lambda s: s.scenario_open_safari_unfold(),
@@ -2148,8 +2297,8 @@ class Run:
         "live-preview-default": lambda s: s.scenario_live("default"),
         "live-preview-full": lambda s: s.scenario_live("full"),
     }
-    NEEDS_SIM = {"standalone", "split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
-    EXPERIMENTAL = {"split-drag", "standalone"}  # run only when named with --only
+    NEEDS_SIM = {"standalone", "standalone-wealth", "split", "split-right-live", "split-turn", "split-drag", "open-in-safari-unfold"}
+    EXPERIMENTAL = {"split-drag", "standalone", "standalone-wealth"}  # run only when named with --only
 
     def main(s):
         only = set(s.a.only.split(",")) if s.a.only else None
