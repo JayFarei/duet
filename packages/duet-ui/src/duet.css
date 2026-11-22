@@ -151,6 +151,10 @@
 .duet-group[data-press="down"] { transition: scale 160ms cubic-bezier(0.3, 0, 0.2, 1.4), left 170ms ease-out, top 170ms ease-out, width 170ms ease-out, height 170ms ease-out, background 200ms ease; }
 .duet-group[data-press="down"]:has(> .duet-btn:nth-of-type(2)) .duet-btn { top: calc(var(--duet-p-top) + var(--duet-j) * var(--duet-p-pitch)) !important; transition: top 170ms ease-out; }
 .duet-group:has(> .duet-lens) { overflow: visible; }
+/* A Home Screen web app (press.ts heldShape): the capsule only swells, a lone button no more than a capsule, and the
+   lens stays inside it, so nothing of the column leaves its rail under a finger. */
+.duet-group[data-press-bound]:has(> .duet-lens) { overflow: hidden; }
+.duet-group[data-press="down"][data-press-bound]:not(:has(> .duet-btn:nth-of-type(2))) { scale: 1.06; }
 .duet-group:has(> .duet-lens) > .duet-btn {
   -webkit-mask: linear-gradient(#000 0 0), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 90 88' preserveAspectRatio='none'%3E%3Crect width='90' height='88' rx='40'/%3E%3C/svg%3E") center var(--duet-lens-dy) / var(--duet-hole-w) var(--duet-hole-h) no-repeat;
   -webkit-mask-composite: xor; mask-composite: exclude;

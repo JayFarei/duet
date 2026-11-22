@@ -5,7 +5,7 @@
 import { spring, TEMPLATE, type Rect } from "./template.ts";
 
 /** Fitted to a 60fps recording of Safari's own column: rise overshoots about 15%, fall about 3%, on one spring per phase. */
-export const PRESS = { rise: spring(204, 14.6), fall: spring(204, 22.8), swell: 1.06, hold: 205, slop: 8, width: 78.8, pitch: 57, inset: 13.7, pad: 23.5, labelled: 44, aim: 6, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000, tapHold: 150 } as const;
+export const PRESS = { rise: spring(204, 14.6), fall: spring(204, 22.8), swell: 1.06, hold: 205, slop: 8, width: 78.8, pitch: 57, inset: 13.7, pad: 23.5, labelled: 44, aim: 6, sideways: 24, reach: 24, overflow: 8, noRelease: 1200, stuck: 6000, tapHold: 150, bound: 1.13 } as const;
 
 /** The lens in points, on [stiffness, damping] springs, fitted to the same recording: at a touch, open and let go. Native
  *  narrows as it speeds up and widens as it slows (area kept), ringing at about 0.6s, and runs a little past the ends. */
@@ -20,8 +20,8 @@ export type PressShape = { x: number; y: number; w: number; h: number; top: numb
 
 /** The capsule under a still finger: native scales it about its centre, the items spreading with it, so a tall capsule
  *  grows more than a short one. Geometry rather than `scale`, so it runs straight on into the open shape. */
-export function swellShape(rest: Rect, restPitch: number = TEMPLATE.item): PressShape {
-  const k = PRESS.swell, w = rest.w * k, h = rest.h * k;
+export function swellShape(rest: Rect, restPitch: number = TEMPLATE.item, k: number = PRESS.swell): PressShape {
+  const w = rest.w * k, h = rest.h * k;
   return { x: rest.x - (w - rest.w) / 2, y: rest.y - (h - rest.h) / 2, w, h, top: (k - 1) * TEMPLATE.control / 2, pitch: restPitch * k, labels: false };
 }
 
@@ -49,12 +49,22 @@ export function pressShape(rest: Rect, n: number, band?: { top: number; bottom: 
   return { x: rest.x + (rest.w - PRESS.width) / 2, y: s.y, w: PRESS.width, h: s.h, top: PRESS.inset, pitch: s.pitch, labels: s.pitch >= PRESS.labelled };
 }
 
+/** The held capsule's shape. In a Home Screen web app (`bounded`) it keeps its swell, open or not: no native column
+ *  opens beside it there, and a capsule that widens to PRESS.width reads as the column leaving its rail (Gabriele,
+ *  2026-11-22: at most PRESS.bound its rest size, in place). Elsewhere it opens as Safari's own column does. */
+export function heldShape(rest: Rect, n: number, restPitch: number, band: { top: number; bottom: number } | undefined, bounded: boolean): PressShape {
+  if (!bounded) return pressShape(rest, n, band);
+  // A tall capsule swells less where a full swell would cross the band: it grows about its centre or not at all.
+  const room = band ? Math.min(rest.y - band.top, band.bottom - rest.y - rest.h) : Infinity;
+  return swellShape(rest, restPitch, Math.max(1, Math.min(PRESS.swell, 1 + (2 * room) / rest.h)));
+}
+
 /** The lens centre for a finger at `fy` (the capsule's coordinates) and the item it names: the nearest item's centre,
  *  as the item at rest is hit. The lens rides a little higher, over the icon. Past the first and last item it gives
  *  way, up to LENS.past, and still names that item. */
-export function lensAt(fy: number, n: number, pitch: number) {
-  const first = PRESS.inset + LENS.centre, y = Math.min(first + (n - 1) * pitch, Math.max(first, fy)), over = fy - y;
-  const index = Math.min(n - 1, Math.max(0, Math.round((fy - PRESS.inset - TEMPLATE.control / 2) / (pitch || 1))));
+export function lensAt(fy: number, n: number, pitch: number, top: number = PRESS.inset) {
+  const first = top + LENS.centre, y = Math.min(first + (n - 1) * pitch, Math.max(first, fy)), over = fy - y;
+  const index = Math.min(n - 1, Math.max(0, Math.round((fy - top - TEMPLATE.control / 2) / (pitch || 1))));
   return { y: y + Math.sign(over) * LENS.past * (1 - Math.exp(-Math.abs(over) / LENS.pastOver)), index };
 }
 
@@ -170,7 +180,7 @@ function mountLens(group: HTMLElement, buttons: HTMLButtonElement[], index: numb
 type Press = { id: number; touch: boolean; group: HTMLElement; buttons: HTMLButtonElement[]; rest: Rect; shape: PressShape; x0: number; y0: number; index: number; fx: number; fy: number; left: number; top: number; lens: Lens | null; hold: number; dog: number; born: number; hop: boolean; move: (e: TouchEvent) => void };
 
 /** Listens on the window for presses on the capsules in `roots`. Returns the cleanup. */
-export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTMLElement) => { top: number; bottom: number } | undefined) {
+export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTMLElement) => { top: number; bottom: number } | undefined, bounded: () => boolean = () => false) {
   let p: Press | null = null, hovered: HTMLElement | null = null, muted = 0, released = false, fading: Lens | null = null, lifting = 0;
   loadRefraction(); // now, since it loads asynchronously and the first press should have it
   const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -191,7 +201,7 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
   };
   const lens = (e: { clientY: number }) => {
     if (!p?.lens) return;
-    const { y, index } = lensAt(e.clientY - p.top, p.buttons.length, p.shape.pitch);
+    const { y, index } = lensAt(e.clientY - p.top, p.buttons.length, p.shape.pitch, p.shape.top);
     p.index = index;
     p.lens.goal = { y: y + p.shape.y, ...LENS.open };
   };
@@ -244,16 +254,17 @@ export function listenPress(roots: () => (HTMLElement | null)[], band: (nav: HTM
     const h = hit(e.clientX, e.clientY);
     if (!h) return;
     const g = h.group, rest = { x: g.offsetLeft, y: g.offsetTop, w: g.offsetWidth, h: g.offsetHeight };
-    const n = h.buttons.length;
+    const n = h.buttons.length, pitch = n > 1 ? h.buttons[1].offsetTop - h.buttons[0].offsetTop : 0, held = bounded();
     const move = (t: TouchEvent) => { if (t.cancelable) t.preventDefault(); }; // the column must not scroll the page
     addEventListener("touchmove", move, { passive: false });
     const selected = h.buttons[h.index].hasAttribute("data-tab") ? h.buttons.findIndex((b) => b.hasAttribute("aria-current")) : -1;
-    p = { id: e.pointerId, touch: e.pointerType === "touch", group: g, buttons: h.buttons, rest, shape: pressShape(rest, n, band(h.nav)), x0: e.clientX, y0: e.clientY, index: h.index, fx: e.clientX, fy: e.clientY, left: 0, top: 0, lens: null, hold: 0, dog: 0, born: performance.now(), hop: selected >= 0, move };
+    p = { id: e.pointerId, touch: e.pointerType === "touch", group: g, buttons: h.buttons, rest, shape: heldShape(rest, n, pitch, band(h.nav), held), x0: e.clientX, y0: e.clientY, index: h.index, fx: e.clientX, fy: e.clientY, left: 0, top: 0, lens: null, hold: 0, dog: 0, born: performance.now(), hop: selected >= 0, move };
     muted = Infinity;
     clearTimeout(lifting);
     fading?.stop(); fading = null;
+    g.toggleAttribute("data-press-bound", held);
     if (n > 1) {
-      vars(g, swellShape(rest, h.buttons[1].offsetTop - h.buttons[0].offsetTop));
+      vars(g, swellShape(rest, pitch));
       h.buttons.forEach((b, i) => b.style.setProperty("--duet-j", `${i}`));
       p.lens = mountLens(g, h.buttons, h.index, still(), selected >= 0 ? selected : h.index);
     }

@@ -925,3 +925,11 @@ Every iOS and Safari quirk Duet handles, what you would see without the handling
 - **Duet does:** starts the drag on a pointerdown inside any `.duet-group` (the open menu is a separate `.duet-blob`, so it never starts one).
 - **You do:** nothing.
 - **Status:** `e2e/layout.spec.ts` ("dragging a control across the middle moves the strip, and the side is remembered"), WebKit.
+
+## A held capsule leaves its rail on the Home Screen
+
+- **You see:** a web app added to the Home Screen of an iPhone Duo (Gabriele, 2026-11-22: wealth, closed and turned to landscape): holding or dragging along the column, its capsule grows out of the column, wider than the rail, its middle sliding up, and reads as the column being dragged out.
+- **Cause:** the press (press.ts, #251) opens a held capsule the way Safari's own column does: 78.8pt wide from 49 (about 1.6x, 1.69x at the spring's peak), its items spread to a 57pt pitch, its top moving up to 10pt. In Safari that matches the native column beside it; on the Home Screen nothing native opens beside it, and the opened capsule overlaps the page and the status column.
+- **Duet does:** in a standalone web app the held capsule keeps its swell, at most 1.06x its rest size about its centre (less for a capsule that would cross the window's band), open or not; the lens stays clipped inside it, and a lone button swells 1.06x. The bound is 1.13x and 1pt of drift. A finger on an item still names that item. Safari tabs are unchanged.
+- **You do:** nothing.
+- **Status:** `test/press.test.mjs` ("held, Home Screen"), `test/props-geometry.test.mjs` (a held capsule stays within 1.13x, in place, every standalone posture), on the Duo simulator `tools/e2e` `--only standalone-wealth` (sa10 to sa19) and `--only standalone` (sa01 to sa09).

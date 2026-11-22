@@ -10,6 +10,7 @@
 - `DuetItem.disabled`: `aria-disabled`, a tap does nothing, no visual change.
 - `<Duet scrollTopOnSelect>` (a place picked in the controls opens at its top) and `<Duet rootAttrs="data-app">` (device, layout and mode on `<html>`). Both off by default.
 - The organisms' pure parts (`hitsControl`, `inspectorKey`, `isTyping`, `withEntry`, `readEntry`, `needsRepair`, `inOrder`, `viewerStep`, `rootAttrs`, `scrollToTop`) on `duet-ui/inspector` too, still React-free.
+- Fix: in a Home Screen web app a held capsule no longer opens past its rail. It used to widen to 78.8pt from 49 (about 1.6x, its centre moving up to 10pt), which on the Duo read as the column dragged out of its rail. There it now keeps its swell, at most 1.06x about its centre and never across the window's band, the lens stays inside it, and a lone button swells 1.06x. Safari tabs open as before.
 - Fix: with `moveControls`, dragging an inline control across the page moves the controls again. The drag listened for a class the capsules lost in 0.6.0. See [edge cases](../../docs/edge-cases.md#dragging-the-inline-controls-does-not-move-them).
 
 ## 0.8.2
