@@ -5,4 +5,7 @@ export { bleed, column } from "./layout.ts";
 export { DuetPanes, DuetPaneBar, usePanes, type DuetPanesProps, type DuetPaneBarProps } from "./duet-panes.tsx";
 export { panes, backFrom, type PaneWindow } from "./panes.ts";
 export { browserOf, detect, deviceOf, isDuo, isIOS, isPreview, isSplit, previewReason, stable, PIN_MAX, PIN_TTL, columnBand, magnet, pageInsets, sidebarInset, DUO, INLINE_WIDTH, MAGNET, WIDE, type Browser, type Context, type Device, type Layout, type Mode, type Side, type Signals } from "./geometry.ts";
+export { inspector, initialInspector, canSplit, stepCard, paneCommands, SPLIT_WIDTH, type InspectorState, type InspectorEvent, type InspectorContext, type InspectorHistory, type InspectorStep, type PaneCommand, type PaneCommandId } from "./inspector.ts";
+export { X, Maximize2, Columns2, ChevronUp, ChevronDown, PANE_GLYPHS, type PaneIcon } from "./glyphs.ts";
+export { paneGlyph } from "./icons.tsx";
 export { TEMPLATE, allocate, frame, place, placesFit, placeTabs, FEWEST_TABS, TIGHTEST_TAB_PITCH, canMoveControls, template, menuBox, confirmBox, primaryTap, groupHeight, type Frame, type Group, type Placed, type Rect, type Slot } from "./template.ts";
