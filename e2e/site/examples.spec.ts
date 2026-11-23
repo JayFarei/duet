@@ -107,7 +107,37 @@ for (const name of ["inbox", "checkout", "reader", "inspector"]) {
     expect(html).not.toContain("ex-seg");
     expect(html).not.toContain('class="nav"');
   });
+
+  // Behind a TLS-terminating proxy (tailscale serve, a load balancer) the request says https while the server listens
+  // on plain http: ?plain must stay an internal rewrite, not a fetch from itself over TLS (#279: every device frame
+  // on the tailnet preview read "Internal Server Error").
+  test(`/examples/${name}?plain serves the app behind a TLS proxy`, async ({ request }) => {
+    for (const host of ["localhost:3510", "127.0.0.1:3510", "preview.example.ts.net"]) {
+      const res = await request.get(`/examples/${name}?plain`, { headers: { "x-forwarded-proto": "https", "x-forwarded-host": host, host } });
+      const html = await res.text();
+      expect(res.status(), `${host}: ${html.slice(0, 200)}`).toBe(200);
+      expect(html).not.toContain("Internal Server Error");
+      expect(html).not.toContain("ex-page");
+    }
+    // And the example page itself stays the example page.
+    const page = await (await request.get(`/examples/${name}`, { headers: { "x-forwarded-proto": "https" } })).text();
+    expect(page).toContain("ex-page");
+  });
 }
+
+test.describe("behind a TLS proxy", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 768, "at 390 the block shows its recorded loop, not the stage");
+  test.use({ extraHTTPHeaders: { "x-forwarded-proto": "https" } });
+
+  test("the device frames run the example, not an error", async ({ page }) => {
+    await page.goto("/examples/inbox");
+    await expect.poll(async () => (await duetFrames(page)).length, { message: "Duet runs in a device frame", timeout: 45_000 }).toBeGreaterThan(0);
+    for (const f of page.frames()) {
+      const text = await f.locator("body").innerText({ timeout: 2000 }).catch(() => "");
+      expect(text, `frame ${f.url()}`).not.toContain("Internal Server Error");
+    }
+  });
+});
 
 test.describe("the stage lets the page scroll", () => {
   test.skip(({ viewport }) => (viewport?.width ?? 0) < 768, "at 390 the block shows its recorded loop, not the stage");
