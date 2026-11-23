@@ -22,16 +22,17 @@ export function GitHub() {
   );
 }
 
-/** The site's top bar: the name, the home sections, GitHub and the theme toggle. Plain links, no Duet: the site pages
- *  scroll the window. */
+/** The site's top bar, on the home page and every example page: the name, How it works, the examples, Install, GitHub
+ *  and the theme toggle. Plain links, no Duet: the site pages scroll the window. Every target 44px tall; under 400px
+ *  "How it works" reads "How" and under 520px the name keeps only its mark, so the bar holds one line at 320px. */
 export function SiteNav() {
   const theme = useTheme();
   return (
     <header className="nav">
-      <a href="/" className="nav-brand"><DuetMark />Duet</a>
+      <a href="/" className="nav-brand" aria-label="Duet home"><DuetMark />Duet</a>
       <nav className="nav-links" aria-label="Site">
-        <a href="/#how">How it works</a>
-        <a href="/#examples">Examples</a>
+        <a href="/#how" aria-label="How it works"><span className="nav-long">How it works</span><span className="nav-short" aria-hidden>How</span></a>
+        <a href="/examples">Examples</a>
         <a href="/#install">Install</a>
       </nav>
       <div className="nav-end">

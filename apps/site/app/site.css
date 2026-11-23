@@ -3,15 +3,28 @@
   :root:not([data-lg-theme="light"]) { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --cta: #0a84ff; --wd-kb: rgb(44 44 48 / 0.82); --wd-key: rgb(108 108 112); }
 }
 :root[data-lg-theme="dark"] { --bg: #000; --card: rgb(28 28 30); --ink: #fff; --dim: rgb(235 235 245 / 0.6); --line: rgb(84 84 88 / 0.6); --code: rgb(44 44 46); --wd-glass: rgb(255 255 255 / 0.12); --wd-island-rim: rgb(255 255 255 / 0.14); --wd-col: rgb(90 89 84 / 0.43); --wd-edge: 0.6; --wd-rim: 0; --wd-shine: rgb(255 255 255 / 0.4); --cta: #0a84ff; --wd-kb: rgb(44 44 48 / 0.82); --wd-key: rgb(108 108 112); }
+/* The site's design tokens. Every page (home, examples) draws its radii, type, spacing and column from these.
+ * Radii: pill, then large (cards, frames), medium (panels inside a card, code), small (tiles, buttons in a panel), xs (skeleton lines).
+ * Type: display, h2 (section and page titles), h3, card (every card and step title), small (stat values, footer name).
+ * Space: a 4px-based scale. --inset: a card's text sits this far in from its 12px padding, level with its demo's label (12 + 14). */
+:root {
+  --r-pill: 99px; --r-lg: 24px; --r-md: 16px; --r-sm: 12px; --r-xs: 4px;
+  --t-display: clamp(48px, min(8vw, 10.5vh), 96px); --t-h2: clamp(42px, 6.6vw, 72px); --t-h3: clamp(32px, 4.6vw, 48px); --t-card: 28px; --t-small: 24px;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px;
+  --pad: 12px; --inset: 14px; --tap: 44px; --pill-x: 20px;
+  --page-w: 1120px; --page-pad: 20px;
+  --serif-face: var(--serif), Georgia, serif;
+}
+@media (max-width: 760px) { :root { --page-pad: 16px; } }
 html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: var(--accent); text-decoration: none; }
 code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 /* Code colors, Xcode's default themes. Tokens come from sugar-high. */
-:root { --sh-keyword: #9b2393; --sh-string: #c41a16; --sh-class: #0b4f79; --sh-entity: #326d74; --sh-property: #0f68a0; --sh-identifier: var(--ink); --sh-sign: rgb(60 60 67 / 0.7); --sh-jsxliterals: var(--ink); --sh-comment: #5d6c79; }
+:root { --sh-keyword: #9b2393; --sh-string: #c41a16; --sh-class: #0b4f79; --sh-entity: #326d74; --sh-property: #0f68a0; --sh-identifier: var(--ink); --sh-sign: var(--dim); --sh-jsxliterals: var(--ink); --sh-comment: #5d6c79; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-lg-theme="light"]) { --sh-keyword: #ff7ab2; --sh-string: #ff8170; --sh-class: #6bdfff; --sh-entity: #67b7a4; --sh-property: #4eb0cc; --sh-sign: rgb(235 235 245 / 0.6); --sh-comment: #7f8c98; }
+  :root:not([data-lg-theme="light"]) { --sh-keyword: #ff7ab2; --sh-string: #ff8170; --sh-class: #6bdfff; --sh-entity: #67b7a4; --sh-property: #4eb0cc; --sh-comment: #7f8c98; }
 }
-:root[data-lg-theme="dark"] { --sh-keyword: #ff7ab2; --sh-string: #ff8170; --sh-class: #6bdfff; --sh-entity: #67b7a4; --sh-property: #4eb0cc; --sh-sign: rgb(235 235 245 / 0.6); --sh-comment: #7f8c98; }
+:root[data-lg-theme="dark"] { --sh-keyword: #ff7ab2; --sh-string: #ff8170; --sh-class: #6bdfff; --sh-entity: #67b7a4; --sh-property: #4eb0cc; --sh-comment: #7f8c98; }
 
 /* The web Duo (app/duo/web-duo.tsx). */
 @keyframes wd-in { from { opacity: 0; } }
@@ -31,31 +44,30 @@ code, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 
 /* The home page (app/home.tsx): one responsive page, Apple-style. Horizontal layout comes from duet-ui's column(). */
 section[id] { scroll-margin-top: 24px; }
-.pill { display: inline-flex; align-items: center; gap: 10px; height: 44px; padding: 0 22px; border-radius: 99px; border: 0; background: var(--card); color: var(--accent); font: 500 17px/1 -apple-system, system-ui; box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
+.pill { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); height: var(--tap); padding: 0 var(--pill-x); border-radius: var(--r-pill); border: 0; background: var(--card); color: var(--accent); font: 500 17px/1 -apple-system, system-ui; box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
 .pill-solid { background: var(--ink); color: var(--bg); box-shadow: none; }
 /* "Copy prompt": a card pill with system blue ink in SF and one generic icon, and a face that flips to "Copied". */
 .pill-cta { position: relative; overflow: hidden; color: var(--cta); white-space: nowrap; font-weight: 600; transition: scale 0.4s cubic-bezier(0.3, 1.5, 0.5, 1); }
 .pill-cta:active { scale: 0.96; transition-duration: 0.1s; }
-.cta-face { display: inline-flex; align-items: center; gap: 12px; transition: opacity 0.2s, translate 0.35s cubic-bezier(0.3, 1.3, 0.5, 1); }
-.cta-done { position: absolute; inset: 0; justify-content: center; gap: 7px; opacity: 0; translate: 0 60%; }
+.cta-face { display: inline-flex; align-items: center; gap: var(--s-3); transition: opacity 0.2s, translate 0.35s cubic-bezier(0.3, 1.3, 0.5, 1); }
+.cta-done { position: absolute; inset: 0; justify-content: center; gap: var(--s-2); opacity: 0; translate: 0 60%; }
 .pill-cta[data-done] .cta-face:not(.cta-done) { opacity: 0; translate: 0 -60%; }
 .pill-cta[data-done] .cta-done { opacity: 1; translate: 0 0; }
 @media (prefers-reduced-motion: reduce) { .pill-cta, .cta-face { transition: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.pill-sm { height: 30px; padding: 0 14px; font-size: 13px; }
 .npm code { font-size: 15px; }
 .npm-hint { font-size: 12px; opacity: 0.75; }
 
 /* One column for the two buttons and the stats, so all their edges line up: the buttons take equal halves, and stack where a half is too narrow to hold one. */
 .actions { display: grid; width: min(100%, 480px); margin: min(30px, 3.5vh) auto 0; }
 .actions .ctas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 0; }
-.actions .pill { justify-content: center; padding: 0 16px; }
-.stats { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr 1.5fr 1fr; margin-top: 12px; border-radius: 20px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); color: inherit; text-decoration: none; transition: box-shadow 0.2s; }
+.actions .pill { padding: 0 var(--s-4); }
+.stats { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr 1.5fr 1fr; margin-top: var(--s-3); border-radius: var(--r-lg); background: var(--card); box-shadow: 0 0 0 0.5px var(--line); color: inherit; text-decoration: none; transition: box-shadow 0.2s; }
 .stats:hover { box-shadow: 0 0 0 1px var(--dim); }
 .stats:not(:has(.stat-spark)) { grid-auto-columns: 1fr; justify-self: center; width: 120px; }
-.stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 13px 4px 12px; }
+.stat { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-2); padding: 13px 4px 12px; }
 .stat-label { color: var(--dim); font: 600 12px/1 -apple-system, system-ui; }
-.stat-value { font: 400 25px/1 var(--serif), Georgia, serif; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.stat-value { font: 400 var(--t-small)/1 var(--serif-face); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .stat-spark { display: flex; align-items: center; min-width: 0; padding: 10px 14px; border-inline: 0.5px solid var(--line); }
 .spark { display: block; width: 100%; height: 40px; overflow: visible; }
 .spark-line { fill: none; stroke: var(--ink); stroke-width: 1.25; stroke-linejoin: round; stroke-linecap: round; }
@@ -63,28 +75,28 @@ section[id] { scroll-margin-top: 24px; }
 .spark-fade-top { stop-color: var(--ink); stop-opacity: 0.14; }
 .spark-fade-end { stop-color: var(--ink); stop-opacity: 0; }
 /* The hero scales with the window's height as well as its width, so a short laptop screen still reaches the device. */
-.display { margin: 0 auto; max-width: 10em; font: 400 clamp(48px, min(8vw, 10.5vh), 96px)/1 var(--serif), Georgia, serif; letter-spacing: -0.02em; text-wrap: balance; }
+.display { margin: 0 auto; max-width: 10em; font: 400 var(--t-display)/1 var(--serif-face); letter-spacing: -0.02em; text-wrap: balance; }
 .display em, .h2 em { font-style: italic; white-space: nowrap; }
-.h2 { margin: 0; font: 400 clamp(42px, 6.6vw, 72px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.015em; }
+.h2 { margin: 0; font: 400 var(--t-h2)/1.02 var(--serif-face); letter-spacing: -0.015em; }
 .lede { margin: 20px auto 0; max-width: 760px; color: var(--dim); font: 500 clamp(19px, min(2.2vw, 3vh), 24px)/1.35 -apple-system, system-ui; letter-spacing: -0.01em; text-wrap: balance; }
-.lede-l { margin-left: 0; margin-top: 14px; margin-bottom: 32px; }
+.lede-l { margin-left: 0; margin-top: var(--s-3); margin-bottom: var(--s-6); }
 .h3 + .lede { margin-top: 10px; font-size: clamp(17px, 1.8vw, 20px); }
-.ctas.ctas-l { justify-content: flex-start; margin-top: 32px; }
-.ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 30px; }
+.ctas.ctas-l { justify-content: flex-start; margin-top: var(--s-6); }
+.ctas { display: flex; flex-wrap: wrap; gap: var(--s-3); justify-content: center; margin-top: var(--s-6); }
 
 .section { padding: clamp(64px, 10vw, 128px) 0 0; }
 
-.card { background: var(--card); border-radius: 22px; }
+.card { background: var(--card); border-radius: var(--r-lg); }
 
-.code { margin: 16px 0 0; padding: 18px 20px; overflow-x: auto; font-size: 13px; line-height: 1.55; }
+.code { margin: var(--s-4) 0 0; padding: var(--s-4) var(--s-5); overflow-x: auto; font-size: 13px; line-height: 1.55; }
 
-.foot { margin-top: clamp(72px, 10vw, 128px); padding: 20px 0 calc(40px + env(safe-area-inset-bottom)); border-top: 0.5px solid var(--line); color: var(--dim); font-size: 13px; line-height: 1.5; }
-.foot p { margin: 8px 0 0; }
-.foot a { color: var(--ink); text-decoration: none; }
+.foot { box-sizing: border-box; width: 100%; max-width: var(--page-w); margin-inline: auto; margin-top: clamp(72px, 10vw, 128px); padding: var(--s-5) var(--page-pad) calc(40px + env(safe-area-inset-bottom)); border-top: 0.5px solid var(--line); color: var(--dim); font-size: 13px; line-height: 1.5; }
+.foot p { margin: var(--s-2) 0 0; }
+.foot a { display: inline-block; padding-block: 14px; margin-block: -14px; color: var(--ink); text-decoration: none; }
 .foot a:hover { text-decoration: underline; }
-.foot-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.foot-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s-1) var(--s-4); }
 .foot-row p { margin: 0; }
-.foot-brand { color: var(--ink); font: 400 22px/1 var(--serif), Georgia, serif; }
+.foot-brand { color: var(--ink); font: 400 var(--t-small)/1 var(--serif-face); }
 /* The OpenMake square, as on RegTail and farei.me: red on hover. */
 .foot-mark { display: inline-block; width: 0.65em; height: 0.65em; margin-right: 0.35em; background: currentColor; transition: background 0.15s ease; }
 .foot-om:hover .foot-mark { background: #e63329; }
@@ -135,8 +147,8 @@ html:root .duet[data-mode="inline"] { --duet-sel: rgb(120 120 128 / 0.2); }
 .sheet-scrim { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; background: rgb(0 0 0 / 0.38); animation: sheet-fade 0.2s ease-out; }
 /* The blur sits on a ::before, not the scrim: Safari 26 tints its top bar with the fixed box at the edge, but not one with a backdrop-filter, leaving a solid band (#136). */
 .sheet-scrim::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
-.sheet { position: fixed; bottom: 0; left: 50%; translate: -50% 0; box-sizing: border-box; width: 100%; max-width: 560px; max-height: 80%; overflow-y: auto; padding: 20px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: var(--card); color: var(--ink); animation: sheet-up 0.25s cubic-bezier(0.3, 0.7, 0.2, 1); }
-.sheet-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.sheet { position: fixed; bottom: 0; left: 50%; translate: -50% 0; box-sizing: border-box; width: 100%; max-width: 560px; max-height: 80%; overflow-y: auto; padding: var(--s-5) var(--s-5) calc(var(--s-5) + env(safe-area-inset-bottom)); border-radius: var(--r-lg) var(--r-lg) 0 0; background: var(--card); color: var(--ink); animation: sheet-up 0.25s cubic-bezier(0.3, 0.7, 0.2, 1); }
+.sheet-head { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-3); }
 .sheet-x { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 99px; background: var(--line); color: var(--ink); cursor: pointer; }
 /* While Duet shows its close (data-duet-close, every mode) that X closes the sheet, like a native sheet's: its own X steps aside (#135). */
 html[data-duet-close] .sheet-x { display: none; }
@@ -144,89 +156,97 @@ html[data-duet-close] .sheet-x { display: none; }
 @keyframes sheet-up { from { transform: translateY(100%); } }
 @media (prefers-reduced-motion: reduce) { .sheet-scrim, .sheet { animation: none; } }
 
-.h3 { margin: clamp(56px, 7vw, 88px) 0 0; font: 400 clamp(32px, 4.6vw, 48px)/1.05 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.h3 { margin: clamp(56px, 7vw, 88px) 0 0; font: 400 var(--t-h3)/1.05 var(--serif-face); letter-spacing: -0.01em; }
 
-/* The site pages (home.tsx, examples): one column 1080 wide at most, 20px clear of each edge. */
-.wrap { box-sizing: border-box; width: 100%; max-width: 1120px; margin-inline: auto; padding-inline: 20px; }
+/* The site pages (home.tsx, examples): one column, --page-w wide at most with --page-pad clear of each edge, so home and
+ * the example pages share one content width (1080 at 1440). */
+.wrap { box-sizing: border-box; width: 100%; max-width: var(--page-w); margin-inline: auto; padding-inline: var(--page-pad); }
 .duo-wait { width: 100%; height: min(85vw, 680px, 70vh); }
 
 /* The top bar (site-nav.tsx). */
-.nav { box-sizing: border-box; display: flex; align-items: center; gap: 20px; max-width: 1120px; height: 60px; margin: 0 auto; padding: 0 20px; }
-.nav-brand { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font: 600 17px/1 -apple-system, system-ui; }
-.nav-links { display: flex; gap: 18px; margin-right: auto; }
-.nav-links a { color: var(--dim); font: 500 15px/1 -apple-system, system-ui; }
+.nav { box-sizing: border-box; display: flex; align-items: center; gap: var(--s-4); max-width: var(--page-w); height: 60px; margin: 0 auto; padding: 0 var(--page-pad); }
+.nav-brand { display: inline-flex; align-items: center; gap: var(--s-2); min-width: var(--tap); height: var(--tap); white-space: nowrap; color: var(--ink); font: 600 17px/1 -apple-system, system-ui; }
+/* Each link a 44px target, padded rather than spaced apart, and on one line: under 400px "How it works" reads "How". */
+.nav-links { display: flex; margin-right: auto; }
+.nav-links a { display: inline-flex; align-items: center; height: var(--tap); padding: 0 var(--s-2); color: var(--dim); font: 500 15px/1 -apple-system, system-ui; white-space: nowrap; }
+.nav-short { display: none; }
+@media (max-width: 400px) { .nav-long { display: none; } .nav-short { display: inline; } }
 .nav-links a:hover, .nav-links a[aria-current="page"] { color: var(--ink); }
-.nav-end { display: flex; gap: 6px; }
-.nav-icon { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 99px; background: none; color: var(--ink); cursor: pointer; }
+.nav-end { display: flex; gap: var(--s-1); }
+.nav-icon { display: grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--ink); cursor: pointer; }
 .nav-icon:hover { background: var(--card); }
-@media (max-width: 520px) { .nav { gap: 12px; } .nav-brand { font-size: 0; gap: 0; } .nav-links { gap: 14px; } }
+@media (max-width: 520px) { .nav { gap: var(--s-1); } .nav-brand { font-size: 0; gap: 0; justify-content: center; } }
 
 /* The intro: title, lede, install and stats. Not a full window, so the simulator shows right under it. */
 .intro { padding-top: clamp(40px, 8vh, 96px); text-align: center; }
-.intro .actions { gap: 12px; }
+.intro .actions { gap: var(--s-3); }
 @media (max-width: 760px) {
   .intro .display { font-size: clamp(38px, 10.5vw, 52px); }
   .intro .lede { margin-top: 14px; font-size: 17px; }
-  .intro .actions { margin-top: 22px; gap: 10px; }
-  .intro .ctas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .intro .pill { justify-content: center; padding: 0 12px; font-size: 16px; }
+  .intro .actions { margin-top: var(--s-5); gap: var(--s-3); }
+  .intro .ctas { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  .intro .pill { padding: 0 var(--s-3); font-size: 16px; }
   .intro .npm code { font-size: 13px; }
   .intro .npm .npm-hint { display: none; }
 }
 
 /* The simulator: the app picker, then the live Duo with its own controls. */
 .sim { padding-top: clamp(48px, 8vw, 96px); scroll-margin-top: 8px; }
-.sim-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
-.stage { max-width: 1120px; margin: 0 auto; padding-inline: 20px; }
-@media (max-width: 760px) { .stage { padding-inline: 16px; } .sim-head { padding-inline: 16px; } }
+.sim-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--s-4); margin-bottom: var(--s-2); }
+.stage { box-sizing: border-box; max-width: var(--page-w); margin: 0 auto; }
+/* The 3D stage without its controls (an example block): "Use the device" unlocks it, "Done" locks it so the page scrolls. */
+.stage-under { display: flex; justify-content: center; padding-bottom: var(--s-4); }
+.stage-chip { display: inline-flex; align-items: center; gap: var(--s-2); height: var(--tap); padding: 0 var(--pill-x); border: 0; border-radius: var(--r-pill); background: color-mix(in srgb, var(--card), transparent 10%); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line), 0 6px 20px rgb(0 0 0 / 0.12); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); font: 500 15px/1 -apple-system, system-ui; white-space: nowrap; cursor: pointer; }
 
 /* How it works: four numbered steps, then the glossary. */
-.how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 32px 0 0; padding: 0; list-style: none; }
-.how li { padding: 20px; border-radius: 22px; background: var(--card); }
-.how-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 99px; background: var(--ink); color: var(--bg); font: 600 14px/1 -apple-system, system-ui; }
-.how h3 { margin: 14px 0 6px; font: 400 26px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.how { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--s-4); margin: var(--s-6) 0 0; padding: 0; list-style: none; }
+.how li { padding: var(--s-5); border-radius: var(--r-lg); background: var(--card); }
+.how-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-pill); background: var(--ink); color: var(--bg); font: 600 14px/1 -apple-system, system-ui; }
+.how h3 { margin: var(--s-3) 0 var(--s-2); font: 400 var(--t-card)/1.1 var(--serif-face); letter-spacing: -0.01em; }
 .how p { margin: 0; color: var(--dim); font: 400 15px/1.45 -apple-system, system-ui; }
 @media (max-width: 960px) { .how { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .how { grid-template-columns: minmax(0, 1fr); } }
-.glossary { width: 100%; margin-top: 32px; border-collapse: collapse; font: 400 16px/1.45 -apple-system, system-ui; }
-.glossary th, .glossary td { padding: 12px 16px 12px 0; border-bottom: 0.5px solid var(--line); text-align: left; vertical-align: top; }
+@media (max-width: 560px) { .how { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; } }
+.glossary { width: 100%; margin-top: var(--s-6); border-collapse: collapse; font: 400 16px/1.45 -apple-system, system-ui; }
+.glossary th, .glossary td { padding: var(--s-3) var(--s-4) var(--s-3) 0; border-bottom: 0.5px solid var(--line); text-align: left; vertical-align: top; }
 .glossary th { width: 9em; font-weight: 600; white-space: nowrap; }
 .glossary td { color: var(--dim); }
 
-/* Examples: one card each, Try it loads it in the simulator, Show code opens its one file. */
-.exs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
-@media (max-width: 960px) { .exs { grid-template-columns: minmax(0, 1fr); } }
-.ex { padding: 12px 12px 16px; min-width: 0; }
-.ex .card-h { margin-top: 8px; }
-.ex-acts { display: flex; gap: 8px; margin: 16px 6px 0; }
-.ex-src { margin: 14px 6px 0; }
-.ex-src summary { color: var(--dim); font: 500 14px/1.2 -apple-system, system-ui; cursor: pointer; }
-.ex-src .code { max-height: 420px; margin-top: 10px; border-radius: 14px; background: var(--code); }
+/* Examples: one card each, Open goes to its page, Show code opens its one file. Each card is a subgrid of the row, so
+ * the cards in a row are one height and their demo, title, text, Open and Show code line up. */
+.exs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
+@media (max-width: 760px) { .exs { grid-template-columns: minmax(0, 1fr); } }
+.ex { display: grid; grid-row: span 5; grid-template-rows: subgrid; row-gap: 0; padding: var(--pad) var(--pad) var(--s-2); min-width: 0; }
+.ex .card-h { margin-top: var(--s-4); }
+.ex-acts { display: flex; gap: var(--s-2); margin: var(--s-4) var(--inset) 0; align-self: end; }
+.ex-src { margin: var(--s-2) var(--inset) 0; }
+.ex-src summary { display: flex; align-items: center; min-height: var(--tap); color: var(--dim); font: 500 15px/1.2 -apple-system, system-ui; cursor: pointer; }
+.ex-src .code { max-height: 420px; margin-top: var(--s-1); border-radius: var(--r-md); background: var(--code); }
+.exs-all { margin-top: var(--s-5); }
 
 /* Cards. */
-.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
 @media (max-width: 760px) { .cards { grid-template-columns: minmax(0, 1fr); } }
-.cards .card { display: block; padding: 12px 12px 20px; color: inherit; }
+.cards .card { display: block; padding: var(--pad) var(--pad) var(--s-5); color: inherit; }
 .ex-card-link:hover { box-shadow: 0 0 0 1px var(--line); }
-.card-h { display: flex; align-items: center; gap: 6px; margin: 14px 6px 4px; font: 400 28px/1.1 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
-.card-p { margin: 0 6px; color: var(--dim); font: 400 15px/1.45 -apple-system, system-ui; }
+.card-h { display: flex; align-items: center; gap: var(--s-2); margin: var(--s-3) var(--inset) var(--s-1); font: 400 var(--t-card)/1.1 var(--serif-face); letter-spacing: -0.01em; }
+.card-p { margin: 0 var(--inset); color: var(--dim); font: 400 15px/1.45 -apple-system, system-ui; }
 
 /* A recorded loop (loop-video.tsx): poster first, or a plain box until the clip is recorded. */
-.loop { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 16px; background: var(--bg); }
+.loop { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: var(--r-md); background: var(--bg); }
 .loop video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .loop:not([data-ready]) video { visibility: hidden; }
-.loop:not([data-ready])::after { content: ""; position: absolute; inset: 22% 30%; border-radius: 18px; box-shadow: inset 0 0 0 1.5px var(--line); }
-.loop-play { position: absolute; right: 10px; bottom: 10px; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 99px; background: var(--card); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
-.loop-count { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 4px 10px; border-radius: 99px; background: var(--card); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; font-variant-numeric: tabular-nums; }
+.loop:not([data-ready])::after { content: ""; position: absolute; inset: 22% 30%; border-radius: var(--r-md); box-shadow: inset 0 0 0 1.5px var(--line); }
+.loop-play { position: absolute; right: var(--s-2); bottom: var(--s-2); display: grid; place-items: center; width: var(--tap); height: var(--tap); padding: 0; border: 0; border-radius: var(--r-pill); background: var(--card); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line); cursor: pointer; }
+.loop-count { position: absolute; left: var(--s-3); bottom: var(--s-3); margin: 0; padding: var(--s-1) var(--s-3); border-radius: var(--r-pill); background: var(--card); color: var(--dim); font: 500 12px/1.2 -apple-system, system-ui; font-variant-numeric: tabular-nums; }
 
 /* Example demos (ex-demo.tsx): a page, the controls Duet draws beside it, and what they do, looping. Like anime.js's
  * documentation previews: a small panel, its label in the corner, the moving part in the middle. */
-.exd { position: relative; height: 184px; overflow: hidden; border-radius: 16px; background: var(--bg); color: var(--ink); --exd-cta: var(--cta); }
+.exd { position: relative; height: 184px; overflow: hidden; border-radius: var(--r-md); background: var(--bg); color: var(--ink); --exd-cta: var(--cta); }
 .exd-label, .exd-cap { position: absolute; top: 12px; font: 600 11px/1 -apple-system, system-ui; letter-spacing: 0.04em; }
-.exd-label { left: 14px; color: var(--dim); text-transform: uppercase; }
+.exd-label { left: var(--inset); color: var(--dim); text-transform: uppercase; }
 .exd-cap { right: 14px; }
-.exd-page { position: absolute; top: 36px; bottom: 14px; left: 14px; right: 80px; border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
-.exd-page::before { content: ""; position: absolute; top: 14px; left: 14px; width: 58%; height: 48px; border-radius: 3px; background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
+.exd-page { position: absolute; top: 36px; bottom: 14px; left: var(--inset); right: 80px; border-radius: var(--r-sm); background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
+.exd-page::before { content: ""; position: absolute; top: 14px; left: 14px; width: 58%; height: 48px; border-radius: var(--r-xs); background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
 .exd-group { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 7px; border-radius: 99px; background: var(--wd-glass); box-shadow: 0 0 0 0.5px var(--line), 0 4px 14px rgb(0 0 0 / 0.08); }
 .exd-group > svg { position: relative; display: block; }
 .exd-one { padding: 9px; }
@@ -263,8 +283,8 @@ html[data-duet-close] .sheet-x { display: none; }
 @keyframes exd-c3 { 0%, 61% { opacity: 0; } 65%, 90% { opacity: 1; } 95%, 100% { opacity: 0; } }
 
 /* Reader: a second pane opens with its Pane bar beside it, goes full screen, and closes. */
-.exd-pane { position: absolute; top: 36px; bottom: 14px; right: 80px; width: calc((100% - 94px) / 2); border-radius: 12px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line), -6px 0 18px rgb(0 0 0 / 0.1); animation: exd-pane 8s cubic-bezier(0.3, 1.1, 0.5, 1) infinite; }
-.exd-pane::before { content: ""; position: absolute; top: 14px; left: 12px; right: 12px; height: 34px; border-radius: 3px; background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
+.exd-pane { position: absolute; top: 36px; bottom: 14px; right: 80px; width: calc((100% - 94px) / 2); border-radius: var(--r-sm); background: var(--card); box-shadow: 0 0 0 0.5px var(--line), -6px 0 18px rgb(0 0 0 / 0.1); animation: exd-pane 8s cubic-bezier(0.3, 1.1, 0.5, 1) infinite; }
+.exd-pane::before { content: ""; position: absolute; top: 14px; left: 12px; right: 12px; height: 34px; border-radius: var(--r-xs); background: repeating-linear-gradient(var(--line) 0 6px, transparent 6px 14px); }
 @keyframes exd-pane { 0%, 8% { opacity: 0; translate: 24px 0; width: calc((100% - 94px) / 2); } 16%, 40% { opacity: 1; translate: 0 0; width: calc((100% - 94px) / 2); } 50%, 70% { opacity: 1; width: calc(100% - 94px); } 78% { opacity: 1; translate: 0 0; width: calc((100% - 94px) / 2); } 86%, 100% { opacity: 0; translate: 24px 0; width: calc((100% - 94px) / 2); } }
 .exd-panebar { position: absolute; top: calc(50% + 11px); right: 23px; translate: 0 -50%; padding: 9px; gap: 12px; animation: exd-panebar 8s ease infinite; }
 .exd-panebar > svg { border-radius: 99px; outline: 0 solid transparent; animation: exd-key 8s ease infinite; }
@@ -273,9 +293,18 @@ html[data-duet-close] .sheet-x { display: none; }
 @keyframes exd-key { 0%, 72% { box-shadow: 0 0 0 0 transparent; } 75% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ink) 18%, transparent); } 80%, 100% { box-shadow: 0 0 0 0 transparent; } }
 @keyframes exd-key-full { 0%, 41% { box-shadow: 0 0 0 0 transparent; } 44% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--ink) 18%, transparent); } 49%, 100% { box-shadow: 0 0 0 0 transparent; } }
 .exd-r2, .exd-r3 { opacity: 0; }
-[data-demo="reader"] .exd-r1 { animation: exd-r1 8s ease infinite; }
-[data-demo="reader"] .exd-r2 { animation: exd-r2 8s ease infinite; }
-[data-demo="reader"] .exd-r3 { animation: exd-r3 8s ease infinite; }
+.exd .exd-r1 { animation: exd-r1 8s ease infinite; }
+.exd .exd-r2 { animation: exd-r2 8s ease infinite; }
+.exd .exd-r3 { animation: exd-r3 8s ease infinite; }
+/* Inspector: a card opens in a pane beside the page with its commands (previous, next, Close), goes full screen,
+ * and closes. The reader's pane and timing, a grid of cards for the page. */
+.exd-cards { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); padding: var(--s-3); box-sizing: border-box; }
+.exd-cards::before { display: none; }
+.exd-cards > span { border-radius: var(--r-xs); box-shadow: 0 0 0 0.5px var(--line); background: repeating-linear-gradient(var(--line) 0 4px, transparent 4px 10px) 8px 10px / 60% 24px no-repeat; }
+.exd-cards > span:first-child { animation: exd-card 8s ease infinite; }
+@keyframes exd-card { 0%, 6% { box-shadow: 0 0 0 0.5px var(--line); } 9%, 80% { box-shadow: 0 0 0 1.5px var(--ink); } 86%, 100% { box-shadow: 0 0 0 0.5px var(--line); } }
+[data-demo="inspector"] .exd-panebar > svg { animation-name: none; }
+[data-demo="inspector"] .exd-panebar > svg:last-child { animation-name: exd-key; }
 @keyframes exd-r1 { 0%, 40% { opacity: 1; } 44%, 100% { opacity: 0; } }
 @keyframes exd-r2 { 0%, 42% { opacity: 0; } 46%, 70% { opacity: 1; } 74%, 100% { opacity: 0; } }
 @keyframes exd-r3 { 0%, 72% { opacity: 0; } 76%, 94% { opacity: 1; } 98%, 100% { opacity: 0; } }
@@ -287,5 +316,4 @@ html[data-duet-close] .sheet-x { display: none; }
  * the page keeps clear of the controls on its edge. */
 html[data-duet-mode] .nav-links, html[data-duet-mode] .nav-end { display: none; }
 html[data-duet-mode] .nav { justify-content: center; }
-.nav, .wrap, .stage { padding-left: calc(20px + var(--duet-inset-left, 0px)); padding-right: calc(20px + var(--duet-inset-right, 0px)); }
-@media (max-width: 760px) { .stage { padding-left: calc(16px + var(--duet-inset-left, 0px)); padding-right: calc(16px + var(--duet-inset-right, 0px)); } }
+.nav, .wrap, .stage, .foot { padding-left: calc(var(--page-pad) + var(--duet-inset-left, 0px)); padding-right: calc(var(--page-pad) + var(--duet-inset-right, 0px)); }

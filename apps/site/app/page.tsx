@@ -23,6 +23,6 @@ async function installs(): Promise<InstallStats | null> {
 
 export default async function Page() {
   // Named here, not taken from home.tsx: a server component gets only a client reference from a "use client" module.
-  const sources = { inbox: source("inbox"), checkout: source("checkout"), reader: source("reader") };
+  const sources = { inbox: source("inbox"), checkout: source("checkout"), reader: source("reader"), inspector: source("inspector") };
   return <Home installs={await installs()} sources={sources} />;
 }

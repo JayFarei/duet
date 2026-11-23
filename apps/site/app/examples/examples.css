@@ -1,30 +1,38 @@
-/* The example pages: a heading, a toolbar (posture, Preview or Code, Open in new tab), then the stage. */
-.ex-page { box-sizing: border-box; width: min(1080px, 100%); margin: 0 auto; padding: 32px 16px 64px; color: var(--ink); font: 400 17px/1.45 -apple-system, system-ui; }
+/* The example pages: the site's top bar, a heading, a toolbar (posture, Preview or Code, Open in new tab), then the
+ * stage. The same column as the home page (.wrap): --page-w wide at most, --page-pad clear of each edge. */
+.ex-page { box-sizing: border-box; width: 100%; max-width: var(--page-w); margin: 0 auto; padding: var(--s-6) var(--page-pad) 64px; color: var(--ink); font: 400 17px/1.45 -apple-system, system-ui; }
 .ex-head { max-width: 680px; }
-.ex-back { color: var(--dim); text-decoration: none; font-size: 15px; }
+/* The way back up, a 44px target on the text's own line. */
+.ex-back { display: inline-flex; align-items: center; gap: var(--s-1); min-height: var(--tap); margin-block: calc(-1 * var(--s-3)); color: var(--dim); text-decoration: none; font-size: 15px; }
 .ex-back:hover { color: var(--ink); }
-.ex-title { margin: 8px 0 8px; font: 400 clamp(40px, 7vw, 64px)/1.02 var(--serif), Georgia, serif; letter-spacing: -0.01em; }
+.ex-title { margin: var(--s-2) 0; font: 400 var(--t-h2)/1.02 var(--serif-face); letter-spacing: -0.015em; }
 .ex-intro { margin: 0; color: var(--dim); }
-.ex-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 28px 0 12px; }
-.ex-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 99px; background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
-.ex-seg button { height: 34px; padding: 0 14px; border: 0; border-radius: 99px; background: none; color: var(--ink); font: 500 14px/1 -apple-system, system-ui; cursor: pointer; }
+.ex-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin: var(--s-6) 0 var(--s-3); }
+.ex-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--r-pill); background: var(--card); box-shadow: 0 0 0 0.5px var(--line); }
+.ex-seg button { height: var(--tap); padding: 0 var(--s-4); border: 0; border-radius: var(--r-pill); background: none; color: var(--ink); font: 500 15px/1 -apple-system, system-ui; cursor: pointer; }
 .ex-seg button[aria-pressed="true"], .ex-seg button[aria-selected="true"] { background: color-mix(in srgb, var(--ink), transparent 88%); }
-.ex-open { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; color: var(--ink); font: 500 14px/1 -apple-system, system-ui; text-decoration: none; }
+.ex-open { display: inline-flex; align-items: center; gap: var(--s-1); min-height: var(--tap); margin-left: auto; color: var(--ink); font: 500 15px/1 -apple-system, system-ui; text-decoration: none; }
 .ex-open:hover { text-decoration: underline; }
-.ex-frame { border-radius: 26px; background: var(--card); overflow: hidden; min-height: 200px; }
+/* A hairline so the frame reads as a surface on a phone too, where the page and the card are close in tone. */
+.ex-frame { border-radius: var(--r-lg); background: var(--card); box-shadow: 0 0 0 0.5px var(--line); overflow: hidden; min-height: 200px; }
 .ex-code { margin: 0; max-height: 70vh; background: var(--code); }
 .ex-loop { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: contain; background: var(--card); }
-/* The other examples, as loops linking to them. */
-.ex-more-h { margin: 48px 0 0; font: 400 30px/1.1 var(--serif), Georgia, serif; }
-.ex-more { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
-.ex-more .loop { margin-bottom: 14px; }
-.ex-card { padding: 28px 22px; color: var(--dim); }
-.ex-card a { color: var(--ink); font-weight: 600; }
+/* The other examples, as loops linking to them. auto-fit, so two or three fill the row with no empty column. */
+.ex-more-h { margin: 48px 0 0; font: 400 var(--t-card)/1.1 var(--serif-face); }
+.ex-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s-4); margin-top: var(--s-4); }
+.ex-more .loop, .ex-more .exd { margin-bottom: var(--s-3); }
+.ex-card { padding: var(--s-6) var(--s-5); color: var(--dim); }
+.ex-card a { display: inline-flex; align-items: center; min-height: var(--tap); color: var(--ink); font-weight: 600; }
+/* Reserved before the stage draws, so the page keeps its height (and a restored scroll position) while it loads. */
 .ex-wait { height: 420px; }
 /* The examples index. */
-.ex-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 32px; }
-.ex-item { display: block; padding: 22px; border-radius: 26px; background: var(--card); color: inherit; text-decoration: none; }
+.ex-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--s-4); margin-top: var(--s-6); }
+.ex-item { display: block; padding: var(--s-5); border-radius: var(--r-lg); background: var(--card); color: inherit; text-decoration: none; }
 .ex-item:hover { box-shadow: 0 0 0 1px var(--line); }
-.ex-item h2 { margin: 0 0 6px; font: 400 30px/1.1 var(--serif), Georgia, serif; }
+.ex-item h2 { margin: 0 0 var(--s-2); font: 400 var(--t-card)/1.1 var(--serif-face); }
 .ex-item p { margin: 0; color: var(--dim); font-size: 15px; }
 body:has(.ex-page) { background: var(--bg); }
+/* An example opened on its own (?plain): one small way back, over the app, until the app itself is all there is. */
+.ex-plain-back { position: fixed; left: calc(var(--s-3) + env(safe-area-inset-left)); bottom: calc(var(--s-3) + env(safe-area-inset-bottom)); z-index: 2147483000; display: inline-flex; align-items: center; gap: var(--s-1); height: var(--tap); padding: 0 var(--s-4) 0 var(--s-3); border-radius: var(--r-pill); background: color-mix(in srgb, var(--card), transparent 10%); color: var(--ink); box-shadow: 0 0 0 0.5px var(--line), 0 6px 20px rgb(0 0 0 / 0.12); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); font: 500 15px/1 -apple-system, system-ui; text-decoration: none; }
+/* Out of the way while Duet's "…" list is open, which can rise over the same corner. */
+html:has(.duet-menu) .ex-plain-back { visibility: hidden; }

@@ -1,9 +1,9 @@
-import { Archive, Check, CreditCard, Ellipsis, File, Inbox, Maximize2, PanelLeft, Send, Star, Trash2, X } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, CreditCard, Ellipsis, File, Inbox, Maximize2, PanelLeft, Send, Star, Trash2, X } from "lucide-react";
 
 /** A small looping demo on each example card, in the spirit of anime.js's documentation previews: a page, the
  *  controls Duet draws beside it, and what they do, in CSS keyframes (site.css, "Example demos"). Still under
  *  prefers-reduced-motion. */
-export function ExDemo({ name }: { name: "inbox" | "checkout" | "reader" }) {
+export function ExDemo({ name }: { name: "inbox" | "checkout" | "reader" | "inspector" }) {
   if (name === "inbox") return (
     <div className="exd" data-demo="inbox" aria-hidden>
       <span className="exd-label">Navigation</span>
@@ -37,6 +37,17 @@ export function ExDemo({ name }: { name: "inbox" | "checkout" | "reader" }) {
       <span className="exd-cap exd-c1">Tap Pay</span>
       <span className="exd-cap exd-c2">Confirm</span>
       <span className="exd-cap exd-c3">Paid</span>
+    </div>
+  );
+  if (name === "inspector") return (
+    <div className="exd" data-demo="inspector" aria-hidden>
+      <span className="exd-label">Inspector</span>
+      <span className="exd-page exd-cards"><span /><span /><span /><span /></span>
+      <span className="exd-pane" />
+      <span className="exd-group exd-panebar"><ChevronUp size={13} /><ChevronDown size={13} /><X size={13} /></span>
+      <span className="exd-cap exd-r1">Beside the page</span>
+      <span className="exd-cap exd-r2">Full screen</span>
+      <span className="exd-cap exd-r3">Close</span>
     </div>
   );
   return (
