@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { ArrowUpRight, Check, Sparkles } from "lucide-react";
-import { column } from "duet-ui";
 import pkg from "duet-ui/package.json";
 import { highlight } from "sugar-high";
 import { AGENT_PROMPT } from "./agent-prompt";
@@ -30,6 +29,7 @@ export const EXAMPLES = [
   { name: "inbox", title: "Inbox", text: "Nine folders as Navigation: Tabs open, Tabs + More or Sidebar closed. Actions, and Close over a message." },
   { name: "checkout", title: "Checkout", text: "Pay as a Primary that asks to confirm. Turned sideways, Pay folds into More." },
   { name: "reader", title: "Reader", text: "Two panes with a Pane bar, and Next book as a Primary with no confirm." },
+  { name: "inspector", title: "Inspector", text: "Cards that open in an inspector beside the page, and figures in a viewer group." },
 ] as const;
 type Name = (typeof EXAMPLES)[number]["name"];
 
@@ -85,7 +85,7 @@ export function Home({ installs, sources }: { installs: InstallStats | null; sou
 
         <section id="examples" className="section wrap">
           <h2 className="h2">Examples</h2>
-          <p className="lede lede-l">Three small apps, one file each.</p>
+          <p className="lede lede-l">Four small apps, one file each.</p>
           <div className="exs">
             {EXAMPLES.map((e) => (
               <article key={e.name} className="card ex">
@@ -93,7 +93,7 @@ export function Home({ installs, sources }: { installs: InstallStats | null; sou
                 <h3 className="card-h">{e.title}</h3>
                 <p className="card-p">{e.text}</p>
                 <div className="ex-acts">
-                  <a className="pill pill-sm" href={`/examples/${e.name}`}>Open<ArrowUpRight size={14} aria-hidden /></a>
+                  <a className="pill" href={`/examples/${e.name}`}>Open<ArrowUpRight size={16} aria-hidden /></a>
                 </div>
                 <details className="ex-src">
                   <summary>Show code</summary>
@@ -102,6 +102,7 @@ export function Home({ installs, sources }: { installs: InstallStats | null; sou
               </article>
             ))}
           </div>
+          <a className="pill exs-all" href="/examples">All examples<ArrowUpRight size={16} aria-hidden /></a>
         </section>
 
         <section id="install" className="section wrap">
@@ -150,7 +151,7 @@ function Stats({ installs }: { installs: InstallStats | null }) {
 
 function Footer() {
   return (
-    <footer className="foot" style={column(980, 20)}>
+    <footer className="foot">
       <div className="foot-row">
         <p>©2026 Duet · Built by <a href="https://openmake.ai" target="_blank" rel="noreferrer" className="foot-om"><span className="foot-mark" aria-hidden />OpenMake</a></p>
         <span className="foot-brand">Duet</span>
