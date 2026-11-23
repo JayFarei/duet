@@ -1308,7 +1308,7 @@ export function Segmented<T extends string>({ value, onChange, options }: { valu
     <div role="radiogroup" style={{ display: "flex", padding: 3, gap: 2, borderRadius: 99, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line)" }}>
       {options.map(([v, label]) => (
         <button key={v} role="radio" aria-checked={value === v} onClick={() => onChange(v)}
-          style={{ ...control, height: 34, padding: "0 14px", whiteSpace: "nowrap", background: value === v ? "var(--accent)" : "transparent", color: value === v ? "var(--bg)" : "var(--ink)" }}>{label}</button>
+          style={{ ...control, height: 44, padding: "0 16px", whiteSpace: "nowrap", background: value === v ? "var(--accent)" : "transparent", color: value === v ? "var(--bg)" : "var(--ink)" }}>{label}</button>
       ))}
     </div>
   );
