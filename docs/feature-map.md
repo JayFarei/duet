@@ -2,13 +2,13 @@
 
 Where each screen and control of the site lives, and how to reach it in a test. Update the entry when you change a screen. Names are the glossary: Group, Navigation (Tabs, Tabs + More, Sidebar), More, Actions, Primary, Close, Pane bar, and the modes Strip, Column, Inline.
 
-Public pages: `/`, `/examples` (index), `/examples/inbox`, `/examples/checkout`, `/examples/reader`. The site suite is `playwright.site.config.ts` (`e2e/site/*.spec.ts`, WebKit and Chromium at 390x844 and 1440x900, port 3510); its shared names and probes are in `e2e/site/site.ts`.
+Public pages: `/`, `/examples` (index), `/examples/inbox`, `/examples/checkout`, `/examples/reader`, `/examples/inspector`. The site suite is `playwright.site.config.ts` (`e2e/site/*.spec.ts`, WebKit and Chromium at 390x844 and 1440x900, port 3510); its shared names and probes are in `e2e/site/site.ts`.
 
 ## Nav (`apps/site/app/site-nav.tsx`)
 
 | Part | Selector | What it does |
 |---|---|---|
-| Top bar | `header.nav` | Duet mark, links to How it works (`/#how`), Examples (`/#examples`) and Install (`/#install`), GitHub. Plain links off a Duo. On a Duo (`html[data-duet-mode]`) the links, GitHub and the theme toggle hide and the bar keeps the centred mark. |
+| Top bar | `header.nav` | On the home page, `/examples` and every example page. Duet mark, links to How it works (`/#how`), Examples (`/examples`) and Install (`/#install`), GitHub. Plain links off a Duo, each a 44px target; under 400px How it works reads How and under 520px the mark drops its name, so the bar keeps one line. On a Duo (`html[data-duet-mode]`) the links, GitHub and the theme toggle hide and the bar keeps the centred mark. |
 | Duo controls | `apps/site/app/site-duet.tsx`, `[data-duet-control]` | Only when `isDuo(readSignals())`. Duet with no children: places are the sections (Try it, How it works, Examples, Install), following the section under the top third and scrolling to it on select; actions are GitHub and the theme. Off a Duo it renders nothing. |
 | Theme toggle | `header.nav button[aria-label="Dark mode"]` (or `"Light mode"`) | Flips light and dark, stored in `localStorage` `duet-theme`. The simulator's screens follow. |
 
@@ -21,25 +21,27 @@ One short page, four sections in order under an intro (`main > section[id]`): th
 | Intro | `[data-testid="hero"]` | Title, lede, install line, copy prompt for coding agents, version and install stats. |
 | Simulator | `#simulator`, `[data-testid="simulator"]` | The live 3D Duo (`Duo embed src="/skeleton"`) with the skeleton site in Safari and its own controls, as on prod: turns, fold and lock, then Device, Surface, Layout and System UI, then With or Without Duet. No presets. The device box keeps one height (`min(width × 0.85, 600, 62% of the window)`), so the controls under it hold still as the posture changes. It stops drawing off screen (`window.__duoFrames` stops). Without WebGL 2 it falls back to the flat WebDuo (`[data-testid="web-duo"]`). |
 | How it works | `#how` | Four steps (`ol.how`): wrap your app, Duet measures, it draws what fits, it steps aside. Then the glossary `table.glossary`, one row per noun in glossary order. |
-| Examples | `#examples article` | One card per example, led by a looping demo (`.exd[data-demo]`, `apps/site/app/ex-demo.tsx`, keyframes in `site.css` "Example demos") of what its controls do: inbox Tabs to Tabs + More to Sidebar, checkout Pay to Confirm to Paid, reader Pane bar Full screen and Close. Still under reduced motion. Open goes to `/examples/<name>`, Show code (`details.ex-src`) opens its one source file. |
+| Examples | `#examples article` | One card per example, led by a looping demo (`.exd[data-demo]`, `apps/site/app/ex-demo.tsx`, keyframes in `site.css` "Example demos") of what its controls do: inbox Tabs to Tabs + More to Sidebar, checkout Pay to Confirm to Paid, reader Pane bar Full screen and Close, inspector a card opening beside the page. Still under reduced motion. Cards in a row share their heights (subgrid). Open goes to `/examples/<name>`, Show code (`details.ex-src`) opens its one source file. All examples (`.exs-all`) goes to `/examples`. |
 | Install | `#install` | Install line, copy prompt, the usage code, links to the API reference, How Duet decides and GitHub. |
 
 ## Examples (`apps/site/app/examples/`)
 
-`/examples` lists the three. Each example is one source file (`<name>/app.tsx`) wrapped in `block.tsx`. `?plain` renders the app alone: the stage's screens load that, and so does "Open in new tab".
+`/examples` lists the four (`examples/list.ts`). Each example is one source file (`<name>/app.tsx`) wrapped in `block.tsx`, under the site's top bar. `/examples/<name>?plain` is the app alone: `apps/site/proxy.ts` rewrites it to `apps/site/app/plain/[name]`, so the server sends only the app and the stage's screens never paint the example page first. The stage loads it, and so does "Open in new tab"; opened on its own (not in a frame) it carries a back chip (`[data-testid="plain-back"]`) to the example page. The posture and the view are in the URL (`?posture=open`, `?view=code`, replaceState).
 
 | Part | Selector | What it does |
 |---|---|---|
 | Posture | `[data-testid="posture"]` (768px and wider) | Closed, Open, Laptop, Sideways: drives the live 3D Duo running the app. Sideways is the closed device turned, a band one button long. |
+| Use the device | `.stage-chip`, `[data-stage-shield]` | The stage starts locked: a shield over it lets the wheel and touch scroll the page. Use the device (or a click on the stage) hands it the pointer; Done, Escape, or scrolling it off screen locks it again. |
 | Preview and Code | `.ex-bar [role="tablist"]` | The live stage, or the source file. Below 768px Preview plays the `example-<name>` loop instead of the stage. |
 | Open in new tab | `.ex-open` | `/examples/<name>?plain`, the app with Duet running on its own. |
-| Other examples | `.ex-more` | The other two examples' loops, linking to them. |
+| Other examples | `.ex-more` | The other examples' loops (or their card demo where no loop is recorded), linking to them. |
 
 | Example | Nouns it exercises |
 |---|---|
 | `/examples/inbox` | Navigation in all three fits (Closed gives `sidebar`, Open gives `tabs`), Actions, More, and Close over an opened message (`[data-testid="inbox-row"]`). |
 | `/examples/checkout` | Pay as a Primary with a confirm box. Sideways folds the Primary into More: the first press arms it, the second pays. Remove waits in More as a destructive Action. |
 | `/examples/reader` | Two panes with the Pane bar (Close, Full screen), and Next book as a Direct Primary. |
+| `/examples/inspector` | `useInspector`, `inspectable` and `DuetInspectButton` open a card in `DuetInspector` (a pane beside the overview, full screen where two do not fit), the controls become the card's commands; three `DuetViewer` figures in a `DuetViewerGroup`; off a Duo the commands stand in a `DuetControlColumn`. `paneGlyph` draws the place icon. The same app is the dev-only `/lab/inspector` the Duo e2e drives; in production that route redirects here. |
 
 ## Recorder mode (`/duo3d?clip=<name>`)
 

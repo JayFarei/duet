@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// The card inspector and the viewer group on the lab page (apps/site/app/lab/inspector): useInspector, DuetInspector,
+// The card inspector and the viewer group on the lab page (apps/site/app/lab/inspector, the app of apps/site/app/examples/inspector): useInspector, DuetInspector,
 // DuetControlColumn, DuetInspectButton, inspectable, DuetViewer. Desktop Safari is off a Duo, so the commands are in
 // the inspector's own glass column and two panes fit from 1050px.
 const WIDE = { width: 1440, height: 900 };

@@ -15,9 +15,9 @@ export const CLIPS = [
   "mode-strip", "mode-column", "mode-inline", "example-inbox", "example-checkout", "example-reader",
   "app-regtail", "app-dashboard", "app-wealth",
 ] as const;
-export const EXAMPLES = ["/examples/inbox", "/examples/checkout", "/examples/reader"] as const;
+export const EXAMPLES = ["/examples/inbox", "/examples/checkout", "/examples/reader", "/examples/inspector"] as const;
 /** Every public page of the site. */
-export const PAGES = ["/", ...EXAMPLES] as const;
+export const PAGES = ["/", "/examples", ...EXAMPLES] as const;
 /** Routes the Duo e2e harness and tools use: kept, never linked from the site. */
 export const HARNESS = ["/lab", "/mockup", "/workbench", "/scroll", "/probe", "/column", "/panes", "/book", "/sheet"] as const;
 /** Routes that are gone. */
