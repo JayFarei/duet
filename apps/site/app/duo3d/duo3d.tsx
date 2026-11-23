@@ -155,6 +155,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
     const tick = () => { if (drew) { w.__duoFrames!++; drew = false; } raf = requestAnimationFrame(tick); };
     raf = requestAnimationFrame(tick);
     const hook = () => {
+      noZoom(duo.current?.contentWindow);
       const g = duo.current?.contentWindow as unknown as Record<string, { prototype: Record<string, unknown> } | undefined> | null;
       for (const k of ["WebGL2RenderingContext", "WebGLRenderingContext"]) {
         const p = g?.[k]?.prototype;
@@ -487,6 +488,21 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
   );
 }
 
+
+/** The device never zooms (#279): the 3D page's orbit controls dolly on the wheel and on a trackpad pinch (a wheel
+ *  with Control held), so the scene's own window catches both first and stops them reaching its canvas. A plain wheel
+ *  keeps its default, so the page still scrolls; a pinch, and Safari's gesture events, lose theirs, so the browser does
+ *  not zoom the page either. Turning and the other controls are untouched. Once per window: the frame's load runs it
+ *  again for a new document. */
+function noZoom(w: Window | null | undefined) {
+  const g = w as (Window & { __duoNoZoom?: boolean }) | null | undefined;
+  try {
+    if (!g || g.__duoNoZoom) return;
+    g.__duoNoZoom = true;
+    g.addEventListener("wheel", (e) => { e.stopImmediatePropagation(); if (e.ctrlKey) e.preventDefault(); }, { capture: true, passive: false });
+    for (const t of ["gesturestart", "gesturechange"]) g.addEventListener(t, (e) => e.preventDefault(), { capture: true, passive: false });
+  } catch { /* another origin's document: not ours to touch */ }
+}
 
 interface Opt { id: string; label: string; icon: ReactNode; on: boolean; off?: boolean; pick: () => void; hint?: string }
 interface Section { key: string; title: string; one?: boolean; slots?: number; opts: Opt[] }
