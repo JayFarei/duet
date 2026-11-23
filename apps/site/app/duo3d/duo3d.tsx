@@ -40,6 +40,10 @@ type Posture = "closed" | "open" | "tent" | "laptop";
 const glyph = (d: ReactNode) => () => (
   <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
 );
+// Embedded: under this width the controls are a list of rows; the gap between the device and them; the window's
+// room above the stage for the line that introduces it (the home's "Try it", an example's toolbar) and a margin below.
+const LIST_W = 700, STAGE_GAP = 14, STAGE_ABOVE = 96, STAGE_MARGIN = 16;
+
 const POSTURES: [Posture, string, () => ReactNode][] = [
   ["closed", "Closed", glyph(<><path d="M7 3h7a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><circle cx="15.5" cy="6.5" r="0.9" fill="currentColor" /></>)],
   ["open", "Open", glyph(<><rect x="2.5" y="5" width="19" height="14" rx="3.5" /><path d="M12 5v14" strokeDasharray="1.5 2" /><circle cx="18.5" cy="8" r="0.9" fill="currentColor" /></>)],
@@ -73,7 +77,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
   const [duet, setDuet] = useState(true);
   const [more, setMore] = useState(false);
   const [manual, setManual] = useState(live), [box, setBox] = useState({ w: 0, h: 0 });
-  const stage = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null), below = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
   // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
@@ -315,11 +319,21 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
   useEffect(() => {
     if (!embed) return;
     const el = stage.current!;
-    const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, Math.min(el.clientWidth * 0.85, 600, innerHeight * 0.62)) });
+    // The device's box fits the window together with what sits under it, so scrolled into view nothing runs past the
+    // bottom: the whole of the controls where they are one compact block, the first row (turns and fold) where they
+    // are a long list on a narrow screen, which never fits anyway.
+    const fit = () => {
+      const b = below.current, first = b?.firstElementChild as HTMLElement | null;
+      const under = b ? (el.clientWidth < LIST_W && first ? first.offsetHeight : b.offsetHeight) + STAGE_GAP : 0;
+      const room = document.documentElement.clientHeight - under - STAGE_ABOVE - STAGE_MARGIN;
+      setBox({ w: el.clientWidth, h: Math.round(Math.max(200, Math.min(el.clientWidth * 0.85, 600, room))) });
+    };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
-    return () => { ro.disconnect(); };
+    if (below.current) ro.observe(below.current);
+    addEventListener("resize", fit);
+    return () => { ro.disconnect(); removeEventListener("resize", fit); };
   }, [embed]);
 
 
@@ -365,7 +379,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
     <Square42 key={by} label={label} onClick={() => go(rotate(s, by), "flat")}><Icon size={18} /></Square42>
   ));
 
-  const list = (embed ? box.w : width) < 700;
+  const list = (embed ? box.w : width) < LIST_W;
   // The page's own buttons float in the device's corner, so the card opens on the device.
   const corner = (
     <div style={{ position: "absolute", top: list ? 12 : 16, right: list ? 12 : 16, zIndex: 5, display: "flex", gap: 6 }}>
@@ -427,7 +441,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
 
   // On the landing page: the device, its controls under it.
   if (embed) return (
-    <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
+    <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: STAGE_GAP, width: "100%" }}>
       {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
           document gets an opaque white backdrop instead of showing the page through. */}
       {/* Locked, a shield lies over the device: WebKit still hands a wheel over an iframe to the iframe even with
@@ -437,11 +451,12 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
         {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
           style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
         {!manual && <div data-stage-shield onClick={chrome ? undefined : () => setManual(true)} style={{ position: "absolute", inset: 0, cursor: chrome ? undefined : "pointer" }} />}
-        {!chrome && (manual
-          ? <button type="button" className="stage-chip" onClick={lock} title="Done, the page scrolls over the device again (Esc)"><Lock size={16} aria-hidden />Done</button>
-          : <button type="button" className="stage-chip" onClick={() => setManual(true)}><Hand size={16} aria-hidden />Use the device</button>)}
       </div>
-      {chrome && <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
+      {/* Under the device, not over it: the chip would cover the bottom bezel. */}
+      {!chrome && <div ref={below} className="stage-under">{manual
+        ? <button type="button" className="stage-chip" onClick={lock} title="Done, the page scrolls over the device again (Esc)"><Lock size={16} aria-hidden />Done</button>
+        : <button type="button" className="stage-chip" onClick={() => setManual(true)}><Hand size={16} aria-hidden />Use the device</button>}</div>}
+      {chrome && <div ref={below} style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
         <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>}
     </div>
   );
