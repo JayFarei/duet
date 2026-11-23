@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { PanesDemo } from "./panes-demo";
 
-export const metadata: Metadata = { title: "Panes" };
+export const metadata: Metadata = { title: "Panes", robots: { index: false } };
 
 // A path of screens (mailboxes, inbox, message, attachment) on <DuetPanes>: one pane folded, two unfolded.
 export default function Page() {

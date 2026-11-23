@@ -8,7 +8,7 @@ import { Workbench, type Data } from "./workbench";
 // The system journeys workbench (dev only): every placement a Safari window can land in on the Duo, drawn on the
 // web Duo, with what the e2e harness saw there. tools/e2e/workbench.py writes the data after each run.
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Workbench" };
+export const metadata: Metadata = { title: "Workbench", robots: { index: false } };
 
 export default function Page() {
   if (!enabled()) notFound();

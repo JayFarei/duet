@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Mockup } from "./mockup";
 
-export const metadata: Metadata = { title: "Mockup" };
+export const metadata: Metadata = { title: "Mockup", robots: { index: false } };
 
 // The open Duo in split view, for trying Duet's split-view behaviour on a desktop browser.
 //   /mockup                       open Duo, split view, Duet running in the Safari pane
