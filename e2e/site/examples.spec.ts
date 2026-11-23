@@ -13,9 +13,12 @@ async function posture(page: Page, name: "Closed" | "Open" | "Laptop" | "Sideway
 }
 
 /** The live stage's Duet frame (the first screen running Duet), or the page itself on a bare route. The stage starts
- *  locked so the page scrolls over it: "Use the device" hands it the pointer first. */
+ *  locked so the page scrolls over it: "Use the device" hands it the pointer first. With the toolbar at the top of
+ *  the window the device and the chip under it both show; clicking the chip from further up would scroll it to the
+ *  bottom edge and the device's top out of view, where a tap into its screens cannot scroll to. */
 async function duet(page: Page) {
   const use = page.getByRole("button", { name: "Use the device" });
+  await page.locator(".ex-bar").first().evaluate((e) => e.scrollIntoView({ block: "start" })).catch(() => {});
   if (await use.isVisible()) await use.click();
   await expect.poll(async () => (await duetFrames(page)).length, { message: "Duet runs", timeout: 45_000 }).toBeGreaterThan(0);
   return (await duetFrames(page))[0];
