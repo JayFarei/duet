@@ -53,9 +53,31 @@ test("an example shows its source", async ({ page }) => {
 test("each example has a looping demo of what its controls do", async ({ page }) => {
   await page.goto("/");
   const demos = page.locator("#examples .exd");
-  await expect(demos).toHaveCount(3);
-  expect(await demos.evaluateAll((d) => d.map((e) => e.getAttribute("data-demo")))).toEqual(["inbox", "checkout", "reader"]);
+  await expect(demos).toHaveCount(4);
+  expect(await demos.evaluateAll((d) => d.map((e) => e.getAttribute("data-demo")))).toEqual(["inbox", "checkout", "reader", "inspector"]);
   expect(await demos.first().evaluate((e) => e.getAnimations({ subtree: true }).length)).toBeGreaterThan(0);
+});
+
+test("example cards in a row share one height, and All examples links the index", async ({ page }) => {
+  await page.goto("/");
+  const rows = await page.locator("#examples article").evaluateAll((a) => {
+    const by = new Map<number, number[]>();
+    for (const e of a) { const r = e.getBoundingClientRect(); by.set(Math.round(r.top), [...(by.get(Math.round(r.top)) ?? []), Math.round(r.height)]); }
+    return [...by.values()];
+  });
+  for (const hs of rows) expect(new Set(hs).size, `heights ${hs}`).toBe(1);
+  await expect(page.locator('#examples a[href="/examples"]')).toBeVisible();
+});
+
+test("the top bar holds one line and every target on the page is 44px tall", async ({ page }) => {
+  await page.goto("/");
+  const nav = await page.locator("header.nav").boundingBox();
+  expect(nav!.height, "one line").toBeLessThanOrEqual(60);
+  const small = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("header.nav a, header.nav button, main a, main button, main summary, footer a")]
+    .filter((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden"; })
+    .filter((e) => e.closest("[aria-hidden]") === null && e.getBoundingClientRect().height < 43.5)
+    .map((e) => `${e.tagName} ${(e.textContent || e.getAttribute("aria-label") || "").trim().slice(0, 30)} ${Math.round(e.getBoundingClientRect().height)}`));
+  expect(small).toEqual([]);
 });
 
 test("off a Duo the top bar keeps its links and Duet draws nothing", async ({ page }) => {

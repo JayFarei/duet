@@ -12,8 +12,14 @@ async function posture(page: Page, name: "Closed" | "Open" | "Laptop" | "Sideway
   await page.waitForTimeout(1500);
 }
 
-/** The live stage's Duet frame (the first screen running Duet), or the page itself on a bare route. */
+/** The live stage's Duet frame (the first screen running Duet), or the page itself on a bare route. The stage starts
+ *  locked so the page scrolls over it: "Use the device" hands it the pointer first. With the toolbar at the top of
+ *  the window the device and the chip under it both show; clicking the chip from further up would scroll it to the
+ *  bottom edge and the device's top out of view, where a tap into its screens cannot scroll to. */
 async function duet(page: Page) {
+  const use = page.getByRole("button", { name: "Use the device" });
+  await page.locator(".ex-bar").first().evaluate((e) => e.scrollIntoView({ block: "start" })).catch(() => {});
+  if (await use.isVisible()) await use.click();
   await expect.poll(async () => (await duetFrames(page)).length, { message: "Duet runs", timeout: 45_000 }).toBeGreaterThan(0);
   return (await duetFrames(page))[0];
 }
@@ -81,12 +87,96 @@ test.describe("Reader", () => {
   });
 });
 
-for (const name of ["inbox", "checkout", "reader"]) {
-  test(`Open in new tab runs Duet on /examples/${name}`, async ({ page }) => {
+for (const name of ["inbox", "checkout", "reader", "inspector"]) {
+  test(`Open in new tab runs Duet on /examples/${name}, with a way back`, async ({ page }) => {
     await page.goto(`/examples/${name}`);
     const href = await page.getByRole("link", { name: /open in new tab|^open$/i }).first().getAttribute("href");
     expect(href).toMatch(new RegExp(`^/examples/${name}\\?plain`));
     await page.goto(href!);
     await expect(page.locator("nav.duet:not(.duet-sidebar) .duet-group").first()).toBeVisible();
+    const back = page.getByTestId("plain-back");
+    await expect(back).toHaveAttribute("href", `/examples/${name}`);
+    await back.click();
+    await expect(page).toHaveURL(new RegExp(`/examples/${name}$`));
+  });
+
+  // The stage's screens load ?plain: the server must send the app alone, or they paint the example page first.
+  test(`/examples/${name}?plain is the app alone from the first byte`, async ({ request }) => {
+    const html = await (await request.get(`/examples/${name}?plain`)).text();
+    expect(html).not.toContain("ex-page");
+    expect(html).not.toContain("ex-seg");
+    expect(html).not.toContain('class="nav"');
+  });
+
+  // Behind a TLS-terminating proxy (tailscale serve, a load balancer) the request says https while the server listens
+  // on plain http: ?plain must stay an internal rewrite, not a fetch from itself over TLS (#279: every device frame
+  // on the tailnet preview read "Internal Server Error").
+  test(`/examples/${name}?plain serves the app behind a TLS proxy`, async ({ request }) => {
+    for (const host of ["localhost:3510", "127.0.0.1:3510", "preview.example.ts.net"]) {
+      const res = await request.get(`/examples/${name}?plain`, { headers: { "x-forwarded-proto": "https", "x-forwarded-host": host, host } });
+      const html = await res.text();
+      expect(res.status(), `${host}: ${html.slice(0, 200)}`).toBe(200);
+      expect(html).not.toContain("Internal Server Error");
+      expect(html).not.toContain("ex-page");
+    }
+    // And the example page itself stays the example page.
+    const page = await (await request.get(`/examples/${name}`, { headers: { "x-forwarded-proto": "https" } })).text();
+    expect(page).toContain("ex-page");
   });
 }
+
+test.describe("behind a TLS proxy", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 768, "at 390 the block shows its recorded loop, not the stage");
+  test.use({ extraHTTPHeaders: { "x-forwarded-proto": "https" } });
+
+  test("the device frames run the example, not an error", async ({ page }) => {
+    await page.goto("/examples/inbox");
+    await expect.poll(async () => (await duetFrames(page)).length, { message: "Duet runs in a device frame", timeout: 45_000 }).toBeGreaterThan(0);
+    for (const f of page.frames()) {
+      const text = await f.locator("body").innerText({ timeout: 2000 }).catch(() => "");
+      expect(text, `frame ${f.url()}`).not.toContain("Internal Server Error");
+    }
+  });
+});
+
+test.describe("the stage lets the page scroll", () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 768, "at 390 the block shows its recorded loop, not the stage");
+
+  test("the wheel over the device scrolls the page until Use the device, Escape locks it again", async ({ page }) => {
+    await page.goto("/examples/inbox");
+    const stage = page.locator(".ex-frame");
+    await stage.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(1500);
+    const box = (await stage.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 200));
+    const y0 = await page.evaluate(() => scrollY);
+    await page.mouse.wheel(0, 300);
+    await expect.poll(() => page.evaluate(() => scrollY), { message: "the page scrolls" }).toBeGreaterThan(y0 + 100);
+    await page.getByRole("button", { name: "Use the device" }).click();
+    await expect(page.getByRole("button", { name: "Done" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", { name: "Use the device" })).toBeVisible();
+  });
+});
+
+test("the posture and the view are in the URL", async ({ page }) => {
+  await page.goto("/examples/checkout?view=code");
+  await expect(page.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".ex-code")).toBeVisible();
+  await page.getByRole("tab", { name: "Preview" }).click();
+  await expect(page).toHaveURL(/\/examples\/checkout$/);
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
+    await page.getByTestId("posture").getByRole("button", { name: "Open", exact: true }).click();
+    await expect(page).toHaveURL(/\?posture=open$/);
+    await page.reload();
+    await expect(page.getByTestId("posture").getByRole("button", { name: "Open", exact: true })).toHaveAttribute("aria-pressed", "true");
+  }
+});
+
+test("example pages carry the site's top bar", async ({ page }) => {
+  for (const path of ["/examples", "/examples/inspector"]) {
+    await page.goto(path);
+    await expect(page.locator("header.nav")).toBeVisible();
+    await expect(page.locator('header.nav a[href="/"]')).toBeVisible();
+  }
+});

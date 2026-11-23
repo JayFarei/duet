@@ -11,6 +11,17 @@ const config: NextConfig = {
   // there and the page never hydrates.
   allowedDevOrigins: ["**.ts.net", ...(process.env.DUET_DEV_ORIGIN ? [process.env.DUET_DEV_ORIGIN] : [])],
   devIndicators: false, // the badge would sit on the control strip in captures
+  // /examples/<name>?plain is the app alone (app/plain): proxy.ts marks such a request with x-duet-plain, since a
+  // query condition here cannot match the empty `?plain`. Before the filesystem, so it wins over the example page.
+  rewrites: async () => ({
+    beforeFiles: [{
+      source: "/examples/:name(inbox|checkout|reader|inspector)",
+      has: [{ type: "header", key: "x-duet-plain", value: "1" }],
+      destination: "/plain/:name",
+    }],
+    afterFiles: [],
+    fallback: [],
+  }),
 };
 
 export default config;

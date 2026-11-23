@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Keyboard, LayoutGrid, Lock, LockOpen, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square, } from "lucide-react";
+import { Activity, ArrowLeftRight, ArrowRight, Columns2, Compass, Ellipsis, Globe, Hand, Keyboard, LayoutGrid, Lock, LockOpen, MessageSquareShare, MessageSquareText, PanelBottom, RotateCcw, RotateCw, Rotate3d, Square, } from "lucide-react";
 import { ONLY_OPEN, Segmented, TOUR, control, fit, group, hardware, rotate, type State, type Turn } from "./reexports";
 import { DUO_APP, channel, type Highlight, type Sync } from "./shared";
 import { CLIPS, type ClipPosture, type Press } from "./clips";
@@ -40,6 +40,10 @@ type Posture = "closed" | "open" | "tent" | "laptop";
 const glyph = (d: ReactNode) => () => (
   <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
 );
+// Embedded: under this width the controls are a list of rows; the gap between the device and them; the window's
+// room above the stage for the line that introduces it (the home's "Try it", an example's toolbar) and a margin below.
+const LIST_W = 700, STAGE_GAP = 14, STAGE_ABOVE = 96, STAGE_MARGIN = 16;
+
 const POSTURES: [Posture, string, () => ReactNode][] = [
   ["closed", "Closed", glyph(<><path d="M7 3h7a5 5 0 0 1 5 5v8a5 5 0 0 1-5 5H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" /><circle cx="15.5" cy="6.5" r="0.9" fill="currentColor" /></>)],
   ["open", "Open", glyph(<><rect x="2.5" y="5" width="19" height="14" rx="3.5" /><path d="M12 5v14" strokeDasharray="1.5 2" /><circle cx="18.5" cy="8" r="0.9" fill="currentColor" /></>)],
@@ -73,7 +77,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
   const [duet, setDuet] = useState(true);
   const [more, setMore] = useState(false);
   const [manual, setManual] = useState(live), [box, setBox] = useState({ w: 0, h: 0 });
-  const stage = useRef<HTMLDivElement>(null);
+  const stage = useRef<HTMLDivElement>(null), below = useRef<HTMLDivElement>(null);
   const width = useSyncExternalStore((f) => { addEventListener("resize", f); return () => removeEventListener("resize", f); }, () => innerWidth, () => 1440);
   // The page in Safari: the skeleton site, or any URL through /duo3d/web, which adds Duet to it.
   const [page, setPage] = useState("");
@@ -101,6 +105,30 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
   const front = () => duo.current?.contentWindow?.postMessage({ reset: true }, "*");
   // The landing page's stage locks again the way it started: the device in front, and a swipe over it scrolls.
   const lock = () => { front(); setManual(false); };
+  const lockRef = useRef(lock);
+  lockRef.current = lock;
+  // Escape locks it again, from the page or from any of the device's own pages (same origin, nested), unless what has
+  // focus took the key first (a sheet, the inspector, an open dialog).
+  useEffect(() => {
+    if (!embed || !manual) return;
+    const on: Window[] = [];
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const doc = (e.target as Node | null)?.ownerDocument ?? document;
+      if (doc.querySelector("dialog[open]")) return;
+      lockRef.current();
+    };
+    const attach = (w: Window) => {
+      try {
+        if (!on.includes(w)) { w.addEventListener("keydown", key); on.push(w); }
+        for (let i = 0; i < w.frames.length; i++) attach(w.frames[i]);
+      } catch { /* another origin */ }
+    };
+    attach(window);
+    // The device's pages load, and reload, after it unlocks.
+    const id = setInterval(() => attach(window), 1000);
+    return () => { clearInterval(id); for (const w of on) try { w.removeEventListener("keydown", key); } catch { /* gone */ } };
+  }, [embed, manual]);
 
   // The stage draws only while it is on screen and the tab is visible: duo stops its render loop (`paused`).
   // window.__duoFrames counts the frames duo draws (its GL draw calls, one tick per animation frame), for the tests.
@@ -117,6 +145,8 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
     return () => { io.disconnect(); document.removeEventListener("visibilitychange", update); };
   }, [!!url]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { duo.current?.contentWindow?.postMessage({ paused: !shown }, "*"); }, [shown]);
+  // Scrolled off screen, an unlocked stage locks again, so coming back to it the page still scrolls over it.
+  useEffect(() => { if (embed && !live && !shown) setManual(false); }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const w = window as unknown as { __duoFrames?: number; __duoYaw?: number };
     w.__duoFrames ??= 0;
@@ -125,6 +155,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
     const tick = () => { if (drew) { w.__duoFrames!++; drew = false; } raf = requestAnimationFrame(tick); };
     raf = requestAnimationFrame(tick);
     const hook = () => {
+      noZoom(duo.current?.contentWindow);
       const g = duo.current?.contentWindow as unknown as Record<string, { prototype: Record<string, unknown> } | undefined> | null;
       for (const k of ["WebGL2RenderingContext", "WebGLRenderingContext"]) {
         const p = g?.[k]?.prototype;
@@ -289,11 +320,21 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
   useEffect(() => {
     if (!embed) return;
     const el = stage.current!;
-    const fit = () => setBox({ w: el.clientWidth, h: Math.max(200, Math.min(el.clientWidth * 0.85, 600, innerHeight * 0.62)) });
+    // The device's box fits the window together with what sits under it, so scrolled into view nothing runs past the
+    // bottom: the whole of the controls where they are one compact block, the first row (turns and fold) where they
+    // are a long list on a narrow screen, which never fits anyway.
+    const fit = () => {
+      const b = below.current, first = b?.firstElementChild as HTMLElement | null;
+      const under = b ? (el.clientWidth < LIST_W && first ? first.offsetHeight : b.offsetHeight) + STAGE_GAP : 0;
+      const room = document.documentElement.clientHeight - under - STAGE_ABOVE - STAGE_MARGIN;
+      setBox({ w: el.clientWidth, h: Math.round(Math.max(200, Math.min(el.clientWidth * 0.85, 600, room))) });
+    };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
-    return () => { ro.disconnect(); };
+    if (below.current) ro.observe(below.current);
+    addEventListener("resize", fit);
+    return () => { ro.disconnect(); removeEventListener("resize", fit); };
   }, [embed]);
 
 
@@ -334,19 +375,19 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
       { id: "forward", label: "Navigation", icon: <ArrowLeftRight size={18} />, on: !!s.forward, off: !safari, pick: () => go({ forward: !s.forward }), hint: "Forward history (Safari)" },
     ] },
   ];
-  const slider = <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ flex: 1, minWidth: 40, accentColor: "var(--accent)" }} />;
+  const slider = <input type="range" aria-label="Fold" title="Fold" min={0} max={1} step={0.001} value={deg / 180} onChange={(e) => scrub(+e.currentTarget.value)} style={{ flex: 1, minWidth: 40, height: 44, margin: 0, accentColor: "var(--accent)" }} />;
   const turns = ([[-90, "Rotate left", RotateCcw], [90, "Rotate right", RotateCw]] as const).map(([by, label, Icon]) => (
     <Square42 key={by} label={label} onClick={() => go(rotate(s, by), "flat")}><Icon size={18} /></Square42>
   ));
 
-  const list = (embed ? box.w : width) < 700;
+  const list = (embed ? box.w : width) < LIST_W;
   // The page's own buttons float in the device's corner, so the card opens on the device.
   const corner = (
     <div style={{ position: "absolute", top: list ? 12 : 16, right: list ? 12 : 16, zIndex: 5, display: "flex", gap: 6 }}>
       <div style={{ position: "relative" }}>
         <Square42 label="More" on={more} onClick={() => setMore((m) => !m)}><Ellipsis size={18} /></Square42>
         {more && (
-          <div style={{ position: "absolute", right: 0, top: 48, zIndex: 5, width: list ? "calc(100vw - 64px)" : 400, maxWidth: 400, padding: 14, borderRadius: 18, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line), 0 18px 50px rgb(0 0 0 / 0.35)", display: "grid", gap: 12, justifyItems: "stretch" }}>
+          <div style={{ position: "absolute", right: 0, top: 50, zIndex: 5, width: list ? "calc(100vw - 64px)" : 400, maxWidth: 400, padding: 14, borderRadius: 18, background: "var(--card)", boxShadow: "0 0 0 0.5px var(--line), 0 18px 50px rgb(0 0 0 / 0.35)", display: "grid", gap: 12, justifyItems: "stretch" }}>
             {/* Before and after: the same site as a plain mobile site, then with Duet. */}
             <form onSubmit={(e) => { e.preventDefault(); setPage(String(new FormData(e.currentTarget).get("url") ?? "").trim()); }} style={{ ...group, alignItems: "center", gap: 6, padding: "0 6px 0 14px" }}>
               <Globe size={16} style={{ color: "var(--dim)", flexShrink: 0 }} />
@@ -366,7 +407,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
       {sections.map((x, i) => (
         <div key={x.key} role="toolbar" aria-label={x.title} style={{ display: "grid", gap: 8, alignContent: "start", padding: "0 10px", borderLeft: i ? "0.5px solid var(--line)" : undefined }}>
           <div style={caption}>{x.one ? x.opts.find((o) => o.on)?.label : x.title}</div>
-          <div style={{ display: "flex", gap: 4, minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
+          <div style={{ display: "flex", gap: 4, minWidth: (x.slots ?? x.opts.length) * 48 - 4 }}>
             {x.opts.map((o) => <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
           </div>
         </div>
@@ -391,7 +432,7 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
             <div style={caption}>{x.title}</div>
             <div style={{ font: "600 14px/1.3 -apple-system, system-ui", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{x.one ? x.opts.find((o) => o.on)?.label : x.opts.filter((o) => o.on).map((o) => o.label).join(", ") || "None"}</div>
           </div>
-          <div style={{ display: "flex", gap: 4, marginLeft: "auto", justifyContent: "flex-end", minWidth: (x.slots ?? x.opts.length) * 46 - 4 }}>
+          <div style={{ display: "flex", gap: 4, marginLeft: "auto", justifyContent: "flex-end", minWidth: (x.slots ?? x.opts.length) * 48 - 4 }}>
             {x.opts.map((o) => <Square42 key={o.id} label={o.hint ?? o.label} on={o.on} off={o.off} onClick={o.pick}>{o.icon}</Square42>)}
           </div>
         </div>
@@ -401,12 +442,22 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
 
   // On the landing page: the device, its controls under it.
   if (embed) return (
-    <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, width: "100%" }}>
+    <div ref={stage} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: STAGE_GAP, width: "100%" }}>
       {/* The 3D page declares no color-scheme, so its iframe stays light: on the dark theme a dark iframe over a light
           document gets an opaque white backdrop instead of showing the page through. */}
-      {url &&<iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
-        style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
-      {chrome && <div style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
+      {/* Locked, a shield lies over the device: WebKit still hands a wheel over an iframe to the iframe even with
+          pointer-events: none, which traps the page's scroll. Without the landing page's controls (an example block),
+          a tap on the device, or Use the device, unlocks it; Done or Escape locks it again. */}
+      <div style={{ position: "relative", width: "100%" }}>
+        {url && <iframe ref={duo} src={url} title="iPhone Duo, 3D" tabIndex={manual ? undefined : -1} onLoad={send}
+          style={{ width: "100%", height: box.h || 260, border: 0, display: "block", background: "transparent", colorScheme: "light", pointerEvents: manual ? undefined : "none" }} />}
+        {!manual && <div data-stage-shield onClick={chrome ? undefined : () => setManual(true)} style={{ position: "absolute", inset: 0, cursor: chrome ? undefined : "pointer" }} />}
+      </div>
+      {/* Under the device, not over it: the chip would cover the bottom bezel. */}
+      {!chrome && <div ref={below} className="stage-under">{manual
+        ? <button type="button" className="stage-chip" onClick={lock} title="Done, the page scrolls over the device again (Esc)"><Lock size={16} aria-hidden />Done</button>
+        : <button type="button" className="stage-chip" onClick={() => setManual(true)}><Hand size={16} aria-hidden />Use the device</button>}</div>}
+      {chrome && <div ref={below} style={{ width: "100%", display: "flex", flexDirection: "column" }}>{handle}{panel}{rows}<div style={{ alignSelf: "center", display: "flex", alignItems: "center", gap: 8 }}>
         <Segmented value={duet ? "on" : "off"} onChange={(v) => setDuet(v === "on")} options={[["off", "Without Duet"], ["on", "With Duet"]]} /></div></div>}
     </div>
   );
@@ -438,6 +489,21 @@ export function Duo3D({ embed = false, src: home = "/skeleton", chrome = true, p
 }
 
 
+/** The device never zooms (#279): the 3D page's orbit controls dolly on the wheel and on a trackpad pinch (a wheel
+ *  with Control held), so the scene's own window catches both first and stops them reaching its canvas. A plain wheel
+ *  keeps its default, so the page still scrolls; a pinch, and Safari's gesture events, lose theirs, so the browser does
+ *  not zoom the page either. Turning and the other controls are untouched. Once per window: the frame's load runs it
+ *  again for a new document. */
+function noZoom(w: Window | null | undefined) {
+  const g = w as (Window & { __duoNoZoom?: boolean }) | null | undefined;
+  try {
+    if (!g || g.__duoNoZoom) return;
+    g.__duoNoZoom = true;
+    g.addEventListener("wheel", (e) => { e.stopImmediatePropagation(); if (e.ctrlKey) e.preventDefault(); }, { capture: true, passive: false });
+    for (const t of ["gesturestart", "gesturechange"]) g.addEventListener(t, (e) => e.preventDefault(), { capture: true, passive: false });
+  } catch { /* another origin's document: not ours to touch */ }
+}
+
 interface Opt { id: string; label: string; icon: ReactNode; on: boolean; off?: boolean; pick: () => void; hint?: string }
 interface Section { key: string; title: string; one?: boolean; slots?: number; opts: Opt[] }
 
@@ -449,7 +515,7 @@ const lit = (on?: boolean): CSSProperties => on
 function Square42({ label, on, off, onClick, children }: { label: string; on?: boolean; off?: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button onClick={onClick} disabled={off} aria-label={label} title={label} aria-pressed={on}
-      style={{ ...control, width: 42, height: 42, borderRadius: 12, padding: 0, flex: "none", display: "grid", placeItems: "center", opacity: off ? 0.35 : 1, cursor: off ? "default" : "pointer", transition: "background 0.2s, box-shadow 0.2s", ...lit(on) }}>{children}</button>
+      style={{ ...control, width: 44, height: 44, borderRadius: "var(--r-sm, 12px)", padding: 0, flex: "none", display: "grid", placeItems: "center", opacity: off ? 0.35 : 1, cursor: off ? "default" : "pointer", transition: "background 0.2s, box-shadow 0.2s", ...lit(on) }}>{children}</button>
   );
 }
 
